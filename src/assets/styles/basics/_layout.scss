@@ -1,0 +1,13 @@
+.main-layout {
+  padding: 0 20px;
+
+  @include for-narrow-layout {
+    padding: 0 20px;
+  }
+  @include for-normal-layout {
+    padding: 0 40px;
+  }
+  @include for-wide-layout {
+    padding: 0 80px;
+  }
+}

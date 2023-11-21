@@ -1,0 +1,41 @@
+button {
+    border:0;
+    padding: 5px 10px;
+    margin: 5px;
+}
+
+form > * {
+    display: block;
+    // width: 200px;
+    margin: 10px 0px;
+}
+
+.btn-link {
+    border:0;
+    background-color: transparent;
+    text-decoration: underline;
+    transition: .5s;
+}
+.btn-link:hover {
+    background-color: $clr1;
+    transform: scale(1.1);
+}
+
+.img-upload-btn {
+    position: relative;
+    overflow: hidden;
+    display: inline-block;
+    cursor: pointer;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 6px 12px;
+    background-color: #f5f5f5;
+    color: #222222;
+    font-size: .875rem;
+    transition: background-color 0.2s;
+    font-family: cereal-medium;
+    &:hover {
+      background-color: #e5e5e5;
+    }
+  }
+  

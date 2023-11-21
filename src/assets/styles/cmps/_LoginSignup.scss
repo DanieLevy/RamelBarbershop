@@ -1,0 +1,186 @@
+
+.login-modal {
+  font-size: 1rem;
+  border-radius: 12px;
+  max-width: 568px;
+  width: 80%;
+  overflow: visible;
+  background-color: #fff;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+
+  z-index: 2;
+
+  .footer-btn {
+    display: flex;
+    gap: 10px;
+    margin: 16px;
+
+    .btn {
+      margin: 0;
+    }
+  }
+
+  .content {
+    cursor: pointer;
+  }
+
+  .login-modal-header {
+    font-size: 1em;
+    padding: 0 24px;
+    min-height: 64px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    font-family: cereal-bold;
+    border-bottom: 1px solid $clr2;
+    color: $clr5;
+
+    .close-btn {
+      position: absolute;
+      right: 25px;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+  }
+
+  .login-form {
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 1;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+
+    label {
+      font-family: cereal;
+      font-size: 0.875rem;
+      color: $clr4;
+      margin-bottom: 8px;
+
+      &.isBarber {
+        display: flex;
+        align-items: center;
+        gap: 10px; 
+      }
+    }
+
+    .btn-primary {
+      border: none;
+      margin: 0 16px 0 0;
+      padding: 0;
+
+      &:hover {
+        background-color: transparent;
+      }
+    }
+  }
+
+  .red-dot {
+    color: red;
+  }
+
+  .input {
+    width: 100%;
+    margin-bottom: 16px;
+    border: 1px solid #b0b0b0;
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+
+    &.input-isBarber {
+      padding: 0;
+      margin: 0;
+      width: unset;
+    }
+
+    &:focus {
+      border-color: $clr5;
+    }
+  }
+}
+
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+  background-color: #00000065;
+  // opacity: 0.5;
+}
+
+// LoginModal Divier
+.divider-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.divider-line {
+  flex-grow: 1;
+  height: 1px;
+  background-color: $clr2;
+}
+
+.divider-text {
+  font-size: 14;
+  padding: 0 10px;
+  color: $clr5;
+}
+
+.img-container {
+  h1 {
+    font-size: 1rem;
+    font-weight: 100;
+    color: $clr4;
+  }
+
+  img {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+  }
+
+}
+
+.change-img-btn {
+  font-family: cereal;
+  font-size: 0.875rem;
+  color: $clr4;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.btn {
+  font-family: cereal-medium;
+  margin-top: 16px;
+  padding: 8px 16px;
+  border-radius: 4px;
+  background-color: $clr1;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  width: 100%;
+  background-color: $clr3;
+  color: #222;
+  border: 1px solid $clr2;
+  border-radius: 4px;
+
+  &:hover {
+    color: #79bbff;
+    border-color: #c6e2ff;
+    background-color: #ecf5ff;
+    outline: 0;
+  }
+}

@@ -1,0 +1,116 @@
+.barber-index {
+    position: relative;
+    top: 80px;
+
+    & .index-header {
+
+        & .index-header-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr;
+            grid-template-areas: "title img" "title img";
+            height: 100%;
+            width: 100%;
+            padding-top: 2rem;
+
+            & .index-header-txt {
+                display: flex;
+                justify-content: space-between;
+                flex-direction: column;
+                height: 100%;
+                font-size: 1.5rem;
+
+                & .index-header-title {}
+
+                & .index-header-subtitle {}
+            }
+
+            & .index-header-img {
+                grid-area: img;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+
+                & img {
+                    object-fit: cover;
+                    width: 70%;
+                    box-shadow: 0px 0px 10px 2px rgb(169 163 151);
+                    border-radius: 50%;
+                }
+            }
+        }
+    }
+
+    & .index-body {
+        & .barbers-list {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            padding: 20px 0;
+
+            .barber-card {
+                display: flex;
+                flex-direction: row;
+                margin: 10px;
+                transition: transform 0.3s ease-in-out;
+                color: #222;
+                border-radius: 10px;
+                position: relative;
+                background-color: white;
+                box-shadow: 0px 0px 3px 1px rgb(130 130 130);
+                padding: 10px;
+                cursor: pointer;
+                width: 300px;
+                justify-content: space-between;
+                align-items: center;
+
+
+                &:hover {}
+
+                &-img {
+                    width: 60px;
+                    height: 60px;
+                    border-radius: 50%;
+
+                    img {
+                        width: 100%;
+                        height: 100%;
+                        border-radius: 50%;
+                        object-fit: cover;
+                    }
+                }
+
+                & .barber-card-content
+
+                & .barber-card-name {
+                    font-size: 1.2rem;
+                    font-weight: 600;
+                }
+
+                & .barber-card-btn {
+                    button {
+                        font-family: Rubik;
+                        background-color: $clr6;
+                        color: white;
+                        border: none;
+                        padding: 5px 10px;
+                        border-radius: 5px;
+                        font-size: 0.8rem;
+                        cursor: pointer;
+                        transition: all 0.3s;
+                        margin: 10px 0 0 0;
+
+                        &:hover {
+                            background-color: $clr6;
+                            color: white;
+                            transform: scale(1.05);
+                        }
+                    }
+
+                }
+            }
+        }
+    }
+}

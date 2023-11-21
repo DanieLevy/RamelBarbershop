@@ -1,0 +1,24 @@
+// Setup
+@import 'setup/variables.scss';
+@import 'setup/functions.scss';
+@import 'setup/mixins.scss';
+@import 'setup/typography.scss';
+
+// Basics
+@import 'basics/helpers.scss';
+@import 'basics/layout.scss';
+@import 'basics/base.scss';
+@import 'basics/links.scss';
+@import 'basics/forms.scss';
+
+// Views
+@import 'pages/BarberIndex.scss';
+
+// Components
+@import 'cmps/AppHeader.scss';
+@import 'cmps/AppFooter.scss';
+@import 'cmps/UserMsg.scss';
+@import 'cmps/App.scss';
+@import 'cmps/LoginSignup.scss';
+@import 'cmps/ImagesEditor.scss';
+@import 'cmps/DatesModal.scss';
