@@ -1,0 +1,66 @@
+.barber-profile {
+    position: relative;
+    top: 80px;
+
+    & .barber-profile-content {
+        display: flex;
+        height: 100%;
+        width: 100%;
+        padding-top: 2rem;
+
+
+        & .barber-profile-img {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+
+            img {
+                object-fit: cover;
+                width: 300px;
+                height: 300px;
+                box-shadow: 0px 0px 10px 2px rgb(169 163 151);
+                border-radius: 50%;
+            }
+        }
+
+        & .barber-profile-reserveation {
+            & .reserveation-step-1 {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                color: #222;
+
+                & .reserveation-opt {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    // gap: 10px;
+                    padding: 10px;
+                    background-color: white;
+
+                    & .title {
+                        // background-color: red;
+                        font-weight: bold;
+                    }
+
+                    & .opt-container {
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        width: 100%;
+                        gap: 10px;
+                        font-family: Rubik-Light;
+
+                        & .price {
+                            // background-color: green;
+                        }
+
+                        & .duration {
+                            // background-color: blue;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

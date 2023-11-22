@@ -1,3 +1,5 @@
+import moment from 'moment';
+
 export const utilService = {
     makeId,
     makeLorem,
@@ -6,7 +8,9 @@ export const utilService = {
     randomPastTime,
     saveToStorage,
     loadFromStorage,
-    getAssetSrc
+    getAssetSrc,
+    getDayNameInHebrew,
+    getNextWeekDates
 }
 
 function makeId(length = 6) {
@@ -69,4 +73,47 @@ function getAssetSrc(name) {
     const modules = import.meta.glob('/src/assets/*', { eager: true })
     const mod = modules[path]
     return mod.default
+}
+
+function getDayNameInHebrew(dayName) {
+    const days = {
+        'Sunday': 'ראשון',
+        'Monday': 'שני',
+        'Tuesday': 'שלישי',
+        'Wednesday': 'רביעי',
+        'Thursday': 'חמישי',
+        'Friday': 'שישי',
+        'Saturday': 'שבת',
+        'Today': 'היום',
+        'Tomorrow': 'מחר',
+        'Next Week': 'בשבוע הבא',
+        'Next Month': 'בחודש הבא',
+        'Next Year': 'בשנה הבאה',
+        'Next': 'בקרוב',
+    }
+    return days[dayName]
+
+}
+
+function getNextWeekDates() {
+    moment.locale('he'); // Set the locale globally to Hebrew
+    const today = 'היום';
+    const tomorrow = 'מחר';
+
+    const nextWeek = [
+        // include timestamp for each day
+        { dayName: today, dayNum: moment().format('DD/MM'), timestamp: moment().format('X') },
+        { dayName: tomorrow, dayNum: moment().add(1, 'days').format('DD/MM'), timestamp: moment().add(1, 'days').format('X') },
+    ];
+
+    for (let i = 2; i < 7; i++) {
+        const dayNum = moment().add(i, 'days').format('DD/MM');
+        const dayNameEng = moment().add(i, 'days').format('dddd');
+        const dayName = utilService.getDayNameInHebrew(dayNameEng);
+        const timestamp = moment().add(i, 'days').format('X');
+        const formattedDay = { dayName, dayNum, timestamp };
+        nextWeek.push(formattedDay);
+    }
+
+    return nextWeek;
 }

@@ -1,13 +1,15 @@
 import { useEffect } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import { loadUsers } from "../store/actions/user.actions"
+import { useNavigate } from "react-router"
 
 export function BarberIndex() {
     const users = useSelector((storeState) => storeState.userModule.users)
+    const navigate = useNavigate()
 
     useEffect(() => {
         loadUsers()
-    }, [users])
+    }, [])
 
     const barbers = users.filter(user => user.isBarber)
     console.log('barbers', barbers);
@@ -37,11 +39,13 @@ export function BarberIndex() {
                 <div className="barbers-list">
                     {barbers.map(barber => <div className="barber-card" key={barber._id}>
                         <div className="barber-card-content">
+                            <div className="barber-card-btn">
+                                <button
+                                    onClick={() => navigate(`/barber/${barber._id}`)}
+                                >קבע תור</button>
+                            </div>
                             <div className="barber-card-name">
                                 {barber.fullname}
-                            </div>
-                            <div className="barber-card-btn">
-                                <button>קבע תור</button>
                             </div>
                         </div>
                         <div className="barber-card-img">

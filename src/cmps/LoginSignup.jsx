@@ -48,6 +48,21 @@ export function LoginSignup(props) {
         !credentials.fullname
       )
         return console.log("All fields are required"), clearState();
+        // if isBarber checked, add reservations empty array to user, else dont add
+      if (credentials.isBarber) {
+        credentials.reservations = [
+          {
+            date: "",
+            time: "",
+            customer: {
+              fullname: "",
+              phone: "",
+              email: "",
+            },
+          }
+        ]
+      }
+
       signup(credentials);
     } else {
       if (!credentials.username || !credentials.password)

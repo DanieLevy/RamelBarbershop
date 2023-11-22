@@ -21,6 +21,7 @@
   align-items: center;
   color: #222222;
   height: 80px;
+  border-bottom: .5px solid $main;
 
   .divider {
     border-bottom-width: 1px;
@@ -44,7 +45,7 @@
     font-weight: 600;
     letter-spacing: 0.1rem;
     cursor: pointer;
-    font-family: $uniq;
+    font-family: "Rubik", sans-serif;
 
     .logo-txt {
       margin-inline-start: 5px;
@@ -96,7 +97,7 @@
 .user-modal {
   position: absolute;
   top: 32px;
-  right: -1px;
+  left: 80px;
   background-color: #fff;
   width: 240px;
   box-shadow: 0 2px 16px #0000001f;

@@ -72,7 +72,7 @@ export function AppHeader() {
       <section className={`header-container`}>
         <header className='main-header flex main-layout'>
           <Link to='/' className='logo flex'>
-            Ramel Barbershop
+            רם-אל ברברשופ
           </Link>
           <div
             className="user-nav flex"
