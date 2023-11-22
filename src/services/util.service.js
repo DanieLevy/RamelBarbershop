@@ -10,7 +10,9 @@ export const utilService = {
     loadFromStorage,
     getAssetSrc,
     getDayNameInHebrew,
-    getNextWeekDates
+    getNextWeekDates,
+    getReserveationOpt,
+    getRandomOTP
 }
 
 function makeId(length = 6) {
@@ -102,8 +104,8 @@ function getNextWeekDates() {
 
     const nextWeek = [
         // include timestamp for each day
-        { dayName: today, dayNum: moment().format('DD/MM'), timestamp: moment().format('X') },
-        { dayName: tomorrow, dayNum: moment().add(1, 'days').format('DD/MM'), timestamp: moment().add(1, 'days').format('X') },
+        { dayName: today, dayNum: moment().format('DD/MM'), dateTimestamp: +(moment().format('X')) },
+        { dayName: tomorrow, dayNum: moment().add(1, 'days').format('DD/MM'), dateTimestamp: +(moment().add(1, 'days').format('X')) }
     ];
 
     for (let i = 2; i < 7; i++) {
@@ -111,9 +113,41 @@ function getNextWeekDates() {
         const dayNameEng = moment().add(i, 'days').format('dddd');
         const dayName = utilService.getDayNameInHebrew(dayNameEng);
         const timestamp = moment().add(i, 'days').format('X');
-        const formattedDay = { dayName, dayNum, timestamp };
+        const formattedDay = { dayName, dayNum, dateTimestamp: +timestamp };
         nextWeek.push(formattedDay);
     }
 
     return nextWeek;
+}
+
+function getReserveationOpt() {
+    const ReserveationOpt =
+        [
+            {
+                title: 'Classic Haircut&Bread',
+                duration: 30,
+                price: 100
+            },
+            {
+                title: 'SKIN/RAZOR FADE',
+                duration: 30,
+                price: 80
+            },
+            {
+                title: 'Classic Bread',
+                duration: 10,
+                price: 50
+            }
+        ]
+    return ReserveationOpt
+}
+
+function getRandomOTP() {
+    // length of 4 digit code using numbers only
+    const length = 4;
+    const chars = '0123456789';
+    let result = '';
+    for (let i = length; i > 0; --i) result += chars[Math.floor(Math.random() * chars.length)];
+    console.log('OTP: ', result);
+    return result;
 }

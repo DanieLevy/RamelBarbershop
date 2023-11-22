@@ -81,3 +81,14 @@ export async function loadUser(userId) {
     console.log('Cannot load user', err)
   }
 }
+
+export async function updateUser(user) {
+  try {
+    const updatedUser = await userService.update(user)
+    store.dispatch({ type: SET_USER, user: updatedUser })
+    return updatedUser
+  } catch (err) {
+    showErrorMsg('Cannot update user')
+    console.log('Cannot update user', err)
+  }
+}

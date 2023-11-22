@@ -37,15 +37,11 @@ function remove(userId) {
   // return httpService.delete(`user/${userId}`)
 }
 
-async function update({ _id, score }) {
-  const user = await storageService.get('user', _id)
-  // user.score = score
-  await storageService.put('user', user)
-
-  // const user = await httpService.put(`user/${_id}`, {_id, score})
-  // // Handle case in which admin updates other user's details
+async function update(user) {
+  user = await storageService.put('user', user)
+  // user = await httpService.put(`user/${user._id}`, user)
+  // Handle case in which admin updates other user's details
   if (getLoggedinUser()._id === user._id) saveLocalUser(user)
-  return user
 }
 
 async function login(userCred) {
@@ -67,8 +63,11 @@ async function signup(userCred) {
     console.log('user name already exist');
     return
   } else {
+    // else do nothing
+  userCred.isBarber ? userCred.workDays = getDefultWorkDays() : console.log('not barber');
     const user = await storageService.post('user', userCred)
     //   const user = await httpService.post('auth/signup', userCred)
+    console.log('user', user);
     return saveLocalUser(user)
   }
 }
@@ -112,6 +111,39 @@ function getEmptyCredentials() {
   }
 }
 
+function getDefultWorkDays() {
+  const workDays = {
+    monday: {
+      isWorking: false,
+      workHours: null,
+    },
+    tuesday: {
+      isWorking: true,
+      workHours: { start: '09:00', end: '20:00' },
+    },
+    wednesday: {
+      isWorking: true,
+      workHours: { start: '09:00', end: '20:00' },
+    },
+    thursday: {
+      isWorking: true,
+      workHours: { start: '09:00', end: '20:00' },
+    },
+    friday: {
+      isWorking: true,
+      workHours: { start: '09:00', end: '14:00' },
+    },
+    saturday: {
+      isWorking: false,
+      workHours: null,
+    },
+    sunday: {
+      isWorking: true,
+      workHours: { start: '09:00', end: '20:00' },
+    },
+  }
+  return workDays
+}
 
 async function demoUser() {
   return {
