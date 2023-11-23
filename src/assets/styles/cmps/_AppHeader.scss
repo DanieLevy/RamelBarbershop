@@ -2,9 +2,10 @@
   position: fixed;
   top: 0;
   width: 100%;
-  background-color: $header-background;
+  // background-color: $header-background;
+  background-color: #0000009c;
   color: $header-text;
-  box-shadow: $header-shadow;
+  // box-shadow: $header-shadow;
   backdrop-filter: blur(10px); // Apply a subtle blur effect
   z-index: 1000; // Adjust z-index as needed
   transition: background-color 0.3s ease-in-out;
@@ -12,146 +13,149 @@
   &.scrolled {
     background-color: rgba(0, 0, 0, 0.65);
   }
-}
 
-.main-header {
-  position: relative;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  color: #222222;
-  height: 80px;
-  border-bottom: .5px solid $main;
-
-  .divider {
-    border-bottom-width: 1px;
-    border-bottom-style: solid;
-    border-bottom-color: #ddd;
-    margin: 5px 0;
-  }
-
-  img {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    object-fit: cover;
-  }
-
-  .logo {
+  .main-header {
+    // position: relative;
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    color: $off-white;
-    font-size: 2rem;
-    font-weight: 600;
-    letter-spacing: 0.1rem;
-    cursor: pointer;
-    font-family: "Rubik", sans-serif;
-
-    .logo-txt {
-      margin-inline-start: 5px;
-    }
-  }
-
-  .nav-text {
-    font-size: 0.875rem;
-    font-weight: 600;
-    position: absolute;
-    right: 100px;
-    min-width: fit-content;
-    white-space: nowrap;
-    cursor: pointer;
-    text-decoration: none;
     color: #222222;
+    height: 100px;
     transition: all 0.3s;
 
-    &:hover {
-      font-size: 0.9rem;
-      // transform: translateY(0);
+    &.close {
+      border-bottom: none;
+      height: 80px;
+      // border-bottom: .5px solid #ddd; 
+      transition: all 0.3s;
     }
-  }
-
-  .user-nav {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    border-radius: 8px;
-    border: 1.5px solid $off-white;
-    cursor: pointer;
-    position: relative;
-    padding: 5px 5px 5px 12px;
-    color: $off-white;
-    transition: all 0.3s;
-
-    &:hover {
-      box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1);
+  
+    .divider {
+      border-bottom-width: 1px;
+      border-bottom-style: solid;
+      border-bottom-color: #ddd;
+      margin: 5px 0;
     }
 
-    .user-icon {
-      height: 26px;
-      width: 26px;
-      border-radius: 50%;
-    }
-  }
-}
+    & .nav-container {
+      display: flex;
+      width: 100%;
+      justify-content: space-evenly;
+      align-items: center;
+      height: 100%;
 
-.user-modal {
-  position: absolute;
-  top: 32px;
-  left: 80px;
-  background-color: #fff;
-  width: 240px;
-  box-shadow: 0 2px 16px #0000001f;
-  border-radius: 12px;
-  padding: 8px 0;
-  margin-top: 34px;
-  font-size: 14px;
-  z-index: 1;
-
-  .back-drop {
-    position: fixed;
-    z-index: -1;
-    width: 100vw;
-    height: 100vh;
-    top: 0;
-    left: 0;
-  }
-
-  ul :nth-child(2) {
-    // margin-block-start: 15px;
-  }
-
-  ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-
-    li {
-      padding: 8px 16px;
+      & .about, .contact, .location, .reservation {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      text-decoration: none;
+      color: #FFFFFF;
+      border-bottom: 1px solid transparent;
+      width: 100px;
       cursor: pointer;
+
+      @media (max-width: 768px) {
+        font-size: 0.8rem;
+    }
+
+    &.reservation {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-decoration: none;
+      color: #FFFFFF;
+flex-direction: row;
+
+svg {
+
+  @media (max-width: 768px) {
+    display: none;
+}
+  width: 24px;
+  height: 24px;
+  fill: #fff;
+  cursor: pointer;
+  margin-inline-start: 5px;
+  // on hover, move the svg
+  transition: all 0.3s;
+  &:hover {
+    transform: translateX(3px);
+  }
+
+}
+    }
+
+      & :link, & :visited {
+        color: #FFFFFF;
+        text-decoration: none;
+      }
+  
+      :hover {
+        color: #FFFFFF;
+        text-decoration: none;
+        border-bottom-color: #FFFFFF; // Change border color on hover
+      }
+  
+      :active {
+        color: #FFFFFF;
+        border-bottom-color: #FFFFFF; // Change border color on hover
+      }
+    }
+
+    }
+  
+  
+    & .logo {
       display: flex;
       align-items: center;
-      gap: 10px;
-      color: #222222;
+      color: $off-white;
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: 0.1rem;
+      cursor: pointer;
+      font-family: "Rubik", sans-serif;
+      position: relative;
+      width: 15%;
+      margin: 10px; 
+      background-color: #00000000;
+      // backdrop-filter: blur(10px); // Apply a subtle blur effect
+      top: 45px;
+      padding: 25px;
+      border-bottom-left-radius: 50%;
+      border-bottom-right-radius: 50%;
+      border-top-left-radius: 50%;
+      border-top-right-radius: 50%;
+      transition: all 0.3s;
 
-      &:hover {
-        background-color: #f5f5f5;
+      // mobile width 200px
+      @media (max-width: 768px) {
+        width: 185px;
+        top: 25px;
+        padding: 0;
+    }
+
+      &.close {
+        width: 80px;
+        margin: 0;
+        padding: 10px;
+        top: 0px;
+        transition: all 0.3s;
+
+      }
+      
+      img {
+        position: relative;
+        width: 100%;
+        border-radius: 50%;
+        object-fit: cover;
+        box-shadow: 0px 0px 10px 2px rgb(169, 163, 151);
+      }
+  
+      .logo-txt {
+        margin-inline-start: 5px;
       }
     }
   }
 
-  .close-modal-btn {
-    position: absolute;
-    top: -12px;
-    right: -1px;
-    padding: 5px;
-    cursor: pointer;
-    background-color: transparent;
-    color: #222222;
-    font-size: 1.5rem;
-
-    &:hover {
-      background-color: #f5f5f5;
-      border-radius: 50%;
-    }
-  }
 }
+

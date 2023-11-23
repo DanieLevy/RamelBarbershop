@@ -1,144 +1,90 @@
 import React, { useEffect } from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { useSelector } from "react-redux"
-import { loadUsers, login, logout, signup } from "../store/actions/user.actions.js"
+import { login, logout, signup } from "../store/actions/user.actions.js"
 import { LoginSignup } from './LoginSignup'
-import { useState } from "react"
 import "react-multi-carousel/lib/styles.css"
 import { IoIosMenu } from "react-icons/io"
 import { FaCircleUser } from "react-icons/fa6"
-import { userService } from "../services/user.service.js"
-
+import { useState } from "react"
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 export function AppHeader() {
-  const user = useSelector((storeState) => storeState.userModule.user)
-  const [userModal, setUserModal] = useState(false)
-  const [loginModal, setLoginModal] = useState(false)
-  const [signupModal, setSignupModal] = useState(false)
-  const users = useSelector((storeState) => storeState.userModule.users)
-  // handle the background color of header-container when user on top of the page or not (scrolling)
+  const navigate = useNavigate()
+
+  const [isMenuOpen, setIsMenuOpen] = useState(window.scrollY === 0 ? false : true)
+
   useEffect(() => {
-    window.addEventListener("scroll", () => {
-      const header = document.querySelector(".header-container")
-      header.classList.toggle("scrolled", window.scrollY > 0)
-    })
+    // handle scroll so when user on top of page, menu is open, else it's closed 
+    // also, when user scroll to top, menu is open immediately
+    const handleScroll = () => {
+      if (window.scrollY === 0) setIsMenuOpen(false)
+      else setIsMenuOpen(true)
+    }
+    window.addEventListener('scroll', handleScroll)
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+    }
   }, [])
 
-  async function onLogin(credentials) {
-    try {
-      const user = await login(credentials)
-      toast.success(`Welcome back ${user.fullname}`)
-
-      closeModal()
-    } catch (err) {
-      toast.error('Cannot login')
-      console.log(`Cannot login`, err);
+  function scrollToClass(className) {
+    // if user not in home page (/) - navigate to home page, then scroll to class
+    if (window.location.pathname !== '/') {
+      navigate('/')
+      setTimeout(() => {
+        const el = document.querySelector(`.${className}`)
+        el.scrollIntoView({ behavior: 'smooth' })
+      }, 1000)
+      return
     }
-  }
-  async function onSignup(credentials) {
-    try {
-      const user = await signup(credentials)
-      toast.success(`Welcome ${user.fullname}`)
-      closeModal()
-    } catch (err) {
-      toast.error('Cannot signup')
-      console.log(`Cannot signup`, err);
+    // if user in home page (/) - scroll to class
+
+    // if className === index-header - scroll to top of page (0)
+    if (className === 'index-header') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
     }
-  }
-  async function onLogout() {
-    try {
-      await logout()
-      toast.info(`Goodbye`)
-    } catch (err) {
-      toast.error('Cannot logout')
-      console.log(`Cannot logout`, err);
-    }
-  }
 
-  function closeModal() {
-    setLoginModal(false)
-    setUserModal(false)
+    // else - scroll to class
+    const el = document.querySelector(`.${className}`)
+    el.scrollIntoView({ behavior: 'smooth' })
   }
-
-  async function displayUsers() {
-    const users = await userService.getUsers()
-    console.log(users);
-  }
-
   return (
     <React.Fragment>
       <section className={`header-container`}>
-        <header className='main-header flex main-layout'>
-          <Link to='/' className='logo flex'>
-            רם-אל ברברשופ
-          </Link>
-          <div
-            className="user-nav flex"
-            onClick={(ev) => {
-              ev.stopPropagation()
-              setUserModal(!userModal)
-            }}
-          >
-            <IoIosMenu />
-            {user && user.imgUrl ? <img src={user.imgUrl} alt="" /> : <FaCircleUser className='user-icon' />}
+        <header className={`main-header flex main-layout ${isMenuOpen ? 'close' : ''}`}>
+        {/* <button className="menu-btn" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+          <IoIosMenu />
+        </button> */}
+          <div className="nav-container">
+            {/* show list of links to pages/scrolldown */}
+            <div className="about flex">
+              <p onClick={() => { scrollToClass('index-header') }}>אודות</p>
+            </div>
+            <div className="contact flex">
+              <p onClick={() => { scrollToClass('index-contact') }}>צור קשר</p>
+            </div>
+            <div className={`logo flex ${isMenuOpen ? 'close' : ''}`}
+              onClick={() => { navigate('/') }}
+            >
+              <img src='https://upcdn.io/W142hJk/raw/demo/4m1ZVkLs6V.jpeg' alt="" />
+            </div>
+            <div className="location flex">
+              <p onClick={() => { scrollToClass('index-location') }}>מיקום</p>
+            </div>
+            <div className="reservation flex">
+              <p onClick={() => { scrollToClass('index-body') }}> קבע תור</p>
+              <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 16 16" version="1.1" data-view-component="true"><path d="M7.78 12.53a.75.75 0 0 1-1.06 0L2.47 8.28a.75.75 0 0 1 0-1.06l4.25-4.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L4.81 7h7.44a.75.75 0 0 1 0 1.5H4.81l2.97 2.97a.75.75 0 0 1 0 1.06Z"></path></svg>
+            </div>
           </div>
-
-          {userModal && (
-            <section className="user-modal">
-              <div className="back-drop" onClick={() => closeModal()}></div>
-              <ul className="user-modal-nav">
-                {!user ? (
-                  <>
-                    <li
-                      onClick={(ev) => {
-                        ev.stopPropagation();
-                        setUserModal(false);
-                        setLoginModal(true)
-                        setSignupModal(false);
-                      }}
-                    >
-                      Login
-                    </li>
-                    <li
-                      onClick={(ev) => {
-                        ev.stopPropagation();
-                        setUserModal(false);
-                        setLoginModal(true)
-                        setSignupModal(true);
-                      }}
-                    >
-                      Signup
-                    </li>
-                  </>
-                ) : (
-                  <>
-                    <li onClick={() => {
-                      onLogout()
-                      setUserModal(false)
-                    }}>Logout</li>
-                  </>
-                )}
-              </ul>
-            </section>
-
-          )
-          }
-        </header >
-      </section >
-      {loginModal && (
-        <LoginSignup
-          login={onLogin}
-          signup={onSignup}
-          onToggleLogin={setLoginModal}
-          closeModal={closeModal}
-          isSignup={signupModal}
-          setSignupModal={setSignupModal}
-        />
-      )
-      }
+        </header>
+      </section>
     </React.Fragment>
 
   );
 }
+
+{/* <Link to='/' className='logo flex'>
+רם-אל ברברשופ
+</Link> */}
