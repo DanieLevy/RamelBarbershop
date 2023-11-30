@@ -11,6 +11,7 @@ import 'react-day-picker/dist/style.css';
 import he from 'date-fns/locale/he';
 import { set } from 'date-fns';
 import { toast } from 'react-toastify';
+import { is } from 'date-fns/locale';
 
 
 export function BarberProfile() {
@@ -27,6 +28,7 @@ export function BarberProfile() {
     const [OTPCode, setOTPCode] = useState(null);
     const [enteredCode, setEnteredCode] = useState(null);
     const [datesModal, setDatesModal] = useState(false);
+    const [isInputFocused, setIsInputFocused] = useState(false);
     const [reservation, setReservation] = useState({
         service: null,
         date: {
@@ -40,6 +42,14 @@ export function BarberProfile() {
             phone: null,
         },
     });
+
+    useEffect(() => {
+        window.addEventListener('click', handleClickOutside);
+        return () => {
+            window.removeEventListener('click', handleClickOutside);
+        };
+    }, [isInputFocused]);
+
 
     useEffect(() => {
         if (!users || !users.length) {
@@ -79,11 +89,8 @@ export function BarberProfile() {
     }
 
     function handleSubmit(ev) {
-        console.log('ev.target[0].value', ev.target[0].value);
-        console.log('ev.target[1].value', ev.target[1].value);
         ev.preventDefault();
         setReservation({ ...reservation, user: { fullname: ev.target[0].value, phone: ev.target[1].value } });
-        console.log('reservationםלםלםל', reservation);
         // generate random code and save it into state
         // random code -
         const OTPCode = utilService.getRandomOTP();
@@ -243,6 +250,23 @@ export function BarberProfile() {
         return 'הבא';
     }
 
+    const handleFocus = () => {
+        setIsInputFocused(true);
+    };
+
+    const handleBlur = () => {
+        setIsInputFocused(false);
+    };
+
+    const handleClickOutside = (e) => {
+        if (isInputFocused && e.target.closest('.reservation-auth-input') === null) {
+            // Clicked outside the input field, so blur the input
+            document.activeElement.blur();
+            // scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
+
     const disabledDays =
         [
             {
@@ -389,6 +413,8 @@ export function BarberProfile() {
                                     >
                                         <input type="text"
                                             required
+                                            // give focus to the input
+                                            autoFocus
                                             pattern='[a-zA-Zא-ת\s]*'
                                             onChange={(ev) => setReservation({ ...reservation, user: { ...reservation.user, fullname: ev.target.value } })}
                                             value={reservation.user?.fullname || ''}
@@ -434,7 +460,16 @@ export function BarberProfile() {
                                             isInputNum={true}
                                             renderSeparator={<span>-</span>}
                                             // add uniq classname for filled input
-                                            renderInput={(props) => <input {...props} type="text" maxLength="1"
+                                            // handle the input to show numbers keyboard on mobile
+                                            renderInput={(props) => <input
+                                                {...props}
+                                                type="number"
+                                                maxLength="1"
+                                                pattern="\d*"
+                                                inputMode="numeric"
+                                                onFocus={handleFocus}
+                                                onBlur={handleBlur}
+                                                autoFocus
                                                 className={`otp-input ${/\d/.test(props.value) ? 'has-number' : ''}`}
                                             />}
                                         />
@@ -457,8 +492,8 @@ export function BarberProfile() {
                                         <button className='reservation-success-btn cancel'>ביטול תור</button>
                                         <button className='reservation-success-btn'>הורד אישור תור</button>
                                     </div>
-                                    </div>
                                 </div>
+                            </div>
                             }
                         </div>
                     </div>
@@ -487,6 +522,7 @@ export function BarberProfile() {
                                 if (resStep === 3) toggleModal();
                                 if (resStep === 4) {
                                     nextBtnRef.current.click();
+                                    setResStep(resStep + 1)
                                     return;
                                 }
                                 if (resStep === 5) {
