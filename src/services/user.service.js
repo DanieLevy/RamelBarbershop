@@ -64,7 +64,20 @@ async function signup(userCred) {
     return
   } else {
     // else do nothing
-  userCred.isBarber ? userCred.workDays = getDefultWorkDays() : console.log('not barber');
+    userCred.isBarber ? userCred.workDays = getDefultWorkDays() : console.log('not barber');
+    userCred.isBarber ? userCred.reservations = [
+      {
+        date: "",
+        time: "",
+        customer: {
+          fullname: "",
+          phone: "",
+          email: "",
+        },
+      }
+    ]
+      : console.log('not barber');
+    
     const user = await storageService.post('user', userCred)
     //   const user = await httpService.post('auth/signup', userCred)
     console.log('user', user);
