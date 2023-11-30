@@ -438,7 +438,8 @@ export function BarberProfile() {
                                             inputMode="text"
                                             maxLength="10"
                                             minLength="10"
-
+                                            onFocus={handleFocus2}
+                                            onBlur={handleBlur2}
                                             // onChange, set the phone number to the user object in reservation with all the numbers include the first numbers that get into the string 
                                             onChange={(ev) => setReservation({ ...reservation, user: { ...reservation.user, phone: ev.target.value } })}
 
