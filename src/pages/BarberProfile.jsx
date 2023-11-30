@@ -251,9 +251,7 @@ export function BarberProfile() {
     }
 
     useEffect(() => {
-        if (isInputFocused) {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
+        window.scrollTo(0, 0);
     }, [isInputFocused]);
 
     const handleFocus = () => {
@@ -262,7 +260,14 @@ export function BarberProfile() {
 
     const handleBlur = () => {
         setIsInputFocused(false);
+    };
 
+    const handleFocus2 = () => {
+        window.scrollTo(0, 0);
+    };
+
+    const handleBlur2 = () => {
+        window.scrollTo(0, 0);
     };
 
     const handleClickOutside = (e) => {
@@ -418,9 +423,10 @@ export function BarberProfile() {
                                     >
                                         <input type="text"
                                             required
-                                            // give focus to the input
-                                            autoFocus
                                             pattern='[a-zA-Zא-ת\s]*'
+                                            inputMode="text"
+                                            onFocus={handleFocus2}
+                                            onBlur={handleBlur2}
                                             onChange={(ev) => setReservation({ ...reservation, user: { ...reservation.user, fullname: ev.target.value } })}
                                             value={reservation.user?.fullname || ''}
                                             placeholder="שם מלא" />
