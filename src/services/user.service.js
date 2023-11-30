@@ -1,3 +1,4 @@
+import { toast } from 'react-toastify'
 import { storageService } from './async-storage.service'
 import { httpService } from './http.service'
 
@@ -110,15 +111,17 @@ function getLoggedinUser() {
 
 async function _createLocalUser() {
   console.log('creating local user');
-  const user = getLoggedinUser()
-  console.log('user', user);
-  // if user exist - remove it
-  if (user) {
-    console.log('removing local user');
-    await logout()
-  }
+  const users = await storageService.query('user')
+  const user = users.find(user => user.username === 'ramel')
+
+  // if (user) {
+  //   console.log('removing local user');
+  //   toast.info('Removing local user')
+  //   await logout()
+  // }
   if (!user) {
-    console.log('creating local userjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj');
+    console.log('creating local user');
+    toast.info('Creating local user')
     await userService.signup({ fullname: 'Ramel Lausani', username: "ramel", password: 'ramel123', isBarber: true, imgUrl: 'https://iili.io/JxtxGON.md.jpg' })
   }
 }
