@@ -250,20 +250,25 @@ export function BarberProfile() {
         return 'הבא';
     }
 
+    useEffect(() => {
+        if (isInputFocused) {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }, [isInputFocused]);
+
     const handleFocus = () => {
         setIsInputFocused(true);
     };
 
     const handleBlur = () => {
         setIsInputFocused(false);
+
     };
 
     const handleClickOutside = (e) => {
         if (isInputFocused && e.target.closest('.reservation-auth-input') === null) {
             // Clicked outside the input field, so blur the input
             document.activeElement.blur();
-            // scroll to top
-            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     };
 
