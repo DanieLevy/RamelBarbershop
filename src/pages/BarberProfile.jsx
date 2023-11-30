@@ -479,9 +479,8 @@ export function BarberProfile() {
                                                 maxLength="1"
                                                 pattern="\d*"
                                                 inputMode="numeric"
-                                                onFocus={handleFocus}
-                                                onBlur={handleBlur}
-                                                autoFocus
+                                                onFocus={(ev) => (handleFocus(ev), handleFocus2(ev))}
+                                                onBlur={(ev) => (handleBlur(ev), handleBlur2(ev))}
                                                 className={`otp-input ${/\d/.test(props.value) ? 'has-number' : ''}`}
                                             />}
                                         />

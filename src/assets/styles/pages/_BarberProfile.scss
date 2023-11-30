@@ -1,4 +1,8 @@
 // TODO: Keep using mobile touch better experience for mobile
+.barber-profile * {
+    color: inherit; 
+  }
+
 .barber-profile {
 
     // style transparent scrollbar in mobile size
@@ -468,6 +472,21 @@
             }
         }
     }
+
+    .barber-profile h3,
+.barber-profile p,
+.barber-profile button {
+  color: #222;
+}
+
+.barber-profile button {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    cursor: pointer;  
+    color: inherit;
+  }
 }
 
 .barber-profile-footer {
