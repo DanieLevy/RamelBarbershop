@@ -41,7 +41,7 @@ async function update(user) {
   user = await storageService.put('user', user)
   // user = await httpService.put(`user/${user._id}`, user)
   // Handle case in which admin updates other user's details
-  if (getLoggedinUser()._id === user._id) saveLocalUser(user)
+  // if (getLoggedinUser()._id === user._id) saveLocalUser(user)
 }
 
 async function login(userCred) {
@@ -96,9 +96,12 @@ function getLoggedinUser() {
 }
 
 async function _createLocalUser() {
+  console.log('creating local user');
   const user = getLoggedinUser()
+  console.log('user', user);
   if (!user) {
-    await userService.signup({ fullname: 'Puki Norma', username: 'puki', password: '123', isAdmin: false })
+    console.log('creating local userjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj');
+    await userService.signup({ fullname: 'Ramel Lausani', username: "ramel", password: 'ramel123', isBarber: true, imgUrl: 'https://iili.io/JxtxGON.md.jpg' })
   }
 }
 

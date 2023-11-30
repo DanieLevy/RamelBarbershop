@@ -1,6 +1,11 @@
 .main-layout {
   padding: 0 20px;
 
+  // for mobile layout
+  @include for-mobile-layout {
+    padding: 0 0px;
+  }
+
   @include for-narrow-layout {
     padding: 0 20px;
   }

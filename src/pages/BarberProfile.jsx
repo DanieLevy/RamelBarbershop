@@ -1,28 +1,44 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import { loadUsers } from '../store/actions/user.actions';
 import moment from 'moment';
 import { utilService } from '../services/util.service';
-import 'moment/locale/he'; // Import the Hebrew locale
-
+import OtpInput from 'react-otp-input';
 import { updateUser } from '../store/actions/user.actions';
-
-import { format, set } from 'date-fns';
-
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
-import { is } from 'date-fns/locale';
+import he from 'date-fns/locale/he';
+import { set } from 'date-fns';
+import { toast } from 'react-toastify';
+
 
 export function BarberProfile() {
     const { barberId } = useParams();
+    const overlayRef = useRef(null);
+    const navigate = useNavigate();
+    // ref for form btn to use it to submit the form from the next btn in footer
+    // this ref i need to attach to the form btn and then click it from the next btn in footer
+    const nextBtnRef = useRef(null);
     const users = useSelector((storeState) => storeState.userModule.users);
+    const dispatch = useDispatch();
     const [barber, setBarber] = useState(null);
     const [resStep, setResStep] = useState(1);
     const [OTPCode, setOTPCode] = useState(null);
+    const [enteredCode, setEnteredCode] = useState(null);
+    const [datesModal, setDatesModal] = useState(false);
     const [reservation, setReservation] = useState({
         service: null,
-        date: null
+        date: {
+            dayName: '',
+            dayNum: '',
+            dateTimestamp: null,
+            timeTimestamp: null,
+        },
+        user: {
+            fullname: '',
+            phone: null,
+        },
     });
 
     useEffect(() => {
@@ -38,6 +54,7 @@ export function BarberProfile() {
 
     useEffect(() => {
         console.log('reservation', reservation);
+        console.log('barber', barber);
     }, [reservation]);
 
 
@@ -49,21 +66,24 @@ export function BarberProfile() {
     function onDayClick(day) {
         console.log('day', day);
         renderTimeSlots(day);
-        setReservation({ ...reservation, date: day });
+        // Dont remove the prev date object, just add the new data to it
+        setReservation({ ...reservation, date: { ...reservation.date, ...day } });
         setResStep(3);
     }
 
     function onTimeClick(time) {
-        console.log('time', time);
+        // console.log('time', time);
         // add to reservation object the time of the reservation under the key 'date' with all the other data of date
         setReservation({ ...reservation, date: { ...reservation.date, timeTimestamp: time } });
         setResStep(4);
     }
 
     function handleSubmit(ev) {
+        console.log('ev.target[0].value', ev.target[0].value);
+        console.log('ev.target[1].value', ev.target[1].value);
         ev.preventDefault();
-        setReservation({ ...reservation, user: { fullname: ev.target[0].value, phone: +ev.target[1].value } });
-        console.log('reservation', reservation);
+        setReservation({ ...reservation, user: { fullname: ev.target[0].value, phone: ev.target[1].value } });
+        console.log('reservationםלםלםל', reservation);
         // generate random code and save it into state
         // random code -
         const OTPCode = utilService.getRandomOTP();
@@ -71,12 +91,20 @@ export function BarberProfile() {
         setResStep(5);
     }
 
-    function handleFullSubmit(ev) {
-        ev.preventDefault();
-        console.log('OTPCode', OTPCode);
-        console.log('ev.target[0].value', ev.target[0].value);
-        if (ev.target[0].value === OTPCode) {
+    async function onUpdateUser(user) {
+        try {
+            await updateUser(user);
+            toast.success('התור נקבע בהצלחה!');
+            setResStep(6);
+        } catch (err) {
+            console.log('err', err);
+            toast.error('אירעה שגיאה, נסה שוב מאוחר יותר');
+        }
+    }
 
+
+    function handleFullSubmit() {
+        if (enteredCode === OTPCode) {
             //  build full reservation object -
             const fullReservation = {
                 _id: utilService.makeId(),
@@ -87,17 +115,18 @@ export function BarberProfile() {
             }
             console.log('fullReservation', fullReservation);
 
-            // update user in db using updateUser action
             const user = {
                 ...barber,
                 reservations: [...barber.reservations, fullReservation]
             }
-            updateUser(user);
+            // updateUser(user);
+            onUpdateUser(user);
+
             console.log('User updated!');
             console.log('user', user);
 
         } else {
-            alert('Wrong code');;
+            alert('קוד אימות שגוי');
         }
     }
 
@@ -112,10 +141,11 @@ export function BarberProfile() {
     const ReserveationOpt = utilService.getReserveationOpt();
 
     function renderTimeSlots(baseTimestamp) {
-        // console.log('baseTimestamp', baseTimestamp);
         const hoursObject = generateHalfHourTimestamps(baseTimestamp.dateTimestamp);
-        console.log('hoursObject', hoursObject);
-        return hoursObject;
+        return hoursObject.map(timestamp => ({
+            timestamp,
+            isTaken: isTimeTaken(baseTimestamp, timestamp)
+        }));
     }
 
     function renderWeekDates() {
@@ -127,13 +157,15 @@ export function BarberProfile() {
         return weekDates;
     }
 
-    function isTimeTaken(time) {
-        const isTimeTaken = barber.reservations.some(res => res.date.timeTimestamp === time);
+    function isTimeTaken(day, time) {
+        const isTimeTaken = barber.reservations.some(res =>
+            res.date.dayName === day.dayName && res.date.timeTimestamp === time
+        );
         return isTimeTaken;
     }
 
     function generateHalfHourTimestamps(baseTimestamp) {
-        console.log('baseTimestamp', baseTimestamp);
+        // console.log('baseTimestamp', baseTimestamp);
         const baseDate = moment.unix(baseTimestamp);
         const dayName = baseDate.format('dddd').toLowerCase();
 
@@ -152,154 +184,325 @@ export function BarberProfile() {
         return timestamps;
     }
 
-    // function handleClick(ev) {
-    //     // handle click to save to user in db using updateUser action
-    //     console.log('ev.target', ev.target);
-    //     const user = {
-    //         ...barber,
-    //         reservations: [...barber.reservations, reservation]
-    //     }
-    // }
+    function isNextBtnDisabled() {
+        if (resStep === 1 && reservation.service === null) return true;
+        if (resStep === 2 && reservation.date.dayName === '' && reservation.date.dayNum === '') return true;
+        if (resStep === 3 && reservation.date.timeTimestamp === null) return true;
+        if (resStep === 4 && reservation.user.fullname === '' && reservation.user.phone === null) return true;
+        // check phone length only if phone is not null or undefined
+        if (resStep === 4 && reservation.user.phone && reservation.user.phone.length !== 10) return true;
+        if (resStep === 4 && reservation.user.phone === "") return true;
+        if (resStep === 4 && reservation.user.phone === null) return true;
 
+        if (resStep === 4 && reservation.user.fullname === "") return true;
+
+        if (resStep === 5 && enteredCode === null) return true;
+        // only if entredcode, check if length is not equal to 4
+        if (resStep === 5 && enteredCode && enteredCode.length !== 4) return true;
+        // only if we have otpcode, check if the entered code is not equal to the otpcode
+        if (resStep === 5 && OTPCode && enteredCode !== OTPCode) return true;
+
+        return false;
+    }
+
+    const toggleModal = () => {
+        setDatesModal(!datesModal);
+    };
+
+    const handleOverlayClick = (event) => {
+        if (event.target === overlayRef.current) {
+            toggleModal();
+        }
+    };
+
+    function onDayPickerClick(dayPickerOutput) {
+        moment.locale('he');
+        const parsedDate = moment(dayPickerOutput);
+        const formattedDate = parsedDate.format('DD/MM');
+        const dayName = parsedDate.format('dddd');
+        const dateTimestamp = parsedDate.format('X');
+
+        const date = {
+            dayName: utilService.getDayNameInHebrew(dayName),
+            dayNum: formattedDate,
+            dateTimestamp: +dateTimestamp,
+        };
+
+        // Dont remove the prev date object, just add the new data to it
+        setReservation({ ...reservation, date: { ...reservation.date, ...date } });
+        setResStep(3);
+        toggleModal();
+    }
+
+    function getNextBtnText() {
+        if (resStep === 1) return 'הבא';
+        if (resStep === 2) return 'הבא';
+        if (resStep === 3) return 'הבא';
+        if (resStep === 4) return 'קבל קוד אימות';
+        if (resStep === 5) return 'קבע תור!';
+        return 'הבא';
+    }
+
+    const disabledDays =
+        [
+            {
+                before: new Date(),
+            },
+            {
+                after: moment().add(1, 'month').toDate(),
+            },
+        ];
 
     if (!barber) return <div className='barber-profile main-layout'>Barber not found</div>;
 
     return (
-        <div className="barber-profile main-layout">
-            <div className="barber-profile-name">{barber.fullname}</div>
-            <div className="barber-profile-content">
-                <div className="barber-profile-img">
-                    <img src={barber.imgUrl} alt="" />
-                </div>
-                <div className="barber-profile-reservation">
-                    {resStep === 1 && <div className="reservation-step-1">
-                        Step 1 - Choose your service type
-                        {ReserveationOpt.map(opt =>
-                            <button
-                                className="reservation-opt"
-                                key={opt.title}
-                                onClick={() => onServiceClick(opt)}
-                            >
-                                <div className="title">{opt.title}</div>
-                                <div className='opt-container flex'>
-                                    <div className="duration">זמן: {opt.duration} דק'</div>
-                                    <div className="sep">|</div>
-                                    <div className="price">מחיר: {opt.price} ש"ח</div>
+        <React.Fragment>
+            <div className="barber-profile main-layout">
+                <div className="barber-profile-header">
+                    <div className='res-summary'>
+                        <h3 className='res-summary-title'>התור שלך:</h3>
+                        <div className='res-summary-content'>
+                            <div className='res-summary-item'>
+                                <div className='res-summary-item-title'>סוג:</div>
+                                <div className='res-summary-item-content'>{reservation.service?.title || 'לא נבחר'}</div>
+                            </div>
+                            <div className='res-summary-item'>
+                                <div className='res-summary-item-title'>תאריך:</div>
+                                {/* if no date, say not selected */}
+                                <div className='res-summary-item-content'>
+                                    {{ date: reservation.date?.dayName ? `${reservation.date.dayName}, ${reservation.date.dayNum}` : 'לא נבחר' }.date}
                                 </div>
-                            </button>
-                        )}
-                    </div>}
-                    {resStep === 2 && <div className="reservation-step-2">
-                        Step 2 - Choose your date
-                        <h1>
-                            {/* {reservation.service.title} */}
-                        </h1>
-                        {/* Render one week forward (each day in a button) */}
-                        {renderWeekDates().map((date, idx) => (
-                            console.log('date', date),
-                            <button key={idx} className="reservation-days"
-                                onClick={() => onDayClick(date)}
-                                // if day has ket isWorking and is false - disable button, else - enable button
-                                disabled={date.isWorking === false}
-                                
-                            >
-                                <div className="day-label">{date.dayName}</div>
-                                <div className="day-num">{date.dayNum}</div>
-                            </button>
-                        ))}
-                        <div className="more-dates">
-                            <div className='more-dates-btn'>תאריכים נוספים</div>
-                            <div className='more-dates-list'>
-                                {/*render months using day picker*/}
-                                <DayPicker
-                                    numberOfMonths={1}
-                                    onDayClick={onDayClick}
-                                    selectedDays={new Date()}
-                                />
 
                             </div>
+                            <div className='res-summary-item'>
+                                <div className='res-summary-item-title'>שעה:</div>
+                                <div className='res-summary-item-content'>
+                                    {{ timeTimestamp: reservation.date?.timeTimestamp ? formatTime(reservation.date.timeTimestamp) : 'לא נבחר' }.timeTimestamp}
+                                </div>
+                            </div>
                         </div>
-                    </div>}
+                    </div>
+                </div>
+                <section className="barber-profile-body">
+                    <div className="barber-profile-content">
+                        <div className="barber-profile-reservation">
+                            {resStep === 1 && <div className="reservation-step-1">
+                                <h3>
+                                    בחר את סוג התור:
+                                </h3>
 
-                    {resStep === 3 && <div className="reservation-step-3">
-                        Step 3 - Choose your time
-                        <h1>
-                            {reservation.service.title}
-                        </h1>
-                        <h2>
-                            {reservation.date.dayName} {reservation.date.dayNum} {reservation.date.monthName}
-                        </h2>
-                        {/* render list of -
-                        time slots acording to barber work hours and reservations - so if a time slot is taken it will be disabled
-                        and if a time slot is not in work hours it will be disabled */}
-                        <div className="time-slots">
-                            {renderTimeSlots(reservation.date).map((timestamp, idx) => (
-                                console.log('timestamp', timestamp),
-                                <button key={idx}
-                                    disabled={isTimeTaken(timestamp)}
-                                    className="time-slot"
-                                    onClick={() => onTimeClick(timestamp)}
-                                >
-                                    {formatTime(timestamp)}
-                                </button>
-                            ))}
-                        </div>
+                                {ReserveationOpt.map(opt =>
+                                    <button
+                                        className={`reservation-opt ${reservation.service?.title === opt.title ? 'selected' : ''}`}
+                                        key={opt.title}
+                                        onClick={() => onServiceClick(opt)}
+                                    >
+                                        <div className="title">{opt.title}</div>
+                                        <div className='opt-container flex'>
+                                            <div className="duration">זמן: {opt.duration} דק'</div>
+                                            <div className="sep">|</div>
+                                            <div className="price">מחיר: {opt.price} ש"ח</div>
+                                        </div>
+                                    </button>
+                                )}
+                            </div>}
+                            {resStep === 2 && <div className="reservation-step-2">
+                                <h3 className='step-title'>
+                                    באיזה יום?
+                                </h3>
 
-                    </div>}
+                                <div className="week-days">
+                                    {renderWeekDates().map((date, idx) => (
+                                        <button key={idx} className={`reservation-day ${reservation.date.dayNum === date.dayNum ? 'selected' : ''}`}
+                                            onClick={() => onDayClick(date)}
+                                            disabled={date.isWorking === false}
 
-                    {/*  Step 4 - Summary of reservation, and validation of the reservation -
+                                        >
+                                            <div className="day-label">{date.dayName}</div>
+                                            <div className="day-num">{date.dayNum}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="more-dates">
+                                    <div className='more-dates-btn'
+                                        onClick={toggleModal}
+                                    >
+                                        <div className='more-dates-btn-text'>לתאריכים נוספים</div>
+                                        <div className='more-dates-btn-icon'>
+                                            <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 16 16" version="1.1" data-view-component="true"><path fillRule="evenodd" d="M1.22 8a.75.75 0 0 1 0-1.06L6.47 2.7a.75.75 0 1 1 1.06 1.06L3.81 7h10.44a.75.75 0 0 1 0 1.5H3.81l3.72 3.72a.75.75 0 1 1-1.06 1.06L1.22 8Z"></path></svg>
+                                        </div>
+                                    </div>
+                                    {datesModal &&
+                                        <>
+                                            <div className="overlay"
+                                                ref={overlayRef}
+                                                onClick={handleOverlayClick}
+                                            ></div>
+                                            <div className='more-dates-modal'>
+                                                {/*render months using day picker*/}
+                                                <DayPicker
+                                                    dir="rtl"
+                                                    locale={he}
+                                                    numberOfMonths={1}
+                                                    selected={reservation.date?.dateTimestamp ? new Date(reservation.date.dateTimestamp * 1000) : Date.now()}
+                                                    onDayClick={onDayPickerClick}
+                                                    disabled={disabledDays}
+
+                                                />
+
+                                            </div>
+                                        </>
+                                    }
+                                </div>
+                            </div>}
+
+                            {resStep === 3 && <div className="reservation-step-3">
+                                <h3 className='step-title'>
+                                    באיזה שעה?
+                                </h3>
+                                <div className="time-slots">
+                                    {renderTimeSlots(reservation.date).map(({ timestamp, isTaken }, idx) => (
+                                        <button
+                                            key={idx}
+                                            disabled={isTaken}
+                                            className={`time-slot ${reservation.date.timeTimestamp === timestamp ? 'selected' : ''}`}
+                                            onClick={() => onTimeClick(timestamp)}
+                                        >
+                                            {formatTime(timestamp)}
+                                        </button>
+                                    ))}
+                                </div>
+
+                            </div>}
+
+                            {/*  Step 4 - Summary of reservation, and validation of the reservation -
                     Need to put Fullname and phone number, then submit. */}
-                    {resStep === 4 && <div className="reservation-step-4">
-                        Step 4 - Summary of reservation, and validation of the reservation
-                        <h1>
-                            {reservation.service.title}
-                        </h1>
-                        <h2>
-                            {reservation.date.dayName} {reservation.date.dayNum} {reservation.date.monthName}
-                        </h2>
-                        <h3>
-                            {reservation.time}
+                            {resStep === 4 && <div className="reservation-step-4">
+                                <h3 className='step-title'>
+                                    פרטים אישיים:
+                                </h3>
 
-                        </h3>
+                                <div className="reservation-form-container">
+                                    <form
+                                        className="reservation-form"
+                                        onSubmit={handleSubmit}
+                                    >
+                                        <input type="text"
+                                            required
+                                            pattern='[a-zA-Zא-ת\s]*'
+                                            onChange={(ev) => setReservation({ ...reservation, user: { ...reservation.user, fullname: ev.target.value } })}
+                                            value={reservation.user?.fullname || ''}
+                                            placeholder="שם מלא" />
+                                        <input
+                                            type="text"
+                                            required
+                                            placeholder="מספר טלפון"
+                                            pattern='[0-9]*'
+                                            inputMode="text"
+                                            maxLength="10"
+                                            minLength="10"
 
-                        <div className="reservation-form">
-                            <form onSubmit={handleSubmit}>
-                                <input type="text"
-                                    required
-                                    pattern='[a-zA-Zא-ת\s]*'
-                                    value={reservation.user.fullname || ''}
-                                    placeholder="שם מלא" />
-                                <input type="text"
-                                    required
-                                    pattern="[0-9]*"
-                                    placeholder="מספר טלפון"
-                                    value={reservation.user.phone || ''}
-                                />
-                                <button>שלח</button>
-                            </form>
+                                            // onChange, set the phone number to the user object in reservation with all the numbers include the first numbers that get into the string 
+                                            onChange={(ev) => setReservation({ ...reservation, user: { ...reservation.user, phone: ev.target.value } })}
+
+                                            value={reservation.user?.phone || ''}
+                                        />
+                                        <button
+                                            ref={nextBtnRef}
+                                            type='submit'
+                                            style={{ display: 'none' }}
+                                        >שלח</button>
+                                    </form>
+                                </div>
+                            </div>}
+
+                            {resStep === 5 && <div className="reservation-step-5">
+                                <h3 className='step-title'>
+                                    קוד אימות נשלח לטלפון שלך
+                                </h3>
+                                <div className="reservation-auth">
+                                    <div className="reservation-auth-text">
+                                        {OTPCode}
+                                    </div>
+                                    <div className="reservation-auth-input">
+                                        <OtpInput
+                                            containerStyle='otp-container'
+                                            value={enteredCode}
+                                            onChange={(code) => setEnteredCode(code)}
+                                            numInputs={4}
+                                            // handle dir ltr
+                                            isInputNum={true}
+                                            renderSeparator={<span>-</span>}
+                                            // add uniq classname for filled input
+                                            renderInput={(props) => <input {...props} type="text" maxLength="1"
+                                                className={`otp-input ${/\d/.test(props.value) ? 'has-number' : ''}`}
+                                            />}
+                                        />
+                                    </div>
+                                </div>
+                            </div>}
+                            {resStep === 6 && <div className="reservation-step-6">
+                                <h3 className='step-title'>
+                                    התור נקבע בהצלחה!
+                                </h3>
+                                {/* add some information about the res and link to cancel the res (hardcoded for now) */}
+                                <div className="reservation-success">
+                                    <div className="reservation-success-text">
+                                        <p>התור נקבע בהצלחה!</p>
+                                        <p>התור נקבע בשם: {reservation.user.fullname}</p>
+                                        <p>בתאריך: {reservation.date.dayNum}</p>
+                                        <p>בשעה: {formatTime(reservation.date.timeTimestamp)}</p>
+                                    </div>
+                                    <div className="reservation-success-btns">
+                                        <button className='reservation-success-btn cancel'>ביטול תור</button>
+                                        <button className='reservation-success-btn'>הורד אישור תור</button>
+                                    </div>
+                                    </div>
+                                </div>
+                            }
                         </div>
-                    </div>}
+                    </div>
+                </section>
+            </div >
+            <div className="barber-profile-footer">
+                <div className='progress-bar'>
+                    <div className='progress-bar-line' style={{ width: `${resStep * 25}%` }}></div>
+                </div>
+                <div className="nav-container">
+                    <div className="nav-steps">
+                        {/* control the steps of the reservation */}
+                        <button className="nav-btn back"
+                            onClick={() => {
+                                if (resStep === 1) navigate('/');
+                                setResStep(resStep - 1)
+                            }
+                            }
 
-                    {resStep === 5 && <div className="reservation-step-5">
-                        Step 5 - validate using 4 number random code hard coded
-                        <h1>
-                            {reservation.service.title}
-                        </h1>
-                        <h2>
-                            {reservation.date.dayName} {reservation.date.dayNum} {reservation.date.monthName}
-                        </h2>
-                        <h3>
-                            {reservation.time}
-                        </h3>
-                        <div className="reservation-form">
-                            <form onSubmit={handleFullSubmit}>
-                                <input type="text" placeholder="קוד אימות" />
-                                <button>שלח</button>
-                            </form>
-                        </div>
-                    </div>}
+                        >
+                            {resStep === 1 ? 'ביטול' : 'הקודם'}
+                        </button>
+                        <button className="nav-btn next"
+                            disabled={isNextBtnDisabled()}
+                            onClick={() => {
+                                if (resStep === 3) toggleModal();
+                                if (resStep === 4) {
+                                    nextBtnRef.current.click();
+                                    return;
+                                }
+                                if (resStep === 5) {
+                                    handleFullSubmit();
+                                    return;
+                                }
+                                setResStep(resStep + 1)
+                            }
+                            }
+                        // type={resStep === 4 ? 'submit' : 'button'}
+                        >
+                            {getNextBtnText()}
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div >
+        </React.Fragment>
     );
 }

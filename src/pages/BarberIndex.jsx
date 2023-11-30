@@ -8,25 +8,26 @@ export function BarberIndex() {
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
     const navigate = useNavigate()
 
-    useEffect(() => {
-        loadUsers()
-    }, [])
+    // useEffect(() => {
+    //     loadUsers()
+    // }, [])
 
-    useEffect(() => {
-        window.addEventListener('resize', () => {
-            setIsMobile(window.innerWidth < 768)
-        })
-        return () => {
-            window.removeEventListener('resize', () => {
-                setIsMobile(window.innerWidth < 768)
-            })
-        }
+    // useEffect(() => {
+    //     window.addEventListener('resize', () => {
+    //         setIsMobile(window.innerWidth < 768)
+    //     })
+    //     return () => {
+    //         window.removeEventListener('resize', () => {
+    //             setIsMobile(window.innerWidth < 768)
+    //         })
+    //     }
 
-    }, [window.innerWidth])
+    // }, [window.innerWidth])
 
 
     const barbers = users.filter(user => user.isBarber)
-    console.log('barbers', barbers);
+    console.log(barbers);
+    if (!barbers) return <div>Loading...</div>
 
     return (
         <div className="barber-index main-layout">

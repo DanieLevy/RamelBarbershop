@@ -98,7 +98,7 @@ function getDayNameInHebrew(dayName) {
 }
 
 function getNextWeekDates() {
-    moment.locale('he'); // Set the locale globally to Hebrew
+    // moment.locale('he'); // Set the locale globally to Hebrew
     const today = 'היום';
     const tomorrow = 'מחר';
 
