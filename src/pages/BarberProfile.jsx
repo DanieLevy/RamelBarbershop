@@ -29,6 +29,7 @@ export function BarberProfile() {
     const [enteredCode, setEnteredCode] = useState(null);
     const [datesModal, setDatesModal] = useState(false);
     const [isInputFocused, setIsInputFocused] = useState(false);
+
     const [reservation, setReservation] = useState({
         service: null,
         date: {
@@ -350,7 +351,9 @@ export function BarberProfile() {
                                         <button key={idx} className={`reservation-day ${reservation.date.dayNum === date.dayNum ? 'selected' : ''}`}
                                             onClick={() => onDayClick(date)}
                                             disabled={date.isWorking === false}
+                                            // when mouse hover on the day, show the day name
 
+                                            title={`${date.dayName} ${date.isWorking === false ? '(המספרה סגורה)' : ''}`}
                                         >
                                             <div className="day-label">{date.dayName}</div>
                                             <div className="day-num">{date.dayNum}</div>

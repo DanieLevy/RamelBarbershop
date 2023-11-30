@@ -225,6 +225,13 @@
                             outline: 2px solid #222222 !important;
                             background-color: #f7f7f7 !important;
                         }
+
+                        &:disabled {
+                            background-color: #e5e5e5;
+                            color: #22222261;
+                            cursor: not-allowed;
+                            transition: all .4s ease-in-out;
+                        }
                     }
 
                 }
