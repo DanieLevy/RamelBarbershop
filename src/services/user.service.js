@@ -112,6 +112,11 @@ async function _createLocalUser() {
   console.log('creating local user');
   const user = getLoggedinUser()
   console.log('user', user);
+  // if user exist - remove it
+  if (user) {
+    console.log('removing local user');
+    await logout()
+  }
   if (!user) {
     console.log('creating local userjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj');
     await userService.signup({ fullname: 'Ramel Lausani', username: "ramel", password: 'ramel123', isBarber: true, imgUrl: 'https://iili.io/JxtxGON.md.jpg' })
