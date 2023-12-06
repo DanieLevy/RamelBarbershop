@@ -42,6 +42,7 @@ function remove(userId) {
 
 async function update(user) {
 const urlReq = `${updateBarber}/${user._id}`
+console.log('user from update', user);
   const barber = await axios.put(urlReq, user)
   console.log('barber from update', barber);
   return saveLocalUser(barber)

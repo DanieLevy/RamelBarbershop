@@ -117,7 +117,7 @@ export function BarberProfile() {
         if (enteredCode === OTPCode) {
             //  build full reservation object -
             const fullReservation = {
-                id: utilService.makeId(),
+                _id: utilService.makeId(),
                 customer: reservation.user,
                 barberId: barber._id,
                 service: reservation.service,
@@ -130,13 +130,10 @@ export function BarberProfile() {
             };
 
             console.log('fullReservation', fullReservation);
-    
-            // update the barber reservations array with the new reservation
             barber.reservations.push(fullReservation);
-            // update the user with the new reservation
-            const user = { ...reservation.user, reservations: barber.reservations };
+            const user = { ...barber };
             onUpdateUser(user);
-    
+
             console.log('User updated!');
             console.log('user', user);
         } else {
