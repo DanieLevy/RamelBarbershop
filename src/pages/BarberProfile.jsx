@@ -59,8 +59,8 @@ export function BarberProfile() {
             return;
         }
         const barberUser = users.find((user) => user._id === barberId) || null;
-        // console.log('barberUser', barberUser);
         setBarber(barberUser);
+        console.log('barberUser', barberUser);
     }, [barberId, users]);
 
 
@@ -121,27 +121,26 @@ export function BarberProfile() {
                 customer: reservation.user,
                 barberId: barber._id,
                 service: reservation.service,
-                date: JSON.stringify({
+                date: {
                     dayName: reservation.date.dayName,
                     dayNum: reservation.date.dayNum,
                     dateTimestamp: reservation.date.dateTimestamp,
                     timeTimestamp: reservation.date.timeTimestamp,
-                }),
+                },
             };
 
             console.log('fullReservation', fullReservation);
     
-            const user = {
-                ...barber,
-                reservations: [...barber.reservations, fullReservation],
-            };
-    
+            // update the barber reservations array with the new reservation
+            barber.reservations.push(fullReservation);
+            // update the user with the new reservation
+            const user = { ...reservation.user, reservations: barber.reservations };
             onUpdateUser(user);
     
             console.log('User updated!');
             console.log('user', user);
         } else {
-            alert('קוד אימות שגוי');
+            toast.error('הקוד שהוזן אינו נכון');
         }
     }
 
@@ -174,10 +173,19 @@ export function BarberProfile() {
 
     function isTimeTaken(day, time) {
         // log all the reservations of the barber
-        console.log('barber.reservationsjjj', barber.reservations);
+        console.log('barber.reservationsjjj', barber.reservations)
+        // convert barber.reservations.[res].date to object
+
         const isTimeTaken = barber.reservations.some(res =>
+            // convert res.date to object
             res.date.dayName === day.dayName && res.date.timeTimestamp === time
         );
+
+
+
+        // const isTimeTaken = barber.reservations.some(res =>
+        //     res.date.dayName === day.dayName && res.date.timeTimestamp === time
+        // );
         return isTimeTaken;
     }
 
