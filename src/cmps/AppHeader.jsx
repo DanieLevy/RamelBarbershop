@@ -26,7 +26,7 @@ export function AppHeader() {
 
   useEffect(() => {
     if (!users || !users.length) {
-      // loadUsers();
+      loadUsers();
       return;
     }
     const barberId = location.pathname.split('/')[2];
@@ -37,7 +37,6 @@ export function AppHeader() {
       return;
     }
     setBarber(barberUser);
-
   }, [location, users]);
 
 

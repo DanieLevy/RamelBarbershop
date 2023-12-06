@@ -10,7 +10,9 @@ export async function loadUsers() {
   try {
     store.dispatch({ type: LOADING_START })
     const users = await userService.getUsers()
-    store.dispatch({ type: SET_USERS, users })
+    console.log('users from actions', users.data);
+    const barbers = users.data.filter(user => user.isBarber)
+    store.dispatch({ type: SET_USERS, users: barbers })
   } catch (err) {
     console.log('UserActions: err in loadUsers', err)
   } finally {
@@ -85,7 +87,9 @@ export async function loadUser(userId) {
 
 export async function updateUser(user) {
   try {
+    console.log('user from actions', user);
     const updatedUser = await userService.update(user)
+    console.log('updatedUser from actions', updatedUser);
     store.dispatch({ type: SET_USER, user: updatedUser })
     return updatedUser
   } catch (err) {

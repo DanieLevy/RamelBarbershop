@@ -54,18 +54,19 @@ export function BarberProfile() {
 
     useEffect(() => {
         if (!users || !users.length) {
+            console.log('no users');
             loadUsers();
             return;
         }
-
         const barberUser = users.find((user) => user._id === barberId) || null;
+        // console.log('barberUser', barberUser);
         setBarber(barberUser);
     }, [barberId, users]);
 
 
     useEffect(() => {
-        console.log('reservation', reservation);
-        console.log('barber', barber);
+        // console.log('reservation', reservation);
+
     }, [reservation]);
 
 
@@ -101,6 +102,7 @@ export function BarberProfile() {
 
     async function onUpdateUser(user) {
         try {
+            console.log('onUpdateUser user', user);
             await updateUser(user);
             toast.success('התור נקבע בהצלחה!');
             setResStep(6);
@@ -115,7 +117,7 @@ export function BarberProfile() {
         if (enteredCode === OTPCode) {
             //  build full reservation object -
             const fullReservation = {
-                _id: utilService.makeId(),
+                id: utilService.makeId(),
                 customer: reservation.user,
                 barberId: barber._id,
                 service: reservation.service,

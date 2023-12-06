@@ -4,7 +4,7 @@ import { loadUsers } from "../store/actions/user.actions"
 import { useNavigate } from "react-router"
 
 export function BarberIndex() {
-    const users = useSelector((storeState) => storeState.userModule.users.data || [])
+    const users = useSelector((storeState) => storeState.userModule.users)
     // console.log('dsuhiafhdusfhuifhsfuishfuisahfsauifhsa', users);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
     const navigate = useNavigate()
@@ -28,7 +28,7 @@ export function BarberIndex() {
 
 
     const barbers = users.filter(user => user.isBarber)
-    // console.log('barbers', barbers);
+    console.log('barbers', barbers);
     if (!barbers) return <div>Loading...</div>
 
     return (
