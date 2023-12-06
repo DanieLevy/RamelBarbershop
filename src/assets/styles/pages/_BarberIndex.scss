@@ -314,3 +314,9 @@
         height: 5px;
     }
 }
+
+.upload-widget__image-editor img {
+    object-fit: cover;
+    width: 100px;
+    height: 100px;
+}

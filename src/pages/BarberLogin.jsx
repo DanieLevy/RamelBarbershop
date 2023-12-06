@@ -34,6 +34,7 @@ export function BarberLogin() {
         try {
             console.log('credentials', credentials);
             const user = await signup(credentials)
+            console.log('user', user);
             toast.success(`Welcome ${user.fullname}`)
             closeModal()
         } catch (err) {

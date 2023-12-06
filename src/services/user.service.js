@@ -101,9 +101,19 @@ async function changeScore(by) {
 }
 
 function saveLocalUser(user) {
-  user = { _id: user._id, fullname: user.fullname, imgUrl: user.imgUrl }
-  sessionStorage.setItem(STORAGE_KEY_LOGGEDIN_USER, JSON.stringify(user))
-  return user
+  console.log('user from saveLocalUser', user);
+  const { barber } = user.data
+  const returnBarber = {
+    _id: barber._id,
+    username: barber.username,
+    fullname: barber.fullname,
+    imgUrl: barber.imgUrl,
+    workDays: barber.workDays,
+    reservations: barber.reservations,
+    isBarber: barber.isBarber,
+  }
+  sessionStorage.setItem(STORAGE_KEY_LOGGEDIN_USER, JSON.stringify(returnBarber))
+  return returnBarber
 }
 
 function getLoggedinUser() {
