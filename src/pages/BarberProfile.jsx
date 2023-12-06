@@ -168,6 +168,8 @@ export function BarberProfile() {
     }
 
     function isTimeTaken(day, time) {
+        // log all the reservations of the barber
+        console.log('barber.reservationsjjj', barber.reservations);
         const isTimeTaken = barber.reservations.some(res =>
             res.date.dayName === day.dayName && res.date.timeTimestamp === time
         );
