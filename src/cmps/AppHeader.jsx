@@ -21,12 +21,12 @@ export function AppHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(window.scrollY === 0 ? false : true);
   const [isHomePage, setIsHomePage] = useState(location.pathname === '/' ? true : false);
   const [isBarberPage, setIsBarberPage] = useState(location.pathname.includes('/barber') ? true : false);
-  const users = useSelector(state => state.userModule.users)
+  const users = useSelector(state => state.userModule.users || []);
   const [barber, setBarber] = useState(null);
 
   useEffect(() => {
     if (!users || !users.length) {
-      loadUsers();
+      // loadUsers();
       return;
     }
     const barberId = location.pathname.split('/')[2];

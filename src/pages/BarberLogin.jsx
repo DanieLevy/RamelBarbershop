@@ -19,6 +19,7 @@ export function BarberLogin() {
 
     async function onLogin(credentials) {
         try {
+            // console.log('credentials', credentials);
             const user = await login(credentials)
             toast.success(`Welcome back ${user.fullname}`)
 
@@ -31,6 +32,7 @@ export function BarberLogin() {
 
     async function onSignup(credentials) {
         try {
+            console.log('credentials', credentials);
             const user = await signup(credentials)
             toast.success(`Welcome ${user.fullname}`)
             closeModal()

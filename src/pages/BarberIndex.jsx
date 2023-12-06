@@ -4,12 +4,14 @@ import { loadUsers } from "../store/actions/user.actions"
 import { useNavigate } from "react-router"
 
 export function BarberIndex() {
-    const users = useSelector((storeState) => storeState.userModule.users)
+    const users = useSelector((storeState) => storeState.userModule.users.data || [])
+    // console.log('dsuhiafhdusfhuifhsfuishfuisahfsauifhsa', users);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
     const navigate = useNavigate()
 
     useEffect(() => {
         loadUsers()
+        // console.log(users);
     }, [])
 
     useEffect(() => {
@@ -26,7 +28,7 @@ export function BarberIndex() {
 
 
     const barbers = users.filter(user => user.isBarber)
-    console.log(barbers);
+    // console.log('barbers', barbers);
     if (!barbers) return <div>Loading...</div>
 
     return (

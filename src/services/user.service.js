@@ -2,7 +2,7 @@ import { toast } from 'react-toastify'
 import { storageService } from './async-storage.service'
 import { httpService } from './http.service'
 import axios from 'axios'
-import { getBarbers } from '../utils/APIRouts.js'
+import { getBarbers, barberLogin, barberRegister, getBarber, updateBarber, deleteBarber } from '../utils/APIRouts.js'
 
 const STORAGE_KEY_LOGGEDIN_USER = 'loggedinUser'
 
@@ -59,9 +59,9 @@ async function login(userCred) {
 }
 
 async function signup(userCred) {
-  const users = await storageService.query('user')
-  const userExist = users.find(user => user.username === userCred.username)
-
+  // Using axios
+  const users = await axios.get(getBarbers)
+  const userExist = users.data.find(user => user.username === userCred.username)
   if (userExist) {
     console.log('user name already exist');
     return
@@ -81,8 +81,7 @@ async function signup(userCred) {
     ]
       : console.log('not barber');
     
-    const user = await storageService.post('user', userCred)
-    //   const user = await httpService.post('auth/signup', userCred)
+    const user = await axios.post(barberRegister, userCred)
     console.log('user', user);
     return saveLocalUser(user)
   }
