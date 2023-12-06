@@ -61,6 +61,7 @@ async function login(userCred) {
 async function signup(userCred) {
   // Using axios
   const users = await axios.get(getBarbers)
+  console.log('users oko okoo okoko', users);
   const userExist = users.data.find(user => user.username === userCred.username)
   if (userExist) {
     console.log('user name already exist');
@@ -82,7 +83,6 @@ async function signup(userCred) {
       : console.log('not barber');
     
     const user = await axios.post(barberRegister, userCred)
-    console.log('user', user);
     return saveLocalUser(user)
   }
 }
