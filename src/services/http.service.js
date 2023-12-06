@@ -1,9 +1,5 @@
 import Axios from 'axios'
-
-const BASE_URL = process.env.NODE_ENV === 'production'
-    ? '/api/'
-    : '//localhost:3030/api/'
-
+import { barberAPI } from '../utils/APIRouts.js'
 
 var axios = Axios.create({
     withCredentials: true
@@ -11,27 +7,31 @@ var axios = Axios.create({
 
 export const httpService = {
     get(endpoint, data) {
-        return ajax(endpoint, 'GET', data)
+        console.log('data: ', data);
+        console.log('endpoint: ', endpoint);
+        return ajax(barberAPI[endpoint], 'GET', data);
     },
     post(endpoint, data) {
-        return ajax(endpoint, 'POST', data)
+        return ajax(barberAPI[endpoint], 'POST', data);
     },
     put(endpoint, data) {
-        return ajax(endpoint, 'PUT', data)
+        return ajax(barberAPI[endpoint], 'PUT', data);
     },
     delete(endpoint, data) {
-        return ajax(endpoint, 'DELETE', data)
+        return ajax(barberAPI[endpoint], 'DELETE', data);
     }
-}
+};
 
 async function ajax(endpoint, method = 'GET', data = null) {
     try {
         const res = await axios({
-            url: `${BASE_URL}${endpoint}`,
+            url: `${endpoint}`,
             method,
             data,
             params: (method === 'GET') ? data : null
         })
+        console.log('res: ', res);
+        console.log('res.data: ', res.data);
         return res.data
     } catch (err) {
         console.log(`Had Issues ${method}ing to the backend, endpoint: ${endpoint}, with data: `, data)

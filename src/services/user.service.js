@@ -23,8 +23,8 @@ window.userService = userService
 _createLocalUser()
 
 function getUsers() {
-  return storageService.query('user')
-  // return httpService.get(`user`)
+  // return storageService.query('user')
+  return httpService.get(`getBarbers`)
 }
 
 async function getById(userId) {
