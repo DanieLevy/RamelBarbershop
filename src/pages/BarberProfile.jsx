@@ -121,20 +121,25 @@ export function BarberProfile() {
                 customer: reservation.user,
                 barberId: barber._id,
                 service: reservation.service,
-                date: reservation.date,
-            }
-            console.log('fullReservation', fullReservation);
+                date: JSON.stringify({
+                    dayName: reservation.date.dayName,
+                    dayNum: reservation.date.dayNum,
+                    dateTimestamp: reservation.date.dateTimestamp,
+                    timeTimestamp: reservation.date.timeTimestamp,
+                }),
+            };
 
+            console.log('fullReservation', fullReservation);
+    
             const user = {
                 ...barber,
-                reservations: [...barber.reservations, fullReservation]
-            }
-            // updateUser(user);
+                reservations: [...barber.reservations, fullReservation],
+            };
+    
             onUpdateUser(user);
-
+    
             console.log('User updated!');
             console.log('user', user);
-
         } else {
             alert('קוד אימות שגוי');
         }
