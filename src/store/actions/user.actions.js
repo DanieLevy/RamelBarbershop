@@ -87,10 +87,9 @@ export async function loadUser(userId) {
 
 export async function updateUser(user) {
   try {
-    console.log('user from actions', user);
     const updatedUser = await userService.update(user)
-    console.log('updatedUser from actions', updatedUser);
-    store.dispatch({ type: SET_USER, user: updatedUser })
+    const barbers = await userService.getUsers()
+    store.dispatch({ type: SET_USERS, users: barbers.data })
     return updatedUser
   } catch (err) {
     showErrorMsg('Cannot update user')

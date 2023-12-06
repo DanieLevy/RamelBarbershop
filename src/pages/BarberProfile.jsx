@@ -60,14 +60,12 @@ export function BarberProfile() {
         }
         const barberUser = users.find((user) => user._id === barberId) || null;
         setBarber(barberUser);
-        console.log('barberUser', barberUser);
     }, [barberId, users]);
 
 
-    useEffect(() => {
-        // console.log('reservation', reservation);
-
-    }, [reservation]);
+    // useEffect(() => {
+    //     console.log('reservation', reservation);
+    // }, [reservation]);
 
 
     function onServiceClick(opt) {
@@ -76,16 +74,12 @@ export function BarberProfile() {
     }
 
     function onDayClick(day) {
-        console.log('day', day);
         renderTimeSlots(day);
-        // Dont remove the prev date object, just add the new data to it
         setReservation({ ...reservation, date: { ...reservation.date, ...day } });
         setResStep(3);
     }
 
     function onTimeClick(time) {
-        // console.log('time', time);
-        // add to reservation object the time of the reservation under the key 'date' with all the other data of date
         setReservation({ ...reservation, date: { ...reservation.date, timeTimestamp: time } });
         setResStep(4);
     }
@@ -93,8 +87,7 @@ export function BarberProfile() {
     function handleSubmit(ev) {
         ev.preventDefault();
         setReservation({ ...reservation, user: { fullname: ev.target[0].value, phone: ev.target[1].value } });
-        // generate random code and save it into state
-        // random code -
+
         const OTPCode = utilService.getRandomOTP();
         setOTPCode(OTPCode);
         setResStep(5);
@@ -133,9 +126,6 @@ export function BarberProfile() {
             barber.reservations.push(fullReservation);
             const user = { ...barber };
             onUpdateUser(user);
-
-            console.log('User updated!');
-            console.log('user', user);
         } else {
             toast.error('הקוד שהוזן אינו נכון');
         }
@@ -169,25 +159,12 @@ export function BarberProfile() {
     }
 
     function isTimeTaken(day, time) {
-        // log all the reservations of the barber
-        console.log('barber.reservationsjjj', barber.reservations)
-        // convert barber.reservations.[res].date to object
-
         const isTimeTaken = barber.reservations.some(res =>
-            // convert res.date to object
-            res.date.dayName === day.dayName && res.date.timeTimestamp === time
-        );
-
-
-
-        // const isTimeTaken = barber.reservations.some(res =>
-        //     res.date.dayName === day.dayName && res.date.timeTimestamp === time
-        // );
+            res.date.dayName === day.dayName && res.date.timeTimestamp === time);
         return isTimeTaken;
     }
 
     function generateHalfHourTimestamps(baseTimestamp) {
-        // console.log('baseTimestamp', baseTimestamp);
         const baseDate = moment.unix(baseTimestamp);
         const dayName = baseDate.format('dddd').toLowerCase();
 
@@ -196,7 +173,6 @@ export function BarberProfile() {
 
         const timestamps = [];
 
-        // Generate timestamps for each half-hour between start and end time
         let currentTimestamp = startTime.clone();
         while (currentTimestamp.isBefore(endTime)) {
             timestamps.push(currentTimestamp.unix());

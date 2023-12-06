@@ -16,13 +16,13 @@ export const userService = {
   getById,
   remove,
   update,
-  changeScore,
   getEmptyCredentials,
   demoUser,
 }
 
 window.userService = userService
 _createLocalUser()
+
 
 function getUsers() {
   // return storageService.query('user')
@@ -42,10 +42,10 @@ function remove(userId) {
 
 async function update(user) {
 const urlReq = `${updateBarber}/${user._id}`
-console.log('user from update', user);
   const barber = await axios.put(urlReq, user)
-  console.log('barber from update', barber);
-  return saveLocalUser(barber)
+  // update user using actions
+  
+  return barber
 }
 
 async function login(userCred) {
@@ -60,15 +60,12 @@ async function login(userCred) {
 }
 
 async function signup(userCred) {
-  // Using axios
   const users = await axios.get(getBarbers)
-  console.log('users oko okoo okoko', users);
   const userExist = users.data.find(user => user.username === userCred.username)
   if (userExist) {
     console.log('user name already exist');
     return
   } else {
-    // else do nothing
     userCred.isBarber ? userCred.workDays = getDefultWorkDays() : console.log('not barber');
     userCred.isBarber ? userCred.reservations = [
       {
@@ -93,17 +90,8 @@ async function logout() {
   // return await httpService.post('auth/logout')
 }
 
-async function changeScore(by) {
-  const user = getLoggedinUser()
-  if (!user) throw new Error('Not loggedin')
-  user.score = user.score + by || by
-  await update(user)
-  return user.score
-}
 
-function saveLocalUser(user) {
-  console.log('user from saveLocalUser', user);
-  const { barber } = user.data
+function saveLocalUser(barber) {
   const returnBarber = {
     _id: barber._id,
     username: barber.username,
@@ -122,19 +110,14 @@ function getLoggedinUser() {
 }
 
 async function _createLocalUser() {
-  console.log('creating local user');
-  const users = await storageService.query('user')
-  const user = users.find(user => user.username === 'ramel')
+  const barbers = await userService.getUsers()
 
-  // if (user) {
-  //   console.log('removing local user');
-  //   toast.info('Removing local user')
-  //   await logout()
-  // }
-  if (!user) {
+  if (!barbers.data.length) {
     console.log('creating local user');
     toast.info('Creating local user')
     await userService.signup({ fullname: 'Ramel Lausani', username: "ramel", password: 'ramel123', isBarber: true, imgUrl: 'https://iili.io/JxtxGON.md.jpg' })
+  } else {
+    console.log('barbershop user exist');
   }
 }
 
