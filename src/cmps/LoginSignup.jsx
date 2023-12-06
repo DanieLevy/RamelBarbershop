@@ -63,7 +63,7 @@ export function LoginSignup(props) {
           }
         ]
       }
-
+      // console.log('signup credentials', credentials);
       signup(credentials);
     } else {
       if (!credentials.username || !credentials.password)

@@ -45,6 +45,7 @@ export async function login(credentials) {
 export async function signup(credentials) {
   try {
     credentials.isAdmin = false
+    credentials.isBarber === true ? console.log('is barber') : console.log('is not barber');
     const user = await userService.signup(credentials)
     store.dispatch({
       type: SET_USER,
