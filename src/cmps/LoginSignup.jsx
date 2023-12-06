@@ -45,7 +45,8 @@ export function LoginSignup(props) {
       if (
         !credentials.username ||
         !credentials.password ||
-        !credentials.fullname
+        !credentials.fullname ||
+        !credentials.email
       )
         return console.log("All fields are required"), clearState();
         // if isBarber checked, add reservations empty array to user, else dont add
@@ -112,6 +113,20 @@ export function LoginSignup(props) {
             onChange={handleChange}
             required
           />
+          {isSignup && (
+            <label htmlFor="email">
+              <span className="red-dot">*</span> Email:
+            </label>
+          )}
+          {isSignup && (
+            <input
+              type="email"
+              name="email"
+              className="input input-email"
+              onChange={handleChange}
+              required
+            />
+          )}
           <label htmlFor="password">
             <span className="red-dot">*</span> Password:
           </label>
