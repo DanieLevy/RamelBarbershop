@@ -1,6 +1,8 @@
 import { toast } from 'react-toastify'
 import { storageService } from './async-storage.service'
 import { httpService } from './http.service'
+import axios from 'axios'
+import { getBarbers } from '../utils/APIRouts.js'
 
 const STORAGE_KEY_LOGGEDIN_USER = 'loggedinUser'
 
@@ -24,7 +26,7 @@ _createLocalUser()
 
 function getUsers() {
   // return storageService.query('user')
-  return httpService.get(`getBarbers`)
+  return axios.get(getBarbers)
 }
 
 async function getById(userId) {

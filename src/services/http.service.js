@@ -1,6 +1,5 @@
 import Axios from 'axios'
-import { barberAPI } from '../utils/APIRouts.js'
-
+// import { barberAPI } from './api.service.js'
 var axios = Axios.create({
     withCredentials: true
 })
