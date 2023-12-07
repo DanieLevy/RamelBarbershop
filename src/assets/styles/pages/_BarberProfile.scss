@@ -327,7 +327,7 @@
                     width: 100%;
                     flex-wrap: wrap;
                     padding: 10px 0;
-                    height: calc(100vh - 350px);
+                    height: fit-content;
                     overflow-y: scroll;
 
                     @include for-mobile-layout {
