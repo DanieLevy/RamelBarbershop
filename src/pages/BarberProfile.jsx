@@ -107,8 +107,6 @@ export function BarberProfile() {
 
 
     function handleFullSubmit() {
-        if (enteredCode === OTPCode) {
-            //  build full reservation object -
             const fullReservation = {
                 _id: utilService.makeId(),
                 customer: reservation.user,
@@ -126,9 +124,6 @@ export function BarberProfile() {
             barber.reservations.push(fullReservation);
             const user = { ...barber };
             onUpdateUser(user);
-        } else {
-            toast.error('הקוד שהוזן אינו נכון');
-        }
     }
 
 
@@ -199,7 +194,7 @@ export function BarberProfile() {
         // if (resStep === 5 && enteredCode && enteredCode.length !== 4) return true;
         // // only if we have otpcode, check if the entered code is not equal to the otpcode
         // if (resStep === 5 && OTPCode && enteredCode !== OTPCode) return true;
-        if (resStep === 5 && OTPCode.length !== 6) return true;
+        if (resStep === 5 && OTPCode ? OTPCode.length !== 6 : true) return true;
 
         return false;
     }
@@ -317,14 +312,17 @@ export function BarberProfile() {
     const verifyOtp = async () => {
         try {
             const data = await confirmation.confirm(OTPCode);
+            console.log('data', data);
             if (data.user) {
                 console.log('user exist');
                 toast.success('התור נקבע בהצלחה! (המשתמש קיים)');
+                handleFullSubmit();
                 setResStep(6);
                 return;
             } else {
                 console.log('user not exist');
                 toast.success('התור נקבע בהצלחה! (המשתמש לא קיים)');
+                handleFullSubmit();
                 setResStep(6);
                 return;
             }
