@@ -177,25 +177,26 @@ export function BarberProfile() {
         return timestamps;
     }
 
+    useEffect(() => {
+        console.log(reservation);
+        console.log('resStep', resStep);
+    }, [reservation]);
+
     function isNextBtnDisabled() {
         if (resStep === 1 && reservation.service === null) return true;
         if (resStep === 2 && reservation.date.dayName === '' && reservation.date.dayNum === '') return true;
         if (resStep === 3 && reservation.date.timeTimestamp === null) return true;
-        if (resStep === 4 && reservation.user.fullname === '' && reservation.user.phone === null) return true;
+        // if (resStep === 4 && reservation.user.fullname === '' && reservation.user.phone === null) return true;
         // check phone length only if phone is not null or undefined
-        if (resStep === 4 && reservation.user.phone && reservation.user.phone.length !== 10) return true;
-        if (resStep === 4 && reservation.user.phone === "") return true;
-        if (resStep === 4 && reservation.user.phone === null) return true;
-
-        if (resStep === 4 && reservation.user.fullname === "") return true;
+        // if (resStep === 4 && reservation.user.phone && reservation.user.phone.length !== 10) return true;
 
         // if (resStep === 5 && enteredCode === null) return true;
         // // only if entredcode, check if length is not equal to 4
         // if (resStep === 5 && enteredCode && enteredCode.length !== 4) return true;
         // // only if we have otpcode, check if the entered code is not equal to the otpcode
         // if (resStep === 5 && OTPCode && enteredCode !== OTPCode) return true;
+        if (resStep === 4 && reservation.user.fullname !== '' && reservation.user.phone !== null && reservation.user.phone.length === 10) return false;
         if (resStep === 5 && OTPCode ? OTPCode.length !== 6 : true) return true;
-
         return false;
     }
 
