@@ -12,6 +12,12 @@ import he from 'date-fns/locale/he';
 import { set } from 'date-fns';
 import { toast } from 'react-toastify';
 import { is } from 'date-fns/locale';
+import io from 'socket.io-client';
+import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { auth } from '../firebase/setup';
+import { OTPCodeCmp } from '../cmps/OTPCode';
+
+const socket = io.connect('http://localhost:5000');
 
 
 export function BarberProfile() {
@@ -62,10 +68,18 @@ export function BarberProfile() {
         setBarber(barberUser);
     }, [barberId, users]);
 
+    // connect to the socket server
+    useEffect(() => {
+        socket.on('barberUpdated', (updatedBarber) => {
+            console.log('Received barberUpdated event from client side:', updatedBarber);
+            // Handle the updated barber data as needed
+        });
 
-    // useEffect(() => {
-    //     console.log('reservation', reservation);
-    // }, [reservation]);
+        return () => {
+            // Clean up the event listener when the component unmounts
+            socket.off('barberUpdated');
+        };
+    }, [socket]);
 
 
     function onServiceClick(opt) {
@@ -445,6 +459,7 @@ export function BarberProfile() {
                                         >שלח</button>
                                     </form>
                                 </div>
+                                <OTPCodeCmp />
                             </div>}
 
                             {resStep === 5 && <div className="reservation-step-5">
@@ -499,6 +514,15 @@ export function BarberProfile() {
                                 </div>
                             </div>
                             }
+
+                            {resStep === '100' && <div className="reservation-step-100">
+                                <OTPCode 
+                                phoneNumber={reservation.user.phone}
+                                setOTPCode={setOTPCode}
+                                 />
+                                </div>
+
+                            }
                         </div>
                     </div>
                 </section>
@@ -525,8 +549,10 @@ export function BarberProfile() {
                             onClick={() => {
                                 if (resStep === 3) toggleModal();
                                 if (resStep === 4) {
-                                    nextBtnRef.current.click();
-                                    setResStep(resStep + 1)
+                                    // nextBtnRef.current.click();
+                                    // setResStep(resStep + 1)
+                                    setResStep('100');
+
                                     return;
                                 }
                                 if (resStep === 5) {
