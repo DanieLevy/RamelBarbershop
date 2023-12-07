@@ -69,17 +69,17 @@ export function BarberProfile() {
     }, [barberId, users]);
 
     // connect to the socket server
-    useEffect(() => {
-        socket.on('barberUpdated', (updatedBarber) => {
-            console.log('Received barberUpdated event from client side:', updatedBarber);
-            // Handle the updated barber data as needed
-        });
+    // useEffect(() => {
+    //     socket.on('barberUpdated', (updatedBarber) => {
+    //         console.log('Received barberUpdated event from client side:', updatedBarber);
+    //         // Handle the updated barber data as needed
+    //     });
 
-        return () => {
-            // Clean up the event listener when the component unmounts
-            socket.off('barberUpdated');
-        };
-    }, [socket]);
+    //     return () => {
+    //         // Clean up the event listener when the component unmounts
+    //         socket.off('barberUpdated');
+    //     };
+    // }, [socket]);
 
 
     function onServiceClick(opt) {
