@@ -1,5 +1,5 @@
-// export const host = "https://danielevy-backend.onrender.com";
-export const host = "http://localhost:5000";
+export const host = "https://danielevy-backend.onrender.com";
+// export const host = "http://localhost:5000";
 // rewrite all barber routes to use barber.* instead of barber.*
 export const getBarbers = `${host}/api/barbershop/users`;
 export const barberLogin = `${host}/api/barbershop/login`;
