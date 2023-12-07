@@ -16,6 +16,7 @@ import io from 'socket.io-client';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { auth } from '../firebase/setup';
 import { OTPCodeCmp } from '../cmps/OTPCode';
+import "react-phone-input-2/lib/style.css";
 
 // const socket = io.connect('http://localhost:5000');
 
@@ -35,6 +36,8 @@ export function BarberProfile() {
     const [enteredCode, setEnteredCode] = useState(null);
     const [datesModal, setDatesModal] = useState(false);
     const [isInputFocused, setIsInputFocused] = useState(false);
+    const [error, setError] = useState(null);
+    const [confirmation, setConfirmation] = useState(null);
 
     const [reservation, setReservation] = useState({
         service: null,
@@ -68,20 +71,6 @@ export function BarberProfile() {
         setBarber(barberUser);
     }, [barberId, users]);
 
-    // connect to the socket server
-    // useEffect(() => {
-    //     socket.on('barberUpdated', (updatedBarber) => {
-    //         console.log('Received barberUpdated event from client side:', updatedBarber);
-    //         // Handle the updated barber data as needed
-    //     });
-
-    //     return () => {
-    //         // Clean up the event listener when the component unmounts
-    //         socket.off('barberUpdated');
-    //     };
-    // }, [socket]);
-
-
     function onServiceClick(opt) {
         setReservation({ ...reservation, service: opt });
         setResStep(2);
@@ -101,10 +90,7 @@ export function BarberProfile() {
     function handleSubmit(ev) {
         ev.preventDefault();
         setReservation({ ...reservation, user: { fullname: ev.target[0].value, phone: ev.target[1].value } });
-
-        const OTPCode = utilService.getRandomOTP();
-        setOTPCode(OTPCode);
-        setResStep(5);
+        sendOtp();
     }
 
     async function onUpdateUser(user) {
@@ -208,11 +194,12 @@ export function BarberProfile() {
 
         if (resStep === 4 && reservation.user.fullname === "") return true;
 
-        if (resStep === 5 && enteredCode === null) return true;
-        // only if entredcode, check if length is not equal to 4
-        if (resStep === 5 && enteredCode && enteredCode.length !== 4) return true;
-        // only if we have otpcode, check if the entered code is not equal to the otpcode
-        if (resStep === 5 && OTPCode && enteredCode !== OTPCode) return true;
+        // if (resStep === 5 && enteredCode === null) return true;
+        // // only if entredcode, check if length is not equal to 4
+        // if (resStep === 5 && enteredCode && enteredCode.length !== 4) return true;
+        // // only if we have otpcode, check if the entered code is not equal to the otpcode
+        // if (resStep === 5 && OTPCode && enteredCode !== OTPCode) return true;
+        if (resStep === 5 && OTPCode.length !== 6) return true;
 
         return false;
     }
@@ -292,10 +279,67 @@ export function BarberProfile() {
             },
         ];
 
+
+    // OTP 
+    const sendOtp = async () => {
+        const phoneNumber = `+972${reservation.user.phone}`;
+        console.log('phoneNumber', phoneNumber);
+        // phone number to string
+        try {
+            const recaptcha = new RecaptchaVerifier(auth, "recaptcha", {
+                size: "invisible",
+                callback: (response) => {
+                    console.log('response', response);
+                },
+            });
+
+            const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptcha);
+            setConfirmation(confirmation);
+            setResStep(5);
+            toast.success('קוד אימות נשלח לטלפון שלך');
+        } catch (err) {
+            console.error('Error sending OTP:', err);
+            toast.error('אירעה שגיאה, נסה שוב מאוחר יותר');
+
+            // Handle specific error types if needed
+            if (err instanceof AuthErrorCodes) {
+                // Handle authentication errors
+                setError(err.message);
+                toast.error('אירעה שגיאה, נסה שוב מאוחר יותר');
+            } else {
+                // Handle other types of errors
+                setError("An unexpected error occurred.");
+                toast.error('אירעה שגיאה, נסה שוב מאוחר יותר');
+            }
+        }
+    };
+
+    const verifyOtp = async () => {
+        try {
+            const data = await confirmation.confirm(OTPCode);
+            if (data.user) {
+                console.log('user exist');
+                toast.success('התור נקבע בהצלחה! (המשתמש קיים)');
+                setResStep(6);
+                return;
+            } else {
+                console.log('user not exist');
+                toast.success('התור נקבע בהצלחה! (המשתמש לא קיים)');
+                setResStep(6);
+                return;
+            }
+        } catch (err) {
+            console.log('Error verifying OTP', err);
+            setError("Failed to verify OTP. Please try again.");
+            toast.error('אירעה שגיאה, נסה שוב מאוחר יותר');
+        }
+    };
+
     if (!barber) return <div className='barber-profile main-layout'>Barber not found</div>;
 
     return (
         <React.Fragment>
+            <div id="recaptcha"></div>
             <div className="barber-profile main-layout">
                 <div className="barber-profile-header">
                     <div className='res-summary'>
@@ -459,7 +503,7 @@ export function BarberProfile() {
                                         >שלח</button>
                                     </form>
                                 </div>
-                                <OTPCodeCmp />
+                                {/* <OTPCodeCmp /> */}
                             </div>}
 
                             {resStep === 5 && <div className="reservation-step-5">
@@ -467,20 +511,15 @@ export function BarberProfile() {
                                     קוד אימות נשלח לטלפון שלך
                                 </h3>
                                 <div className="reservation-auth">
-                                    <div className="reservation-auth-text">
-                                        {OTPCode}
-                                    </div>
                                     <div className="reservation-auth-input">
                                         <OtpInput
                                             containerStyle='otp-container'
-                                            value={enteredCode}
-                                            onChange={(code) => setEnteredCode(code)}
-                                            numInputs={4}
+                                            value={OTPCode}
+                                            onChange={(code) => setOTPCode(code)}
+                                            numInputs={6}
                                             // handle dir ltr
                                             isInputNum={true}
                                             renderSeparator={<span>-</span>}
-                                            // add uniq classname for filled input
-                                            // handle the input to show numbers keyboard on mobile
                                             renderInput={(props) => <input
                                                 {...props}
                                                 type="number"
@@ -514,15 +553,6 @@ export function BarberProfile() {
                                 </div>
                             </div>
                             }
-
-                            {resStep === '100' && <div className="reservation-step-100">
-                                <OTPCode 
-                                phoneNumber={reservation.user.phone}
-                                setOTPCode={setOTPCode}
-                                 />
-                                </div>
-
-                            }
                         </div>
                     </div>
                 </section>
@@ -549,14 +579,11 @@ export function BarberProfile() {
                             onClick={() => {
                                 if (resStep === 3) toggleModal();
                                 if (resStep === 4) {
-                                    // nextBtnRef.current.click();
-                                    // setResStep(resStep + 1)
-                                    setResStep('100');
-
+                                    nextBtnRef.current.click();
                                     return;
                                 }
                                 if (resStep === 5) {
-                                    handleFullSubmit();
+                                    verifyOtp();
                                     return;
                                 }
                                 setResStep(resStep + 1)
