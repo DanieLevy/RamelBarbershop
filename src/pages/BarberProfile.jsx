@@ -17,7 +17,7 @@ import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { auth } from '../firebase/setup';
 import { OTPCodeCmp } from '../cmps/OTPCode';
 
-const socket = io.connect('http://localhost:5000');
+// const socket = io.connect('http://localhost:5000');
 
 
 export function BarberProfile() {
