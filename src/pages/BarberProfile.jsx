@@ -12,10 +12,8 @@ import he from 'date-fns/locale/he';
 import { set } from 'date-fns';
 import { toast } from 'react-toastify';
 import { is } from 'date-fns/locale';
-import io from 'socket.io-client';
-import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
-import { auth } from '../firebase/setup';
-import { OTPCodeCmp } from '../cmps/OTPCode';
+import { sendPhoneOtp, verifyOtp, getServices } from '../supabase/supabaseAuth';
+import { supabase } from '../supabase/supabaseClient';
 import "react-phone-input-2/lib/style.css";
 
 // const socket = io.connect('http://localhost:5000');
@@ -38,6 +36,8 @@ export function BarberProfile() {
     const [isInputFocused, setIsInputFocused] = useState(false);
     const [error, setError] = useState(null);
     const [confirmation, setConfirmation] = useState(null);
+    const [services, setServices] = useState([]);
+    const [isServicesLoading, setIsServicesLoading] = useState(false);
 
     const [reservation, setReservation] = useState({
         service: null,
@@ -60,16 +60,46 @@ export function BarberProfile() {
         };
     }, [isInputFocused]);
 
+    useEffect(() => {
+        // Add invisible recaptcha container
+        const recaptchaContainer = document.createElement('div');
+        recaptchaContainer.id = 'recaptcha-container';
+        document.body.appendChild(recaptchaContainer);
+
+        // Load services from Supabase
+        const loadServicesData = async () => {
+            setIsServicesLoading(true);
+            try {
+                const servicesData = await getServices();
+                setServices(servicesData);
+            } catch (error) {
+                console.error('Error loading services:', error);
+                toast.error('שגיאה בטעינת השירותים, אנא נסה שנית');
+            } finally {
+                setIsServicesLoading(false);
+            }
+        };
+
+        loadServicesData();
+
+        return () => {
+            // Clean up recaptcha container when component unmounts
+            const container = document.getElementById('recaptcha-container');
+            if (container) {
+                document.body.removeChild(container);
+            }
+        };
+    }, []);
 
     useEffect(() => {
         if (!users || !users.length) {
             console.log('no users');
-            loadUsers();
+            dispatch(loadUsers());
             return;
         }
         const barberUser = users.find((user) => user._id === barberId) || null;
         setBarber(barberUser);
-    }, [barberId, users]);
+    }, [barberId, users, dispatch]);
 
     function onServiceClick(opt) {
         setReservation({ ...reservation, service: opt });
@@ -96,7 +126,7 @@ export function BarberProfile() {
     async function onUpdateUser(user) {
         try {
             console.log('onUpdateUser user', user);
-            await updateUser(user);
+            await dispatch(updateUser(user));
             toast.success('התור נקבע בהצלחה!');
             setResStep(6);
         } catch (err) {
@@ -105,28 +135,25 @@ export function BarberProfile() {
         }
     }
 
-
     function handleFullSubmit() {
-            const fullReservation = {
-                _id: utilService.makeId(),
-                customer: reservation.user,
-                barberId: barber._id,
-                service: reservation.service,
-                date: {
-                    dayName: reservation.date.dayName,
-                    dayNum: reservation.date.dayNum,
-                    dateTimestamp: reservation.date.dateTimestamp,
-                    timeTimestamp: reservation.date.timeTimestamp,
-                },
-            };
+        const fullReservation = {
+            _id: utilService.makeId(),
+            customer: reservation.user,
+            barberId: barber._id,
+            service: reservation.service,
+            date: {
+                dayName: reservation.date.dayName,
+                dayNum: reservation.date.dayNum,
+                dateTimestamp: reservation.date.dateTimestamp,
+                timeTimestamp: reservation.date.timeTimestamp,
+            },
+        };
 
-            console.log('fullReservation', fullReservation);
-            barber.reservations.push(fullReservation);
-            const user = { ...barber };
-            onUpdateUser(user);
+        console.log('fullReservation', fullReservation);
+        barber.reservations.push(fullReservation);
+        const user = { ...barber };
+        onUpdateUser(user);
     }
-
-
 
     function formatTime(time) {
         const timestamp = moment.unix(time);
@@ -134,22 +161,42 @@ export function BarberProfile() {
         return timeStr;
     }
 
-    const ReserveationOpt = utilService.getReserveationOpt();
+    const ReserveationOpt = isServicesLoading ? [] : services;
 
-    function renderTimeSlots(baseTimestamp) {
-        const hoursObject = generateHalfHourTimestamps(baseTimestamp.dateTimestamp);
-        return hoursObject.map(timestamp => ({
-            timestamp,
-            isTaken: isTimeTaken(baseTimestamp, timestamp)
-        }));
+    async function renderTimeSlots(baseTimestamp) {
+        try {
+            // Use Supabase function to get available time slots
+            const { data, error } = await supabase.rpc('get_available_time_slots', {
+                p_barber_id: barber._id,
+                p_date_timestamp: baseTimestamp.dateTimestamp
+            });
+
+            if (error) throw error;
+
+            return data.map(slot => ({
+                timestamp: slot.time_timestamp,
+                isTaken: !slot.is_available
+            }));
+        } catch (error) {
+            console.error('Error getting time slots:', error);
+            
+            // Fallback to old method if Supabase function fails
+            const hoursObject = generateHalfHourTimestamps(baseTimestamp.dateTimestamp);
+            return hoursObject.map(timestamp => ({
+                timestamp,
+                isTaken: isTimeTaken(baseTimestamp, timestamp)
+            }));
+        }
     }
 
     function renderWeekDates() {
         const weekDates = utilService.getNextWeekDates();
-        weekDates.forEach(date => {
-            const dayName = moment.unix(date.dateTimestamp).format('dddd').toLowerCase();
-            if (!barber.workDays[dayName].isWorking) date.isWorking = false;
-        });
+        if (barber && barber.workDays) {
+            weekDates.forEach(date => {
+                const dayName = moment.unix(date.dateTimestamp).format('dddd').toLowerCase();
+                if (!barber.workDays[dayName].isWorking) date.isWorking = false;
+            });
+        }
         return weekDates;
     }
 
@@ -186,15 +233,6 @@ export function BarberProfile() {
         if (resStep === 1 && reservation.service === null) return true;
         if (resStep === 2 && reservation.date.dayName === '' && reservation.date.dayNum === '') return true;
         if (resStep === 3 && reservation.date.timeTimestamp === null) return true;
-        // if (resStep === 4 && reservation.user.fullname === '' && reservation.user.phone === null) return true;
-        // check phone length only if phone is not null or undefined
-        // if (resStep === 4 && reservation.user.phone && reservation.user.phone.length !== 10) return true;
-
-        // if (resStep === 5 && enteredCode === null) return true;
-        // // only if entredcode, check if length is not equal to 4
-        // if (resStep === 5 && enteredCode && enteredCode.length !== 4) return true;
-        // // only if we have otpcode, check if the entered code is not equal to the otpcode
-        // if (resStep === 5 && OTPCode && enteredCode !== OTPCode) return true;
         if (resStep === 4 && reservation.user.fullname !== '' && reservation.user.phone !== null && reservation.user.phone.length === 10) return false;
         if (resStep === 5 && OTPCode ? OTPCode.length !== 6 : true) return true;
         return false;
@@ -251,86 +289,62 @@ export function BarberProfile() {
     };
 
     const handleFocus2 = () => {
-        window.scrollTo(0, 0);
+        setIsInputFocused(true);
     };
 
     const handleBlur2 = () => {
-        window.scrollTo(0, 0);
+        setIsInputFocused(false);
     };
 
     const handleClickOutside = (e) => {
-        if (isInputFocused && e.target.closest('.reservation-auth-input') === null) {
-            // Clicked outside the input field, so blur the input
-            document.activeElement.blur();
+        if (isInputFocused) {
+            const isInput = e.target.tagName === 'INPUT';
+            const isOtpInput = e.target.closest('.otp-input-container');
+            const isInputContainer = e.target.closest('.user-details-form');
+            if (!isInput && !isOtpInput && !isInputContainer) {
+                setIsInputFocused(false);
+            }
         }
     };
 
-    const disabledDays =
-        [
-            {
-                before: new Date(),
-            },
-            {
-                after: moment().add(1, 'month').toDate(),
-            },
-        ];
-
-
-    // OTP 
+    // Updated to use the Supabase auth helper functions
     const sendOtp = async () => {
-        const phoneNumber = `+972${reservation.user.phone}`;
-        console.log('phoneNumber', phoneNumber);
-        // phone number to string
         try {
-            const recaptcha = new RecaptchaVerifier(auth, "recaptcha", {
-                size: "invisible",
-                callback: (response) => {
-                    console.log('response', response);
-                },
-            });
-
-            const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptcha);
-            setConfirmation(confirmation);
-            setResStep(5);
-            toast.success('קוד אימות נשלח לטלפון שלך');
-        } catch (err) {
-            console.error('Error sending OTP:', err);
-            toast.error('אירעה שגיאה, נסה שוב מאוחר יותר');
-
-            // Handle specific error types if needed
-            if (err instanceof AuthErrorCodes) {
-                // Handle authentication errors
-                setError(err.message);
-                toast.error('אירעה שגיאה, נסה שוב מאוחר יותר');
+            const phoneNumberWithPrefix = `+972${reservation.user.phone}`;
+            const result = await sendPhoneOtp(phoneNumberWithPrefix);
+            
+            if (result.success) {
+                setConfirmation(result.confirmation);
+                setResStep(5);
             } else {
-                // Handle other types of errors
-                setError("An unexpected error occurred.");
-                toast.error('אירעה שגיאה, נסה שוב מאוחר יותר');
+                toast.error('שגיאה בשליחת קוד האימות, נסה שוב');
+                console.error(result.error);
             }
+        } catch (error) {
+            console.error('Error in sendOtp:', error);
+            toast.error('שגיאה בשליחת קוד האימות, נסה שוב');
         }
     };
 
-    const verifyOtp = async () => {
+    // Updated to use the Supabase auth helper functions
+    const verifyOtpCode = async () => {
         try {
-            const data = await confirmation.confirm(OTPCode);
-            console.log('data', data);
-            if (data.user) {
-                console.log('user exist');
-                toast.success('התור נקבע בהצלחה! (המשתמש קיים)');
-                handleFullSubmit();
-                setResStep(6);
-                return;
-            } else {
-                console.log('user not exist');
-                toast.success('התור נקבע בהצלחה! (המשתמש לא קיים)');
-                handleFullSubmit();
-                setResStep(6);
+            if (!confirmation || !enteredCode) {
+                toast.error('נא להזין קוד אימות');
                 return;
             }
-        } catch (err) {
-            console.log('Error verifying OTP', err);
-            setError("Failed to verify OTP. Please try again.");
-            toast.error('אירעה שגיאה, נסה שוב מאוחר יותר');
+            
+            const result = await verifyOtp(confirmation, enteredCode);
+            
+            if (result.success) {
+                handleFullSubmit();
+            } else {
+                toast.error('קוד אימות שגוי');
+                console.error(result.error);
+            }
+        } catch (error) {
+            console.error('Error in verifyOtp:', error);
+            toast.error('שגיאה באימות הקוד, נסה שוב');
         }
     };
 
@@ -582,7 +596,7 @@ export function BarberProfile() {
                                     return;
                                 }
                                 if (resStep === 5) {
-                                    verifyOtp();
+                                    verifyOtpCode();
                                     return;
                                 }
                                 setResStep(resStep + 1)

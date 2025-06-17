@@ -11,8 +11,8 @@ export async function loadUsers() {
     store.dispatch({ type: LOADING_START })
     const users = await userService.getUsers()
     console.log('users from actions', users.data);
-    const barbers = users.data.filter(user => user.isBarber)
-    store.dispatch({ type: SET_USERS, users: barbers })
+    store.dispatch({ type: SET_USERS, users: users.data })
+    return users.data;
   } catch (err) {
     console.log('UserActions: err in loadUsers', err)
   } finally {
@@ -46,14 +46,11 @@ export async function login(credentials) {
 
 export async function signup(credentials) {
   try {
-    credentials.isAdmin = false
-    credentials.isBarber === true ? console.log('is barber') : console.log('is not barber');
     const user = await userService.signup(credentials)
     store.dispatch({
       type: SET_USER,
       user,
     })
-    // socketService.login(user)
     return user
   } catch (err) {
     console.log('Cannot signup', err)
@@ -68,7 +65,6 @@ export async function logout() {
       type: SET_USER,
       user: null,
     })
-    // socketService.logout()
   } catch (err) {
     console.log('Cannot logout', err)
     throw err
@@ -79,6 +75,7 @@ export async function loadUser(userId) {
   try {
     const user = await userService.getById(userId)
     store.dispatch({ type: SET_WATCHED_USER, user })
+    return user;
   } catch (err) {
     showErrorMsg('Cannot load user')
     console.log('Cannot load user', err)
@@ -88,11 +85,12 @@ export async function loadUser(userId) {
 export async function updateUser(user) {
   try {
     const updatedUser = await userService.update(user)
-    const barbers = await userService.getUsers()
-    store.dispatch({ type: SET_USERS, users: barbers.data })
+    // Reload users to get the updated list
+    await loadUsers()
     return updatedUser
   } catch (err) {
     showErrorMsg('Cannot update user')
     console.log('Cannot update user', err)
+    throw err;
   }
 }

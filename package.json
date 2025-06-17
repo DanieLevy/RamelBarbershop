@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@bytescale/upload-widget-react": "^4.10.0",
+    "@supabase/supabase-js": "^2.50.0",
     "@trendyol-js/react-carousel": "^3.0.2",
     "@vonage/server-sdk": "^3.10.0",
     "animate.css": "^4.1.1",
