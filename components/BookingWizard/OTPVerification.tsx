@@ -24,6 +24,8 @@ export function OTPVerification() {
     setOtpConfirmation,
     nextStep,
     prevStep,
+    lockFlow,
+    unlockFlow,
   } = useBookingStore()
   
   const { login } = useAuthStore()
@@ -42,10 +44,13 @@ export function OTPVerification() {
 
   useEffect(() => {
     isMountedRef.current = true
+    // Lock the flow to prevent auth sync from disrupting the wizard
+    lockFlow()
     return () => {
       isMountedRef.current = false
       clearRecaptchaVerifier()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -412,6 +417,7 @@ export function OTPVerification() {
       <button
         onClick={() => {
           clearRecaptchaVerifier()
+          unlockFlow() // Allow auth sync again when going back
           prevStep()
         }}
         disabled={verifying}

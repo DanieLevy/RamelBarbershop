@@ -26,6 +26,9 @@ interface BookingState {
   // Logged-in customer data
   loggedInCustomer: Customer | null
   
+  // Flag to prevent auth sync during active booking flow
+  isFlowLocked: boolean
+  
   // Booking data
   barberId: string | null
   service: Service | null
@@ -46,7 +49,9 @@ interface BookingState {
   setTime: (timestamp: number) => void
   setCustomer: (customer: Partial<CustomerInfo>) => void
   setOtpConfirmation: (confirmation: ConfirmationResult | null) => void
-  setLoggedInUser: (customer: Customer | null) => void
+  setLoggedInUser: (customer: Customer | null, force?: boolean) => void
+  lockFlow: () => void
+  unlockFlow: () => void
   reset: () => void
   
   // Computed
@@ -65,6 +70,7 @@ export const useBookingStore = create<BookingState>((set, get) => ({
   totalSteps: 6,
   isUserLoggedIn: false,
   loggedInCustomer: null,
+  isFlowLocked: false,
   barberId: null,
   service: null,
   date: null,
@@ -97,7 +103,15 @@ export const useBookingStore = create<BookingState>((set, get) => ({
   
   setOtpConfirmation: (confirmation) => set({ otpConfirmation: confirmation }),
   
-  setLoggedInUser: (customer) => {
+  setLoggedInUser: (customer, force = false) => {
+    const state = get()
+    
+    // Don't change user state mid-flow unless forced
+    // This prevents the auth sync from disrupting the wizard after OTP verification
+    if (state.isFlowLocked && !force) {
+      return
+    }
+    
     if (customer) {
       set({
         isUserLoggedIn: true,
@@ -117,6 +131,10 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     }
   },
   
+  lockFlow: () => set({ isFlowLocked: true }),
+  
+  unlockFlow: () => set({ isFlowLocked: false }),
+  
   reset: () =>
     set({
       step: 1,
@@ -125,6 +143,7 @@ export const useBookingStore = create<BookingState>((set, get) => ({
       timeTimestamp: null,
       customer: { ...initialCustomer },
       otpConfirmation: null,
+      isFlowLocked: false,
       // Note: Don't reset isUserLoggedIn and loggedInCustomer here
     }),
 

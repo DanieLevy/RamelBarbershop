@@ -218,6 +218,14 @@
     padding-top: env(safe-area-inset-top, 0);
   }
 
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+  }
+
+  .pt-safe {
+    padding-top: max(env(safe-area-inset-top, 0px), 8px);
+  }
+
   /* Text gradient */
   .text-gradient-gold {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-accent-gold via-accent-gold-light to-accent-gold;

@@ -23,7 +23,7 @@ export default async function HomePage() {
       
       <main className="relative">
         {/* Hero Section */}
-        <section className="index-header relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden">
+        <section className="index-header relative min-h-[100dvh] w-full flex flex-col items-center justify-center overflow-hidden">
           {/* Background with gradient overlay */}
           <div className="absolute inset-0 bg-background-dark">
             {/* Subtle pattern overlay */}
@@ -57,7 +57,7 @@ export default async function HomePage() {
           </div>
           
           {/* Hero content */}
-          <div className="relative z-10 text-center px-4 py-20 max-w-4xl mx-auto">
+          <div className="relative z-10 text-center px-4 pt-16 pb-8 sm:py-16 max-w-4xl mx-auto">
             {/* Logo with glow */}
             <div className="mb-8 animate-fade-in">
               <div className="relative inline-block">
@@ -93,7 +93,7 @@ export default async function HomePage() {
             </div>
             
             {/* Description */}
-            <p className="text-foreground-muted leading-relaxed text-sm sm:text-base max-w-2xl mx-auto mb-10 animate-fade-in-up animation-delay-300">
+            <p className="text-foreground-muted leading-relaxed text-sm sm:text-base max-w-2xl mx-auto mb-6 sm:mb-8 animate-fade-in-up animation-delay-300">
               רמאל ברברשופ הוא מקום ייחודי במינו, עם תפיסה חדשנית ומקורית של עולם הספא והטיפוח הגברי.
               אנו מציעים לכם חוויה ייחודית של טיפוח וספא לגברים בלבד,
               באווירה נעימה ומרגיעה, עם צוות מקצועי ומנוסה.
@@ -123,13 +123,15 @@ export default async function HomePage() {
             </a>
           </div>
           
-          {/* Scroll indicator */}
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-            <div className="flex flex-col items-center gap-2 text-foreground-muted">
-              <span className="text-xs">גלול למטה</span>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent-gold">
-                <path d="M12 5v14M5 12l7 7 7-7"/>
-              </svg>
+          {/* Scroll indicator - fixed positioning */}
+          <div className="w-full flex justify-center absolute bottom-4 sm:bottom-6">
+            <div className="animate-bounce">
+              <div className="flex flex-col items-center gap-2 text-foreground-muted">
+                <span className="text-xs">גלול למטה</span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent-gold">
+                  <path d="M7 13l5 5 5-5M7 6l5 5 5-5"/>
+                </svg>
+              </div>
             </div>
           </div>
         </section>

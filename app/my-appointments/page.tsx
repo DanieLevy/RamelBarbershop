@@ -9,9 +9,10 @@ import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { toast } from 'sonner'
 import { cn, formatDateHebrew, formatTime as formatTimeUtil } from '@/lib/utils'
-import { Calendar, Clock, Scissors, User, X, History, ChevronRight } from 'lucide-react'
+import { Calendar, Clock, Scissors, User, X, History, ChevronRight, LogIn } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { ReservationWithDetails } from '@/types/database'
+import { LoginModal } from '@/components/LoginModal'
 
 type TabType = 'upcoming' | 'past' | 'cancelled'
 
@@ -30,12 +31,10 @@ export default function MyAppointmentsPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabType>('upcoming')
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [showLoginModal, setShowLoginModal] = useState(false)
 
-  useEffect(() => {
-    if (isInitialized && !isLoggedIn) {
-      router.replace('/')
-    }
-  }, [isInitialized, isLoggedIn, router])
+  // No longer redirect - show login prompt instead
+  // useEffect removed
 
   useEffect(() => {
     if (customer?.id || customer?.phone) {
@@ -205,8 +204,64 @@ export default function MyAppointmentsPage() {
     )
   }
 
+  // Show login prompt for guests
   if (!isLoggedIn) {
-    return null
+    return (
+      <>
+        <AppHeader />
+        <main className="relative top-20 sm:top-24 min-h-screen bg-background-dark">
+          <div className="container-mobile py-8 sm:py-12 pb-24">
+            <div className="max-w-md mx-auto">
+              <GlassCard className="text-center py-12 px-6">
+                {/* Icon */}
+                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-accent-gold/10 flex items-center justify-center">
+                  <Calendar size={40} strokeWidth={1} className="text-accent-gold" />
+                </div>
+                
+                {/* Title */}
+                <h1 className="text-2xl text-foreground-light font-medium mb-3">
+                  התורים שלי
+                </h1>
+                
+                {/* Description */}
+                <p className="text-foreground-muted mb-8 leading-relaxed">
+                  התחבר כדי לראות את התורים שלך,
+                  <br />
+                  לנהל הזמנות ולקבל תזכורות
+                </p>
+                
+                {/* Login Button */}
+                <button
+                  onClick={() => setShowLoginModal(true)}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-accent-gold text-background-dark rounded-xl font-medium hover:bg-accent-gold/90 transition-all hover:scale-[1.02]"
+                >
+                  <LogIn size={20} strokeWidth={2} />
+                  <span>התחבר עכשיו</span>
+                </button>
+                
+                {/* Or book new */}
+                <div className="mt-6 pt-6 border-t border-white/10">
+                  <p className="text-foreground-muted text-sm mb-3">
+                    עדיין לא קבעת תור?
+                  </p>
+                  <button
+                    onClick={() => router.push('/')}
+                    className="text-accent-gold hover:underline text-sm font-medium"
+                  >
+                    קבע תור חדש ←
+                  </button>
+                </div>
+              </GlassCard>
+            </div>
+          </div>
+        </main>
+        
+        <LoginModal 
+          isOpen={showLoginModal} 
+          onClose={() => setShowLoginModal(false)} 
+        />
+      </>
+    )
   }
 
   return (

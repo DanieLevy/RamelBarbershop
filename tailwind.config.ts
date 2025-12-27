@@ -57,6 +57,7 @@ const config: Config = {
         'float': 'float 3s ease-in-out infinite',
         'shimmer': 'shimmer 2s linear infinite',
         'barber-pole': 'barber-pole 2s linear infinite',
+        'ripple': 'ripple 0.6s ease-out forwards',
       },
       keyframes: {
         'spin-scissors': {
@@ -100,6 +101,10 @@ const config: Config = {
         'barber-pole': {
           '0%': { backgroundPosition: '0 0' },
           '100%': { backgroundPosition: '0 50px' },
+        },
+        'ripple': {
+          '0%': { transform: 'scale(0)', opacity: '1' },
+          '100%': { transform: 'scale(4)', opacity: '0' },
         },
       },
       backdropBlur: {

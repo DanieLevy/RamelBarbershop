@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/useAuthStore'
 import { LoginModal } from './LoginModal'
-import { User, Calendar, LogOut, Menu, X, Home, Phone, MapPin } from 'lucide-react'
+import { User, Calendar, LogOut, Menu, X, Home, Phone, MapPin, Scissors, ChevronDown } from 'lucide-react'
 
 interface AppHeaderProps {
   barberImgUrl?: string
@@ -18,7 +18,7 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
   
   const { customer, isLoggedIn, isLoading, logout } = useAuthStore()
   
-  const [isScrolled, setIsScrolled] = useState(false)
+  const [scrollProgress, setScrollProgress] = useState(0)
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
@@ -27,14 +27,19 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
   const isHomePage = pathname === '/'
   const isBarberPage = pathname.includes('/barber') && !pathname.includes('/dashboard')
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 0)
-    }
-
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
+  // Track scroll progress for smooth transitions
+  const handleScroll = useCallback(() => {
+    const scrollY = window.scrollY
+    // Calculate progress: 0 at top, 1 when scrolled past 100px
+    const progress = Math.min(scrollY / 100, 1)
+    setScrollProgress(progress)
   }, [])
+
+  useEffect(() => {
+    handleScroll()
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [handleScroll])
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -98,21 +103,28 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
     setShowMobileMenu(false)
   }
 
-  // User menu dropdown component
-  const UserMenu = () => {
+  // Derived values based on scroll
+  const isScrolled = scrollProgress > 0.3
+  const showHeaderLogo = scrollProgress > 0.5
+
+  // User button component
+  const UserButton = ({ compact = false }: { compact?: boolean }) => {
     if (!isLoggedIn || !customer) {
       return (
         <button
           onClick={() => setShowLoginModal(true)}
           disabled={isLoading}
           className={cn(
-            'flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-all text-sm',
-            'bg-accent-gold/10 border border-accent-gold/30 text-accent-gold hover:bg-accent-gold/20',
+            'flex items-center gap-2 rounded-full transition-all font-medium',
+            compact
+              ? 'px-3 py-2 text-xs'
+              : 'px-4 py-2.5 text-sm',
+            'bg-accent-gold text-background-dark hover:bg-accent-gold/90',
             isLoading && 'opacity-50 cursor-not-allowed'
           )}
         >
-          <User size={14} strokeWidth={1.5} />
-          <span className="hidden xs:inline">התחברות</span>
+          <User size={compact ? 14 : 16} strokeWidth={2} />
+          <span>{compact ? 'כניסה' : 'התחברות'}</span>
         </button>
       )
     }
@@ -121,31 +133,45 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
       <div className="relative" ref={menuRef}>
         <button
           onClick={() => setShowUserMenu(!showUserMenu)}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent-gold/10 border border-accent-gold/30 text-accent-gold hover:bg-accent-gold/20 transition-all"
+          className={cn(
+            'flex items-center gap-2 rounded-full transition-all',
+            'bg-white/10 hover:bg-white/15 border border-white/20',
+            compact ? 'px-2.5 py-1.5' : 'px-3 py-2'
+          )}
         >
-          <div className="w-7 h-7 rounded-full bg-accent-gold/30 flex items-center justify-center">
-            <User size={14} strokeWidth={1.5} />
+          <div className={cn(
+            'rounded-full bg-accent-gold/30 flex items-center justify-center',
+            compact ? 'w-6 h-6' : 'w-7 h-7'
+          )}>
+            <User size={compact ? 12 : 14} strokeWidth={1.5} className="text-accent-gold" />
           </div>
-          <span className="text-sm max-w-[80px] truncate hidden sm:block">
+          <span className={cn(
+            'max-w-[70px] truncate text-foreground-light',
+            compact ? 'text-xs hidden sm:block' : 'text-sm'
+          )}>
             {customer.fullname.split(' ')[0]}
           </span>
+          <ChevronDown size={14} strokeWidth={1.5} className={cn(
+            'text-foreground-muted transition-transform',
+            showUserMenu && 'rotate-180'
+          )} />
         </button>
 
         {showUserMenu && (
-          <div className="absolute left-0 top-full mt-2 w-48 bg-background-darker border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 animate-fade-in">
-            <div className="p-3 border-b border-white/10">
+          <div className="absolute left-0 top-full mt-2 w-52 bg-background-darker/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 animate-fade-in">
+            <div className="p-4 border-b border-white/10 bg-gradient-to-r from-accent-gold/10 to-transparent">
               <p className="text-foreground-light font-medium truncate">
                 {customer.fullname}
               </p>
-              <p className="text-foreground-muted text-xs" dir="ltr">
+              <p className="text-foreground-muted text-xs mt-0.5" dir="ltr">
                 {customer.phone}
               </p>
             </div>
 
-            <div className="py-1">
+            <div className="p-2">
               <button
                 onClick={handleMyAppointments}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-foreground-light hover:bg-white/5 transition-colors"
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-foreground-light hover:bg-white/5 transition-colors"
               >
                 <Calendar size={18} strokeWidth={1.5} className="text-accent-gold" />
                 <span className="text-sm">התורים שלי</span>
@@ -153,7 +179,7 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
 
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-red-400 hover:bg-red-500/10 transition-colors"
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors"
               >
                 <LogOut size={18} strokeWidth={1.5} />
                 <span className="text-sm">התנתק</span>
@@ -168,8 +194,7 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
   // Mobile menu items
   const mobileMenuItems = [
     { label: 'בית', icon: Home, action: () => router.push('/') },
-    { label: 'אודות', icon: User, action: () => scrollToSection('index-header') },
-    { label: 'קבע תור', icon: Calendar, action: () => scrollToSection('index-body') },
+    { label: 'הצוות שלנו', icon: Scissors, action: () => scrollToSection('index-body') },
     { label: 'מיקום', icon: MapPin, action: () => scrollToSection('index-location') },
     { label: 'צור קשר', icon: Phone, action: () => scrollToSection('index-contact') },
   ]
@@ -178,92 +203,118 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
     <>
       <header
         className={cn(
-          'fixed top-0 w-full z-50 transition-all duration-300',
-          'bg-black/60 backdrop-blur-md',
-          isScrolled && 'bg-black/80'
+          'fixed top-0 left-0 right-0 z-50 transition-all duration-500'
         )}
+        style={{
+          // Dynamic background based on scroll - starts fully transparent
+          backgroundColor: `rgba(0, 0, 0, ${scrollProgress * 0.85})`,
+          backdropFilter: `blur(${scrollProgress * 16}px)`,
+        }}
       >
-        <div
-          className={cn(
-            'flex justify-between items-center text-white transition-all duration-300 px-4 sm:px-6 lg:px-10',
-            isScrolled ? 'h-16 sm:h-20' : 'h-20 sm:h-24'
-          )}
-        >
+        {/* Top accent line */}
+        <div 
+          className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-accent-gold to-transparent transition-opacity duration-500"
+          style={{ opacity: scrollProgress }}
+        />
+        
+        <div className={cn(
+          'mx-auto transition-all duration-500 px-4 sm:px-6',
+          isScrolled ? 'py-2 sm:py-3' : 'py-3 sm:py-4'
+        )}>
           {isHomePage && (
-            <nav className="flex w-full justify-between items-center">
-              {/* Mobile hamburger button */}
-              <button
-                onClick={() => setShowMobileMenu(true)}
-                className="sm:hidden p-2 -ml-2 text-foreground-light hover:text-accent-gold transition-colors"
-                aria-label="פתח תפריט"
-              >
-                <Menu size={22} strokeWidth={1.5} />
-              </button>
-              
-              {/* Right side - Navigation (desktop only) */}
-              <div className="hidden sm:flex items-center gap-4 md:gap-6">
+            <nav className="flex items-center justify-between">
+              {/* Left side - Mobile menu + Desktop nav */}
+              <div className="flex items-center gap-4">
+                {/* Mobile hamburger */}
                 <button
-                  onClick={() => scrollToSection('index-header')}
-                  className="hover:text-accent-gold transition-colors cursor-pointer text-sm md:text-base relative group"
+                  onClick={() => setShowMobileMenu(true)}
+                  className="md:hidden p-2 -ml-2 rounded-full hover:bg-white/10 transition-colors"
+                  aria-label="פתח תפריט"
                 >
-                  אודות
-                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-accent-gold transition-all group-hover:w-full" />
+                  <Menu size={22} strokeWidth={1.5} className="text-foreground-light" />
                 </button>
                 
-                <button
-                  onClick={() => scrollToSection('index-contact')}
-                  className="hover:text-accent-gold transition-colors cursor-pointer text-sm md:text-base relative group"
-                >
-                  צור קשר
-                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-accent-gold transition-all group-hover:w-full" />
-                </button>
+                {/* Desktop navigation */}
+                <div className="hidden md:flex items-center gap-6">
+                  <button
+                    onClick={() => scrollToSection('index-body')}
+                    className="text-sm text-foreground-light/80 hover:text-accent-gold transition-colors"
+                  >
+                    הצוות
+                  </button>
+                  <button
+                    onClick={() => scrollToSection('index-location')}
+                    className="text-sm text-foreground-light/80 hover:text-accent-gold transition-colors"
+                  >
+                    מיקום
+                  </button>
+                  <button
+                    onClick={() => scrollToSection('index-contact')}
+                    className="text-sm text-foreground-light/80 hover:text-accent-gold transition-colors"
+                  >
+                    צור קשר
+                  </button>
+                </div>
               </div>
               
-              {/* Logo - Center */}
-              <div
-                onClick={() => router.push('/')}
+              {/* Center - Logo (appears on scroll) */}
+              <div 
                 className={cn(
-                  'cursor-pointer transition-all duration-300 rounded-full overflow-hidden shadow-lg absolute left-1/2 -translate-x-1/2 border border-accent-gold/30',
-                  isScrolled ? 'w-12 h-12 sm:w-14 sm:h-14' : 'w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20'
+                  'absolute left-1/2 -translate-x-1/2 transition-all duration-500',
+                  showHeaderLogo ? 'opacity-100 scale-100' : 'opacity-0 scale-75 pointer-events-none'
                 )}
               >
-                <Image
-                  src="/icon.png"
-                  alt="Ramel Barbershop Logo"
-                  width={80}
-                  height={80}
-                  className="w-full h-full object-cover"
-                  priority
-                />
+                <button
+                  onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                  className="flex items-center gap-3 group"
+                >
+                  <div className={cn(
+                    'rounded-full overflow-hidden border-2 border-accent-gold/40 shadow-lg transition-all duration-300 group-hover:border-accent-gold/60',
+                    isScrolled ? 'w-10 h-10 sm:w-11 sm:h-11' : 'w-12 h-12 sm:w-14 sm:h-14'
+                  )}>
+                    <Image
+                      src="/icon.png"
+                      alt="Ramel Barbershop"
+                      width={56}
+                      height={56}
+                      className="w-full h-full object-cover"
+                      priority
+                    />
+                  </div>
+                  <span className={cn(
+                    'font-medium text-foreground-light hidden sm:block transition-all duration-300',
+                    isScrolled ? 'text-base' : 'text-lg'
+                  )}>
+                    רמאל <span className="text-accent-gold">ברברשופ</span>
+                  </span>
+                </button>
               </div>
               
-              {/* Left side - Book & Login */}
+              {/* Right side - CTA + User */}
               <div className="flex items-center gap-2 sm:gap-3">
+                {/* Book now button - desktop */}
                 <button
                   onClick={() => scrollToSection('index-body')}
-                  className="hidden sm:flex items-center gap-1 hover:text-accent-gold transition-colors cursor-pointer text-sm md:text-base relative group"
+                  className={cn(
+                    'hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-full font-medium text-sm transition-all',
+                    'border border-accent-gold/50 text-accent-gold hover:bg-accent-gold hover:text-background-dark'
+                  )}
                 >
+                  <Scissors size={16} strokeWidth={1.5} />
                   קבע תור
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 16 16"
-                    className="w-4 h-4 fill-current hidden md:block"
-                  >
-                    <path d="M7.78 12.53a.75.75 0 0 1-1.06 0L2.47 8.28a.75.75 0 0 1 0-1.06l4.25-4.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L4.81 7h7.44a.75.75 0 0 1 0 1.5H4.81l2.97 2.97a.75.75 0 0 1 0 1.06Z" />
-                  </svg>
-                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-accent-gold transition-all group-hover:w-full" />
                 </button>
                 
-                <UserMenu />
+                <UserButton compact={!isScrolled} />
               </div>
             </nav>
           )}
 
           {isBarberPage && (
-            <nav className="flex w-full justify-between items-center">
+            <nav className="flex items-center justify-between">
+              {/* Back button */}
               <button
                 onClick={() => router.push('/')}
-                className="flex items-center gap-2 hover:text-accent-gold transition-colors"
+                className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-white/10 transition-colors text-foreground-light"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -275,16 +326,20 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
                     d="M1.22 8a.75.75 0 0 1 0-1.06L6.47 2.7a.75.75 0 1 1 1.06 1.06L3.81 7h10.44a.75.75 0 0 1 0 1.5H3.81l3.72 3.72a.75.75 0 1 1-1.06 1.06L1.22 8Z"
                   />
                 </svg>
-                <span className="hidden xs:inline">חזור</span>
+                <span className="text-sm">חזור</span>
               </button>
 
-              <h1 className="text-base sm:text-lg font-medium">הזמנת תור</h1>
+              {/* Title */}
+              <h1 className="text-base sm:text-lg font-medium text-foreground-light">
+                הזמנת תור
+              </h1>
 
-              <div className="flex items-center gap-2 sm:gap-3">
-                <UserMenu />
+              {/* Right side */}
+              <div className="flex items-center gap-2">
+                <UserButton compact />
                 
                 {/* Barber avatar */}
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden shadow-md border border-accent-gold/30">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden shadow-md border-2 border-accent-gold/40">
                   <Image
                     src={barberImgUrl || '/icon.png'}
                     alt="Barber"
@@ -304,44 +359,48 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
         <>
           {/* Overlay */}
           <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 sm:hidden animate-fade-in"
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] md:hidden animate-fade-in"
             onClick={() => setShowMobileMenu(false)}
           />
           
           {/* Drawer */}
-          <div className="fixed top-0 right-0 bottom-0 w-72 bg-background-darker border-l border-white/10 z-50 sm:hidden animate-slide-in-right">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-white/10">
+          <div className="fixed top-0 right-0 bottom-0 w-[280px] bg-background-darker z-[100] md:hidden animate-slide-in-right shadow-2xl">
+            {/* Header with gradient */}
+            <div className="relative p-5 border-b border-white/10 bg-gradient-to-br from-accent-gold/10 via-transparent to-accent-orange/5">
+              <button
+                onClick={() => setShowMobileMenu(false)}
+                className="absolute top-4 left-4 p-2 rounded-full bg-white/10 text-foreground-light hover:bg-white/20 transition-colors"
+                aria-label="סגור תפריט"
+              >
+                <X size={18} strokeWidth={2} />
+              </button>
+              
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full overflow-hidden border border-accent-gold/30">
+                <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-accent-gold/40 shadow-lg">
                   <Image
                     src="/icon.png"
                     alt="Ramel Barbershop"
-                    width={40}
-                    height={40}
+                    width={48}
+                    height={48}
                     className="w-full h-full object-cover"
                   />
                 </div>
-                <span className="font-medium text-foreground-light">רמאל ברברשופ</span>
+                <div>
+                  <span className="font-semibold text-foreground-light block">רמאל ברברשופ</span>
+                  <span className="text-xs text-accent-gold">חווית טיפוח לגבר</span>
+                </div>
               </div>
-              <button
-                onClick={() => setShowMobileMenu(false)}
-                className="p-2 text-foreground-muted hover:text-foreground-light transition-colors"
-                aria-label="סגור תפריט"
-              >
-                <X size={22} strokeWidth={1.5} />
-              </button>
             </div>
             
             {/* User info if logged in */}
             {isLoggedIn && customer && (
-              <div className="p-4 border-b border-white/10 bg-accent-gold/5">
+              <div className="p-4 border-b border-white/10 bg-white/5">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-accent-gold/20 flex items-center justify-center">
                     <User size={18} strokeWidth={1.5} className="text-accent-gold" />
                   </div>
                   <div>
-                    <p className="text-foreground-light font-medium">{customer.fullname}</p>
+                    <p className="text-foreground-light font-medium text-sm">{customer.fullname}</p>
                     <p className="text-foreground-muted text-xs" dir="ltr">{customer.phone}</p>
                   </div>
                 </div>
@@ -349,54 +408,59 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
             )}
             
             {/* Menu items */}
-            <nav className="py-2">
-              {mobileMenuItems.map((item) => (
-                <button
-                  key={item.label}
-                  onClick={item.action}
-                  className="w-full flex items-center gap-4 px-4 py-3 text-foreground-light hover:bg-white/5 hover:text-accent-gold transition-colors"
-                >
-                  <item.icon size={22} strokeWidth={1.5} className="text-accent-gold" />
-                  <span>{item.label}</span>
-                </button>
-              ))}
+            <nav className="py-4 px-3">
+              <div className="space-y-1">
+                {mobileMenuItems.map((item) => (
+                  <button
+                    key={item.label}
+                    onClick={item.action}
+                    className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-foreground-light hover:bg-white/5 transition-colors"
+                  >
+                    <item.icon size={20} strokeWidth={1.5} className="text-accent-gold" />
+                    <span className="text-sm font-medium">{item.label}</span>
+                  </button>
+                ))}
+              </div>
               
-              {isLoggedIn && (
-                <>
-                  <div className="my-2 border-t border-white/10" />
+              <div className="my-4 h-px bg-white/10" />
+              
+              {isLoggedIn ? (
+                <div className="space-y-1">
                   <button
                     onClick={handleMyAppointments}
-                    className="w-full flex items-center gap-4 px-4 py-3 text-foreground-light hover:bg-white/5 hover:text-accent-gold transition-colors"
+                    className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-foreground-light hover:bg-white/5 transition-colors"
                   >
-                    <Calendar size={22} strokeWidth={1.5} className="text-accent-gold" />
-                    <span>התורים שלי</span>
+                    <Calendar size={20} strokeWidth={1.5} className="text-accent-gold" />
+                    <span className="text-sm font-medium">התורים שלי</span>
                   </button>
                   <button
                     onClick={handleLogout}
-                    className="w-full flex items-center gap-4 px-4 py-3 text-red-400 hover:bg-red-500/10 transition-colors"
+                    className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors"
                   >
-                    <LogOut size={22} strokeWidth={1.5} />
-                    <span>התנתק</span>
+                    <LogOut size={20} strokeWidth={1.5} />
+                    <span className="text-sm font-medium">התנתק</span>
                   </button>
-                </>
-              )}
-              
-              {!isLoggedIn && (
-                <>
-                  <div className="my-2 border-t border-white/10" />
-                  <button
-                    onClick={() => {
-                      setShowMobileMenu(false)
-                      setShowLoginModal(true)
-                    }}
-                    className="w-full flex items-center gap-4 px-4 py-3 text-accent-gold hover:bg-accent-gold/10 transition-colors"
-                  >
-                    <User size={22} strokeWidth={1.5} />
-                    <span>התחברות</span>
-                  </button>
-                </>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setShowMobileMenu(false)
+                    setShowLoginModal(true)
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-accent-gold text-background-dark font-medium text-sm transition-colors hover:bg-accent-gold/90"
+                >
+                  <User size={18} strokeWidth={2} />
+                  <span>התחברות</span>
+                </button>
               )}
             </nav>
+            
+            {/* Footer */}
+            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10 bg-background-darker">
+              <p className="text-center text-foreground-muted text-xs">
+                © 2024 רמאל ברברשופ
+              </p>
+            </div>
           </div>
         </>
       )}
