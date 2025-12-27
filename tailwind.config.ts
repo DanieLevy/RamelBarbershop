@@ -43,6 +43,7 @@ const config: Config = {
         },
       },
       fontFamily: {
+        ploni: ['Ploni', 'Rubik', 'sans-serif'],
         rubik: ['Rubik', 'sans-serif'],
         cereal: ['AirbnbCereal', 'sans-serif'],
       },

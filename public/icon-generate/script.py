@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Wedding Planner Icon Generator
+Ramel Barbershop Icon Generator
 Generates all required icon sizes from a single source image
 and automatically places them in the correct locations.
 
 Usage:
-    1. Place your source logo image as 'logo.png' in this folder
+    1. Place your source logo image as 'NewIcon.png' in this folder
     2. Run: python script.py
     3. All icons will be generated and placed in the correct locations
 
@@ -63,14 +63,14 @@ def copy_file(src, dst):
     print(f"  ✓ Copied {src.name} → {dst}")
 
 def main():
-    print("🎨 Wedding Planner Icon Generator")
+    print("🎨 Ramel Barbershop Icon Generator")
     print("=" * 50)
     
     # Check if input file exists
     input_path = Path(__file__).parent / INPUT
     if not input_path.exists():
         print(f"\n❌ Error: '{INPUT}' not found in {Path(__file__).parent}")
-        print("   Please place your source logo image as 'logo.png'")
+        print("   Please place your source logo image as 'NewIcon.png'")
         return
     
     # Load source image
@@ -133,19 +133,6 @@ def main():
     generated_count += 1
     
     # ============================================
-    # Shortcut Icons (in /public/icons/)
-    # ============================================
-    print("\n🔗 Generating Shortcut icons...")
-    shortcut_icons = [
-        "shortcut-task.png",
-        "shortcut-budget.png",
-        "shortcut-calendar.png",
-    ]
-    for name in shortcut_icons:
-        save_icon(img, 96, ICONS_DIR / name)
-        generated_count += 1
-    
-    # ============================================
     # Main logo for app use (high-res)
     # ============================================
     print("\n✨ Generating main logo...")
@@ -161,7 +148,6 @@ def main():
     print(f"   • {ICONS_DIR}")
     print(f"     └─ PWA icons (72-512px)")
     print(f"     └─ Apple Touch icons")
-    print(f"     └─ Shortcut icons")
     print(f"   • {PUBLIC_DIR}")
     print(f"     └─ favicon.ico, favicon-*.png")
     print(f"     └─ apple-touch-icon.png")
@@ -169,7 +155,7 @@ def main():
     print(f"   • {APP_DIR}")
     print(f"     └─ favicon.ico")
     print("\n💡 Tip: Run again anytime to regenerate all icons!")
-    print("   Just replace 'logo.png' with your new design.")
+    print("   Just replace 'NewIcon.png' with your new design.")
 
 if __name__ == "__main__":
     main()

@@ -1,28 +1,87 @@
 {
-  "name": "Ramel Barbershop",
-  "short_name": "Ramel",
-  "description": "מספרה מקצועית בירושלים - רמאל ברברשופ",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#080b0d",
-  "theme_color": "#080b0d",
-  "orientation": "portrait",
-  "dir": "rtl",
+  "name": "רמאל ברברשופ - Ramel Barbershop",
+  "short_name": "רמאל",
+  "description": "מספרה מקצועית בירושלים - קביעת תורים אונליין",
   "lang": "he",
+  "dir": "rtl",
+  "scope": "/",
+  "id": "/?source=pwa",
+  "start_url": "/?source=pwa",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "theme_color": "#080b0d",
+  "background_color": "#080b0d",
+  "categories": ["lifestyle", "business"],
+  "prefer_related_applications": false,
+  "launch_handler": {
+    "client_mode": ["focus-existing", "auto"]
+  },
+  "handle_links": "preferred",
   "icons": [
     {
-      "src": "/icon.png",
-      "sizes": "192x192",
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/icon.png",
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable any"
     }
   ],
-  "categories": ["lifestyle", "business"]
+  "shortcuts": [
+    {
+      "name": "קבע תור חדש",
+      "short_name": "תור חדש",
+      "description": "קביעת תור אצל הספר",
+      "url": "/?action=book&source=pwa",
+      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "התורים שלי",
+      "short_name": "תורים",
+      "description": "צפייה בתורים הקיימים",
+      "url": "/my-appointments?source=pwa",
+      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
+    }
+  ]
 }
-

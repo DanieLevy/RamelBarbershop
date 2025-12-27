@@ -4,18 +4,21 @@ import { cn } from '@/lib/utils'
 import { forwardRef } from 'react'
 
 interface GlassCardProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'hover' | 'gold' | 'dark'
+  variant?: 'default' | 'hover' | 'gold' | 'dark' | 'elevated' | 'subtle' | 'interactive'
   padding?: 'none' | 'sm' | 'md' | 'lg'
-  rounded?: 'md' | 'lg' | 'xl' | '2xl' | 'full'
+  rounded?: 'md' | 'lg' | 'xl' | '2xl' | '3xl' | 'full'
 }
 
 export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(
   ({ className, variant = 'default', padding = 'md', rounded = '2xl', children, ...props }, ref) => {
     const variantClasses = {
-      default: 'bg-background-card backdrop-blur-lg border border-white/10',
-      hover: 'bg-background-card backdrop-blur-lg border border-white/10 transition-all duration-300 hover:border-accent-gold/30 hover:shadow-gold cursor-pointer',
+      default: 'glass-card',
+      hover: 'glass-card-hover',
       gold: 'bg-accent-gold/10 backdrop-blur-lg border border-accent-gold/30',
       dark: 'bg-background-darker backdrop-blur-lg border border-white/5',
+      elevated: 'glass-elevated',
+      subtle: 'glass-subtle',
+      interactive: 'glass-interactive',
     }
 
     const paddingClasses = {
@@ -30,6 +33,7 @@ export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(
       lg: 'rounded-lg',
       xl: 'rounded-xl',
       '2xl': 'rounded-2xl',
+      '3xl': 'rounded-3xl',
       full: 'rounded-full',
     }
 

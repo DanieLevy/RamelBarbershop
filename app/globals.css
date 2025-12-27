@@ -2,12 +2,89 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom Fonts */
+/* =====================================================
+   iOS Liquid Glass Design System Variables
+   ===================================================== */
+:root {
+  /* Glass Effect Variables */
+  --glass-blur: 20px;
+  --glass-blur-subtle: 12px;
+  --glass-blur-strong: 28px;
+  --glass-blur-intense: 36px;
+  --glass-bg: rgba(26, 26, 26, 0.72);
+  --glass-bg-subtle: rgba(26, 26, 26, 0.5);
+  --glass-bg-strong: rgba(26, 26, 26, 0.88);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-border-subtle: rgba(255, 255, 255, 0.08);
+  --glass-border-strong: rgba(255, 255, 255, 0.2);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  --glass-shadow-elevated: 0 16px 48px rgba(0, 0, 0, 0.35);
+  
+  /* Glass Border Radii */
+  --glass-radius-sm: 12px;
+  --glass-radius-md: 16px;
+  --glass-radius-lg: 20px;
+  --glass-radius-xl: 24px;
+  --glass-radius-2xl: 28px;
+  --glass-radius-3xl: 32px;
+  
+  /* Glass Animation Timing */
+  --glass-transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --glass-transition-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  
+  /* Safe Area Variables */
+  --safe-area-inset-top: 0px;
+  --safe-area-inset-right: 0px;
+  --safe-area-inset-bottom: 0px;
+  --safe-area-inset-left: 0px;
+}
+
+/* Safe Area for iOS 11.2+ */
+@supports (padding-top: env(safe-area-inset-top)) {
+  :root {
+    --safe-area-inset-top: env(safe-area-inset-top);
+    --safe-area-inset-right: env(safe-area-inset-right);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom);
+    --safe-area-inset-left: env(safe-area-inset-left);
+  }
+}
+
+/* =====================================================
+   Ploni Hebrew Font - Primary
+   ===================================================== */
+@font-face {
+  font-family: 'Ploni';
+  src: url('/fonts/ploni-ultralight-aaa.otf') format('opentype');
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Ploni';
+  src: url('/fonts/ploni-light-aaa.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Ploni';
+  src: url('/fonts/ploni-regular-aaa.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* =====================================================
+   Fallback Fonts - Rubik & Cereal
+   ===================================================== */
 @font-face {
   font-family: 'Rubik';
   src: url('/fonts/Rubik/Rubik-Regular.ttf') format('truetype');
   font-weight: 400;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
@@ -15,6 +92,7 @@
   src: url('/fonts/Rubik/Rubik-Medium.ttf') format('truetype');
   font-weight: 500;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
@@ -22,6 +100,7 @@
   src: url('/fonts/Rubik/Rubik-Bold.ttf') format('truetype');
   font-weight: 700;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
@@ -29,6 +108,7 @@
   src: url('/fonts/Rubik/Rubik-Light.ttf') format('truetype');
   font-weight: 300;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
@@ -36,6 +116,7 @@
   src: url('/fonts/Cereal/AirbnbCereal-Book.ttf') format('truetype');
   font-weight: 400;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
@@ -43,6 +124,7 @@
   src: url('/fonts/Cereal/AirbnbCereal-Medium.ttf') format('truetype');
   font-weight: 500;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
@@ -50,9 +132,12 @@
   src: url('/fonts/Cereal/AirbnbCereal-Bold.ttf') format('truetype');
   font-weight: 700;
   font-style: normal;
+  font-display: swap;
 }
 
-/* Base Styles */
+/* =====================================================
+   Base Styles
+   ===================================================== */
 @layer base {
   * {
     box-sizing: border-box;
@@ -61,10 +146,13 @@
   html {
     line-height: 1.5;
     scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   body {
-    @apply font-rubik bg-background-dark text-foreground-light;
+    @apply font-ploni bg-background-dark text-foreground-light;
     margin: 0;
     overflow-x: hidden;
   }
@@ -91,6 +179,16 @@
     min-width: 44px;
   }
 
+  /* Prevent iOS zoom on input focus */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="tel"],
+  input[type="number"],
+  textarea {
+    font-size: 16px !important;
+  }
+
   /* Smooth scrollbar */
   ::-webkit-scrollbar {
     width: 8px;
@@ -111,15 +209,66 @@
   }
 }
 
-/* Component Styles */
+/* =====================================================
+   Component Styles - Liquid Glass System
+   ===================================================== */
 @layer components {
-  /* Glass Card Effect */
+  /* Basic Glass Card */
   .glass-card {
-    @apply bg-background-card backdrop-blur-lg border border-white/10 rounded-2xl;
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--glass-radius-xl);
+    box-shadow: var(--glass-shadow);
   }
 
   .glass-card-hover {
-    @apply glass-card transition-all duration-300 hover:border-accent-gold/30 hover:shadow-gold;
+    @apply glass-card;
+    transition: all var(--glass-transition);
+  }
+
+  .glass-card-hover:hover {
+    border-color: rgba(255, 170, 61, 0.3);
+    box-shadow: 0 4px 20px rgba(255, 170, 61, 0.15);
+  }
+
+  /* Elevated Glass (for floating elements) */
+  .glass-elevated {
+    background: var(--glass-bg-strong);
+    backdrop-filter: blur(var(--glass-blur-strong)) saturate(200%);
+    -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(200%);
+    border: 1px solid var(--glass-border-strong);
+    border-radius: var(--glass-radius-2xl);
+    box-shadow: var(--glass-shadow-elevated);
+  }
+
+  /* Subtle Glass (less prominent) */
+  .glass-subtle {
+    background: var(--glass-bg-subtle);
+    backdrop-filter: blur(var(--glass-blur-subtle)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--glass-blur-subtle)) saturate(150%);
+    border: 1px solid var(--glass-border-subtle);
+    border-radius: var(--glass-radius-lg);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Interactive Glass (with tap feedback) */
+  .glass-interactive {
+    @apply glass-card;
+    transition: all var(--glass-transition);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  .glass-interactive:hover {
+    background: var(--glass-bg-strong);
+    transform: translateY(-2px);
+  }
+
+  .glass-interactive:active {
+    transform: scale(0.98);
   }
 
   /* Gold Glow Effect */
@@ -172,6 +321,8 @@
   /* Touch-friendly button */
   .touch-btn {
     @apply min-h-[48px] min-w-[48px] flex items-center justify-center;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
 
   /* Mobile-first container */
@@ -192,7 +343,9 @@
   }
 }
 
-/* Utility Styles */
+/* =====================================================
+   Utility Styles
+   ===================================================== */
 @layer utilities {
   /* Legacy content-style for backwards compatibility */
   .content-style h1 {
@@ -211,19 +364,19 @@
 
   /* Safe area padding for notched devices */
   .safe-bottom {
-    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-bottom: var(--safe-area-inset-bottom);
   }
 
   .safe-top {
-    padding-top: env(safe-area-inset-top, 0);
+    padding-top: var(--safe-area-inset-top);
   }
 
   .pb-safe {
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+    padding-bottom: max(var(--safe-area-inset-bottom), 8px);
   }
 
   .pt-safe {
-    padding-top: max(env(safe-area-inset-top, 0px), 8px);
+    padding-top: max(var(--safe-area-inset-top), 8px);
   }
 
   /* Text gradient */
@@ -253,6 +406,72 @@
   }
 }
 
+/* =====================================================
+   PWA Standalone Mode Styles
+   ===================================================== */
+@media (display-mode: standalone) {
+  /* Adjust body for safe areas */
+  body {
+    padding-top: var(--safe-area-inset-top);
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Notch area background - matches app background */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--safe-area-inset-top);
+    background: #080b0d;
+    z-index: 9999;
+  }
+
+  /* Adjust main content for bottom nav */
+  main {
+    padding-bottom: calc(5.5rem + var(--safe-area-inset-bottom));
+  }
+
+  /* Prevent rubber-band scrolling */
+  html, body {
+    overscroll-behavior-y: none;
+  }
+}
+
+/* Touch optimization for mobile */
+@media (hover: none) {
+  /* Disable hover effects on touch devices */
+  .glass-card-hover:hover,
+  .glass-interactive:hover {
+    transform: none;
+    background: var(--glass-bg);
+  }
+
+  /* Keep active states */
+  .glass-interactive:active {
+    transform: scale(0.98);
+    background: var(--glass-bg-strong);
+  }
+
+  /* Disable focus ring on touch */
+  *:focus {
+    outline: none;
+  }
+}
+
+/* Prevent tap highlight and improve touch response */
+button, [role="button"], a {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* =====================================================
+   External Component Overrides
+   ===================================================== */
+
 /* Google Maps Dark Mode Filter */
 .map-dark {
   filter: invert(90%) hue-rotate(180deg) brightness(0.9) contrast(0.9);
@@ -264,7 +483,7 @@
 
 /* Toast Container Styles */
 .Toastify__toast-body {
-  font-family: 'AirbnbCereal', sans-serif;
+  font-family: 'Ploni', 'Rubik', sans-serif;
   font-size: 1rem;
 }
 
@@ -283,17 +502,10 @@
 
 /* Mobile bottom nav safe area */
 .bottom-nav-safe {
-  padding-bottom: max(env(safe-area-inset-bottom, 0), 12px);
+  padding-bottom: max(var(--safe-area-inset-bottom), 12px);
 }
 
 /* Focus visible styles */
 *:focus-visible {
   @apply outline-none ring-2 ring-accent-gold ring-offset-2 ring-offset-background-dark;
-}
-
-/* Disable focus on touch devices */
-@media (hover: none) {
-  *:focus {
-    outline: none;
-  }
 }
