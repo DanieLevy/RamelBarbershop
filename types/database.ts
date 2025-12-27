@@ -96,6 +96,30 @@ export interface Database {
           open_days: string[]
           created_at: string
           updated_at: string
+          // Dynamic content fields
+          hero_title: string | null
+          hero_subtitle: string | null
+          hero_description: string | null
+          // Location fields
+          address_text: string | null
+          address_lat: number | null
+          address_lng: number | null
+          waze_link: string | null
+          google_maps_link: string | null
+          // Contact & Social fields
+          contact_phone: string | null
+          contact_email: string | null
+          contact_whatsapp: string | null
+          social_instagram: string | null
+          social_facebook: string | null
+          social_tiktok: string | null
+          // Visibility toggles
+          show_phone: boolean
+          show_email: boolean
+          show_whatsapp: boolean
+          show_instagram: boolean
+          show_facebook: boolean
+          show_tiktok: boolean
         }
         Insert: {
           id?: string
@@ -108,6 +132,30 @@ export interface Database {
           open_days?: string[]
           created_at?: string
           updated_at?: string
+          // Dynamic content fields
+          hero_title?: string | null
+          hero_subtitle?: string | null
+          hero_description?: string | null
+          // Location fields
+          address_text?: string | null
+          address_lat?: number | null
+          address_lng?: number | null
+          waze_link?: string | null
+          google_maps_link?: string | null
+          // Contact & Social fields
+          contact_phone?: string | null
+          contact_email?: string | null
+          contact_whatsapp?: string | null
+          social_instagram?: string | null
+          social_facebook?: string | null
+          social_tiktok?: string | null
+          // Visibility toggles
+          show_phone?: boolean
+          show_email?: boolean
+          show_whatsapp?: boolean
+          show_instagram?: boolean
+          show_facebook?: boolean
+          show_tiktok?: boolean
         }
         Update: {
           id?: string
@@ -120,6 +168,30 @@ export interface Database {
           open_days?: string[]
           created_at?: string
           updated_at?: string
+          // Dynamic content fields
+          hero_title?: string | null
+          hero_subtitle?: string | null
+          hero_description?: string | null
+          // Location fields
+          address_text?: string | null
+          address_lat?: number | null
+          address_lng?: number | null
+          waze_link?: string | null
+          google_maps_link?: string | null
+          // Contact & Social fields
+          contact_phone?: string | null
+          contact_email?: string | null
+          contact_whatsapp?: string | null
+          social_instagram?: string | null
+          social_facebook?: string | null
+          social_tiktok?: string | null
+          // Visibility toggles
+          show_phone?: boolean
+          show_email?: boolean
+          show_whatsapp?: boolean
+          show_instagram?: boolean
+          show_facebook?: boolean
+          show_tiktok?: boolean
         }
       }
       barbershop_closures: {

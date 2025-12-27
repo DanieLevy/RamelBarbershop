@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
-import { useAuthStore } from '@/store/useAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import type { BarberWithWorkDays } from '@/types/database'
@@ -22,8 +21,6 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
     prevStep,
     reset,
   } = useBookingStore()
-  
-  const { customer: _authCustomer } = useAuthStore()
   
   const [isCreating, setIsCreating] = useState(false)
   const [isCreated, setIsCreated] = useState(false)

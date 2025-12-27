@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { MapPin, Phone, Clock } from 'lucide-react'
+import type { BarbershopSettings } from '@/types/database'
 
 // Custom SVG icons for social media (Lucide doesn't have brand icons)
 const WhatsAppIcon = () => (
@@ -23,29 +24,65 @@ const FacebookIcon = () => (
   </svg>
 )
 
-export function Footer() {
+interface FooterProps {
+  settings?: BarbershopSettings | null
+}
+
+export function Footer({ settings }: FooterProps) {
   const currentYear = new Date().getFullYear()
 
-  const socialLinks = [
-    {
+  // Get values from settings with defaults
+  const shopName = settings?.name || 'רמאל ברברשופ'
+  const phone = settings?.contact_phone || settings?.phone || '052-384-0981'
+  const addressText = settings?.address_text || 'בית הכרם 30, ירושלים'
+  const whatsappNumber = settings?.contact_whatsapp || '972523840981'
+  const instagramUrl = settings?.social_instagram || 'https://www.instagram.com/ram__el_barber_shop/'
+  const facebookUrl = settings?.social_facebook || 'https://www.facebook.com/ramel.leusani'
+  
+  // Visibility toggles
+  const showWhatsapp = settings?.show_whatsapp !== false
+  const showInstagram = settings?.show_instagram !== false
+  const showFacebook = settings?.show_facebook !== false
+  
+  // Working hours
+  const workStart = settings?.work_hours_start?.slice(0, 5) || '09:00'
+  const workEnd = settings?.work_hours_end?.slice(0, 5) || '20:00'
+  const openDays = settings?.open_days || ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+  const isFridayOpen = openDays.includes('friday')
+
+  // Build social links array based on visibility
+  const socialLinks = []
+  
+  if (showWhatsapp) {
+    socialLinks.push({
       name: 'WhatsApp',
       icon: WhatsAppIcon,
-      url: 'https://wa.me/972523840981',
+      url: `https://wa.me/${whatsappNumber}`,
       color: 'hover:text-green-400',
-    },
-    {
+    })
+  }
+  
+  if (showInstagram && instagramUrl) {
+    socialLinks.push({
       name: 'Instagram',
       icon: InstagramIcon,
-      url: 'https://www.instagram.com/ram__el_barber_shop/',
+      url: instagramUrl,
       color: 'hover:text-pink-400',
-    },
-    {
+    })
+  }
+  
+  if (showFacebook && facebookUrl) {
+    socialLinks.push({
       name: 'Facebook',
       icon: FacebookIcon,
-      url: 'https://www.facebook.com/ramel.leusani',
+      url: facebookUrl,
       color: 'hover:text-blue-400',
-    },
-  ]
+    })
+  }
+
+  // Format phone for tel: link
+  const formattedPhone = phone.replace(/[^0-9+]/g, '')
+  const telLink = formattedPhone.startsWith('+') ? formattedPhone : '+972' + formattedPhone.replace(/^0/, '')
 
   return (
     <footer className="bg-background-darker border-t border-white/10">
@@ -58,7 +95,7 @@ export function Footer() {
               <div className="w-16 h-16 rounded-full overflow-hidden border border-accent-gold/30 shadow-gold-sm">
                 <Image
                   src="/icon.png"
-                  alt="Ramel Barbershop"
+                  alt={shopName}
                   width={64}
                   height={64}
                   className="w-full h-full object-cover"
@@ -66,7 +103,7 @@ export function Footer() {
               </div>
             </Link>
             <p className="text-foreground-muted text-sm leading-relaxed">
-              רמאל ברברשופ - מספרה מקצועית בירושלים.
+              {shopName} - מספרה מקצועית בירושלים.
               <br />
               חוויית טיפוח ייחודית לגבר המודרני.
             </p>
@@ -109,55 +146,54 @@ export function Footer() {
             <ul className="space-y-3">
               <li className="flex items-center gap-3 text-sm">
                 <MapPin size={16} strokeWidth={1.5} className="text-accent-gold flex-shrink-0" />
-                <span className="text-foreground-muted">בית הכרם 30, ירושלים</span>
+                <span className="text-foreground-muted">{addressText}</span>
               </li>
               <li>
                 <a
-                  href="tel:+972523840981"
+                  href={`tel:${telLink}`}
                   className="flex items-center gap-3 text-sm text-foreground-muted hover:text-accent-gold transition-colors"
                 >
                   <Phone size={16} strokeWidth={1.5} className="text-accent-gold flex-shrink-0" />
-                  <span dir="ltr">052-384-0981</span>
+                  <span dir="ltr">{phone}</span>
                 </a>
               </li>
               <li className="flex items-start gap-3 text-sm">
                 <Clock size={16} strokeWidth={1.5} className="text-accent-gold flex-shrink-0 mt-0.5" />
                 <div className="text-foreground-muted">
-                  <p>א&apos;-ה&apos;: 09:00 - 20:00</p>
-                  <p>ו&apos;: 09:00 - 14:00</p>
+                  <p>א&apos;-ה&apos;: {workStart} - {workEnd}</p>
+                  {isFridayOpen && <p>ו&apos;: {workStart} - 14:00</p>}
                 </div>
               </li>
             </ul>
           </div>
 
           {/* Social links */}
-          <div>
-            <h4 className="text-foreground-light font-medium mb-4">עקבו אחרינו</h4>
-            <div className="flex items-center gap-4">
-              {socialLinks.map((social) => (
-                <a
-                  key={social.name}
-                  href={social.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-foreground-muted transition-all hover:scale-110 ${social.color}`}
-                  aria-label={social.name}
-                >
-                  <social.icon />
-                </a>
-              ))}
+          {socialLinks.length > 0 && (
+            <div>
+              <h4 className="text-foreground-light font-medium mb-4">עקבו אחרינו</h4>
+              <div className="flex items-center gap-4">
+                {socialLinks.map((social) => (
+                  <a
+                    key={social.name}
+                    href={social.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-foreground-muted transition-all hover:scale-110 ${social.color}`}
+                    aria-label={social.name}
+                  >
+                    <social.icon />
+                  </a>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
       {/* Bottom bar */}
       <div className="border-t border-white/5">
-        <div className="container-mobile py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-foreground-muted">
-          <p>© {currentYear} רמאל ברברשופ. כל הזכויות שמורות.</p>
-          <p className="flex items-center gap-1">
-            נבנה עם <span className="text-red-400">❤</span> בירושלים
-          </p>
+        <div className="container-mobile py-4 flex items-center justify-center text-xs text-foreground-muted">
+          <p>© {currentYear} {shopName}. כל הזכויות שמורות.</p>
         </div>
       </div>
 

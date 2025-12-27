@@ -6,16 +6,25 @@ import { LocationSection } from '@/components/LocationSection'
 import { Footer } from '@/components/Footer'
 import { SectionTitle } from '@/components/ui/SectionTitle'
 import Image from 'next/image'
-import type { BarberWithWorkDays } from '@/types/database'
+import type { BarberWithWorkDays, BarbershopSettings } from '@/types/database'
 
 export default async function HomePage() {
   const supabase = await createClient()
   
-  // Fetch barbers with their work days
-  const { data: barbers } = await supabase
-    .from('users')
-    .select('*, work_days(*)')
-    .eq('is_barber', true) as { data: BarberWithWorkDays[] | null }
+  // Fetch barbers and settings in parallel for better performance
+  const [barbersResult, settingsResult] = await Promise.all([
+    supabase
+      .from('users')
+      .select('*, work_days(*)')
+      .eq('is_barber', true),
+    supabase
+      .from('barbershop_settings')
+      .select('*')
+      .single()
+  ])
+  
+  const barbers = barbersResult.data as BarberWithWorkDays[] | null
+  const settings = settingsResult.data as BarbershopSettings | null
 
   return (
     <>
@@ -77,12 +86,14 @@ export default async function HomePage() {
             
             {/* Title */}
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground-light mb-4 animate-fade-in-up">
-              רמאל <span className="text-gradient-gold">ברברשופ</span>
+              {settings?.hero_title?.split(' ').map((word, i) => 
+                i === 1 ? <span key={i} className="text-gradient-gold">{word}</span> : <span key={i}>{word} </span>
+              ) || <>רמאל <span className="text-gradient-gold">ברברשופ</span></>}
             </h1>
             
             {/* Subtitle */}
             <p className="text-lg sm:text-xl md:text-2xl text-foreground-muted mb-6 animate-fade-in-up animation-delay-100">
-              חווית טיפוח ייחודית לגבר המודרני
+              {settings?.hero_subtitle || 'חווית טיפוח ייחודית לגבר המודרני'}
             </p>
             
             {/* Decorative line */}
@@ -94,9 +105,7 @@ export default async function HomePage() {
             
             {/* Description */}
             <p className="text-foreground-muted leading-relaxed text-sm sm:text-base max-w-2xl mx-auto mb-6 sm:mb-8 animate-fade-in-up animation-delay-300">
-              רמאל ברברשופ הוא מקום ייחודי במינו, עם תפיסה חדשנית ומקורית של עולם הספא והטיפוח הגברי.
-              אנו מציעים לכם חוויה ייחודית של טיפוח וספא לגברים בלבד,
-              באווירה נעימה ומרגיעה, עם צוות מקצועי ומנוסה.
+              {settings?.hero_description || 'רמאל ברברשופ הוא מקום ייחודי במינו, עם תפיסה חדשנית ומקורית של עולם הספא והטיפוח הגברי. אנו מציעים לכם חוויה ייחודית של טיפוח וספא לגברים בלבד, באווירה נעימה ומרגיעה, עם צוות מקצועי ומנוסה.'}
             </p>
             
             {/* CTA Button */}
@@ -162,13 +171,13 @@ export default async function HomePage() {
         </section>
 
         {/* Location Section */}
-        <LocationSection />
+        <LocationSection settings={settings} />
 
         {/* Contact Section */}
-        <ContactSection />
+        <ContactSection settings={settings} />
       </main>
       
-      <Footer />
+      <Footer settings={settings} />
     </>
   )
 }

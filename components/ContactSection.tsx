@@ -1,8 +1,9 @@
 'use client'
 
-import { Phone, Clock } from 'lucide-react'
+import { Phone, Clock, Mail } from 'lucide-react'
 import { SectionTitle } from '@/components/ui/SectionTitle'
 import { GlassCard } from '@/components/ui/GlassCard'
+import type { BarbershopSettings } from '@/types/database'
 
 // Custom SVG icons for social media (Lucide doesn't have brand icons)
 const WhatsAppIcon = () => (
@@ -23,34 +24,99 @@ const FacebookIcon = () => (
   </svg>
 )
 
-export function ContactSection() {
-  const contacts = [
-    {
+const TikTokIcon = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7">
+    <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+  </svg>
+)
+
+interface ContactSectionProps {
+  settings?: BarbershopSettings | null
+}
+
+export function ContactSection({ settings }: ContactSectionProps) {
+  // Default values with settings override
+  const phone = settings?.contact_phone || '052-384-0981'
+  const email = settings?.contact_email || 'info@ramel-barbershop.co.il'
+  const whatsappNumber = settings?.contact_whatsapp || '972523840981'
+  const instagramUrl = settings?.social_instagram || 'https://www.instagram.com/ram__el_barber_shop/'
+  const facebookUrl = settings?.social_facebook || 'https://www.facebook.com/ramel.leusani'
+  const tiktokUrl = settings?.social_tiktok || ''
+  
+  // Visibility toggles
+  const showPhone = settings?.show_phone !== false
+  const showEmail = settings?.show_email !== false
+  const showWhatsapp = settings?.show_whatsapp !== false
+  const showInstagram = settings?.show_instagram !== false
+  const showFacebook = settings?.show_facebook !== false
+  const showTiktok = settings?.show_tiktok === true && !!tiktokUrl
+
+  // Opening hours from settings
+  const workStart = settings?.work_hours_start?.slice(0, 5) || '09:00'
+  const workEnd = settings?.work_hours_end?.slice(0, 5) || '20:00'
+  const openDays = settings?.open_days || ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+  
+  // Build social contacts array based on visibility
+  const socialContacts = []
+  
+  if (showWhatsapp) {
+    socialContacts.push({
       name: 'WhatsApp',
       icon: WhatsAppIcon,
-      url: 'https://wa.me/972523840981',
+      url: `https://wa.me/${whatsappNumber}`,
       color: 'bg-green-500/10 border-green-500/30 text-green-400 hover:bg-green-500/20',
       description: 'שלח הודעה',
-    },
-    {
+    })
+  }
+  
+  if (showInstagram && instagramUrl) {
+    socialContacts.push({
       name: 'Instagram',
       icon: InstagramIcon,
-      url: 'https://www.instagram.com/ram__el_barber_shop/',
+      url: instagramUrl,
       color: 'bg-pink-500/10 border-pink-500/30 text-pink-400 hover:bg-pink-500/20',
       description: 'עקוב אחרינו',
-    },
-    {
+    })
+  }
+  
+  if (showFacebook && facebookUrl) {
+    socialContacts.push({
       name: 'Facebook',
       icon: FacebookIcon,
-      url: 'https://www.facebook.com/ramel.leusani',
+      url: facebookUrl,
       color: 'bg-blue-500/10 border-blue-500/30 text-blue-400 hover:bg-blue-500/20',
       description: 'הצטרף לקהילה',
-    },
-  ]
+    })
+  }
+  
+  if (showTiktok && tiktokUrl) {
+    socialContacts.push({
+      name: 'TikTok',
+      icon: TikTokIcon,
+      url: tiktokUrl,
+      color: 'bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20',
+      description: 'סרטונים',
+    })
+  }
 
   const openPhone = () => {
-    window.open('tel:+972523840981', '_self')
+    const formattedPhone = phone.replace(/[^0-9+]/g, '')
+    window.open(`tel:${formattedPhone.startsWith('+') ? formattedPhone : '+972' + formattedPhone.replace(/^0/, '')}`, '_self')
   }
+
+  const openEmail = () => {
+    window.open(`mailto:${email}`, '_self')
+  }
+
+  // Determine grid columns based on visible items
+  const visibleContactCards = (showPhone ? 1 : 0) + (showEmail ? 1 : 0) + socialContacts.length
+  const gridCols = visibleContactCards <= 2 ? 'grid-cols-1 sm:grid-cols-2' : 
+                   visibleContactCards <= 3 ? 'grid-cols-1 sm:grid-cols-3' :
+                   'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
+
+  // Check if Saturday is a working day
+  const isSaturdayOpen = openDays.includes('saturday')
+  const isFridayOpen = openDays.includes('friday')
 
   return (
     <section className="index-contact py-16 sm:py-20 lg:py-24 bg-background-dark">
@@ -59,24 +125,43 @@ export function ContactSection() {
         
         <div className="max-w-4xl mx-auto">
           {/* Main contact grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-10">
+          <div className={`grid ${gridCols} gap-4 sm:gap-6 mb-10`}>
             {/* Phone card */}
-            <GlassCard
-              variant="hover"
-              className="flex flex-col items-center text-center cursor-pointer"
-              onClick={openPhone}
-            >
-              <div className="w-14 h-14 rounded-full bg-accent-gold/20 flex items-center justify-center mb-4">
-                <Phone size={24} strokeWidth={1.5} className="text-accent-gold" />
-              </div>
-              <h3 className="text-foreground-light font-medium mb-1">התקשר עכשיו</h3>
-              <p className="text-accent-gold text-lg font-medium" dir="ltr">
-                052-384-0981
-              </p>
-            </GlassCard>
+            {showPhone && (
+              <GlassCard
+                variant="hover"
+                className="flex flex-col items-center text-center cursor-pointer"
+                onClick={openPhone}
+              >
+                <div className="w-14 h-14 rounded-full bg-accent-gold/20 flex items-center justify-center mb-4">
+                  <Phone size={24} strokeWidth={1.5} className="text-accent-gold" />
+                </div>
+                <h3 className="text-foreground-light font-medium mb-1">התקשר עכשיו</h3>
+                <p className="text-accent-gold text-lg font-medium" dir="ltr">
+                  {phone}
+                </p>
+              </GlassCard>
+            )}
+
+            {/* Email card */}
+            {showEmail && email && (
+              <GlassCard
+                variant="hover"
+                className="flex flex-col items-center text-center cursor-pointer"
+                onClick={openEmail}
+              >
+                <div className="w-14 h-14 rounded-full bg-accent-gold/20 flex items-center justify-center mb-4">
+                  <Mail size={24} strokeWidth={1.5} className="text-accent-gold" />
+                </div>
+                <h3 className="text-foreground-light font-medium mb-1">שלח מייל</h3>
+                <p className="text-accent-gold text-sm font-medium truncate max-w-full" dir="ltr">
+                  {email}
+                </p>
+              </GlassCard>
+            )}
             
             {/* Social cards */}
-            {contacts.map((contact) => (
+            {socialContacts.map((contact) => (
               <button
                 key={contact.name}
                 onClick={() => window.open(contact.url, '_blank')}
@@ -103,15 +188,29 @@ export function ContactSection() {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between items-center py-2 border-b border-white/5">
                 <span className="text-foreground-muted">ראשון - חמישי</span>
-                <span className="text-foreground-light font-medium" dir="ltr">09:00 - 20:00</span>
+                <span className="text-foreground-light font-medium" dir="ltr">
+                  {workStart} - {workEnd}
+                </span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-white/5">
                 <span className="text-foreground-muted">שישי</span>
-                <span className="text-foreground-light font-medium" dir="ltr">09:00 - 14:00</span>
+                {isFridayOpen ? (
+                  <span className="text-foreground-light font-medium" dir="ltr">
+                    {workStart} - 14:00
+                  </span>
+                ) : (
+                  <span className="text-red-400 font-medium">סגור</span>
+                )}
               </div>
               <div className="flex justify-between items-center py-2">
                 <span className="text-foreground-muted">שבת</span>
-                <span className="text-red-400 font-medium">סגור</span>
+                {isSaturdayOpen ? (
+                  <span className="text-foreground-light font-medium" dir="ltr">
+                    {workStart} - {workEnd}
+                  </span>
+                ) : (
+                  <span className="text-red-400 font-medium">סגור</span>
+                )}
               </div>
             </div>
           </GlassCard>

@@ -282,8 +282,8 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
                     />
                   </div>
                   <span className={cn(
-                    'font-medium text-foreground-light hidden sm:block transition-all duration-300',
-                    isScrolled ? 'text-base' : 'text-lg'
+                    'font-medium text-foreground-light block transition-all duration-300',
+                    isScrolled ? 'text-sm sm:text-base' : 'text-base sm:text-lg'
                   )}>
                     רמאל <span className="text-accent-gold">ברברשופ</span>
                   </span>
