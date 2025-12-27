@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Home, Search, Calendar, User, LayoutDashboard, Users, LogIn, Scissors } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useAuthStore } from '@/store/useAuthStore'
-import { useBarberAuthStore } from '@/store/useBarberAuthStore'
+import { useCurrentUser, type UserType } from '@/hooks/useCurrentUser'
 import { LoginModal } from '@/components/LoginModal'
 
 interface NavItem {
@@ -18,15 +17,12 @@ interface NavItem {
   action?: () => void
 }
 
-type UserRole = 'guest' | 'customer' | 'barber'
-
 export function MobileBottomNav() {
   const pathname = usePathname()
   const router = useRouter()
   
-  // Auth stores
-  const { isLoggedIn: isCustomerLoggedIn, isInitialized: customerInitialized } = useAuthStore()
-  const { isLoggedIn: isBarberLoggedIn, isInitialized: barberInitialized } = useBarberAuthStore()
+  // Use unified auth hook
+  const { type: userRole, isInitialized } = useCurrentUser()
   
   // UI State
   const [isVisible, setIsVisible] = useState(true)
@@ -37,15 +33,6 @@ export function MobileBottomNav() {
   const lastScrollY = useRef(0)
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null)
   const dropupRef = useRef<HTMLDivElement>(null)
-
-  // Determine user role
-  const getUserRole = useCallback((): UserRole => {
-    if (isBarberLoggedIn) return 'barber'
-    if (isCustomerLoggedIn) return 'customer'
-    return 'guest'
-  }, [isBarberLoggedIn, isCustomerLoggedIn])
-
-  const userRole = getUserRole()
 
   // Don't show on dashboard pages or barber booking wizard
   const shouldHide = pathname.startsWith('/barber/dashboard') || 
@@ -125,7 +112,7 @@ export function MobileBottomNav() {
   }
 
   // Wait for auth to initialize (with fallback)
-  const isReady = (customerInitialized && barberInitialized) || forceShow
+  const isReady = isInitialized || forceShow
   if (!isReady) {
     return null
   }
@@ -144,13 +131,14 @@ export function MobileBottomNav() {
   }
 
   // Navigation items based on role
-  const getNavItems = (): NavItem[] => {
-    switch (userRole) {
+  const getNavItems = (role: UserType): NavItem[] => {
+    switch (role) {
       case 'barber':
+        // Barber-specific navigation with quick access to their upcoming customer appointments
         return [
           { id: 'home', label: 'בית', href: '/', icon: Home },
           { id: 'dashboard', label: 'לוח בקרה', href: '/barber/dashboard', icon: LayoutDashboard },
-          { id: 'upcoming', label: 'תורים קרובים', labelActive: 'תורים', href: '/barber/dashboard/reservations', icon: Users },
+          { id: 'upcoming', label: 'לקוחות קרובים', labelActive: 'לקוחות', href: '/barber/dashboard/reservations', icon: Users },
         ]
       case 'customer':
         return [
@@ -169,7 +157,7 @@ export function MobileBottomNav() {
     }
   }
 
-  const navItems = getNavItems()
+  const navItems = getNavItems(userRole)
 
   const getActiveItem = (): string => {
     if (pathname === '/my-appointments') return 'calendar'

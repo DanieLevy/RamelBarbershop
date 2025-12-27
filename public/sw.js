@@ -1,6 +1,6 @@
 // Service Worker for Ramel Barbershop PWA
 // Version is updated automatically during build
-const APP_VERSION = '2025.12.28.0112';
+const APP_VERSION = '2025.12.28.0156';
 const CACHE_NAME = `ramel-pwa-${APP_VERSION}`;
 
 // Assets to cache (minimal - only critical for app shell)
@@ -15,6 +15,8 @@ const STATIC_ASSETS = [
 ];
 
 // Install event - cache static assets
+// IMPORTANT: Do NOT call skipWaiting() here - we want the SW to enter "waiting" state
+// so the user can see the update modal and choose when to update
 self.addEventListener('install', (event) => {
   console.log(`[SW] Installing version ${APP_VERSION}`);
   
@@ -25,8 +27,9 @@ self.addEventListener('install', (event) => {
         return cache.addAll(STATIC_ASSETS);
       })
       .then(() => {
-        // Skip waiting to activate immediately
-        return self.skipWaiting();
+        console.log('[SW] Installation complete - waiting for activation');
+        // Do NOT call skipWaiting() here - let the update modal handle it
+        // The user will trigger skipWaiting via the update modal
       })
   );
 });

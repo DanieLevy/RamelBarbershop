@@ -4,9 +4,9 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
-import { useAuthStore } from '@/store/useAuthStore'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { LoginModal } from './LoginModal'
-import { User, Calendar, LogOut, Menu, X, Home, Phone, MapPin, Scissors, ChevronDown } from 'lucide-react'
+import { User, Calendar, LogOut, Menu, X, Home, Phone, MapPin, Scissors, ChevronDown, LayoutDashboard, Settings } from 'lucide-react'
 
 interface AppHeaderProps {
   barberImgUrl?: string
@@ -16,7 +16,8 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
   const router = useRouter()
   const pathname = usePathname()
   
-  const { customer, isLoggedIn, isLoading, logout } = useAuthStore()
+  // Use unified auth hook
+  const { type: userType, customer, barber, isLoggedIn, isLoading, isAdmin, displayName, logout } = useCurrentUser()
   
   const [scrollProgress, setScrollProgress] = useState(0)
   const [showLoginModal, setShowLoginModal] = useState(false)
@@ -107,9 +108,10 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
   const isScrolled = scrollProgress > 0.3
   const showHeaderLogo = scrollProgress > 0.5
 
-  // User button component
+  // User button component - handles both customer and barber states
   const UserButton = ({ compact = false }: { compact?: boolean }) => {
-    if (!isLoggedIn || !customer) {
+    // Not logged in - show login button
+    if (!isLoggedIn) {
       return (
         <button
           onClick={() => setShowLoginModal(true)}
@@ -129,88 +131,213 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
       )
     }
 
-    return (
-      <div className="relative" ref={menuRef}>
-        <button
-          onClick={() => setShowUserMenu(!showUserMenu)}
-          className={cn(
-            'flex items-center gap-2 rounded-full transition-all',
-            'bg-white/10 hover:bg-white/15 border border-white/20',
-            compact ? 'px-2.5 py-1.5' : 'px-3 py-2'
+    // Logged in as barber
+    if (userType === 'barber' && barber) {
+      return (
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            className={cn(
+              'flex items-center gap-2 rounded-full transition-all',
+              'bg-accent-gold/20 hover:bg-accent-gold/30 border border-accent-gold/40',
+              compact ? 'px-2.5 py-1.5' : 'px-3 py-2'
+            )}
+          >
+            <div className={cn(
+              'rounded-full bg-accent-gold/40 flex items-center justify-center',
+              compact ? 'w-6 h-6' : 'w-7 h-7'
+            )}>
+              <Scissors size={compact ? 12 : 14} strokeWidth={1.5} className="text-accent-gold" />
+            </div>
+            <span className={cn(
+              'max-w-[80px] truncate text-accent-gold font-medium',
+              compact ? 'text-xs hidden sm:block' : 'text-sm'
+            )}>
+              {displayName.split(' ')[0]}
+            </span>
+            <ChevronDown size={14} strokeWidth={1.5} className={cn(
+              'text-accent-gold/70 transition-transform',
+              showUserMenu && 'rotate-180'
+            )} />
+          </button>
+
+          {showUserMenu && (
+            <div className="absolute left-0 top-full mt-2 w-56 bg-background-darker/95 backdrop-blur-xl border border-accent-gold/20 rounded-2xl shadow-2xl overflow-hidden z-50 animate-fade-in">
+              <div className="p-4 border-b border-white/10 bg-gradient-to-r from-accent-gold/15 to-transparent">
+                <div className="flex items-center gap-2">
+                  <Scissors size={14} strokeWidth={1.5} className="text-accent-gold" />
+                  <span className="text-accent-gold text-xs font-medium">
+                    {isAdmin ? 'מנהל' : 'ספר'}
+                  </span>
+                </div>
+                <p className="text-foreground-light font-medium truncate mt-1">
+                  {displayName}
+                </p>
+                <p className="text-foreground-muted text-xs mt-0.5" dir="ltr">
+                  {barber.email}
+                </p>
+              </div>
+
+              <div className="p-2">
+                <button
+                  onClick={() => {
+                    router.push('/barber/dashboard')
+                    setShowUserMenu(false)
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-foreground-light hover:bg-white/5 transition-colors"
+                >
+                  <LayoutDashboard size={18} strokeWidth={1.5} className="text-accent-gold" />
+                  <span className="text-sm">לוח בקרה</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    router.push('/barber/dashboard/reservations')
+                    setShowUserMenu(false)
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-foreground-light hover:bg-white/5 transition-colors"
+                >
+                  <Calendar size={18} strokeWidth={1.5} className="text-accent-gold" />
+                  <span className="text-sm">תורים קרובים</span>
+                </button>
+
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      router.push('/barber/dashboard/settings')
+                      setShowUserMenu(false)
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-foreground-light hover:bg-white/5 transition-colors"
+                  >
+                    <Settings size={18} strokeWidth={1.5} className="text-accent-gold" />
+                    <span className="text-sm">הגדרות</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors"
+                >
+                  <LogOut size={18} strokeWidth={1.5} />
+                  <span className="text-sm">התנתק</span>
+                </button>
+              </div>
+            </div>
           )}
-        >
-          <div className={cn(
-            'rounded-full bg-accent-gold/30 flex items-center justify-center',
-            compact ? 'w-6 h-6' : 'w-7 h-7'
-          )}>
-            <User size={compact ? 12 : 14} strokeWidth={1.5} className="text-accent-gold" />
-          </div>
-          <span className={cn(
-            'max-w-[70px] truncate text-foreground-light',
-            compact ? 'text-xs hidden sm:block' : 'text-sm'
-          )}>
-            {customer.fullname.split(' ')[0]}
-          </span>
-          <ChevronDown size={14} strokeWidth={1.5} className={cn(
-            'text-foreground-muted transition-transform',
-            showUserMenu && 'rotate-180'
-          )} />
-        </button>
+        </div>
+      )
+    }
 
-        {showUserMenu && (
-          <div className="absolute left-0 top-full mt-2 w-52 bg-background-darker/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 animate-fade-in">
-            <div className="p-4 border-b border-white/10 bg-gradient-to-r from-accent-gold/10 to-transparent">
-              <p className="text-foreground-light font-medium truncate">
-                {customer.fullname}
-              </p>
-              <p className="text-foreground-muted text-xs mt-0.5" dir="ltr">
-                {customer.phone}
-              </p>
+    // Logged in as customer
+    if (userType === 'customer' && customer) {
+      return (
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            className={cn(
+              'flex items-center gap-2 rounded-full transition-all',
+              'bg-white/10 hover:bg-white/15 border border-white/20',
+              compact ? 'px-2.5 py-1.5' : 'px-3 py-2'
+            )}
+          >
+            <div className={cn(
+              'rounded-full bg-accent-gold/30 flex items-center justify-center',
+              compact ? 'w-6 h-6' : 'w-7 h-7'
+            )}>
+              <User size={compact ? 12 : 14} strokeWidth={1.5} className="text-accent-gold" />
             </div>
+            <span className={cn(
+              'max-w-[70px] truncate text-foreground-light',
+              compact ? 'text-xs hidden sm:block' : 'text-sm'
+            )}>
+              {customer.fullname.split(' ')[0]}
+            </span>
+            <ChevronDown size={14} strokeWidth={1.5} className={cn(
+              'text-foreground-muted transition-transform',
+              showUserMenu && 'rotate-180'
+            )} />
+          </button>
 
-            <div className="p-2">
-              <button
-                onClick={handleMyAppointments}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-foreground-light hover:bg-white/5 transition-colors"
-              >
-                <Calendar size={18} strokeWidth={1.5} className="text-accent-gold" />
-                <span className="text-sm">התורים שלי</span>
-              </button>
+          {showUserMenu && (
+            <div className="absolute left-0 top-full mt-2 w-52 bg-background-darker/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 animate-fade-in">
+              <div className="p-4 border-b border-white/10 bg-gradient-to-r from-accent-gold/10 to-transparent">
+                <p className="text-foreground-light font-medium truncate">
+                  {customer.fullname}
+                </p>
+                <p className="text-foreground-muted text-xs mt-0.5" dir="ltr">
+                  {customer.phone}
+                </p>
+              </div>
 
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors"
-              >
-                <LogOut size={18} strokeWidth={1.5} />
-                <span className="text-sm">התנתק</span>
-              </button>
+              <div className="p-2">
+                <button
+                  onClick={handleMyAppointments}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-foreground-light hover:bg-white/5 transition-colors"
+                >
+                  <Calendar size={18} strokeWidth={1.5} className="text-accent-gold" />
+                  <span className="text-sm">התורים שלי</span>
+                </button>
+
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors"
+                >
+                  <LogOut size={18} strokeWidth={1.5} />
+                  <span className="text-sm">התנתק</span>
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-    )
+          )}
+        </div>
+      )
+    }
+
+    // Fallback (shouldn't happen)
+    return null
   }
 
-  // Mobile menu items
-  const mobileMenuItems = [
-    { label: 'בית', icon: Home, action: () => router.push('/') },
-    { label: 'הצוות שלנו', icon: Scissors, action: () => scrollToSection('index-body') },
-    { label: 'מיקום', icon: MapPin, action: () => scrollToSection('index-location') },
-    { label: 'צור קשר', icon: Phone, action: () => scrollToSection('index-contact') },
-  ]
+  // Mobile menu items - dynamic based on user type
+  const getMobileMenuItems = () => {
+    const baseItems = [
+      { label: 'בית', icon: Home, action: () => router.push('/') },
+    ]
+
+    if (userType === 'barber') {
+      // Barber-specific menu items
+      return [
+        ...baseItems,
+        { label: 'לוח בקרה', icon: LayoutDashboard, action: () => router.push('/barber/dashboard') },
+        { label: 'תורים קרובים', icon: Calendar, action: () => router.push('/barber/dashboard/reservations') },
+        ...(isAdmin ? [{ label: 'הגדרות', icon: Settings, action: () => router.push('/barber/dashboard/settings') }] : []),
+      ]
+    }
+
+    // Guest and customer - show navigation items
+    return [
+      ...baseItems,
+      { label: 'הצוות שלנו', icon: Scissors, action: () => scrollToSection('index-body') },
+      { label: 'מיקום', icon: MapPin, action: () => scrollToSection('index-location') },
+      { label: 'צור קשר', icon: Phone, action: () => scrollToSection('index-contact') },
+    ]
+  }
+
+  const mobileMenuItems = getMobileMenuItems()
 
   return (
     <>
       <header
         className={cn(
-          'fixed top-0 left-0 right-0 z-50 transition-all duration-500',
-          'pt-[env(safe-area-inset-top,0px)]' // PWA safe area support
+          'fixed left-0 right-0 z-50 transition-all duration-500',
+          // In standalone mode, html has padding-top for safe area, so header uses top:0
+          // In browser mode, header is at top:0 normally
         )}
         style={{
           // Dynamic background based on scroll - starts fully transparent
           backgroundColor: `rgba(8, 11, 13, ${scrollProgress * 0.95})`,
           backdropFilter: `blur(${scrollProgress * 20}px)`,
           WebkitBackdropFilter: `blur(${scrollProgress * 20}px)`,
+          // top is handled by CSS in globals.css for standalone mode
+          top: 0,
         }}
       >
         {/* Top accent line */}
@@ -394,8 +521,27 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
               </div>
             </div>
             
-            {/* User info if logged in */}
-            {isLoggedIn && customer && (
+            {/* User info if logged in - show different UI for barber vs customer */}
+            {isLoggedIn && userType === 'barber' && barber && (
+              <div className="p-4 border-b border-white/10 bg-accent-gold/10">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-accent-gold/30 flex items-center justify-center">
+                    <Scissors size={18} strokeWidth={1.5} className="text-accent-gold" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-foreground-light font-medium text-sm">{displayName}</p>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent-gold/20 text-accent-gold">
+                        {isAdmin ? 'מנהל' : 'ספר'}
+                      </span>
+                    </div>
+                    <p className="text-foreground-muted text-xs" dir="ltr">{barber.email}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {isLoggedIn && userType === 'customer' && customer && (
               <div className="p-4 border-b border-white/10 bg-white/5">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-accent-gold/20 flex items-center justify-center">
@@ -426,7 +572,19 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
               
               <div className="my-4 h-px bg-white/10" />
               
-              {isLoggedIn ? (
+              {/* Logged in as barber */}
+              {isLoggedIn && userType === 'barber' ? (
+                <div className="space-y-1">
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors"
+                  >
+                    <LogOut size={20} strokeWidth={1.5} />
+                    <span className="text-sm font-medium">התנתק</span>
+                  </button>
+                </div>
+              ) : isLoggedIn && userType === 'customer' ? (
+                /* Logged in as customer */
                 <div className="space-y-1">
                   <button
                     onClick={handleMyAppointments}
@@ -444,6 +602,7 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
                   </button>
                 </div>
               ) : (
+                /* Not logged in - guest */
                 <button
                   onClick={() => {
                     setShowMobileMenu(false)

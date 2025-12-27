@@ -2,11 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
+import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { findCustomerByPhone } from '@/lib/services/customer.service'
 import { sendPhoneOtp, verifyOtp, clearRecaptchaVerifier, isTestUser, TEST_USER, setSkipDebugMode } from '@/lib/firebase/config'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { X, Scissors } from 'lucide-react'
+import { X, Scissors, AlertTriangle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { ConfirmationResult } from 'firebase/auth'
 
@@ -15,13 +16,14 @@ interface LoginModalProps {
   onClose: () => void
 }
 
-type Step = 'phone' | 'name' | 'otp' | 'debug-choice'
+type Step = 'phone' | 'name' | 'otp' | 'debug-choice' | 'blocked'
 
 const RECAPTCHA_CONTAINER_ID = 'login-recaptcha-container'
 
 export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const router = useRouter()
   const { login } = useAuthStore()
+  const { isLoggedIn: isBarberLoggedIn, barber, logout: barberLogout } = useBarberAuthStore()
   
   const [step, setStep] = useState<Step>('phone')
   const [phone, setPhone] = useState('')
@@ -34,6 +36,13 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [countdown, setCountdown] = useState(0)
   
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([])
+
+  // Check if barber is logged in and show blocked state
+  useEffect(() => {
+    if (isOpen && isBarberLoggedIn) {
+      setStep('blocked')
+    }
+  }, [isOpen, isBarberLoggedIn])
 
   // Reset state when modal closes
   useEffect(() => {
@@ -249,6 +258,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           {step === 'name' && 'הרשמה'}
           {step === 'otp' && 'אימות טלפון'}
           {step === 'debug-choice' && '🧪 מצב בדיקה'}
+          {step === 'blocked' && 'לא ניתן להתחבר'}
         </h2>
         
         {/* Phone Step */}
@@ -484,19 +494,63 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           </div>
         )}
         
-        {/* Barber Login Link */}
-        <div className="mt-6 pt-4 border-t border-white/10">
-          <button
-            onClick={() => {
-              onClose()
-              router.push('/barber/login')
-            }}
-            className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-foreground-muted hover:text-accent-gold transition-colors"
-          >
-            <Scissors size={14} strokeWidth={1.5} />
-            <span>כניסה לספרים</span>
-          </button>
-        </div>
+        {/* Blocked Step - Barber is already logged in */}
+        {step === 'blocked' && (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col items-center gap-3 py-4">
+              <div className="w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center">
+                <AlertTriangle size={32} strokeWidth={1.5} className="text-amber-400" />
+              </div>
+              <p className="text-foreground-light text-center font-medium">
+                אתה מחובר כספר
+              </p>
+              <p className="text-foreground-muted text-sm text-center">
+                {barber?.fullname || barber?.email}
+              </p>
+            </div>
+            
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
+              <p className="text-amber-400 text-sm text-center">
+                לא ניתן להתחבר לשני סוגי חשבונות בו-זמנית.
+                <br />
+                יש להתנתק מחשבון הספר כדי להתחבר כלקוח.
+              </p>
+            </div>
+            
+            <button
+              onClick={() => {
+                barberLogout()
+                setStep('phone')
+              }}
+              className="w-full py-3 rounded-xl font-medium transition-all bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
+            >
+              התנתק מחשבון הספר
+            </button>
+            
+            <button
+              onClick={onClose}
+              className="w-full py-3 rounded-xl font-medium transition-all border border-white/20 text-foreground-light hover:bg-white/5"
+            >
+              סגור
+            </button>
+          </div>
+        )}
+        
+        {/* Barber Login Link - hide when blocked */}
+        {step !== 'blocked' && (
+          <div className="mt-6 pt-4 border-t border-white/10">
+            <button
+              onClick={() => {
+                onClose()
+                router.push('/barber/login')
+              }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-foreground-muted hover:text-accent-gold transition-colors"
+            >
+              <Scissors size={14} strokeWidth={1.5} />
+              <span>כניסה לספרים</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -61,7 +61,7 @@ export function PWAProvider({ children }: PWAProviderProps) {
       
       {/* Force Update Modal - Non-dismissible */}
       {pwa.isUpdateAvailable && (
-        <UpdateModal onUpdate={pwa.updateApp} />
+        <UpdateModal onUpdate={pwa.updateApp} version={pwa.currentVersion} />
       )}
       
       {/* Install Banner - Smart behavior based on visit count */}

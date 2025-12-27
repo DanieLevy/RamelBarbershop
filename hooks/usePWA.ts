@@ -91,6 +91,8 @@ export const usePWA = (): UsePWAReturn => {
   useEffect(() => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
 
+    let updateInterval: NodeJS.Timeout | null = null
+
     const registerSW = async () => {
       try {
         const registration = await navigator.serviceWorker.register('/sw.js', {
@@ -103,28 +105,42 @@ export const usePWA = (): UsePWAReturn => {
 
         setState((prev) => ({ ...prev, isServiceWorkerReady: true }))
 
-        // Check for updates immediately and periodically
+        // Check if there's already a waiting worker (user closed app before updating)
+        if (registration.waiting) {
+          console.log('[PWA] Found waiting service worker on load')
+          setState((prev) => ({ ...prev, isUpdateAvailable: true }))
+        }
+
+        // Check for updates immediately
         registration.update()
         
-        // Check for updates every 5 minutes
-        const updateInterval = setInterval(() => {
+        // Check for updates every 1 minute for faster update detection
+        updateInterval = setInterval(() => {
           registration.update()
-        }, 5 * 60 * 1000)
+        }, 1 * 60 * 1000)
 
         // Listen for new service worker
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing
           if (!newWorker) return
 
+          console.log('[PWA] New service worker found, tracking state...')
+
           newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              console.log('[PWA] New version available!')
-              setState((prev) => ({ ...prev, isUpdateAvailable: true }))
+            console.log('[PWA] New worker state:', newWorker.state)
+            
+            if (newWorker.state === 'installed') {
+              if (navigator.serviceWorker.controller) {
+                // New SW installed while old one is still controlling
+                console.log('[PWA] New version installed and waiting!')
+                setState((prev) => ({ ...prev, isUpdateAvailable: true }))
+              } else {
+                // First install - no update needed, just fresh install
+                console.log('[PWA] First install complete')
+              }
             }
           })
         })
-
-        return () => clearInterval(updateInterval)
       } catch (error) {
         console.error('[PWA] Service Worker registration failed:', error)
       }
@@ -133,7 +149,7 @@ export const usePWA = (): UsePWAReturn => {
     registerSW()
 
     // Listen for SW messages
-    navigator.serviceWorker.addEventListener('message', (event) => {
+    const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'SW_UPDATED') {
         console.log('[PWA] Received update notification, version:', event.data.version)
         setState((prev) => ({
@@ -142,13 +158,21 @@ export const usePWA = (): UsePWAReturn => {
           currentVersion: event.data.version,
         }))
       }
-    })
+    }
+    navigator.serviceWorker.addEventListener('message', handleMessage)
 
     // Handle controller change (new SW took over)
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
+    const handleControllerChange = () => {
       console.log('[PWA] Controller changed, reloading...')
       window.location.reload()
-    })
+    }
+    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange)
+
+    return () => {
+      if (updateInterval) clearInterval(updateInterval)
+      navigator.serviceWorker.removeEventListener('message', handleMessage)
+      navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange)
+    }
   }, [])
 
   // Listen for install prompt
@@ -207,14 +231,38 @@ export const usePWA = (): UsePWAReturn => {
 
   // Update the app
   const updateApp = useCallback(() => {
-    if (!swRegistrationRef.current?.waiting) {
-      console.log('[PWA] No waiting worker to activate')
+    const registration = swRegistrationRef.current
+    
+    if (!registration) {
+      console.log('[PWA] No registration found, reloading...')
       window.location.reload()
       return
     }
 
-    // Tell the waiting SW to skip waiting
-    swRegistrationRef.current.waiting.postMessage({ type: 'SKIP_WAITING' })
+    // Try waiting worker first
+    if (registration.waiting) {
+      console.log('[PWA] Telling waiting worker to skip waiting...')
+      registration.waiting.postMessage({ type: 'SKIP_WAITING' })
+      return
+    }
+
+    // If no waiting worker, check for installing worker
+    if (registration.installing) {
+      console.log('[PWA] Worker still installing, waiting...')
+      const worker = registration.installing
+      
+      worker.addEventListener('statechange', () => {
+        if (worker.state === 'installed') {
+          console.log('[PWA] Worker now installed, skip waiting...')
+          worker.postMessage({ type: 'SKIP_WAITING' })
+        }
+      })
+      return
+    }
+
+    // Fallback: just reload
+    console.log('[PWA] No worker to update, reloading...')
+    window.location.reload()
   }, [])
 
   // Check for updates manually
