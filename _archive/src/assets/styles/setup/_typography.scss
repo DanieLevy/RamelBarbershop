@@ -1,0 +1,50 @@
+@font-face {
+  font-family: cereal;
+  src: url('../fonts/Cereal/AirbnbCereal-Book.ttf');
+}
+@font-face {
+  font-family: cereal-bold;
+  src: url('../fonts/Cereal/AirbnbCereal-Bold.ttf');
+}
+@font-face {
+  font-family: cereal-medium;
+  src: url('../fonts/Cereal/AirbnbCereal-Medium.ttf');
+}
+@font-face {
+  font-family: cereal-light;
+  src: url('../fonts/Cereal/AirbnbCereal-Light.ttf');
+}
+@font-face {
+  font-family: cereal-black;
+  src: url('../fonts/Cereal/AirbnbCereal-Black.ttf');
+}
+
+// import Glass Antiqua font from Google Fonts and give it $
+@import url('https://fonts.googleapis.com/css2?family=Glass+Antiqua&display=swap');
+$uniq: 'Glass Antiqua', serif;
+
+
+@font-face {
+  font-family: Rubik;
+  src: url('../fonts/Rubik/Rubik-Regular.ttf');
+}
+
+@font-face {
+  font-family: Rubik-Bold;
+  src: url('../fonts/Rubik/Rubik-Bold.ttf');
+}
+
+@font-face {
+  font-family: Rubik-Medium;
+  src: url('../fonts/Rubik/Rubik-Medium.ttf');
+}
+
+@font-face {
+  font-family: Rubik-Light;
+  src: url('../fonts/Rubik/Rubik-Light.ttf');
+}
+
+@font-face {
+  font-family: Rubik-Black;
+  src: url('../fonts/Rubik/Rubik-Black.ttf');
+}

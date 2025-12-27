@@ -1,0 +1,76 @@
+* {
+  box-sizing: border-box;
+  font-family: Rubik;
+}
+
+html {
+  line-height: 1.5;
+  color: $txt;
+  background-color: $bg;
+}
+
+.divider-both {
+  border-top: 1px solid $clr2;
+  border-bottom: 1px solid $clr2;
+  padding: em(24px) 0;
+}
+
+.divider-bottom {
+  border-bottom: 1px solid $clr2;
+  padding-block-end: em(24px);
+}
+
+body {
+  height: 100vh;
+  font-size: rem(18px);
+  margin: 0;
+  margin: auto;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  line-height: 1;
+  margin: 0;
+  padding: 0;
+}
+
+section,
+main,
+footer {
+  padding: 0;
+  margin: 0;
+}
+
+img {
+  width: 100%;
+  height: 100%;
+}
+
+p {
+  margin: 0;
+  padding: 0;
+}
+
+a {
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.Toastify__toast-body {
+  font-family: cereal;
+  font-size: rem(16px);
+}
+
+.divider {
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: rgb(255 255 255 / 50%);
+  /* margin: 5px 0; */
+  padding: 5px 0;
+}

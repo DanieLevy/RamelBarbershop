@@ -1,0 +1,11 @@
+.otp-code-cmp {
+    direction: ltr;
+
+    & .otp-code-cmp-content {
+        // background-color: red;
+    }
+}
+
+.grecaptcha-badge {
+    bottom: 80px !important;
+}

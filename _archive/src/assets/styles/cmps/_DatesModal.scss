@@ -1,0 +1,20 @@
+.dates-modal {
+    position: absolute;
+    transform: translateX(-50%);
+    left: 50%;
+    top: 80%;
+  
+    width: 100%;
+    max-width: fit-content;
+    margin-top: 12px;
+    background: white;
+    border-radius: 32px;
+    box-shadow: 0 0 0 1px #0000000a, 0 8px 16px #00000026;
+    padding: 16px 32px;
+  
+  
+    #dates {
+      display: flex;
+      flex-direction: column;
+    }
+  }

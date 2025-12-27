@@ -1,0 +1,585 @@
+// TODO: Keep using mobile touch better experience for mobile
+.barber-profile * {
+    color: inherit; 
+  }
+
+.barber-profile {
+
+    // style transparent scrollbar in mobile size
+    @include for-mobile-layout {
+        &::-webkit-scrollbar {
+            width: 0px;
+            background: transparent; /* make scrollbar transparent */
+        }
+
+        &::-webkit-scrollbar-thumb {
+            background: transparent; /* make scrollbar transparent */
+        }
+
+        &::-webkit-scrollbar-track {
+            background: transparent; /* make scrollbar transparent */
+        }
+
+        &::-webkit-scrollbar-corner {
+            background: transparent; /* make scrollbar transparent */
+        }  
+    }
+    
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 10px;
+    width: 100%;
+    padding: 10px;
+    background-color: white;
+    overflow: scroll;
+    height: calc(100vh - 150px);
+    position: absolute;
+    color: #222 !important;
+
+    // mobile
+    @include for-mobile-layout {
+        top: 80px;
+    }
+
+    & .barber-profile-header {
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        padding: 10px;
+        // background-color: hsl(0deg 0% 100% / 50%);
+        // border-top-right-radius: 10px;
+        // border-top-left-radius: 10px;
+        border-bottom: 1px solid #a6a6a65a;
+
+        & .barber-profile-img {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+
+            img {
+                object-fit: cover;
+                width: 80px;
+                height: 80px;
+                // box-shadow: 0px 0px 10px 2px rgb(169 163 151);
+                border-radius: 50%;
+                border: 1px solid #ffffff;
+            }
+        }
+
+        & .res-summary {
+            font-size: 0.875rem;
+            color: #222;
+
+            & .res-summary-content {
+                margin-top: 10px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: flex-start;
+                gap: 1px;
+
+                & .res-summary-item {
+                    display: flex;
+                    flex-direction: row;
+                    align-items: center;
+                    gap: 5px;
+                    font-family: Rubik-Light !important;
+                    font-weight: 100;
+                    font-size: 0.75rem;
+                    // color: hsl(0deg 0% 100% / 50%);
+
+                    & .res-summary-item-title {
+                        font-weight: bold;
+                        font-size: 0.875rem;
+                        color: #222;
+                    }
+                }
+            }
+        }
+
+    }
+
+    & .barber-profile-content {
+        // background-color: red;
+
+        & .barber-profile-reservation {
+            & .reservation-step-1 {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 25px;
+                color: #222;
+                width: 100%;
+                padding: 10px;
+
+                h3 {
+                    // color: red;
+                    align-self: flex-start;
+                }
+
+                & .reservation-opt {
+                    // this is btn 
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    flex-direction: column;
+                    gap: 10px;
+                    width: 80%;
+
+                    border: 1px solid transparent !important;
+                    background-color: #fff !important;
+                    border: 1px solid rgb(221, 221, 221) !important;
+                    box-sizing: border-box !important;
+                    border-radius: 12px !important;
+                    display: flex !important;
+                    justify-content: space-between !important;
+                    // width: 100%!important;
+                    cursor: pointer !important;
+                    padding: 16px !important;
+                    outline: none !important;
+                    align-items: center !important;
+                    transition: all .1s ease-in-out;
+
+                    &:hover {
+                        background-color: #f5f5f5;
+                    }
+
+                    &.selected {
+                        outline: 2px solid #222222 !important;
+                        background-color: #f7f7f7 !important;
+                    }
+
+
+
+                    & .title {
+                        // background-color: red;
+                        font-weight: bold;
+                        font-family: cereal-light;
+                        font-size: .875rem;
+                        color: #222222!important;
+                   }
+
+                    & .opt-container {
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        width: 100%;
+                        gap: 10px;
+                        font-family: Rubik-Light;
+                        color: #717171 !important;
+
+
+
+                        & .price {
+                            // background-color: green;
+                        }
+
+                        & .duration {
+                            // background-color: blue;
+                        }
+                    }
+                }
+            }
+
+            & .reservation-step-2 {
+                & .step-title {
+                    padding: 10px 0;
+                }
+
+                & .week-days {
+                    // background-color: red;
+                    display: flex;
+                    justify-content: flex-start;
+                    align-items: center;
+                    gap: 10px;
+                    flex-wrap: wrap;
+                    width: 100%;
+
+                    & .reservation-day {
+                        background-color: #fff;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        flex-direction: column;
+                        gap: 3px;
+                        width: 80px;
+                        padding: 5px;
+                        border-radius: 10px;
+                        border: none;
+                        outline: 1px solid rgba(149, 150, 152, .2705882353);
+                        cursor: pointer;
+                        transition: all .2s ease-in-out;
+
+                        & .day-label {
+                            font-weight: bold;
+                            font-size: .875rem;
+                        }
+
+                        & .day-num {
+                            // font-weight: bold;
+                            font-size: 0.625rem;
+                        }
+
+                        &.selected {
+                            outline: 2px solid #222222 !important;
+                            background-color: #f7f7f7 !important;
+                        }
+
+                        &:disabled {
+                            background-color: #e5e5e5;
+                            color: #22222261;
+                            cursor: not-allowed;
+                            transition: all .4s ease-in-out;
+                        }
+                    }
+
+                }
+
+                & .more-dates {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    width: 100%;
+
+                    & .more-dates-btn {
+                        margin-top: 24px;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        padding: 10px 20px;
+                        gap: 5px;
+                        font-weight: bold;
+                        outline: 1px solid rgba(0, 0, 0, 0.271);
+                        background-color: #fff;
+                        border-radius: 10px;
+                        padding-top: 15px;
+                        cursor: pointer;
+                        transition: all .2s ease-in-out;
+
+                        & .more-dates-btn-text {
+                            font-size: 0.875rem;
+                        }
+
+                        & .more-dates-btn-icon {
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                            width: 15px;
+                            height: 15px;
+
+                            svg {
+                                width: 100%;
+                                height: 100%;
+                                fill: #222;
+                                transition: all .2s ease-in-out;
+
+                            }
+                        }
+
+                    }
+
+                    & .overlay {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0, 0, 0, 0.5); // Adjust the alpha value for darkness
+                        z-index: 900; // Set a z-index lower than the modal
+                      }
+
+                    & .more-dates-modal {
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        z-index: 1000; // Adjust as needed
+                        background-color: #fff; // Adjust background color
+                        padding: 20px; // Adjust padding
+                        border-radius: 8px; // Adjust border-radius
+                        box-shadow: 0 0 10px rgba(0, 0, 0, 0.2); // Adjust box shadow
+                      
+                        // Add any other styling properties you need for your modal
+                      
+                        // Media query for mobile devices
+                        @media screen and (max-width: 767px) {
+                          width: 90%; // Adjust width for mobile devices
+                          max-width: 400px; // Set a maximum width if needed
+                          height: auto; // Allow the height to adjust based on content
+                        }
+                      }
+                }
+
+            }
+
+            & .reservation-step-3 {
+                & .step-title {
+                    padding: 10px 0;
+                }
+
+                & .time-slots {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    flex-direction: row;
+                    gap: 15px;
+                    width: 100%;
+                    flex-wrap: wrap;
+                    padding: 10px 0;
+                    height: fit-content;
+                    overflow-y: scroll;
+
+                    @include for-mobile-layout {
+                        &::-webkit-scrollbar {
+                            width: 0px;
+                            background: transparent; /* make scrollbar transparent */
+                        }
+                
+                        &::-webkit-scrollbar-thumb {
+                            background: transparent; /* make scrollbar transparent */
+                        }
+                
+                        &::-webkit-scrollbar-track {
+                            background: transparent; /* make scrollbar transparent */
+                        }
+                
+                        &::-webkit-scrollbar-corner {
+                            background: transparent; /* make scrollbar transparent */
+                        }  
+                    }
+
+                    & .time-slot {
+                        background-color: #fff;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        flex-direction: column;
+                        gap: 3px;
+                        width: 150px;
+                        padding: 5px;
+                        border-radius: 10px;
+                        border: none;
+                        outline: 1px solid rgba(149, 150, 152, .2705882353);
+                        cursor: pointer;
+                        transition: all .2s ease-in-out;
+
+                        // design disabled time slot
+                        &:disabled {
+                            background-color: #e5e5e5;
+                            cursor: not-allowed;
+                            transition: all .4s ease-in-out;
+                        }
+
+                        &.selected {
+                            outline: 2px solid #222222 !important;
+                            background-color: #f7f7f7 !important;
+                        }
+
+                        & .time-label {
+                            font-weight: bold;
+                            font-size: .875rem;
+                        }
+
+                        & .time-num {
+                            // font-weight: bold;
+                            font-size: 0.625rem;
+                        }
+                    }
+
+                }
+
+            
+            }
+
+            & .reservation-step-4 {
+                & .step-title {
+                    padding: 10px 0;
+                }
+
+                & .reservation-form-container {
+                    & .reservation-form {
+                        // style the inputs
+                        input {
+                            border: 1px solid #e5e5e5;
+                            border-radius: 8px;
+                            padding: 10px;
+                            width: 60%;
+                            outline: none;
+                            transition: all .2s ease-in-out;
+
+                            &:focus {
+                                border: 1px solid #222;
+                            }
+                        }
+                    }
+                }
+
+            }
+
+            & .reservation-step-5 {
+                & .step-title {
+                    padding: 10px 0;
+                }
+
+                & .reservation-auth {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    flex-direction: column;
+                    gap: 10px;
+                    width: 100%;
+                    padding: 10px;
+
+                    & .reservation-auth-text {
+
+                    }
+
+                    & .reservation-auth-input { // Container
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        flex-direction: column;
+                        gap: 10px;
+                        width: 100%;
+                        padding: 30px 10px!important;
+
+                        & .otp-container{
+                            flex-direction: row-reverse;
+                            gap: 10px;
+
+                            span {
+                                font-size: 1rem;
+                                font-family: cereal-light;
+                                font-weight: 100;
+                                color: #2222226d;
+                            }
+                        }
+
+                        & .otp-input {
+                            border: 1px solid #e5e5e5;
+                            border-radius: 8px;
+                            padding: 10px;
+                            width: 40px!important;
+                            outline: none;
+                            transition: all .2s ease-in-out;
+                            font-size: 1rem!important;
+                            
+                            &.has-number {
+                                border: 1px solid rgba(107, 107, 107, 0.3960784314);
+                                box-shadow: 0px 0px 10px 1px rgb(111 111 111 / 34%);
+                            }
+
+                            &:focus {
+                                border: 1px solid #6b6b6b65;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    .barber-profile h3,
+.barber-profile p,
+.barber-profile button {
+  color: #222;
+}
+
+.barber-profile button {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    cursor: pointer;  
+    color: inherit;
+  }
+}
+
+.barber-profile-footer {
+    background-color: rgb(255, 255, 255);
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 70px;
+    z-index: 100;
+
+    & .progress-bar {
+        width: 100%;
+        height: 8px; // Adjust the height as needed
+        background-color: #e0e0e0; // Set the background color for the progress bar container
+        // border-radius: 5px; // Optional: Add rounded corners
+
+        .progress-bar-line {
+            height: 100%;
+            background-color: #ffaa3db3;
+            transition: width 0.3s ease-in-out;
+        }
+    }
+
+    & .nav-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        height: 61px;
+
+
+        & .nav-steps {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+            padding: 0 20px;
+
+
+            & .nav-btn {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                border: none;
+
+                &.back {
+                    text-decoration: underline;
+                    color: #222;
+                    background-color: transparent;
+                    border: none;
+                    outline: none;
+                    cursor: pointer;
+                    font-size: 1rem;
+                    font-weight: 600;
+                    border-radius: 8px;
+                    line-height: 1.5rem;
+                }
+
+                &.next {
+                    background-color: #222;
+                    color: #fff;
+                    padding: 5px 15px;
+                    margin: 0;
+                    cursor: pointer;
+                    text-align: center;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    line-height: 1.25rem;
+                    font-size: 1rem;
+                    transition: all .4s ease-in-out;
+
+                    &:disabled {
+                        background-color: #e5e5e5;
+                        cursor: not-allowed;
+                        transition: all .4s ease-in-out;
+                    }
+                }
+            }
+        }
+    }
+
+}
+
+// 
+.rdp-day_selected, .rdp-day_selected:focus-visible, .rdp-day_selected:hover {
+    background-color: #222!important;
+}
