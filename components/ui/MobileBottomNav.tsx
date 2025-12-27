@@ -49,7 +49,9 @@ export function MobileBottomNav() {
 
   // Don't show on dashboard pages or barber booking wizard
   const shouldHide = pathname.startsWith('/barber/dashboard') || 
-                     (pathname.startsWith('/barber/') && pathname !== '/barber/login')
+                     pathname.includes('/book') ||
+                     (pathname.startsWith('/barber/') && pathname !== '/barber/login' && !pathname.match(/^\/barber\/[^/]+$/))
+
   
   // Scroll-based hide/show logic
   useEffect(() => {
@@ -109,12 +111,22 @@ export function MobileBottomNav() {
     setShowLoginDropup(false)
   }, [pathname])
 
+  // Fallback: show nav after timeout even if auth isn't initialized
+  const [forceShow, setForceShow] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setForceShow(true)
+    }, 2000) // 2 second fallback
+    return () => clearTimeout(timer)
+  }, [])
+
   if (shouldHide) {
     return null
   }
 
-  // Wait for auth to initialize
-  if (!customerInitialized || !barberInitialized) {
+  // Wait for auth to initialize (with fallback)
+  const isReady = (customerInitialized && barberInitialized) || forceShow
+  if (!isReady) {
     return null
   }
 
@@ -194,8 +206,12 @@ export function MobileBottomNav() {
     <>
       <div 
         className={cn(
-          'fixed bottom-0 left-0 right-0 z-50 md:hidden flex justify-center pb-6 px-4 pointer-events-none',
+          'fixed bottom-0 left-0 right-0 z-50 pointer-events-none',
           'transition-all duration-300 ease-out',
+          // Mobile: centered floating pill with padding
+          'flex justify-center pb-6 px-4',
+          // Desktop: full width bar at bottom
+          'md:pb-0 md:px-0',
           isVisible ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
         )}
       >
@@ -203,7 +219,7 @@ export function MobileBottomNav() {
         {showLoginDropup && (
           <div 
             ref={dropupRef}
-            className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 pointer-events-auto animate-fade-in"
+            className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 pointer-events-auto animate-fade-in md:mb-4"
           >
             <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[200px]">
               <div className="p-1">
@@ -230,16 +246,20 @@ export function MobileBottomNav() {
 
         <nav
           className={cn(
-            // Floating pill shape
             'pointer-events-auto',
+            // Mobile: Floating pill shape
             'inline-flex items-center gap-1',
             'px-2 py-2',
             'rounded-full',
+            // Desktop: Full width bar
+            'md:w-full md:rounded-none md:px-0 md:py-0',
+            'md:justify-center md:gap-0',
             // Dark glassmorphism background
             'bg-[#1a1a1a]/95 backdrop-blur-xl',
             // Subtle border and shadow
             'border border-white/10',
-            'shadow-[0_8px_32px_rgba(0,0,0,0.4)]'
+            'md:border-x-0 md:border-b-0',
+            'shadow-[0_8px_32px_rgba(0,0,0,0.4)] md:shadow-[0_-4px_20px_rgba(0,0,0,0.3)]'
           )}
           role="navigation"
           aria-label="תפריט ניווט ראשי"
@@ -257,18 +277,22 @@ export function MobileBottomNav() {
                   // Base styles
                   'relative flex items-center justify-center gap-2',
                   'transition-all duration-300 ease-out',
-                  // Rounded pill for each item
+                  // Mobile: Rounded pill for each item
                   'rounded-full',
-                  // Size and padding
+                  // Desktop: Square items in row
+                  'md:rounded-none md:flex-1 md:max-w-[200px]',
+                  // Size and padding - Mobile
                   isActive 
                     ? 'px-4 py-2.5' 
                     : 'p-3',
-                  // Active state - gold background
+                  // Desktop padding
+                  'md:px-6 md:py-4',
+                  // Active state - gold background (mobile) / gold underline (desktop)
                   isActive 
-                    ? 'bg-accent-gold text-background-dark' 
-                    : 'text-foreground-muted hover:text-foreground-light',
+                    ? 'bg-accent-gold text-background-dark md:bg-transparent md:text-accent-gold md:border-b-2 md:border-accent-gold' 
+                    : 'text-foreground-muted hover:text-foreground-light md:border-b-2 md:border-transparent',
                   // Touch feedback
-                  'active:scale-95',
+                  'active:scale-95 md:active:scale-100',
                   // Focus styles
                   'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-gold/50'
                 )}
@@ -281,12 +305,16 @@ export function MobileBottomNav() {
                   className="flex-shrink-0"
                 />
                 
-                {/* Label - only visible when active, horizontal layout */}
-                {isActive && (
-                  <span className="text-sm font-semibold whitespace-nowrap">
-                    {displayLabel}
-                  </span>
-                )}
+                {/* Label - Mobile: only visible when active. Desktop: always visible */}
+                <span className={cn(
+                  'text-sm font-semibold whitespace-nowrap',
+                  // Mobile: hide when not active
+                  !isActive && 'hidden md:block',
+                  // Desktop: always show, adjust font weight
+                  'md:font-medium'
+                )}>
+                  {displayLabel}
+                </span>
               </button>
             )
           })}

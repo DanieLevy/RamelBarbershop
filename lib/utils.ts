@@ -227,3 +227,163 @@ export function parseTimeString(timeStr: string): { hour: number; minute: number
 export function cn(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(' ')
 }
+
+/**
+ * Format price with currency symbol
+ */
+export function formatPrice(price: number): string {
+  return `₪${price.toLocaleString('he-IL')}`
+}
+
+/**
+ * Hebrew day letter mapping
+ */
+const hebrewDayLetters: Record<string, string> = {
+  sunday: "א'",
+  monday: "ב'",
+  tuesday: "ג'",
+  wednesday: "ד'",
+  thursday: "ה'",
+  friday: "ו'",
+  saturday: "ש'",
+}
+
+/**
+ * Day order for sorting
+ */
+const dayOrder = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+
+export interface OpenDayRange {
+  range: string
+  isSingleDay: boolean
+}
+
+/**
+ * Format open days into grouped ranges
+ * e.g., ['sunday', 'tuesday', 'wednesday', 'thursday', 'friday'] 
+ *   => ["א'", "ג'-ה'", "ו'"] (if friday is open)
+ *   or smartly grouped consecutive days
+ */
+export function formatOpenDaysRanges(openDays: string[]): OpenDayRange[] {
+  if (!openDays || openDays.length === 0) return []
+  
+  // Sort days by their order in the week
+  const sortedDays = [...openDays].sort((a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b))
+  
+  const ranges: OpenDayRange[] = []
+  let rangeStart = ''
+  let rangeEnd = ''
+  
+  for (let i = 0; i < sortedDays.length; i++) {
+    const currentDay = sortedDays[i]
+    const currentIndex = dayOrder.indexOf(currentDay)
+    
+    if (!rangeStart) {
+      rangeStart = currentDay
+      rangeEnd = currentDay
+    } else {
+      const prevIndex = dayOrder.indexOf(rangeEnd)
+      // Check if current day is consecutive
+      if (currentIndex === prevIndex + 1) {
+        rangeEnd = currentDay
+      } else {
+        // End current range and start a new one
+        if (rangeStart === rangeEnd) {
+          ranges.push({ range: hebrewDayLetters[rangeStart], isSingleDay: true })
+        } else {
+          ranges.push({ range: `${hebrewDayLetters[rangeStart]}-${hebrewDayLetters[rangeEnd]}`, isSingleDay: false })
+        }
+        rangeStart = currentDay
+        rangeEnd = currentDay
+      }
+    }
+  }
+  
+  // Don't forget the last range
+  if (rangeStart) {
+    if (rangeStart === rangeEnd) {
+      ranges.push({ range: hebrewDayLetters[rangeStart], isSingleDay: true })
+    } else {
+      ranges.push({ range: `${hebrewDayLetters[rangeStart]}-${hebrewDayLetters[rangeEnd]}`, isSingleDay: false })
+    }
+  }
+  
+  return ranges
+}
+
+/**
+ * Format opening hours display with proper day grouping
+ * Returns array of { days: string, hours: string, isClosed?: boolean }
+ */
+export interface OpeningHoursDisplay {
+  days: string
+  hours: string
+  isClosed?: boolean
+}
+
+export function formatOpeningHours(
+  openDays: string[],
+  workStart: string,
+  workEnd: string,
+  fridayEnd?: string
+): OpeningHoursDisplay[] {
+  const result: OpeningHoursDisplay[] = []
+  
+  // Separate Friday and Saturday from regular days (they often have different hours or closed)
+  const regularDays = openDays.filter(d => d !== 'friday' && d !== 'saturday')
+  const hasFriday = openDays.includes('friday')
+  const hasSaturday = openDays.includes('saturday')
+  
+  // Format regular weekdays
+  if (regularDays.length > 0) {
+    const ranges = formatOpenDaysRanges(regularDays)
+    const daysStr = ranges.map(r => r.range).join(', ')
+    result.push({
+      days: daysStr,
+      hours: `${workStart} - ${workEnd}`
+    })
+  }
+  
+  // Check for closed weekdays (except Friday/Saturday)
+  const allWeekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday']
+  const closedWeekdays = allWeekdays.filter(d => !openDays.includes(d))
+  if (closedWeekdays.length > 0 && closedWeekdays.length < 5) {
+    const closedRanges = formatOpenDaysRanges(closedWeekdays)
+    const closedStr = closedRanges.map(r => r.range).join(', ')
+    result.push({
+      days: closedStr,
+      hours: 'סגור',
+      isClosed: true
+    })
+  }
+  
+  // Friday
+  if (hasFriday) {
+    result.push({
+      days: "ו'",
+      hours: `${workStart} - ${fridayEnd || '14:00'}`
+    })
+  } else {
+    result.push({
+      days: "ו'",
+      hours: 'סגור',
+      isClosed: true
+    })
+  }
+  
+  // Saturday
+  if (hasSaturday) {
+    result.push({
+      days: "ש'",
+      hours: `${workStart} - ${workEnd}`
+    })
+  } else {
+    result.push({
+      days: "ש'",
+      hours: 'סגור',
+      isClosed: true
+    })
+  }
+  
+  return result
+}

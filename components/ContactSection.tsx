@@ -3,6 +3,7 @@
 import { Phone, Clock, Mail } from 'lucide-react'
 import { SectionTitle } from '@/components/ui/SectionTitle'
 import { GlassCard } from '@/components/ui/GlassCard'
+import { formatOpeningHours } from '@/lib/utils'
 import type { BarbershopSettings } from '@/types/database'
 
 // Custom SVG icons for social media (Lucide doesn't have brand icons)
@@ -114,9 +115,8 @@ export function ContactSection({ settings }: ContactSectionProps) {
                    visibleContactCards <= 3 ? 'grid-cols-1 sm:grid-cols-3' :
                    'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
 
-  // Check if Saturday is a working day
-  const isSaturdayOpen = openDays.includes('saturday')
-  const isFridayOpen = openDays.includes('friday')
+  // Generate formatted opening hours display
+  const openingHoursDisplay = formatOpeningHours(openDays, workStart, workEnd, '14:00')
 
   return (
     <section className="index-contact py-16 sm:py-20 lg:py-24 bg-background-dark">
@@ -186,32 +186,23 @@ export function ContactSection({ settings }: ContactSectionProps) {
             </div>
             
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between items-center py-2 border-b border-white/5">
-                <span className="text-foreground-muted">ראשון - חמישי</span>
-                <span className="text-foreground-light font-medium" dir="ltr">
-                  {workStart} - {workEnd}
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-white/5">
-                <span className="text-foreground-muted">שישי</span>
-                {isFridayOpen ? (
-                  <span className="text-foreground-light font-medium" dir="ltr">
-                    {workStart} - 14:00
-                  </span>
-                ) : (
-                  <span className="text-red-400 font-medium">סגור</span>
-                )}
-              </div>
-              <div className="flex justify-between items-center py-2">
-                <span className="text-foreground-muted">שבת</span>
-                {isSaturdayOpen ? (
-                  <span className="text-foreground-light font-medium" dir="ltr">
-                    {workStart} - {workEnd}
-                  </span>
-                ) : (
-                  <span className="text-red-400 font-medium">סגור</span>
-                )}
-              </div>
+              {openingHoursDisplay.map((item, index) => (
+                <div 
+                  key={index}
+                  className={`flex justify-between items-center py-2 ${
+                    index < openingHoursDisplay.length - 1 ? 'border-b border-white/5' : ''
+                  }`}
+                >
+                  <span className="text-foreground-muted">{item.days}</span>
+                  {item.isClosed ? (
+                    <span className="text-red-400 font-medium">{item.hours}</span>
+                  ) : (
+                    <span className="text-foreground-light font-medium" dir="ltr">
+                      {item.hours}
+                    </span>
+                  )}
+                </div>
+              ))}
             </div>
           </GlassCard>
         </div>

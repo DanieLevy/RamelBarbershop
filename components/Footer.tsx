@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { MapPin, Phone, Clock } from 'lucide-react'
+import { formatOpeningHours } from '@/lib/utils'
 import type { BarbershopSettings } from '@/types/database'
 
 // Custom SVG icons for social media (Lucide doesn't have brand icons)
@@ -48,7 +49,11 @@ export function Footer({ settings }: FooterProps) {
   const workStart = settings?.work_hours_start?.slice(0, 5) || '09:00'
   const workEnd = settings?.work_hours_end?.slice(0, 5) || '20:00'
   const openDays = settings?.open_days || ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday']
-  const isFridayOpen = openDays.includes('friday')
+  
+  // Get formatted opening hours for display
+  const openingHoursDisplay = formatOpeningHours(openDays, workStart, workEnd, '14:00')
+  // For footer, we just show a compact version - main days and friday if open
+  const mainHours = openingHoursDisplay.filter(h => !h.isClosed).slice(0, 2)
 
   // Build social links array based on visibility
   const socialLinks = []
@@ -160,8 +165,9 @@ export function Footer({ settings }: FooterProps) {
               <li className="flex items-start gap-3 text-sm">
                 <Clock size={16} strokeWidth={1.5} className="text-accent-gold flex-shrink-0 mt-0.5" />
                 <div className="text-foreground-muted">
-                  <p>א&apos;-ה&apos;: {workStart} - {workEnd}</p>
-                  {isFridayOpen && <p>ו&apos;: {workStart} - 14:00</p>}
+                  {mainHours.map((item, index) => (
+                    <p key={index}>{item.days}: {item.hours}</p>
+                  ))}
                 </div>
               </li>
             </ul>

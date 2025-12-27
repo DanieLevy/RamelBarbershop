@@ -24,6 +24,7 @@ interface BookingWizardClientProps {
   barberSchedule?: BarberSchedule | null
   barberClosures?: BarberClosure[]
   barberMessages?: BarberMessage[]
+  preSelectedServiceId?: string
 }
 
 export function BookingWizardClient({ 
@@ -35,8 +36,9 @@ export function BookingWizardClient({
   barberSchedule,
   barberClosures = [],
   barberMessages = [],
+  preSelectedServiceId,
 }: BookingWizardClientProps) {
-  const { step, setBarberId, setLoggedInUser, reset, getActualStep, isUserLoggedIn } = useBookingStore()
+  const { step, setBarberId, setService, nextStep, setLoggedInUser, reset, getActualStep, isUserLoggedIn } = useBookingStore()
   const { customer: loggedInCustomer, isLoggedIn, isInitialized } = useAuthStore()
 
   // Set barber ID on mount and reset on unmount
@@ -44,6 +46,20 @@ export function BookingWizardClient({
     setBarberId(barberId)
     return () => reset()
   }, [barberId, setBarberId, reset])
+
+  // Handle pre-selected service - auto-advance to date selection
+  useEffect(() => {
+    if (preSelectedServiceId && services.length > 0) {
+      const selectedService = services.find(s => s.id === preSelectedServiceId)
+      if (selectedService) {
+        setService(selectedService)
+        // Move to step 2 (date selection) if we're at step 1
+        if (step === 1) {
+          nextStep()
+        }
+      }
+    }
+  }, [preSelectedServiceId, services, setService, step, nextStep])
 
   // Sync logged-in user state with booking store
   useEffect(() => {

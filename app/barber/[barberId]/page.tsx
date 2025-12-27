@@ -2,8 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
-import { BookingWizardClient } from '@/components/BookingWizard/BookingWizardClient'
-import type { BarberWithWorkDays, Service, BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure, BarberMessage } from '@/types/database'
+import { BarberProfileClient } from '@/components/BarberProfile/BarberProfileClient'
+import type { BarberWithWorkDays, Service, BarbershopSettings } from '@/types/database'
 
 interface BarberPageProps {
   params: Promise<{ barberId: string }>
@@ -13,7 +13,7 @@ export default async function BarberPage({ params }: BarberPageProps) {
   const { barberId } = await params
   const supabase = await createClient()
   
-  // Fetch barber data
+  // Fetch barber data with work days
   const { data: barber, error: barberError } = await supabase
     .from('users')
     .select('*, work_days(*)')
@@ -30,59 +30,27 @@ export default async function BarberPage({ params }: BarberPageProps) {
     .from('services')
     .select('*')
     .eq('barber_id', barberId)
-    .eq('is_active', true) as { data: Service[] | null }
+    .eq('is_active', true)
+    .order('price', { ascending: true }) as { data: Service[] | null }
   
-  // Fetch barbershop settings
+  // Fetch barbershop settings for footer
   const { data: shopSettings } = await supabase
     .from('barbershop_settings')
     .select('*')
     .single() as { data: BarbershopSettings | null }
   
-  // Fetch barbershop closures
-  const { data: shopClosures } = await supabase
-    .from('barbershop_closures')
-    .select('*')
-    .gte('end_date', new Date().toISOString().split('T')[0]) as { data: BarbershopClosure[] | null }
-  
-  // Fetch barber schedule
-  const { data: barberSchedule } = await supabase
-    .from('barber_schedules')
-    .select('*')
-    .eq('barber_id', barberId)
-    .single() as { data: BarberSchedule | null }
-  
-  // Fetch barber closures
-  const { data: barberClosures } = await supabase
-    .from('barber_closures')
-    .select('*')
-    .eq('barber_id', barberId)
-    .gte('end_date', new Date().toISOString().split('T')[0]) as { data: BarberClosure[] | null }
-  
-  // Fetch barber messages
-  const { data: barberMessages } = await supabase
-    .from('barber_messages')
-    .select('*')
-    .eq('barber_id', barberId)
-    .eq('is_active', true) as { data: BarberMessage[] | null }
-  
   return (
     <>
       <AppHeader barberImgUrl={barber.img_url || undefined} />
       
-      <main className="pt-20 sm:pt-24 min-h-screen bg-background-dark">
-        <BookingWizardClient
-          barberId={barberId}
-          barber={barber}
-          services={services || []}
-          shopSettings={shopSettings}
-          shopClosures={shopClosures || []}
-          barberSchedule={barberSchedule}
-          barberClosures={barberClosures || []}
-          barberMessages={barberMessages || []}
+      <main className="pt-16 sm:pt-20 min-h-screen bg-background-dark">
+        <BarberProfileClient 
+          barber={barber} 
+          services={services || []} 
         />
       </main>
       
-      <Footer />
+      <Footer settings={shopSettings} />
     </>
   )
 }
