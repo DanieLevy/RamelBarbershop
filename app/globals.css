@@ -412,12 +412,11 @@
 @media (display-mode: standalone) {
   /* Adjust body for safe areas */
   body {
-    padding-top: var(--safe-area-inset-top);
     overscroll-behavior: none;
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Notch area background - matches app background */
+  /* Notch area background - must be BELOW header (z-50) but above content */
   body::before {
     content: '';
     position: fixed;
@@ -426,7 +425,8 @@
     right: 0;
     height: var(--safe-area-inset-top);
     background: #080b0d;
-    z-index: 9999;
+    z-index: 40; /* Below header's z-50, but above regular content */
+    pointer-events: none;
   }
 
   /* Adjust main content for bottom nav */

@@ -203,12 +203,14 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
     <>
       <header
         className={cn(
-          'fixed top-0 left-0 right-0 z-50 transition-all duration-500'
+          'fixed top-0 left-0 right-0 z-50 transition-all duration-500',
+          'pt-[env(safe-area-inset-top,0px)]' // PWA safe area support
         )}
         style={{
           // Dynamic background based on scroll - starts fully transparent
-          backgroundColor: `rgba(0, 0, 0, ${scrollProgress * 0.85})`,
-          backdropFilter: `blur(${scrollProgress * 16}px)`,
+          backgroundColor: `rgba(8, 11, 13, ${scrollProgress * 0.95})`,
+          backdropFilter: `blur(${scrollProgress * 20}px)`,
+          WebkitBackdropFilter: `blur(${scrollProgress * 20}px)`,
         }}
       >
         {/* Top accent line */}

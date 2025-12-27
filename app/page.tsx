@@ -49,6 +49,14 @@ export default async function HomePage() {
             <div className="absolute inset-0 bg-gradient-to-r from-accent-gold/5 via-transparent to-accent-orange/5" />
           </div>
           
+          {/* Top fade overlay for PWA notch blending */}
+          <div 
+            className="absolute top-0 left-0 right-0 h-32 sm:h-40 pointer-events-none z-[1]"
+            style={{
+              background: 'linear-gradient(to bottom, #080b0d 0%, #080b0d 30%, transparent 100%)',
+            }}
+          />
+          
           {/* Decorative elements */}
           <div className="absolute top-20 left-4 sm:left-10 opacity-10 animate-float">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-accent-gold">
