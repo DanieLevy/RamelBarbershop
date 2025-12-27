@@ -2,29 +2,18 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
+import { useAuthStore } from '@/store/useAuthStore'
 import { sendPhoneOtp, verifyOtp, clearRecaptchaVerifier } from '@/lib/firebase/config'
 import { createClient } from '@/lib/supabase/client'
+import { getOrCreateCustomer } from '@/lib/services/customer.service'
 import { toast } from 'react-toastify'
 import { cn } from '@/lib/utils'
-
-// Debug logger with timestamp
-const debug = (message: string, data?: unknown) => {
-  const timestamp = new Date().toISOString().split('T')[1].slice(0, 12)
-  console.log(`[${timestamp}] [OTPVerification]`, message, data !== undefined ? data : '')
-}
-
-const debugError = (message: string, error?: unknown) => {
-  const timestamp = new Date().toISOString().split('T')[1].slice(0, 12)
-  console.error(`[${timestamp}] [OTPVerification] ERROR:`, message, error)
-}
 
 const RECAPTCHA_CONTAINER_ID = 'recaptcha-container'
 const RESEND_COOLDOWN_SECONDS = 60
 const MAX_RETRY_ATTEMPTS = 3
 
 export function OTPVerification() {
-  debug('Component rendering')
-  
   const {
     customer,
     barberId,
@@ -36,15 +25,8 @@ export function OTPVerification() {
     nextStep,
     prevStep,
   } = useBookingStore()
-
-  debug('Store state:', { 
-    customerPhone: customer.phone, 
-    barberId, 
-    hasService: !!service,
-    hasDate: !!date,
-    hasTime: !!timeTimestamp,
-    hasOtpConfirmation: !!otpConfirmation 
-  })
+  
+  const { login } = useAuthStore()
 
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [sending, setSending] = useState(false)
@@ -58,61 +40,27 @@ export function OTPVerification() {
   const hasSentRef = useRef(false)
   const isMountedRef = useRef(true)
 
-  // Cleanup on unmount
   useEffect(() => {
-    debug('useEffect: Mount - setting isMountedRef to true')
     isMountedRef.current = true
-    
     return () => {
-      debug('useEffect: Unmount - cleaning up')
       isMountedRef.current = false
       clearRecaptchaVerifier()
     }
   }, [])
 
-  // Send OTP on first mount only
   useEffect(() => {
-    debug('useEffect: Send OTP check', { 
-      hasSent: hasSentRef.current, 
-      sent, 
-      sending 
-    })
-    
     if (!hasSentRef.current && !sent && !sending) {
-      debug('useEffect: Conditions met, will send OTP')
       hasSentRef.current = true
-      
-      // Check if container exists
-      const container = document.getElementById(RECAPTCHA_CONTAINER_ID)
-      debug('useEffect: reCAPTCHA container exists:', !!container)
-      
-      // Small delay to ensure DOM is ready for reCAPTCHA
-      debug('useEffect: Setting timeout for handleSendOtp (500ms)')
       const timer = setTimeout(() => {
-        debug('useEffect: Timeout fired, checking if still mounted')
         if (isMountedRef.current) {
-          debug('useEffect: Still mounted, calling handleSendOtp')
           handleSendOtp()
-        } else {
-          debug('useEffect: Component unmounted, skipping handleSendOtp')
         }
       }, 500)
-      
-      return () => {
-        debug('useEffect: Clearing timeout')
-        clearTimeout(timer)
-      }
-    } else {
-      debug('useEffect: Conditions NOT met for sending OTP', {
-        hasSent: hasSentRef.current,
-        sent,
-        sending
-      })
+      return () => clearTimeout(timer)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Countdown timer
   useEffect(() => {
     if (countdown > 0) {
       const timer = setTimeout(() => {
@@ -124,97 +72,48 @@ export function OTPVerification() {
     }
   }, [countdown])
 
-  // Format phone number for Firebase (Israeli format)
   const formatPhoneNumber = useCallback((phone: string): string => {
-    debug('formatPhoneNumber called with:', phone)
-    
-    // Remove any non-digit characters
     const cleaned = phone.replace(/\D/g, '')
-    debug('Cleaned phone:', cleaned)
-    
-    let formatted: string
-    // Convert Israeli format 05XXXXXXXX to +9725XXXXXXXX
     if (cleaned.startsWith('0')) {
-      formatted = `+972${cleaned.slice(1)}`
-    } else if (cleaned.startsWith('972')) {
-      formatted = `+${cleaned}`
-    } else {
-      formatted = `+972${cleaned}`
+      return `+972${cleaned.slice(1)}`
     }
-    
-    debug('Formatted phone:', formatted)
-    return formatted
+    if (cleaned.startsWith('972')) {
+      return `+${cleaned}`
+    }
+    return `+972${cleaned}`
   }, [])
 
   const handleSendOtp = useCallback(async () => {
-    debug('========== handleSendOtp CALLED ==========')
-    debug('Current state:', { countdown, sending, retryCount, sent })
-    
-    if (countdown > 0) {
-      debug('ABORT: Countdown still active:', countdown)
-      return
-    }
-    
-    if (sending) {
-      debug('ABORT: Already sending')
-      return
-    }
-    
+    if (countdown > 0 || sending) return
     if (retryCount >= MAX_RETRY_ATTEMPTS) {
-      debug('ABORT: Max retry attempts reached:', retryCount)
       setError('יותר מדי ניסיונות נכשלו. נסה שוב מאוחר יותר.')
       return
     }
     
-    debug('Proceeding with OTP send')
     setSending(true)
     setError(null)
     
     const phoneNumber = formatPhoneNumber(customer.phone)
-    debug('Phone number to send:', phoneNumber)
-    
-    // Verify container exists
-    const container = document.getElementById(RECAPTCHA_CONTAINER_ID)
-    if (!container) {
-      debugError('reCAPTCHA container not found in DOM!')
-      setError('שגיאה טכנית - רענן את הדף')
-      setSending(false)
-      return
-    }
-    debug('reCAPTCHA container found:', container.id)
     
     try {
-      debug('Calling sendPhoneOtp...')
       const result = await sendPhoneOtp(phoneNumber, RECAPTCHA_CONTAINER_ID)
       
-      debug('sendPhoneOtp returned:', { success: result.success, hasConfirmation: !!result.confirmation, error: result.error })
-      
-      if (!isMountedRef.current) {
-        debug('Component unmounted after sendPhoneOtp, aborting')
-        return
-      }
+      if (!isMountedRef.current) return
       
       if (result.success && result.confirmation) {
-        debug('OTP sent successfully!')
         setOtpConfirmation(result.confirmation)
         setSent(true)
         setCountdown(RESEND_COOLDOWN_SECONDS)
         setRetryCount(0)
         toast.success('קוד אימות נשלח בהצלחה!')
-        
-        // Focus first input
-        setTimeout(() => {
-          debug('Focusing first OTP input')
-          inputRefs.current[0]?.focus()
-        }, 100)
+        setTimeout(() => inputRefs.current[0]?.focus(), 100)
       } else {
-        debug('OTP send failed:', result.error)
         setError(result.error || 'שגיאה בשליחת קוד האימות')
         setRetryCount(prev => prev + 1)
         toast.error('שגיאה בשליחת הקוד')
       }
     } catch (err) {
-      debugError('Unexpected error in handleSendOtp:', err)
+      console.error('Unexpected OTP send error:', err)
       if (isMountedRef.current) {
         setError('שגיאה בלתי צפויה - נסה שוב')
         setRetryCount(prev => prev + 1)
@@ -222,25 +121,18 @@ export function OTPVerification() {
     }
     
     if (isMountedRef.current) {
-      debug('Setting sending to false')
       setSending(false)
     }
-    
-    debug('========== handleSendOtp COMPLETED ==========')
-  }, [countdown, sending, customer.phone, setOtpConfirmation, formatPhoneNumber, retryCount, sent])
+  }, [countdown, sending, customer.phone, setOtpConfirmation, formatPhoneNumber, retryCount])
 
   const handleOtpChange = (index: number, value: string) => {
-    // Only allow digits
     if (!/^\d*$/.test(value)) return
     
     const newOtp = [...otp]
     newOtp[index] = value.slice(-1)
     setOtp(newOtp)
     
-    // Clear error when user starts typing
     if (error) setError(null)
-    
-    // Auto-focus next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus()
     }
@@ -277,18 +169,14 @@ export function OTPVerification() {
   }
 
   const handleVerify = async () => {
-    debug('========== handleVerify CALLED ==========')
     const code = otp.join('')
-    debug('OTP code:', code)
     
     if (code.length !== 6) {
-      debug('ABORT: Code length is not 6')
       setError('נא להזין קוד בן 6 ספרות')
       return
     }
     
     if (!otpConfirmation) {
-      debug('ABORT: No OTP confirmation object')
       setError('לא נמצא קוד אימות פעיל - בקש קוד חדש')
       return
     }
@@ -297,42 +185,49 @@ export function OTPVerification() {
     setError(null)
     
     try {
-      debug('Calling verifyOtp...')
       const result = await verifyOtp(otpConfirmation, code)
       
-      debug('verifyOtp returned:', result)
-      
-      if (!isMountedRef.current) {
-        debug('Component unmounted after verifyOtp, aborting')
-        return
-      }
+      if (!isMountedRef.current) return
       
       if (result.success) {
-        debug('OTP verified successfully!')
         toast.info('מאמת ויוצר תור...')
         
-        const reservationCreated = await createReservation()
+        // Get or create customer and log them in
+        const customerRecord = await getOrCreateCustomer(
+          customer.phone.replace(/\D/g, ''),
+          customer.fullname,
+          result.firebaseUid
+        )
+        
+        if (!customerRecord) {
+          setError('שגיאה ביצירת משתמש')
+          setVerifying(false)
+          return
+        }
+        
+        // Log the user in (saves to localStorage)
+        await login(customer.phone.replace(/\D/g, ''), customer.fullname, result.firebaseUid)
+        
+        // Create reservation with customer_id
+        const reservationCreated = await createReservation(customerRecord.id)
         
         if (!isMountedRef.current) return
         
         if (reservationCreated) {
-          debug('Reservation created successfully!')
           toast.success('התור נקבע בהצלחה!')
           nextStep()
         } else {
-          debug('Failed to create reservation')
           setError('שגיאה ביצירת התור - נסה שוב')
           toast.error('שגיאה ביצירת התור')
         }
       } else {
-        debug('OTP verification failed:', result.error)
         setError(result.error || 'קוד שגוי, נסה שוב')
         toast.error('קוד שגוי')
         setOtp(['', '', '', '', '', ''])
         inputRefs.current[0]?.focus()
       }
     } catch (err) {
-      debugError('Unexpected error in handleVerify:', err)
+      console.error('Unexpected verify error:', err)
       if (isMountedRef.current) {
         setError('שגיאה בלתי צפויה - נסה שוב')
       }
@@ -341,26 +236,21 @@ export function OTPVerification() {
     if (isMountedRef.current) {
       setVerifying(false)
     }
-    
-    debug('========== handleVerify COMPLETED ==========')
   }
 
-  const createReservation = async (): Promise<boolean> => {
-    debug('========== createReservation CALLED ==========')
-    debug('Reservation data:', { barberId, service: service?.id, date, timeTimestamp })
-    
+  const createReservation = async (customerId: string): Promise<boolean> => {
     if (!barberId || !service || !date || !timeTimestamp) {
-      debugError('Missing reservation data')
       return false
     }
     
     try {
       const supabase = createClient()
-      debug('Supabase client created')
       
-      const reservationData = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: insertError } = await (supabase.from('reservations') as any).insert({
         barber_id: barberId,
         service_id: service.id,
+        customer_id: customerId,
         customer_name: customer.fullname,
         customer_phone: customer.phone,
         date_timestamp: date.dateTimestamp,
@@ -368,21 +258,16 @@ export function OTPVerification() {
         day_name: date.dayName,
         day_num: date.dayNum,
         status: 'confirmed',
-      }
-      debug('Inserting reservation:', reservationData)
-      
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: insertError, data } = await (supabase.from('reservations') as any).insert(reservationData).select()
+      })
       
       if (insertError) {
-        debugError('Insert error:', insertError)
+        console.error('Error creating reservation:', insertError)
         return false
       }
       
-      debug('Reservation created:', data)
       return true
     } catch (err) {
-      debugError('Error in createReservation:', err)
+      console.error('Error creating reservation:', err)
       return false
     }
   }
@@ -390,8 +275,6 @@ export function OTPVerification() {
   const otpCode = otp.join('')
   const canVerify = otpCode.length === 6 && !!otpConfirmation && !verifying
   const canResend = countdown === 0 && !sending && retryCount < MAX_RETRY_ATTEMPTS
-
-  debug('Render state:', { sent, sending, error, countdown, retryCount, canVerify, canResend })
 
   return (
     <div className="flex flex-col gap-6">
@@ -410,15 +293,8 @@ export function OTPVerification() {
         </p>
       </div>
       
-      {/* Recaptcha container (invisible) - REQUIRED for Firebase */}
       <div id={RECAPTCHA_CONTAINER_ID} className="flex justify-center" />
       
-      {/* Debug info - remove in production */}
-      <div className="text-xs text-foreground-muted/50 text-center p-2 bg-black/20 rounded">
-        Debug: sending={String(sending)} | sent={String(sent)} | error={error || 'none'} | retry={retryCount}
-      </div>
-      
-      {/* Loading spinner while sending */}
       {sending && !sent && (
         <div className="flex flex-col items-center gap-3 py-6">
           <div className="w-10 h-10 border-3 border-accent-gold border-t-transparent rounded-full animate-spin" />
@@ -426,7 +302,6 @@ export function OTPVerification() {
         </div>
       )}
       
-      {/* Manual send button if stuck */}
       {!sending && !sent && !error && (
         <div className="flex flex-col items-center gap-3 py-4">
           <p className="text-foreground-muted text-sm">לא נשלח אוטומטית?</p>
@@ -439,7 +314,6 @@ export function OTPVerification() {
         </div>
       )}
       
-      {/* OTP Input - show when sent or there's an error */}
       {(sent || error) && !sending && (
         <>
           <div className="flex flex-col items-center gap-4">
@@ -528,7 +402,6 @@ export function OTPVerification() {
       
       <button
         onClick={() => {
-          debug('Back button clicked')
           clearRecaptchaVerifier()
           prevStep()
         }}

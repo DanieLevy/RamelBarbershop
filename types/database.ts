@@ -41,6 +41,35 @@ export interface Database {
           updated_at?: string
         }
       }
+      customers: {
+        Row: {
+          id: string
+          phone: string
+          fullname: string
+          firebase_uid: string | null
+          last_login_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          phone: string
+          fullname: string
+          firebase_uid?: string | null
+          last_login_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          phone?: string
+          fullname?: string
+          firebase_uid?: string | null
+          last_login_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
       work_days: {
         Row: {
           id: string
@@ -104,6 +133,7 @@ export interface Database {
           id: string
           barber_id: string
           service_id: string
+          customer_id: string | null
           customer_name: string
           customer_phone: string
           date_timestamp: number
@@ -117,6 +147,7 @@ export interface Database {
           id?: string
           barber_id: string
           service_id: string
+          customer_id?: string | null
           customer_name: string
           customer_phone: string
           date_timestamp: number
@@ -130,6 +161,7 @@ export interface Database {
           id?: string
           barber_id?: string
           service_id?: string
+          customer_id?: string | null
           customer_name?: string
           customer_phone?: string
           date_timestamp?: number
@@ -158,6 +190,7 @@ export interface Database {
 
 // Convenience types
 export type User = Database['public']['Tables']['users']['Row']
+export type Customer = Database['public']['Tables']['customers']['Row']
 export type WorkDay = Database['public']['Tables']['work_days']['Row']
 export type Service = Database['public']['Tables']['services']['Row']
 export type Reservation = Database['public']['Tables']['reservations']['Row']
@@ -172,3 +205,16 @@ export interface TimeSlot {
   is_available: boolean
 }
 
+// Session storage type
+export interface StoredSession {
+  customerId: string
+  phone: string
+  fullname: string
+  expiresAt: number // Unix timestamp in milliseconds
+}
+
+// Reservation with service details
+export interface ReservationWithDetails extends Reservation {
+  services?: Service
+  users?: User
+}

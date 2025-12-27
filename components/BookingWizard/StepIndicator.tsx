@@ -3,8 +3,8 @@
 import { useBookingStore } from '@/store/useBookingStore'
 import { cn } from '@/lib/utils'
 
-const steps = [
-  { num: 1, label: 'סוג שירות' },
+const guestSteps = [
+  { num: 1, label: 'שירות' },
   { num: 2, label: 'תאריך' },
   { num: 3, label: 'שעה' },
   { num: 4, label: 'פרטים' },
@@ -12,11 +12,20 @@ const steps = [
   { num: 6, label: 'סיום' },
 ]
 
+const loggedInSteps = [
+  { num: 1, label: 'שירות' },
+  { num: 2, label: 'תאריך' },
+  { num: 3, label: 'שעה' },
+  { num: 4, label: 'סיום' },
+]
+
 export function StepIndicator() {
-  const step = useBookingStore((state) => state.step)
+  const { step, isUserLoggedIn } = useBookingStore()
+  
+  const steps = isUserLoggedIn ? loggedInSteps : guestSteps
 
   return (
-    <div className="flex items-center justify-center gap-2 w-full max-w-md">
+    <div className="flex items-center justify-center gap-1 md:gap-2 w-full max-w-md">
       {steps.map((s, idx) => (
         <div key={s.num} className="flex items-center">
           <div
@@ -27,7 +36,7 @@ export function StepIndicator() {
           >
             <div
               className={cn(
-                'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all',
+                'w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm font-medium transition-all',
                 step === s.num
                   ? 'bg-accent-gold text-background-dark scale-110'
                   : step > s.num
@@ -37,13 +46,13 @@ export function StepIndicator() {
             >
               {step > s.num ? '✓' : s.num}
             </div>
-            <span className="text-xs text-foreground-light hidden md:block">{s.label}</span>
+            <span className="text-[10px] md:text-xs text-foreground-light hidden sm:block">{s.label}</span>
           </div>
           
           {idx < steps.length - 1 && (
             <div
               className={cn(
-                'w-6 md:w-10 h-0.5 mx-1',
+                'w-4 md:w-8 lg:w-10 h-0.5 mx-0.5 md:mx-1',
                 step > s.num ? 'bg-green-600' : 'bg-foreground-muted/30'
               )}
             />
@@ -53,4 +62,3 @@ export function StepIndicator() {
     </div>
   )
 }
-

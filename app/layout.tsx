@@ -3,6 +3,7 @@ import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import './globals.css'
 import { Providers } from './providers'
+import { AuthProvider } from '@/components/AuthProvider'
 
 export const metadata: Metadata = {
   title: 'Ramel BarberShop',
@@ -26,7 +27,9 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen">
         <Providers>
-          {children}
+          <AuthProvider>
+            {children}
+          </AuthProvider>
           <ToastContainer
             position="bottom-right"
             autoClose={5000}

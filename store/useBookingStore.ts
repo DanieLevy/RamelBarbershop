@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Service } from '@/types/database'
+import type { Service, Customer } from '@/types/database'
 import type { ConfirmationResult } from 'firebase/auth'
 
 export interface DateSelection {
@@ -14,8 +14,17 @@ export interface CustomerInfo {
 }
 
 interface BookingState {
-  // Current step (1-6)
+  // Current step (1-6 for guest, 1-4 for logged-in user)
   step: number
+  
+  // Total steps (4 for logged-in, 6 for guest)
+  totalSteps: number
+  
+  // Is user logged in (affects step count)
+  isUserLoggedIn: boolean
+  
+  // Logged-in customer data
+  loggedInCustomer: Customer | null
   
   // Booking data
   barberId: string | null
@@ -37,10 +46,12 @@ interface BookingState {
   setTime: (timestamp: number) => void
   setCustomer: (customer: Partial<CustomerInfo>) => void
   setOtpConfirmation: (confirmation: ConfirmationResult | null) => void
+  setLoggedInUser: (customer: Customer | null) => void
   reset: () => void
   
   // Computed
   isStepComplete: (step: number) => boolean
+  getActualStep: () => string // Returns step name for rendering
 }
 
 const initialCustomer: CustomerInfo = {
@@ -51,6 +62,9 @@ const initialCustomer: CustomerInfo = {
 export const useBookingStore = create<BookingState>((set, get) => ({
   // Initial state
   step: 1,
+  totalSteps: 6,
+  isUserLoggedIn: false,
+  loggedInCustomer: null,
   barberId: null,
   service: null,
   date: null,
@@ -61,7 +75,10 @@ export const useBookingStore = create<BookingState>((set, get) => ({
   // Actions
   setStep: (step) => set({ step }),
   
-  nextStep: () => set((state) => ({ step: Math.min(state.step + 1, 6) })),
+  nextStep: () => {
+    const state = get()
+    set({ step: Math.min(state.step + 1, state.totalSteps) })
+  },
   
   prevStep: () => set((state) => ({ step: Math.max(state.step - 1, 1) })),
   
@@ -80,6 +97,26 @@ export const useBookingStore = create<BookingState>((set, get) => ({
   
   setOtpConfirmation: (confirmation) => set({ otpConfirmation: confirmation }),
   
+  setLoggedInUser: (customer) => {
+    if (customer) {
+      set({
+        isUserLoggedIn: true,
+        loggedInCustomer: customer,
+        totalSteps: 4, // service, date, time, confirmation
+        customer: {
+          fullname: customer.fullname,
+          phone: customer.phone,
+        },
+      })
+    } else {
+      set({
+        isUserLoggedIn: false,
+        loggedInCustomer: null,
+        totalSteps: 6,
+      })
+    }
+  },
+  
   reset: () =>
     set({
       step: 1,
@@ -88,27 +125,71 @@ export const useBookingStore = create<BookingState>((set, get) => ({
       timeTimestamp: null,
       customer: { ...initialCustomer },
       otpConfirmation: null,
+      // Note: Don't reset isUserLoggedIn and loggedInCustomer here
     }),
 
   // Computed
   isStepComplete: (step) => {
     const state = get()
-    switch (step) {
-      case 1:
-        return state.service !== null
-      case 2:
-        return state.date !== null
-      case 3:
-        return state.timeTimestamp !== null
-      case 4:
-        return state.customer.fullname.trim() !== '' && state.customer.phone.length === 10
-      case 5:
-        return false // OTP verification handled separately
-      case 6:
-        return true
-      default:
-        return false
+    
+    if (state.isUserLoggedIn) {
+      // For logged-in users: service(1), date(2), time(3), confirmation(4)
+      switch (step) {
+        case 1:
+          return state.service !== null
+        case 2:
+          return state.date !== null
+        case 3:
+          return state.timeTimestamp !== null
+        case 4:
+          return true
+        default:
+          return false
+      }
+    } else {
+      // For guests: service(1), date(2), time(3), details(4), otp(5), confirmation(6)
+      switch (step) {
+        case 1:
+          return state.service !== null
+        case 2:
+          return state.date !== null
+        case 3:
+          return state.timeTimestamp !== null
+        case 4:
+          return state.customer.fullname.trim() !== '' && state.customer.phone.length === 10
+        case 5:
+          return false // OTP verification handled separately
+        case 6:
+          return true
+        default:
+          return false
+      }
+    }
+  },
+  
+  getActualStep: () => {
+    const state = get()
+    
+    if (state.isUserLoggedIn) {
+      // Logged-in user steps: service, date, time, confirmation
+      switch (state.step) {
+        case 1: return 'service'
+        case 2: return 'date'
+        case 3: return 'time'
+        case 4: return 'confirmation'
+        default: return 'service'
+      }
+    } else {
+      // Guest steps: service, date, time, details, otp, confirmation
+      switch (state.step) {
+        case 1: return 'service'
+        case 2: return 'date'
+        case 3: return 'time'
+        case 4: return 'details'
+        case 5: return 'otp'
+        case 6: return 'confirmation'
+        default: return 'service'
+      }
     }
   },
 }))
-
