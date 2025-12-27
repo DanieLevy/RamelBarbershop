@@ -6,7 +6,7 @@ import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { FaPlus, FaTrash, FaCalendarAlt } from 'react-icons/fa'
+import { Plus, Trash, Calendar } from 'lucide-react'
 import type { BarbershopClosure } from '@/types/database'
 
 export default function ClosuresPage() {
@@ -135,7 +135,7 @@ export default function ClosuresPage() {
           onClick={() => setShowForm(!showForm)}
           className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-background-dark rounded-lg font-medium hover:bg-accent-gold/90 transition-colors"
         >
-          <FaPlus className="w-4 h-4" />
+          <Plus size={16} strokeWidth={1.5} />
           הוסף
         </button>
       </div>
@@ -204,7 +204,7 @@ export default function ClosuresPage() {
       <div className="bg-background-card border border-white/10 rounded-2xl p-6">
         {closures.length === 0 ? (
           <div className="text-center py-8">
-            <FaCalendarAlt className="w-12 h-12 text-foreground-muted/30 mx-auto mb-3" />
+            <Calendar size={48} strokeWidth={1.5} className="text-foreground-muted/30 mx-auto mb-3" />
             <p className="text-foreground-muted">אין ימי סגירה מוגדרים</p>
           </div>
         ) : (
@@ -226,7 +226,7 @@ export default function ClosuresPage() {
                       ? 'bg-red-500/20 text-red-400'
                       : 'bg-foreground-muted/20 text-foreground-muted'
                   )}>
-                    <FaCalendarAlt className="w-5 h-5" />
+                    <Calendar size={20} strokeWidth={1.5} />
                   </div>
                   <div>
                     <p className="text-foreground-light font-medium">
@@ -245,7 +245,7 @@ export default function ClosuresPage() {
                   className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                   title="מחק"
                 >
-                  <FaTrash className="w-4 h-4" />
+                  <Trash size={16} strokeWidth={1.5} />
                 </button>
               </div>
             ))}

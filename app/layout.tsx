@@ -9,8 +9,8 @@ export const metadata: Metadata = {
   title: 'Ramel BarberShop',
   description: 'מספרה מקצועית בירושלים - רמאל ברברשופ',
   icons: {
-    icon: '/icon.png',
-    apple: '/icon.png',
+    icon: '/NewIcon.png',
+    apple: '/NewIcon.png',
   },
   manifest: '/manifest.json',
   appleWebApp: {

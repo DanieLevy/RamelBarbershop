@@ -5,15 +5,22 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/useAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { AppHeader } from '@/components/AppHeader'
-import { Footer } from '@/components/Footer'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { toast } from 'sonner'
 import { cn, formatDateHebrew, formatTime as formatTimeUtil } from '@/lib/utils'
-import { FaCalendarAlt, FaClock, FaCut, FaUser, FaTimes, FaHistory, FaChevronRight } from 'react-icons/fa'
+import { Calendar, Clock, Scissors, User, X, History, ChevronRight } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import type { ReservationWithDetails } from '@/types/database'
 
 type TabType = 'upcoming' | 'past' | 'cancelled'
+
+interface Tab {
+  key: TabType
+  label: string
+  icon: LucideIcon
+  count: number
+}
 
 export default function MyAppointmentsPage() {
   const router = useRouter()
@@ -89,8 +96,8 @@ export default function MyAppointmentsPage() {
       const supabase = createClient()
       
       // Perform the update
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .from('reservations') as any)
         .update({ status: 'cancelled' })
         .eq('id', reservationId)
@@ -179,10 +186,10 @@ export default function MyAppointmentsPage() {
     }
   })
 
-  const tabs = [
-    { key: 'upcoming' as TabType, label: 'קרובים', icon: FaCalendarAlt, count: reservations.filter(isUpcoming).length },
-    { key: 'past' as TabType, label: 'עברו', icon: FaHistory, count: reservations.filter(isPast).length },
-    { key: 'cancelled' as TabType, label: 'בוטלו', icon: FaTimes, count: reservations.filter(isCancelled).length },
+  const tabs: Tab[] = [
+    { key: 'upcoming', label: 'קרובים', icon: Calendar, count: reservations.filter(isUpcoming).length },
+    { key: 'past', label: 'עברו', icon: History, count: reservations.filter(isPast).length },
+    { key: 'cancelled', label: 'בוטלו', icon: X, count: reservations.filter(isCancelled).length },
   ]
 
   if (!isInitialized || isLoading) {
@@ -221,31 +228,34 @@ export default function MyAppointmentsPage() {
             
             {/* Tabs - horizontal scroll on mobile */}
             <div className="flex gap-1 sm:gap-2 mb-6 bg-background-card rounded-xl p-1 overflow-x-auto scrollbar-hide">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={cn(
-                    'flex-1 min-w-[90px] py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap',
-                    activeTab === tab.key
-                      ? 'bg-accent-gold text-background-dark'
-                      : 'text-foreground-muted hover:text-foreground-light'
-                  )}
-                >
-                  <tab.icon className="w-3.5 h-3.5" />
-                  <span>{tab.label}</span>
-                  {tab.count > 0 && (
-                    <span className={cn(
-                      'text-xs px-1.5 py-0.5 rounded-full',
+              {tabs.map((tab) => {
+                const Icon = tab.icon
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    className={cn(
+                      'flex-1 min-w-[90px] py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap',
                       activeTab === tab.key
-                        ? 'bg-background-dark/20'
-                        : 'bg-white/10'
-                    )}>
-                      {tab.count}
-                    </span>
-                  )}
-                </button>
-              ))}
+                        ? 'bg-accent-gold text-background-dark'
+                        : 'text-foreground-muted hover:text-foreground-light'
+                    )}
+                  >
+                    <Icon size={14} strokeWidth={1.5} />
+                    <span>{tab.label}</span>
+                    {tab.count > 0 && (
+                      <span className={cn(
+                        'text-xs px-1.5 py-0.5 rounded-full',
+                        activeTab === tab.key
+                          ? 'bg-background-dark/20'
+                          : 'bg-white/10'
+                      )}>
+                        {tab.count}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
             </div>
             
             {/* Content */}
@@ -256,7 +266,7 @@ export default function MyAppointmentsPage() {
             ) : filteredReservations.length === 0 ? (
               <GlassCard className="text-center py-12">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-white/5 flex items-center justify-center">
-                  <FaCalendarAlt className="w-8 h-8 text-foreground-muted" />
+                  <Calendar size={32} strokeWidth={1} className="text-foreground-muted" />
                 </div>
                 <p className="text-foreground-muted mb-4">
                   {activeTab === 'upcoming' && 'אין תורים קרובים'}
@@ -322,28 +332,28 @@ export default function MyAppointmentsPage() {
                     {/* Details - responsive grid */}
                     <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:gap-4">
                       <div className="flex items-center gap-2">
-                        <FaCalendarAlt className="w-4 h-4 text-accent-gold flex-shrink-0" />
+                        <Calendar size={16} strokeWidth={1.5} className="text-accent-gold flex-shrink-0" />
                         <span className="text-foreground-light text-sm truncate">
                           {formatDate(reservation.date_timestamp)}
                         </span>
                       </div>
                       
                       <div className="flex items-center gap-2">
-                        <FaClock className="w-4 h-4 text-accent-gold flex-shrink-0" />
+                        <Clock size={16} strokeWidth={1.5} className="text-accent-gold flex-shrink-0" />
                         <span className="text-foreground-light text-sm" dir="ltr">
                           {formatTime(reservation.time_timestamp)}
                         </span>
                       </div>
                       
                       <div className="flex items-center gap-2">
-                        <FaCut className="w-4 h-4 text-accent-gold flex-shrink-0" />
+                        <Scissors size={16} strokeWidth={1.5} className="text-accent-gold flex-shrink-0" />
                         <span className="text-foreground-light text-sm truncate">
                           {reservation.services?.name_he || 'שירות'}
                         </span>
                       </div>
                       
                       <div className="flex items-center gap-2">
-                        <FaUser className="w-4 h-4 text-accent-gold flex-shrink-0" />
+                        <User size={16} strokeWidth={1.5} className="text-accent-gold flex-shrink-0" />
                         <span className="text-foreground-light text-sm truncate">
                           {reservation.users?.fullname || 'ספר'}
                         </span>
@@ -368,15 +378,13 @@ export default function MyAppointmentsPage() {
                 onClick={() => router.push('/')}
                 className="inline-flex items-center gap-2 text-foreground-muted hover:text-foreground-light text-sm transition-colors py-2"
               >
-                <FaChevronRight className="w-3 h-3" />
+                <ChevronRight size={12} strokeWidth={1.5} />
                 <span>חזרה לדף הבית</span>
               </button>
             </div>
           </div>
         </div>
       </main>
-      
-      <Footer />
     </>
   )
 }

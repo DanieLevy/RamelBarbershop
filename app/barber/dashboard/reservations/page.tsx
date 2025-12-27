@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn, formatTime as formatTimeUtil, formatDateHebrew, nowInIsrael } from '@/lib/utils'
 import { startOfDay, endOfDay } from 'date-fns'
-import { FaCalendarAlt, FaPhone, FaCheck, FaTimes, FaClock } from 'react-icons/fa'
+import { Calendar, Phone, Check, X, Clock } from 'lucide-react'
 import type { Reservation, Service } from '@/types/database'
 
 interface ReservationWithService extends Reservation {
@@ -65,8 +65,8 @@ export default function ReservationsPage() {
     try {
       const supabase = createClient()
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .from('reservations') as any)
         .update({ status })
         .eq('id', id)
@@ -231,7 +231,7 @@ export default function ReservationsPage() {
       <div className="bg-background-card border border-white/10 rounded-2xl p-6">
         {filteredReservations.length === 0 ? (
           <div className="text-center py-8">
-            <FaCalendarAlt className="w-12 h-12 text-foreground-muted/30 mx-auto mb-3" />
+            <Calendar size={48} strokeWidth={1} className="text-foreground-muted/30 mx-auto mb-3" />
             <p className="text-foreground-muted">אין תורים להציג</p>
           </div>
         ) : (
@@ -260,7 +260,7 @@ export default function ReservationsPage() {
                           ? 'bg-green-500/20 text-green-400'
                           : 'bg-accent-gold/20 text-accent-gold'
                     )}>
-                      <FaCalendarAlt className="w-5 h-5" />
+                      <Calendar size={20} strokeWidth={1.5} />
                     </div>
                     <div>
                       <div className="flex items-center gap-2 mb-1">
@@ -283,11 +283,11 @@ export default function ReservationsPage() {
                       </p>
                       <div className="flex items-center gap-4 text-sm">
                         <span className="flex items-center gap-1 text-foreground-muted">
-                          <FaClock className="w-3 h-3" />
+                          <Clock size={12} strokeWidth={1.5} />
                           {formatTime(res.time_timestamp)}
                         </span>
                         <span className="flex items-center gap-1 text-foreground-muted">
-                          <FaCalendarAlt className="w-3 h-3" />
+                          <Calendar size={12} strokeWidth={1.5} />
                           {formatDate(res.time_timestamp)}
                         </span>
                       </div>
@@ -295,7 +295,7 @@ export default function ReservationsPage() {
                         href={`tel:${res.customer_phone}`}
                         className="flex items-center gap-1 text-accent-gold text-sm mt-2 hover:underline"
                       >
-                        <FaPhone className="w-3 h-3" />
+                        <Phone size={12} strokeWidth={1.5} />
                         {res.customer_phone}
                       </a>
                     </div>
@@ -315,7 +315,7 @@ export default function ReservationsPage() {
                         )}
                         title="סמן כהושלם"
                       >
-                        <FaCheck className="w-4 h-4" />
+                        <Check size={16} strokeWidth={1.5} />
                       </button>
                       <button
                         onClick={() => {
@@ -332,7 +332,7 @@ export default function ReservationsPage() {
                         )}
                         title="בטל תור"
                       >
-                        <FaTimes className="w-4 h-4" />
+                        <X size={16} strokeWidth={1.5} />
                       </button>
                     </div>
                   )}

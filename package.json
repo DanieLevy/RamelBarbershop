@@ -10,7 +10,6 @@
     "lint:fix": "eslint . --ext .ts,.tsx --fix"
   },
   "dependencies": {
-    "@phosphor-icons/react": "^2.1.10",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.50.0",
     "@tanstack/react-query": "^5.62.0",
@@ -18,11 +17,11 @@
     "date-fns": "^3.6.0",
     "date-fns-tz": "^3.2.0",
     "firebase": "^10.7.1",
+    "lucide-react": "^0.562.0",
     "next": "^16.1.1",
     "react": "^19.2.3",
     "react-day-picker": "^9.4.4",
     "react-dom": "^19.2.3",
-    "react-icons": "^5.4.0",
     "react-otp-input": "^3.1.1",
     "sonner": "^2.0.7",
     "zustand": "^5.0.2"

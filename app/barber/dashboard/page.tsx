@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
-import { FaCalendarAlt, FaClock, FaCheckCircle, FaTimesCircle } from 'react-icons/fa'
+import Link from 'next/link'
+import { Calendar, Clock, CheckCircle, XCircle } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import type { Reservation, Service } from '@/types/database'
 
 interface DashboardStats {
@@ -116,28 +118,28 @@ export default function DashboardPage() {
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard
-          icon={FaCalendarAlt}
+          icon={Calendar}
           label="תורים להיום"
           value={stats.todayReservations}
           color="gold"
           loading={loading}
         />
         <StatCard
-          icon={FaClock}
+          icon={Clock}
           label="תורים קרובים"
           value={stats.upcomingReservations}
           color="blue"
           loading={loading}
         />
         <StatCard
-          icon={FaCheckCircle}
+          icon={CheckCircle}
           label="הושלמו היום"
           value={stats.completedToday}
           color="green"
           loading={loading}
         />
         <StatCard
-          icon={FaTimesCircle}
+          icon={XCircle}
           label="בוטלו היום"
           value={stats.cancelledToday}
           color="red"
@@ -149,12 +151,12 @@ export default function DashboardPage() {
       <div className="bg-background-card border border-white/10 rounded-2xl p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-medium text-foreground-light">התורים הקרובים</h2>
-          <a
+          <Link
             href="/barber/dashboard/reservations"
             className="text-accent-gold text-sm hover:underline"
           >
             הצג הכל →
-          </a>
+          </Link>
         </div>
 
         {loading ? (
@@ -163,7 +165,7 @@ export default function DashboardPage() {
           </div>
         ) : upcomingList.length === 0 ? (
           <div className="text-center py-8">
-            <FaCalendarAlt className="w-12 h-12 text-foreground-muted/30 mx-auto mb-3" />
+            <Calendar size={48} strokeWidth={1} className="text-foreground-muted/30 mx-auto mb-3" />
             <p className="text-foreground-muted">אין תורים קרובים</p>
           </div>
         ) : (
@@ -175,7 +177,7 @@ export default function DashboardPage() {
               >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full bg-accent-gold/20 flex items-center justify-center">
-                    <FaCalendarAlt className="w-5 h-5 text-accent-gold" />
+                    <Calendar size={20} strokeWidth={1.5} className="text-accent-gold" />
                   </div>
                   <div>
                     <p className="text-foreground-light font-medium">
@@ -205,30 +207,30 @@ export default function DashboardPage() {
         <div className="mt-8 p-6 bg-accent-gold/10 border border-accent-gold/30 rounded-2xl">
           <h3 className="text-lg font-medium text-accent-gold mb-3">פעולות מנהל מהירות</h3>
           <div className="flex flex-wrap gap-3">
-            <a
+            <Link
               href="/barber/dashboard/barbers"
               className="px-4 py-2 bg-background-dark rounded-lg text-sm text-foreground-light hover:bg-white/5 transition-colors"
             >
               ניהול ספרים
-            </a>
-            <a
+            </Link>
+            <Link
               href="/barber/dashboard/schedule"
               className="px-4 py-2 bg-background-dark rounded-lg text-sm text-foreground-light hover:bg-white/5 transition-colors"
             >
               שעות פתיחה
-            </a>
-            <a
+            </Link>
+            <Link
               href="/barber/dashboard/closures"
               className="px-4 py-2 bg-background-dark rounded-lg text-sm text-foreground-light hover:bg-white/5 transition-colors"
             >
               ימי סגירה
-            </a>
-            <a
+            </Link>
+            <Link
               href="/barber/dashboard/settings"
               className="px-4 py-2 bg-background-dark rounded-lg text-sm text-foreground-light hover:bg-white/5 transition-colors"
             >
               הגדרות מספרה
-            </a>
+            </Link>
           </div>
         </div>
       )}
@@ -243,7 +245,7 @@ function StatCard({
   color,
   loading,
 }: {
-  icon: React.ComponentType<{ className?: string }>
+  icon: LucideIcon
   label: string
   value: number
   color: 'gold' | 'blue' | 'green' | 'red'
@@ -259,7 +261,7 @@ function StatCard({
   return (
     <div className="bg-background-card border border-white/10 rounded-xl p-5">
       <div className={`w-10 h-10 rounded-lg ${colorClasses[color]} flex items-center justify-center mb-3`}>
-        <Icon className="w-5 h-5" />
+        <Icon size={20} strokeWidth={1.5} />
       </div>
       <p className="text-foreground-muted text-sm">{label}</p>
       {loading ? (
@@ -270,4 +272,3 @@ function StatCard({
     </div>
   )
 }
-

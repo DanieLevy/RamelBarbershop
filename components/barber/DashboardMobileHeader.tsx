@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { FaBars } from 'react-icons/fa'
+import { Menu } from 'lucide-react'
 
 interface DashboardMobileHeaderProps {
   barberName: string
@@ -18,7 +18,7 @@ export function DashboardMobileHeader({ barberName, onMenuToggle }: DashboardMob
           className="p-2 -mr-2 text-foreground-light hover:text-accent-gold transition-colors"
           aria-label="פתח תפריט"
         >
-          <FaBars className="w-5 h-5" />
+          <Menu size={20} strokeWidth={1.5} />
         </button>
         
         {/* Logo and title */}
@@ -45,4 +45,3 @@ export function DashboardMobileHeader({ barberName, onMenuToggle }: DashboardMob
     </header>
   )
 }
-

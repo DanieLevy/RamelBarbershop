@@ -3,7 +3,7 @@
 import { useBookingStore } from '@/store/useBookingStore'
 import type { WorkDay, BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure } from '@/types/database'
 import { getNextWeekDates, cn } from '@/lib/utils'
-import { FaChevronRight } from 'react-icons/fa'
+import { ChevronRight } from 'lucide-react'
 
 interface DateSelectionProps {
   workDays: WorkDay[]
@@ -137,7 +137,7 @@ export function DateSelection({
         onClick={prevStep}
         className="flex items-center justify-center gap-2 text-foreground-muted hover:text-foreground-light transition-colors text-sm py-2"
       >
-        <FaChevronRight className="w-3 h-3" />
+        <ChevronRight size={12} strokeWidth={1.5} />
         <span>חזור לבחירת שירות</span>
       </button>
     </div>

@@ -3,10 +3,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
 import { findCustomerByPhone } from '@/lib/services/customer.service'
-import { sendPhoneOtp, verifyOtp, clearRecaptchaVerifier, isTestUser, TEST_USER } from '@/lib/firebase/config'
+import { sendPhoneOtp, verifyOtp, clearRecaptchaVerifier, isTestUser, TEST_USER, setSkipDebugMode } from '@/lib/firebase/config'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { FaTimes, FaCut } from 'react-icons/fa'
+import { X, Scissors } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { ConfirmationResult } from 'firebase/auth'
 
@@ -15,7 +15,7 @@ interface LoginModalProps {
   onClose: () => void
 }
 
-type Step = 'phone' | 'name' | 'otp'
+type Step = 'phone' | 'name' | 'otp' | 'debug-choice'
 
 const RECAPTCHA_CONTAINER_ID = 'login-recaptcha-container'
 
@@ -29,7 +29,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [isNewUser, setIsNewUser] = useState(false)
+  const [, setIsNewUser] = useState(false)
   const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null)
   const [countdown, setCountdown] = useState(0)
   
@@ -97,6 +97,13 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         return
       }
       
+      // Check if it's a test user in development - offer choice
+      if (process.env.NODE_ENV === 'development' && isTestUser(phoneClean)) {
+        setStep('debug-choice')
+        setLoading(false)
+        return
+      }
+      
       // Send OTP
       await sendOtpToPhone(phoneClean)
     } catch (err) {
@@ -104,6 +111,12 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       setError('שגיאה בבדיקת המספר')
       setLoading(false)
     }
+  }
+  
+  const handleDebugChoice = async (useDebug: boolean) => {
+    setSkipDebugMode(!useDebug)
+    setLoading(true)
+    await sendOtpToPhone(phone.replace(/\D/g, ''), !useDebug)
   }
 
   const handleNameSubmit = async () => {
@@ -118,16 +131,20 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     await sendOtpToPhone(phone.replace(/\D/g, ''))
   }
 
-  const sendOtpToPhone = async (phoneClean: string) => {
+  const sendOtpToPhone = async (phoneClean: string, forceRealOtp: boolean = false) => {
     try {
       const formattedPhone = formatPhoneNumber(phoneClean)
-      const result = await sendPhoneOtp(formattedPhone, RECAPTCHA_CONTAINER_ID)
+      const result = await sendPhoneOtp(formattedPhone, RECAPTCHA_CONTAINER_ID, forceRealOtp)
       
       if (result.success && result.confirmation) {
         setConfirmation(result.confirmation)
         setStep('otp')
         setCountdown(60)
-        toast.success('קוד אימות נשלח!')
+        if (result.isDebugUser) {
+          toast.success('מצב בדיקה - קוד: ' + TEST_USER.otpCode)
+        } else {
+          toast.success('קוד אימות נשלח!')
+        }
         setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
       } else {
         setError(result.error || 'שגיאה בשליחת הקוד')
@@ -220,7 +237,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           className="absolute top-4 left-4 text-foreground-muted hover:text-foreground-light transition-colors"
           aria-label="סגור"
         >
-          <FaTimes className="w-5 h-5" />
+          <X size={20} strokeWidth={1.5} />
         </button>
         
         {/* reCAPTCHA container */}
@@ -231,6 +248,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           {step === 'phone' && 'התחברות'}
           {step === 'name' && 'הרשמה'}
           {step === 'otp' && 'אימות טלפון'}
+          {step === 'debug-choice' && '🧪 מצב בדיקה'}
         </h2>
         
         {/* Phone Step */}
@@ -337,6 +355,57 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           </div>
         )}
         
+        {/* Debug Choice Step */}
+        {step === 'debug-choice' && (
+          <div className="flex flex-col gap-4">
+            <p className="text-foreground-muted text-sm text-center">
+              זוהה משתמש בדיקה. איך תרצה להמשיך?
+            </p>
+            
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+              <p className="text-blue-400 text-sm text-center mb-2">
+                <strong>מצב בדיקה:</strong> ללא שליחת SMS אמיתי
+              </p>
+              <p className="text-blue-400/80 text-xs text-center">
+                קוד: <span className="font-mono font-bold">{TEST_USER.otpCode}</span>
+              </p>
+            </div>
+            
+            <button
+              onClick={() => handleDebugChoice(true)}
+              disabled={loading}
+              className={cn(
+                'w-full py-3 rounded-xl font-medium transition-all',
+                loading
+                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
+                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
+              )}
+            >
+              {loading ? 'טוען...' : '🧪 השתמש במצב בדיקה'}
+            </button>
+            
+            <button
+              onClick={() => handleDebugChoice(false)}
+              disabled={loading}
+              className={cn(
+                'w-full py-3 rounded-xl font-medium transition-all border',
+                loading
+                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed border-foreground-muted/30'
+                  : 'bg-transparent text-foreground-light border-white/20 hover:border-accent-gold/50'
+              )}
+            >
+              {loading ? 'טוען...' : '📱 שלח SMS אמיתי'}
+            </button>
+            
+            <button
+              onClick={() => setStep('phone')}
+              className="text-foreground-muted hover:text-foreground-light text-sm transition-colors"
+            >
+              ← חזור
+            </button>
+          </div>
+        )}
+        
         {/* OTP Step */}
         {step === 'otp' && (
           <div className="flex flex-col gap-4">
@@ -424,7 +493,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             }}
             className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-foreground-muted hover:text-accent-gold transition-colors"
           >
-            <FaCut className="w-3.5 h-3.5" />
+            <Scissors size={14} strokeWidth={1.5} />
             <span>כניסה לספרים</span>
           </button>
         </div>
@@ -432,4 +501,3 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     </div>
   )
 }
-

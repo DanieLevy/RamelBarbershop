@@ -3,10 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { createClient } from '@/lib/supabase/client'
-import { formatTime, cn, parseTimeString, timestampToIsraelDate, generateTimeSlots } from '@/lib/utils'
+import { formatTime, cn, parseTimeString, generateTimeSlots } from '@/lib/utils'
 import type { TimeSlot, BarbershopSettings, BarberSchedule } from '@/types/database'
-import { format } from 'date-fns'
-import { FaChevronRight, FaChevronDown, FaChevronUp } from 'react-icons/fa'
+import { ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 
 interface TimeSelectionProps {
@@ -206,9 +205,9 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule }: TimeSe
                 className="flex items-center gap-2 text-sm text-foreground-muted hover:text-foreground-light transition-colors py-2"
               >
                 {showReserved ? (
-                  <FaChevronUp className="w-3 h-3" />
+                  <ChevronUp size={12} strokeWidth={1.5} />
                 ) : (
-                  <FaChevronDown className="w-3 h-3" />
+                  <ChevronDown size={12} strokeWidth={1.5} />
                 )}
                 <span className="w-2 h-2 rounded-full bg-red-400" />
                 שעות תפוסות ({reservedSlots.length})
@@ -237,7 +236,7 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule }: TimeSe
         onClick={prevStep}
         className="flex items-center justify-center gap-2 text-foreground-muted hover:text-foreground-light transition-colors text-sm py-2"
       >
-        <FaChevronRight className="w-3 h-3" />
+        <ChevronRight size={12} strokeWidth={1.5} />
         <span>חזור לבחירת תאריך</span>
       </button>
     </div>

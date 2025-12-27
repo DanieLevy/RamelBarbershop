@@ -23,6 +23,17 @@ export function isTestUser(phone: string): boolean {
          phone === TEST_USER.phone
 }
 
+// Flag to track if user chose to skip debug mode for this session
+let skipDebugMode = false
+
+export function setSkipDebugMode(skip: boolean): void {
+  skipDebugMode = skip
+}
+
+export function shouldUseDebugMode(): boolean {
+  return !skipDebugMode
+}
+
 // Mock confirmation result for test user
 class MockConfirmationResult {
   verificationId = 'test-verification-id'
@@ -109,14 +120,15 @@ export function initRecaptchaVerifier(containerId: string): RecaptchaVerifier | 
 
 export async function sendPhoneOtp(
   phoneNumber: string,
-  containerId: string = 'recaptcha-container'
-): Promise<{ success: boolean; confirmation?: ConfirmationResult; error?: string }> {
-  // Check if this is the test user - bypass real OTP
-  if (isTestUser(phoneNumber)) {
+  containerId: string = 'recaptcha-container',
+  forceRealOtp: boolean = false
+): Promise<{ success: boolean; confirmation?: ConfirmationResult; error?: string; isDebugUser?: boolean }> {
+  // Check if this is the test user - bypass real OTP (unless forced to use real)
+  if (isTestUser(phoneNumber) && shouldUseDebugMode() && !forceRealOtp) {
     console.log('📱 Test user detected - bypassing real OTP')
     // Return mock confirmation for test user
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return { success: true, confirmation: new MockConfirmationResult() as any }
+    return { success: true, confirmation: new MockConfirmationResult() as any, isDebugUser: true }
   }
 
   try {

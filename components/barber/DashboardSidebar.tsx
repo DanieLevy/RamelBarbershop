@@ -3,42 +3,44 @@
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { cn } from '@/lib/utils'
 import {
-  FaHome,
-  FaCalendarAlt,
-  FaCut,
-  FaClock,
-  FaUser,
-  FaCog,
-  FaUsers,
-  FaCalendarCheck,
-  FaTimesCircle,
-  FaSignOutAlt,
-  FaTimes,
-} from 'react-icons/fa'
+  Home,
+  Calendar,
+  Scissors,
+  Clock,
+  User,
+  Settings,
+  Users,
+  CalendarCheck,
+  XCircle,
+  LogOut,
+  X,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 interface NavItem {
   label: string
   href: string
-  icon: React.ComponentType<{ className?: string }>
+  icon: LucideIcon
   adminOnly?: boolean
 }
 
 const navItems: NavItem[] = [
-  { label: 'סקירה כללית', href: '/barber/dashboard', icon: FaHome },
-  { label: 'התורים שלי', href: '/barber/dashboard/reservations', icon: FaCalendarAlt },
-  { label: 'השירותים שלי', href: '/barber/dashboard/services', icon: FaCut },
-  { label: 'הלו"ז שלי', href: '/barber/dashboard/my-schedule', icon: FaClock },
-  { label: 'פרופיל', href: '/barber/dashboard/profile', icon: FaUser },
+  { label: 'סקירה כללית', href: '/barber/dashboard', icon: Home },
+  { label: 'התורים שלי', href: '/barber/dashboard/reservations', icon: Calendar },
+  { label: 'השירותים שלי', href: '/barber/dashboard/services', icon: Scissors },
+  { label: 'הלו"ז שלי', href: '/barber/dashboard/my-schedule', icon: Clock },
+  { label: 'פרופיל', href: '/barber/dashboard/profile', icon: User },
 ]
 
 const adminNavItems: NavItem[] = [
-  { label: 'הגדרות המספרה', href: '/barber/dashboard/settings', icon: FaCog, adminOnly: true },
-  { label: 'ניהול ספרים', href: '/barber/dashboard/barbers', icon: FaUsers, adminOnly: true },
-  { label: 'שעות פתיחה', href: '/barber/dashboard/schedule', icon: FaCalendarCheck, adminOnly: true },
-  { label: 'ימי סגירה', href: '/barber/dashboard/closures', icon: FaTimesCircle, adminOnly: true },
+  { label: 'הגדרות המספרה', href: '/barber/dashboard/settings', icon: Settings, adminOnly: true },
+  { label: 'ניהול ספרים', href: '/barber/dashboard/barbers', icon: Users, adminOnly: true },
+  { label: 'שעות פתיחה', href: '/barber/dashboard/schedule', icon: CalendarCheck, adminOnly: true },
+  { label: 'ימי סגירה', href: '/barber/dashboard/closures', icon: XCircle, adminOnly: true },
 ]
 
 interface DashboardSidebarProps {
@@ -130,7 +132,7 @@ export function DashboardSidebar({ isMobileOpen, onMobileClose }: DashboardSideb
               className="p-2 text-foreground-muted hover:text-foreground-light transition-colors"
               aria-label="סגור תפריט"
             >
-              <FaTimes className="w-5 h-5" />
+              <X size={20} strokeWidth={1.5} />
             </button>
           </div>
 
@@ -209,7 +211,7 @@ function SidebarContent({
                     : 'text-foreground-light hover:bg-white/5'
                 )}
               >
-                <Icon className="w-4 h-4" />
+                <Icon size={16} strokeWidth={1.5} />
                 <span>{item.label}</span>
               </button>
             )
@@ -237,7 +239,7 @@ function SidebarContent({
                         : 'text-foreground-light hover:bg-white/5'
                     )}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon size={16} strokeWidth={1.5} />
                     <span>{item.label}</span>
                   </button>
                 )
@@ -253,16 +255,16 @@ function SidebarContent({
           onClick={onLogout}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-red-400 hover:bg-red-500/10 transition-all"
         >
-          <FaSignOutAlt className="w-4 h-4" />
+          <LogOut size={16} strokeWidth={1.5} />
           <span>התנתק</span>
         </button>
         
-        <a
+        <Link
           href="/"
           className="block mt-2 text-center text-xs text-foreground-muted hover:text-foreground-light transition-colors"
         >
           ← חזרה לאתר
-        </a>
+        </Link>
       </div>
     </>
   )

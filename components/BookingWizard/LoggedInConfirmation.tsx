@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import type { BarberWithWorkDays } from '@/types/database'
 import { cn, formatTime } from '@/lib/utils'
-import { FaCheck, FaCalendarAlt, FaClock, FaCut, FaUser, FaPhone } from 'react-icons/fa'
+import { Check, Calendar, Clock, Scissors, User, Phone } from 'lucide-react'
 
 interface LoggedInConfirmationProps {
   barber: BarberWithWorkDays
@@ -23,7 +23,7 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
     reset,
   } = useBookingStore()
   
-  const { customer: authCustomer } = useAuthStore()
+  const { customer: _authCustomer } = useAuthStore()
   
   const [isCreating, setIsCreating] = useState(false)
   const [isCreated, setIsCreated] = useState(false)
@@ -131,7 +131,7 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
       {/* Success Icon */}
       <div className="flex justify-center">
         <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center">
-          <FaCheck className="w-10 h-10 text-green-500" />
+          <Check size={40} strokeWidth={1.5} className="text-green-500" />
         </div>
       </div>
       
@@ -150,19 +150,19 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
         
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <FaUser className="w-4 h-4 text-accent-gold" />
+            <User size={16} strokeWidth={1.5} className="text-accent-gold" />
             <span className="text-foreground-muted">ספר:</span>
             <span className="text-foreground-light font-medium">{barber.fullname}</span>
           </div>
           
           <div className="flex items-center gap-3">
-            <FaCut className="w-4 h-4 text-accent-gold" />
+            <Scissors size={16} strokeWidth={1.5} className="text-accent-gold" />
             <span className="text-foreground-muted">שירות:</span>
             <span className="text-foreground-light font-medium">{service?.name_he}</span>
           </div>
           
           <div className="flex items-center gap-3">
-            <FaCalendarAlt className="w-4 h-4 text-accent-gold" />
+            <Calendar size={16} strokeWidth={1.5} className="text-accent-gold" />
             <span className="text-foreground-muted">תאריך:</span>
             <span className="text-foreground-light font-medium">
               {date?.dayName} {date?.dayNum}
@@ -170,7 +170,7 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
           </div>
           
           <div className="flex items-center gap-3">
-            <FaClock className="w-4 h-4 text-accent-gold" />
+            <Clock size={16} strokeWidth={1.5} className="text-accent-gold" />
             <span className="text-foreground-muted">שעה:</span>
             <span className="text-foreground-light font-medium" dir="ltr">
               {timeTimestamp && formatTime(timeTimestamp)}
@@ -178,7 +178,7 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
           </div>
           
           <div className="flex items-center gap-3">
-            <FaPhone className="w-4 h-4 text-accent-gold" />
+            <Phone size={16} strokeWidth={1.5} className="text-accent-gold" />
             <span className="text-foreground-muted">טלפון:</span>
             <span className="text-foreground-light font-medium" dir="ltr">
               {loggedInCustomer?.phone}
@@ -221,4 +221,3 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
     </div>
   )
 }
-

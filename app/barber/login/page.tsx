@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { cn } from '@/lib/utils'
-import { FaLock, FaEnvelope, FaEye, FaEyeSlash, FaChevronRight } from 'react-icons/fa'
+import Link from 'next/link'
+import { Lock, Mail, Eye, EyeOff, ChevronRight } from 'lucide-react'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import Image from 'next/image'
 
@@ -109,7 +110,7 @@ export default function BarberLoginPage() {
                 אימייל
               </label>
               <div className="relative">
-                <FaEnvelope className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted w-4 h-4" />
+                <Mail size={16} strokeWidth={1.5} className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
                 <input
                   id="email"
                   type="email"
@@ -134,7 +135,7 @@ export default function BarberLoginPage() {
                 סיסמה
               </label>
               <div className="relative">
-                <FaLock className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted w-4 h-4" />
+                <Lock size={16} strokeWidth={1.5} className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
@@ -156,7 +157,7 @@ export default function BarberLoginPage() {
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground-light transition-colors p-1"
                   aria-label={showPassword ? 'הסתר סיסמה' : 'הצג סיסמה'}
                 >
-                  {showPassword ? <FaEyeSlash className="w-4 h-4" /> : <FaEye className="w-4 h-4" />}
+                  {showPassword ? <EyeOff size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
                 </button>
               </div>
             </div>
@@ -191,13 +192,13 @@ export default function BarberLoginPage() {
         
         {/* Back link */}
         <div className="mt-6 text-center">
-          <a
+          <Link
             href="/"
             className="inline-flex items-center gap-2 text-foreground-muted hover:text-foreground-light text-sm transition-colors py-2"
           >
-            <FaChevronRight className="w-3 h-3" />
+            <ChevronRight size={12} strokeWidth={1.5} />
             <span>חזרה לאתר</span>
-          </a>
+          </Link>
         </div>
       </div>
     </div>

@@ -1,47 +1,46 @@
 'use client'
 
+import { useState, useTransition } from 'react'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import type { BarberWithWorkDays } from '@/types/database'
-import { cn } from '@/lib/utils'
-import { FaCut, FaCalendarAlt } from 'react-icons/fa'
+import { Calendar, Loader2 } from 'lucide-react'
 
 interface BarberCardProps {
   barber: BarberWithWorkDays
 }
 
-// Map day keys to Hebrew abbreviations
-const dayAbbreviations: Record<string, string> = {
-  sunday: 'א',
-  monday: 'ב',
-  tuesday: 'ג',
-  wednesday: 'ד',
-  thursday: 'ה',
-  friday: 'ו',
-  saturday: 'ש',
-}
-
 export function BarberCard({ barber }: BarberCardProps) {
-  const router = useRouter()
-
-  // Get working days from work_days array
-  const workingDays = barber.work_days
-    ?.filter((wd) => wd.is_working)
-    .map((wd) => wd.day_of_week.toLowerCase()) || []
-
-  const handleBookNow = () => {
-    router.push(`/barber/${barber.id}`)
+  const [isPending, startTransition] = useTransition()
+  const [isNavigating, setIsNavigating] = useState(false)
+  
+  const handleNavigation = () => {
+    setIsNavigating(true)
+    startTransition(() => {
+      // Navigation happens via Link, this just tracks the transition
+    })
   }
 
+  const showLoader = isPending || isNavigating
+
   return (
-    <div
-      className="group relative w-full"
-      onClick={handleBookNow}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && handleBookNow()}
+    <Link
+      href={`/barber/${barber.id}`}
+      prefetch={true}
+      onClick={handleNavigation}
+      className="group relative w-full block"
       aria-label={`קבע תור אצל ${barber.fullname}`}
     >
+      {/* Loading overlay */}
+      {showLoader && (
+        <div className="absolute inset-0 z-10 bg-background-dark/80 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 size={32} strokeWidth={1.5} className="text-accent-gold animate-spin" />
+            <span className="text-accent-gold text-sm">טוען...</span>
+          </div>
+        </div>
+      )}
+      
       {/* Card container */}
       <div className="relative bg-background-card backdrop-blur-lg border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 hover:border-accent-gold/40 hover:shadow-gold cursor-pointer">
         {/* Top decorative bar */}
@@ -77,51 +76,21 @@ export function BarberCard({ barber }: BarberCardProps) {
             {/* Info */}
             <div className="flex-1 text-right sm:text-center">
               {/* Name */}
-              <h3 className="text-lg sm:text-xl font-medium text-foreground-light mb-1 group-hover:text-accent-gold transition-colors">
+              <h3 className="text-lg sm:text-xl font-medium text-foreground-light mb-3 group-hover:text-accent-gold transition-colors">
                 {barber.fullname}
               </h3>
-              
-              {/* Role badge */}
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-accent-gold/10 rounded-full mb-3">
-                <FaCut className="w-3 h-3 text-accent-gold" />
-                <span className="text-xs text-accent-gold font-medium">ספר מקצועי</span>
-              </div>
-              
-              {/* Working days */}
-              {workingDays.length > 0 && (
-                <div className="flex items-center justify-end sm:justify-center gap-2 text-foreground-muted">
-                  <div className="flex items-center gap-1" dir="rtl">
-                    {['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].map((day) => (
-                      <span
-                        key={day}
-                        className={cn(
-                          'w-5 h-5 text-[10px] rounded flex items-center justify-center font-medium',
-                          workingDays.includes(day)
-                            ? 'bg-accent-gold/20 text-accent-gold'
-                            : 'bg-white/5 text-foreground-muted/40'
-                        )}
-                        title={day}
-                      >
-                        {dayAbbreviations[day]}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
           
           {/* Book button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              handleBookNow()
-            }}
-            className="w-full mt-5 flex items-center justify-center gap-2 py-3 px-4 bg-accent-gold/10 border border-accent-gold/30 text-accent-gold rounded-xl font-medium transition-all hover:bg-accent-gold hover:text-background-dark hover:scale-[1.02] group-hover:border-accent-gold"
-          >
-            <FaCalendarAlt className="w-4 h-4" />
-            <span>קבע תור</span>
-          </button>
+          <div className="w-full mt-5 flex items-center justify-center gap-2 py-3 px-4 bg-accent-gold/10 border border-accent-gold/30 text-accent-gold rounded-xl font-medium transition-all group-hover:bg-accent-gold group-hover:text-background-dark group-hover:scale-[1.02] group-hover:border-accent-gold">
+            {showLoader ? (
+              <Loader2 size={18} strokeWidth={1.5} className="animate-spin" />
+            ) : (
+              <Calendar size={18} strokeWidth={1.5} />
+            )}
+            <span>{showLoader ? 'טוען...' : 'קבע תור'}</span>
+          </div>
         </div>
         
         {/* Corner decorations */}
@@ -130,6 +99,6 @@ export function BarberCard({ barber }: BarberCardProps) {
         <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-accent-gold/20 rounded-bl-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
         <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-accent-gold/20 rounded-br-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
-    </div>
+    </Link>
   )
 }

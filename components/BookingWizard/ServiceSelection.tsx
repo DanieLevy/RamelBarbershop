@@ -3,7 +3,7 @@
 import { useBookingStore } from '@/store/useBookingStore'
 import type { Service } from '@/types/database'
 import { cn } from '@/lib/utils'
-import { FaCut, FaClock, FaShekelSign } from 'react-icons/fa'
+import { Scissors, Clock } from 'lucide-react'
 
 interface ServiceSelectionProps {
   services: Service[]
@@ -48,7 +48,7 @@ export function ServiceSelection({ services }: ServiceSelectionProps) {
                 ? 'bg-accent-gold/20 text-accent-gold'
                 : 'bg-white/5 text-foreground-muted'
             )}>
-              <FaCut className="w-5 h-5" />
+              <Scissors size={20} strokeWidth={1.5} />
             </div>
             
             {/* Content */}
@@ -57,15 +57,14 @@ export function ServiceSelection({ services }: ServiceSelectionProps) {
                 {service.name_he}
               </span>
               <span className="text-foreground-muted text-sm flex items-center gap-1 mt-1">
-                <FaClock className="w-3 h-3" />
+                <Clock size={12} strokeWidth={1.5} />
                 {service.duration} דקות
               </span>
             </div>
             
             {/* Price */}
             <div className="flex items-center gap-1 text-accent-gold font-medium text-lg">
-              <span>{service.price}</span>
-              <FaShekelSign className="w-4 h-4" />
+              <span>₪{service.price}</span>
             </div>
           </button>
         ))}

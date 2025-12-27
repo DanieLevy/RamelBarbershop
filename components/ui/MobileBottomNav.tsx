@@ -2,12 +2,13 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { FaHome, FaCut, FaCalendarAlt, FaPhone } from 'react-icons/fa'
+import { Home, Scissors, Calendar, Phone, UserCog } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 interface NavItem {
   label: string
   href: string
-  icon: React.ComponentType<{ className?: string }>
+  icon: LucideIcon
   action?: () => void
 }
 
@@ -47,10 +48,11 @@ export function MobileBottomNav() {
   }
 
   const navItems: NavItem[] = [
-    { label: 'בית', href: '/', icon: FaHome },
-    { label: 'קבע תור', href: '/', icon: FaCut, action: scrollToTeam },
-    { label: 'התורים שלי', href: '/my-appointments', icon: FaCalendarAlt },
-    { label: 'צור קשר', href: '/', icon: FaPhone, action: scrollToContact },
+    { label: 'בית', href: '/', icon: Home },
+    { label: 'קבע תור', href: '/', icon: Scissors, action: scrollToTeam },
+    { label: 'התורים שלי', href: '/my-appointments', icon: Calendar },
+    { label: 'צור קשר', href: '/', icon: Phone, action: scrollToContact },
+    { label: 'לספרים', href: '/barber/login', icon: UserCog },
   ]
 
   const isActive = (item: NavItem) => {
@@ -59,6 +61,9 @@ export function MobileBottomNav() {
     }
     if (item.href === '/my-appointments') {
       return pathname === '/my-appointments'
+    }
+    if (item.href === '/barber/login') {
+      return pathname.startsWith('/barber/')
     }
     return false
   }
@@ -96,8 +101,10 @@ export function MobileBottomNav() {
               aria-current={active ? 'page' : undefined}
             >
               <Icon
+                size={20}
+                strokeWidth={1.5}
                 className={cn(
-                  'w-5 h-5 transition-transform',
+                  'transition-transform',
                   active && 'scale-110'
                 )}
               />
@@ -112,4 +119,3 @@ export function MobileBottomNav() {
     </nav>
   )
 }
-

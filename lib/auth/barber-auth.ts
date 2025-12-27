@@ -174,7 +174,7 @@ export async function setBarberPassword(
 }
 
 /**
- * Create a new barber user
+ * Create a new barber user with default work days and schedule
  */
 export async function createBarber(data: {
   username: string
@@ -227,7 +227,53 @@ export async function createBarber(data: {
     return { success: false, error: errorMessage }
   }
   
-  return { success: true, user: newUser as User }
+  const createdUser = newUser as User
+  
+  // Fetch barbershop settings to get default work days and hours
+  const { data: shopSettingsData } = await supabase
+    .from('barbershop_settings')
+    .select('open_days, work_hours_start, work_hours_end')
+    .limit(1)
+    .single()
+  
+  const shopSettings = shopSettingsData as { open_days?: string[]; work_hours_start?: string; work_hours_end?: string } | null
+  const defaultOpenDays = shopSettings?.open_days || ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+  const defaultWorkHoursStart = shopSettings?.work_hours_start || '09:00'
+  const defaultWorkHoursEnd = shopSettings?.work_hours_end || '19:00'
+  
+  // Create default work_days entries for the new barber
+  const allDays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+  const workDaysInserts = allDays.map(day => ({
+    user_id: createdUser.id,
+    day_of_week: day,
+    is_working: defaultOpenDays.includes(day),
+  }))
+  
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: workDaysError } = await (supabase.from('work_days') as any)
+    .insert(workDaysInserts)
+  
+  if (workDaysError) {
+    console.error('Error creating default work_days:', workDaysError)
+    // Don't fail the barber creation, just log the error
+  }
+  
+  // Create default barber_schedules entry
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: scheduleError } = await (supabase.from('barber_schedules') as any)
+    .insert({
+      barber_id: createdUser.id,
+      work_days: defaultOpenDays,
+      work_hours_start: defaultWorkHoursStart,
+      work_hours_end: defaultWorkHoursEnd,
+    })
+  
+  if (scheduleError) {
+    console.error('Error creating default barber_schedule:', scheduleError)
+    // Don't fail the barber creation, just log the error
+  }
+  
+  return { success: true, user: createdUser }
 }
 
 /**

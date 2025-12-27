@@ -13,7 +13,7 @@ import { CustomerDetails } from './CustomerDetails'
 import { OTPVerification } from './OTPVerification'
 import { Confirmation } from './Confirmation'
 import { LoggedInConfirmation } from './LoggedInConfirmation'
-import { FaBell } from 'react-icons/fa'
+import { Bell } from 'lucide-react'
 
 interface BookingWizardClientProps {
   barberId: string
@@ -116,7 +116,7 @@ export function BookingWizardClient({
               key={msg.id} 
               className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3 flex items-start gap-3"
             >
-              <FaBell className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+              <Bell size={16} strokeWidth={1.5} className="text-blue-400 flex-shrink-0 mt-0.5" />
               <p className="text-blue-300 text-sm">{msg.message}</p>
             </div>
           ))}

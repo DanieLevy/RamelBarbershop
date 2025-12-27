@@ -1,8 +1,15 @@
 'use client'
 
-import { FaWaze, FaMapMarkerAlt, FaDirections } from 'react-icons/fa'
+import { MapPin, Navigation } from 'lucide-react'
 import { SectionTitle } from '@/components/ui/SectionTitle'
 import { GlassCard } from '@/components/ui/GlassCard'
+
+// Custom Waze icon (Lucide doesn't have brand icons)
+const WazeIcon = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+    <path d="M20.54 6.63c-1.62-4.07-6.4-5.85-10.21-4.2-.98.42-1.87 1.01-2.63 1.73C4.5 7.1 3 11.13 4.17 14.73c.35 1.08.91 2.07 1.65 2.93-.23.93-.47 1.93-.71 2.87-.09.36.28.66.59.47 1.03-.6 2.03-1.17 3.05-1.73 1.34.44 2.74.62 4.17.52 5.51-.39 9.55-5.15 9.14-10.46-.11-1.4-.55-2.75-1.27-3.94.1-.25.09-.53-.25-.76zM9 11a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm6 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3z"/>
+  </svg>
+)
 
 export function LocationSection() {
   const openWaze = () => {
@@ -25,7 +32,7 @@ export function LocationSection() {
               {/* Address */}
               <div className="flex items-start gap-4 mb-6">
                 <div className="w-12 h-12 rounded-full bg-accent-gold/20 flex items-center justify-center flex-shrink-0">
-                  <FaMapMarkerAlt className="w-5 h-5 text-accent-gold" />
+                  <MapPin size={20} strokeWidth={1.5} className="text-accent-gold" />
                 </div>
                 <div>
                   <h3 className="text-foreground-light font-medium mb-1">כתובת</h3>
@@ -40,7 +47,7 @@ export function LocationSection() {
                   onClick={openWaze}
                   className="flex items-center justify-center gap-3 w-full py-3 px-4 bg-[#33CCFF]/10 border border-[#33CCFF]/30 text-[#33CCFF] rounded-xl font-medium transition-all hover:bg-[#33CCFF]/20 hover:scale-[1.02]"
                 >
-                  <FaWaze className="w-5 h-5" />
+                  <WazeIcon />
                   <span>נווט עם Waze</span>
                 </button>
                 
@@ -48,7 +55,7 @@ export function LocationSection() {
                   onClick={openGoogleMaps}
                   className="flex items-center justify-center gap-3 w-full py-3 px-4 bg-accent-gold/10 border border-accent-gold/30 text-accent-gold rounded-xl font-medium transition-all hover:bg-accent-gold/20 hover:scale-[1.02]"
                 >
-                  <FaDirections className="w-5 h-5" />
+                  <Navigation size={20} strokeWidth={1.5} />
                   <span>נווט עם Google Maps</span>
                 </button>
               </div>

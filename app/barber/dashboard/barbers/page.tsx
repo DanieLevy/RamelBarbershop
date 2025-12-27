@@ -6,15 +6,15 @@ import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { getAllBarbers, createBarber, updateBarber, setBarberPassword } from '@/lib/auth/barber-auth'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { FaPlus, FaEdit, FaUser, FaEnvelope, FaPhone, FaCrown } from 'react-icons/fa'
-import type { User } from '@/types/database'
+import { Plus, Pencil, User, Mail, Phone, Crown } from 'lucide-react'
+import type { User as UserType } from '@/types/database'
 import Image from 'next/image'
 
 export default function BarbersPage() {
   const router = useRouter()
   const { isAdmin, barber: currentBarber } = useBarberAuthStore()
   
-  const [barbers, setBarbers] = useState<User[]>([])
+  const [barbers, setBarbers] = useState<UserType[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -57,7 +57,7 @@ export default function BarbersPage() {
     setShowForm(false)
   }
 
-  const handleEdit = (barber: User) => {
+  const handleEdit = (barber: UserType) => {
     setEditingId(barber.id)
     setUsername(barber.username)
     setFullname(barber.fullname)
@@ -122,7 +122,7 @@ export default function BarbersPage() {
     setSaving(false)
   }
 
-  const handleToggleActive = async (barber: User) => {
+  const handleToggleActive = async (barber: UserType) => {
     if (barber.id === currentBarber?.id) {
       toast.error('לא ניתן להשבית את עצמך')
       return
@@ -159,7 +159,7 @@ export default function BarbersPage() {
           onClick={() => { resetForm(); setShowForm(true) }}
           className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-background-dark rounded-lg font-medium hover:bg-accent-gold/90 transition-colors"
         >
-          <FaPlus className="w-4 h-4" />
+          <Plus size={16} strokeWidth={1.5} />
           הוסף ספר
         </button>
       </div>
@@ -246,7 +246,7 @@ export default function BarbersPage() {
       <div className="bg-background-card border border-white/10 rounded-2xl p-6">
         {barbers.length === 0 ? (
           <div className="text-center py-8">
-            <FaUser className="w-12 h-12 text-foreground-muted/30 mx-auto mb-3" />
+            <User size={48} strokeWidth={1} className="text-foreground-muted/30 mx-auto mb-3" />
             <p className="text-foreground-muted">אין ספרים במערכת</p>
           </div>
         ) : (
@@ -273,7 +273,7 @@ export default function BarbersPage() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <FaUser className="w-6 h-6 text-foreground-muted" />
+                        <User size={24} strokeWidth={1.5} className="text-foreground-muted" />
                       </div>
                     )}
                   </div>
@@ -281,7 +281,9 @@ export default function BarbersPage() {
                     <div className="flex items-center gap-2">
                       <p className="text-foreground-light font-medium">{barber.fullname}</p>
                       {barber.role === 'admin' && (
-                        <FaCrown className="w-4 h-4 text-accent-gold" title="מנהל" />
+                        <span title="מנהל">
+                          <Crown size={16} strokeWidth={1.5} className="text-accent-gold" />
+                        </span>
                       )}
                       {!barber.is_active && (
                         <span className="text-xs text-red-400 bg-red-500/20 px-2 py-0.5 rounded">
@@ -291,12 +293,12 @@ export default function BarbersPage() {
                     </div>
                     <div className="flex items-center gap-3 text-foreground-muted text-sm">
                       <span className="flex items-center gap-1">
-                        <FaEnvelope className="w-3 h-3" />
+                        <Mail size={12} strokeWidth={1.5} />
                         {barber.email}
                       </span>
                       {barber.phone && (
                         <span className="flex items-center gap-1">
-                          <FaPhone className="w-3 h-3" />
+                          <Phone size={12} strokeWidth={1.5} />
                           {barber.phone}
                         </span>
                       )}
@@ -310,7 +312,7 @@ export default function BarbersPage() {
                     className="p-2 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition-colors"
                     title="ערוך"
                   >
-                    <FaEdit className="w-4 h-4" />
+                    <Pencil size={16} strokeWidth={1.5} />
                   </button>
                   {barber.id !== currentBarber?.id && (
                     <button
@@ -334,4 +336,3 @@ export default function BarbersPage() {
     </div>
   )
 }
-

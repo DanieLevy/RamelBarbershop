@@ -81,7 +81,7 @@ export default function NotFound() {
 
         {/* Fun message */}
         <p className="mt-8 text-foreground-muted/50 text-xs">
-          "Hair we go again..." 💈
+          &ldquo;Hair we go again...&rdquo; 💈
         </p>
       </div>
 

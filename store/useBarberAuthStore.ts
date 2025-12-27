@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { User, UserRole } from '@/types/database'
+import type { User } from '@/types/database'
 import { 
   loginBarber, 
   clearBarberSession, 

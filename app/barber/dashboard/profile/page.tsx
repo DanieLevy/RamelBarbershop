@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { uploadAvatar } from '@/lib/storage/upload'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { FaUser, FaCamera, FaBell, FaPlus, FaTrash, FaEdit, FaUpload } from 'react-icons/fa'
+import { User, Camera, Bell, Plus, Trash, Pencil, Upload } from 'lucide-react'
 import type { BarberMessage } from '@/types/database'
 import Image from 'next/image'
 
@@ -170,8 +170,8 @@ export default function ProfilePage() {
     const supabase = createClient()
     
     if (editingMessageId) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .from('barber_messages') as any)
         .update({ message: messageText, updated_at: new Date().toISOString() })
         .eq('id', editingMessageId)
@@ -186,8 +186,8 @@ export default function ProfilePage() {
         fetchMessages()
       }
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .from('barber_messages') as any)
         .insert({
           barber_id: barber.id,
@@ -212,8 +212,8 @@ export default function ProfilePage() {
   const handleToggleMessage = async (id: string, isActive: boolean) => {
     const supabase = createClient()
     
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from('barber_messages') as any)
       .update({ is_active: !isActive })
       .eq('id', id)
@@ -276,7 +276,7 @@ export default function ProfilePage() {
       {/* Profile Section */}
       <div className="bg-background-card border border-white/10 rounded-2xl p-6 mb-6">
         <h3 className="text-lg font-medium text-foreground-light mb-4 flex items-center gap-2">
-          <FaUser className="w-5 h-5 text-accent-gold" />
+          <User size={20} strokeWidth={1.5} className="text-accent-gold" />
           פרטים אישיים
         </h3>
 
@@ -294,7 +294,7 @@ export default function ProfilePage() {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <FaUser className="w-10 h-10 text-foreground-muted" />
+                  <User size={40} strokeWidth={1.5} className="text-foreground-muted" />
                 </div>
               )}
             </div>
@@ -312,7 +312,7 @@ export default function ProfilePage() {
                 <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
-                  <FaCamera className="w-5 h-5 text-white mb-1" />
+                  <Camera size={20} strokeWidth={1.5} className="text-white mb-1" />
                   <span className="text-white text-xs">שנה</span>
                 </>
               )}
@@ -335,7 +335,7 @@ export default function ProfilePage() {
               disabled={uploadingImage}
               className="flex items-center gap-2 px-4 py-2 bg-background-dark border border-white/10 rounded-lg text-foreground-muted hover:text-foreground-light hover:border-white/20 transition-colors text-sm"
             >
-              <FaUpload className="w-4 h-4" />
+              <Upload size={16} strokeWidth={1.5} />
               {uploadingImage ? 'מעלה...' : 'העלה תמונה'}
             </button>
             <p className="text-foreground-muted/60 text-xs mt-2">
@@ -428,14 +428,14 @@ export default function ProfilePage() {
       <div className="bg-background-card border border-white/10 rounded-2xl p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-medium text-foreground-light flex items-center gap-2">
-            <FaBell className="w-5 h-5 text-accent-gold" />
+            <Bell size={20} strokeWidth={1.5} className="text-accent-gold" />
             הודעות ללקוחות
           </h3>
           <button
             onClick={() => { resetMessageForm(); setShowMessageForm(true) }}
             className="flex items-center gap-2 px-3 py-1.5 bg-accent-gold text-background-dark rounded-lg text-sm font-medium hover:bg-accent-gold/90 transition-colors"
           >
-            <FaPlus className="w-3 h-3" />
+            <Plus size={12} strokeWidth={1.5} />
             הוסף
           </button>
         </div>
@@ -506,13 +506,13 @@ export default function ProfilePage() {
                     onClick={() => handleEditMessage(msg)}
                     className="p-1.5 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded transition-colors"
                   >
-                    <FaEdit className="w-3 h-3" />
+                    <Pencil size={12} strokeWidth={1.5} />
                   </button>
                   <button
                     onClick={() => handleDeleteMessage(msg.id)}
                     className="p-1.5 text-foreground-muted hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
                   >
-                    <FaTrash className="w-3 h-3" />
+                    <Trash size={12} strokeWidth={1.5} />
                   </button>
                 </div>
               </div>

@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/useAuthStore'
 import { LoginModal } from './LoginModal'
-import { User, CalendarBlank, SignOut, List, X, House, Phone, MapPin } from '@phosphor-icons/react'
+import { User, Calendar, LogOut, Menu, X, Home, Phone, MapPin } from 'lucide-react'
 
 interface AppHeaderProps {
   barberImgUrl?: string
@@ -111,7 +111,7 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
             isLoading && 'opacity-50 cursor-not-allowed'
           )}
         >
-          <User size={14} weight="thin" />
+          <User size={14} strokeWidth={1.5} />
           <span className="hidden xs:inline">התחברות</span>
         </button>
       )
@@ -124,7 +124,7 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
           className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent-gold/10 border border-accent-gold/30 text-accent-gold hover:bg-accent-gold/20 transition-all"
         >
           <div className="w-7 h-7 rounded-full bg-accent-gold/30 flex items-center justify-center">
-            <User size={14} weight="thin" />
+            <User size={14} strokeWidth={1.5} />
           </div>
           <span className="text-sm max-w-[80px] truncate hidden sm:block">
             {customer.fullname.split(' ')[0]}
@@ -147,7 +147,7 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
                 onClick={handleMyAppointments}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-foreground-light hover:bg-white/5 transition-colors"
               >
-                <CalendarBlank size={18} weight="thin" className="text-accent-gold" />
+                <Calendar size={18} strokeWidth={1.5} className="text-accent-gold" />
                 <span className="text-sm">התורים שלי</span>
               </button>
 
@@ -155,7 +155,7 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
                 onClick={handleLogout}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-red-400 hover:bg-red-500/10 transition-colors"
               >
-                <SignOut size={18} weight="thin" />
+                <LogOut size={18} strokeWidth={1.5} />
                 <span className="text-sm">התנתק</span>
               </button>
             </div>
@@ -167,9 +167,9 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
 
   // Mobile menu items
   const mobileMenuItems = [
-    { label: 'בית', icon: House, action: () => router.push('/') },
+    { label: 'בית', icon: Home, action: () => router.push('/') },
     { label: 'אודות', icon: User, action: () => scrollToSection('index-header') },
-    { label: 'קבע תור', icon: CalendarBlank, action: () => scrollToSection('index-body') },
+    { label: 'קבע תור', icon: Calendar, action: () => scrollToSection('index-body') },
     { label: 'מיקום', icon: MapPin, action: () => scrollToSection('index-location') },
     { label: 'צור קשר', icon: Phone, action: () => scrollToSection('index-contact') },
   ]
@@ -197,7 +197,7 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
                 className="sm:hidden p-2 -ml-2 text-foreground-light hover:text-accent-gold transition-colors"
                 aria-label="פתח תפריט"
               >
-                <List size={22} weight="thin" />
+                <Menu size={22} strokeWidth={1.5} />
               </button>
               
               {/* Right side - Navigation (desktop only) */}
@@ -329,7 +329,7 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
                 className="p-2 text-foreground-muted hover:text-foreground-light transition-colors"
                 aria-label="סגור תפריט"
               >
-                <X size={22} weight="thin" />
+                <X size={22} strokeWidth={1.5} />
               </button>
             </div>
             
@@ -338,7 +338,7 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
               <div className="p-4 border-b border-white/10 bg-accent-gold/5">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-accent-gold/20 flex items-center justify-center">
-                    <User size={18} weight="thin" className="text-accent-gold" />
+                    <User size={18} strokeWidth={1.5} className="text-accent-gold" />
                   </div>
                   <div>
                     <p className="text-foreground-light font-medium">{customer.fullname}</p>
@@ -356,7 +356,7 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
                   onClick={item.action}
                   className="w-full flex items-center gap-4 px-4 py-3 text-foreground-light hover:bg-white/5 hover:text-accent-gold transition-colors"
                 >
-                  <item.icon size={22} weight="thin" className="text-accent-gold" />
+                  <item.icon size={22} strokeWidth={1.5} className="text-accent-gold" />
                   <span>{item.label}</span>
                 </button>
               ))}
@@ -368,14 +368,14 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
                     onClick={handleMyAppointments}
                     className="w-full flex items-center gap-4 px-4 py-3 text-foreground-light hover:bg-white/5 hover:text-accent-gold transition-colors"
                   >
-                    <CalendarBlank size={22} weight="thin" className="text-accent-gold" />
+                    <Calendar size={22} strokeWidth={1.5} className="text-accent-gold" />
                     <span>התורים שלי</span>
                   </button>
                   <button
                     onClick={handleLogout}
                     className="w-full flex items-center gap-4 px-4 py-3 text-red-400 hover:bg-red-500/10 transition-colors"
                   >
-                    <SignOut size={22} weight="thin" />
+                    <LogOut size={22} strokeWidth={1.5} />
                     <span>התנתק</span>
                   </button>
                 </>
@@ -391,7 +391,7 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
                     }}
                     className="w-full flex items-center gap-4 px-4 py-3 text-accent-gold hover:bg-accent-gold/10 transition-colors"
                   >
-                    <User size={22} weight="thin" />
+                    <User size={22} strokeWidth={1.5} />
                     <span>התחברות</span>
                   </button>
                 </>

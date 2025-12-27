@@ -5,7 +5,7 @@ import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { FaPlus, FaEdit, FaTrash, FaCut } from 'react-icons/fa'
+import { Plus, Pencil, Trash2, Scissors } from 'lucide-react'
 import type { Service } from '@/types/database'
 
 export default function ServicesPage() {
@@ -104,7 +104,7 @@ export default function ServicesPage() {
     if (editingId) {
       // Update existing service
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.from('services') as any)
+      const { error } = await (supabase.from('services') as any)
         .update(serviceData)
         .eq('id', editingId)
         .select()
@@ -120,7 +120,7 @@ export default function ServicesPage() {
     } else {
       // Create new service
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.from('services') as any)
+      const { error } = await (supabase.from('services') as any)
         .insert(serviceData)
         .select()
       
@@ -175,7 +175,7 @@ export default function ServicesPage() {
           onClick={() => { resetForm(); setShowForm(true) }}
           className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-background-dark rounded-lg font-medium hover:bg-accent-gold/90 transition-colors"
         >
-          <FaPlus className="w-4 h-4" />
+          <Plus size={16} strokeWidth={1.5} />
           הוסף שירות
         </button>
       </div>
@@ -273,7 +273,7 @@ export default function ServicesPage() {
       <div className="bg-background-card border border-white/10 rounded-2xl p-6">
         {services.length === 0 ? (
           <div className="text-center py-8">
-            <FaCut className="w-12 h-12 text-foreground-muted/30 mx-auto mb-3" />
+            <Scissors size={48} strokeWidth={1} className="text-foreground-muted/30 mx-auto mb-3" />
             <p className="text-foreground-muted">אין שירותים מוגדרים</p>
             <p className="text-foreground-muted text-sm mt-1">הוסף את השירותים שאתה מציע ללקוחות</p>
           </div>
@@ -286,7 +286,7 @@ export default function ServicesPage() {
               >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-lg bg-accent-gold/20 flex items-center justify-center">
-                    <FaCut className="w-5 h-5 text-accent-gold" />
+                    <Scissors size={20} strokeWidth={1.5} className="text-accent-gold" />
                   </div>
                   <div>
                     <p className="text-foreground-light font-medium">{service.name_he}</p>
@@ -302,14 +302,14 @@ export default function ServicesPage() {
                     className="p-2 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition-colors"
                     title="ערוך"
                   >
-                    <FaEdit className="w-4 h-4" />
+                    <Pencil size={16} strokeWidth={1.5} />
                   </button>
                   <button
                     onClick={() => handleDelete(service.id)}
                     className="p-2 text-foreground-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                     title="מחק"
                   >
-                    <FaTrash className="w-4 h-4" />
+                    <Trash2 size={16} strokeWidth={1.5} />
                   </button>
                 </div>
               </div>
@@ -320,4 +320,3 @@ export default function ServicesPage() {
     </div>
   )
 }
-

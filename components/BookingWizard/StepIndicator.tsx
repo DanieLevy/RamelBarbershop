@@ -2,22 +2,29 @@
 
 import { useBookingStore } from '@/store/useBookingStore'
 import { cn } from '@/lib/utils'
-import { FaCut, FaCalendarAlt, FaClock, FaUser, FaLock, FaCheck } from 'react-icons/fa'
+import { Scissors, Calendar, Clock, User, Lock, Check } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
-const guestSteps = [
-  { num: 1, label: 'שירות', icon: FaCut },
-  { num: 2, label: 'תאריך', icon: FaCalendarAlt },
-  { num: 3, label: 'שעה', icon: FaClock },
-  { num: 4, label: 'פרטים', icon: FaUser },
-  { num: 5, label: 'אימות', icon: FaLock },
-  { num: 6, label: 'סיום', icon: FaCheck },
+interface Step {
+  num: number
+  label: string
+  icon: LucideIcon
+}
+
+const guestSteps: Step[] = [
+  { num: 1, label: 'שירות', icon: Scissors },
+  { num: 2, label: 'תאריך', icon: Calendar },
+  { num: 3, label: 'שעה', icon: Clock },
+  { num: 4, label: 'פרטים', icon: User },
+  { num: 5, label: 'אימות', icon: Lock },
+  { num: 6, label: 'סיום', icon: Check },
 ]
 
-const loggedInSteps = [
-  { num: 1, label: 'שירות', icon: FaCut },
-  { num: 2, label: 'תאריך', icon: FaCalendarAlt },
-  { num: 3, label: 'שעה', icon: FaClock },
-  { num: 4, label: 'סיום', icon: FaCheck },
+const loggedInSteps: Step[] = [
+  { num: 1, label: 'שירות', icon: Scissors },
+  { num: 2, label: 'תאריך', icon: Calendar },
+  { num: 3, label: 'שעה', icon: Clock },
+  { num: 4, label: 'סיום', icon: Check },
 ]
 
 export function StepIndicator() {
@@ -52,9 +59,9 @@ export function StepIndicator() {
                 )}
               >
                 {isCompleted ? (
-                  <FaCheck className="w-3 h-3" />
+                  <Check size={12} strokeWidth={2} />
                 ) : (
-                  <Icon className="w-3.5 h-3.5" />
+                  <Icon size={14} strokeWidth={1.5} />
                 )}
               </div>
               
