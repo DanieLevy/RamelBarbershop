@@ -4,9 +4,9 @@ import { useState, useEffect, useRef } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { useAuthStore } from '@/store/useAuthStore'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'react-toastify'
+import { toast } from 'sonner'
 import type { BarberWithWorkDays } from '@/types/database'
-import { cn } from '@/lib/utils'
+import { cn, formatTime } from '@/lib/utils'
 import { FaCheck, FaCalendarAlt, FaClock, FaCut, FaUser, FaPhone } from 'react-icons/fa'
 
 interface LoggedInConfirmationProps {
@@ -83,11 +83,6 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
     } finally {
       setIsCreating(false)
     }
-  }
-
-  const formatTime = (timestamp: number): string => {
-    const date = new Date(timestamp)
-    return date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
   }
 
   if (isCreating) {

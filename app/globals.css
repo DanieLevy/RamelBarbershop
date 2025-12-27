@@ -60,15 +60,17 @@
 
   html {
     line-height: 1.5;
+    scroll-behavior: smooth;
   }
 
   body {
     @apply font-rubik bg-background-dark text-foreground-light;
     margin: 0;
+    overflow-x: hidden;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    line-height: 1;
+    line-height: 1.2;
     margin: 0;
     padding: 0;
   }
@@ -82,26 +84,174 @@
     max-width: 100%;
     height: auto;
   }
+
+  /* Improve tap targets on mobile */
+  button, a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Smooth scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #1a1a1a;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #404040;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #505050;
+  }
 }
 
-/* Custom Utilities */
-@layer utilities {
-  .content-style h1 {
-    @apply text-center text-2xl font-light tracking-wide uppercase;
+/* Component Styles */
+@layer components {
+  /* Glass Card Effect */
+  .glass-card {
+    @apply bg-background-card backdrop-blur-lg border border-white/10 rounded-2xl;
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300 hover:border-accent-gold/30 hover:shadow-gold;
+  }
+
+  /* Gold Glow Effect */
+  .gold-glow {
+    box-shadow: 0 0 40px rgba(255, 170, 61, 0.3);
+  }
+
+  .gold-glow-sm {
+    box-shadow: 0 0 20px rgba(255, 170, 61, 0.2);
+  }
+
+  /* Vintage Border */
+  .vintage-border {
+    @apply border-2 border-accent-gold/40;
+    border-image: linear-gradient(135deg, #ffaa3d 0%, #7A5230 50%, #ffaa3d 100%) 1;
+  }
+
+  /* Section Title with Lines */
+  .section-title {
+    @apply text-center text-2xl md:text-3xl font-light tracking-wide uppercase text-foreground-light;
     display: grid;
     grid-template-columns: 1fr max-content 1fr;
-    grid-gap: 20px;
+    grid-gap: 16px;
     align-items: center;
   }
 
-  .content-style h1::after,
-  .content-style h1::before {
-    content: " ";
+  .section-title::after,
+  .section-title::before {
+    content: "";
     display: block;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.5);
-    border-top: 1px solid rgba(255, 255, 255, 0.5);
-    height: 5px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 170, 61, 0.5), transparent);
   }
+
+  /* Barber Pole Stripe Pattern */
+  .barber-pole {
+    background: repeating-linear-gradient(
+      45deg,
+      #D35400,
+      #D35400 10px,
+      #F2F2F2 10px,
+      #F2F2F2 20px,
+      #080b0d 20px,
+      #080b0d 30px
+    );
+    background-size: 100% 50px;
+    animation: barber-pole 2s linear infinite;
+  }
+
+  /* Touch-friendly button */
+  .touch-btn {
+    @apply min-h-[48px] min-w-[48px] flex items-center justify-center;
+  }
+
+  /* Mobile-first container */
+  .container-mobile {
+    @apply px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto;
+  }
+
+  /* Shimmer loading effect */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.1) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+}
+
+/* Utility Styles */
+@layer utilities {
+  /* Legacy content-style for backwards compatibility */
+  .content-style h1 {
+    @apply section-title;
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Safe area padding for notched devices */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+
+  /* Text gradient */
+  .text-gradient-gold {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-accent-gold via-accent-gold-light to-accent-gold;
+  }
+
+  /* Animation delays */
+  .animation-delay-100 {
+    animation-delay: 100ms;
+  }
+
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .animation-delay-300 {
+    animation-delay: 300ms;
+  }
+
+  .animation-delay-400 {
+    animation-delay: 400ms;
+  }
+
+  .animation-delay-500 {
+    animation-delay: 500ms;
+  }
+}
+
+/* Google Maps Dark Mode Filter */
+.map-dark {
+  filter: invert(90%) hue-rotate(180deg) brightness(0.9) contrast(0.9);
+}
+
+.map-dark img {
+  filter: invert(100%) hue-rotate(180deg) brightness(1.1) contrast(1.1);
 }
 
 /* Toast Container Styles */
@@ -114,6 +264,28 @@
 .rdp-day_selected,
 .rdp-day_selected:focus-visible,
 .rdp-day_selected:hover {
-  background-color: #222 !important;
+  background-color: #ffaa3d !important;
+  color: #080b0d !important;
 }
 
+/* Mobile drawer overlay */
+.drawer-overlay {
+  @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-40;
+}
+
+/* Mobile bottom nav safe area */
+.bottom-nav-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0), 12px);
+}
+
+/* Focus visible styles */
+*:focus-visible {
+  @apply outline-none ring-2 ring-accent-gold ring-offset-2 ring-offset-background-dark;
+}
+
+/* Disable focus on touch devices */
+@media (hover: none) {
+  *:focus {
+    outline: none;
+  }
+}

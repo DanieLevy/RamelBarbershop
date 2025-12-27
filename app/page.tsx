@@ -3,6 +3,9 @@ import { AppHeader } from '@/components/AppHeader'
 import { BarberCard } from '@/components/BarberCard'
 import { ContactSection } from '@/components/ContactSection'
 import { LocationSection } from '@/components/LocationSection'
+import { Footer } from '@/components/Footer'
+import { SectionTitle } from '@/components/ui/SectionTitle'
+import Image from 'next/image'
 import type { BarberWithWorkDays } from '@/types/database'
 
 export default async function HomePage() {
@@ -18,44 +21,141 @@ export default async function HomePage() {
     <>
       <AppHeader />
       
-      <main className="relative top-20">
+      <main className="relative">
         {/* Hero Section */}
-        <section
-          className="index-header relative min-h-[calc(100vh-80px)] w-full flex justify-center items-center bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: 'url(/img/img1.jpg)' }}
-        >
-          {/* Dark overlay */}
-          <div className="absolute inset-0 bg-black/85 z-0" />
-          
-          {/* About content */}
-          <div className="relative z-10 text-center px-4 md:px-[20vw] py-12">
-            <p className="text-foreground-light leading-relaxed text-base md:text-lg">
-              רמאל ברברשופ הוא מקום ייחודי במינו, עם תפיסה חדשנית ומקורית של עולם הספא והטיפוח הגברי.
-              ברברשופ מציעים לכם חוויה ייחודית של טיפוח וספא לגברים בלבד,
-              באווירה נעימה ומרגיעה, עם צוות מקצועי ומנוסה שידאג לכם לחוויה מושלמת ומרגיעה.
-              זו לא חוויה של פעם בחיים, לגבר קלאסי כמוך – זו דרך חיים.
-              בנוסף תוכלו לרכוש מוצרי פרורסו, ראוזל ודפר דן אצלנו במספרה:
-            </p>
-            <div className="mt-6">
-              <img
-                src="https://iili.io/JouEOas.th.jpg"
-                alt="Products"
-                className="w-12 h-12 rounded-full mx-auto"
+        <section className="index-header relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden">
+          {/* Background with gradient overlay */}
+          <div className="absolute inset-0 bg-background-dark">
+            {/* Subtle pattern overlay */}
+            <div className="absolute inset-0 opacity-[0.03]">
+              <div 
+                className="w-full h-full"
+                style={{
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+                }}
               />
+            </div>
+            {/* Gradient overlays */}
+            <div className="absolute inset-0 bg-gradient-to-b from-background-dark via-transparent to-background-dark" />
+            <div className="absolute inset-0 bg-gradient-to-r from-accent-gold/5 via-transparent to-accent-orange/5" />
+          </div>
+          
+          {/* Decorative elements */}
+          <div className="absolute top-20 left-4 sm:left-10 opacity-10 animate-float">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-accent-gold">
+              <circle cx="6" cy="6" r="3" />
+              <circle cx="6" cy="18" r="3" />
+              <line x1="20" y1="4" x2="8.12" y2="15.88" />
+              <line x1="14.47" y1="14.48" x2="20" y2="20" />
+              <line x1="8.12" y1="8.12" x2="12" y2="12" />
+            </svg>
+          </div>
+          <div className="absolute bottom-40 right-4 sm:right-10 opacity-10 animate-float animation-delay-300">
+            <svg width="50" height="50" viewBox="0 0 24 24" fill="currentColor" className="text-accent-gold">
+              <path d="M7 5C7 3.89543 7.89543 3 9 3H15C16.1046 3 17 3.89543 17 5V7H18C19.1046 7 20 7.89543 20 9V10C20 11.1046 19.1046 12 18 12H17V19C17 20.1046 16.1046 21 15 21H9C7.89543 21 7 20.1046 7 19V12H6C4.89543 12 4 11.1046 4 10V9C4 7.89543 4.89543 7 6 7H7V5Z"/>
+            </svg>
+          </div>
+          
+          {/* Hero content */}
+          <div className="relative z-10 text-center px-4 py-20 max-w-4xl mx-auto">
+            {/* Logo with glow */}
+            <div className="mb-8 animate-fade-in">
+              <div className="relative inline-block">
+                <div className="absolute inset-0 rounded-full bg-accent-gold/20 blur-2xl scale-150" />
+                <div className="relative w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 mx-auto rounded-full overflow-hidden border-2 border-accent-gold/40 shadow-gold-lg">
+                  <Image
+                    src="/icon.png"
+                    alt="Ramel Barbershop Logo"
+                    width={192}
+                    height={192}
+                    className="w-full h-full object-cover"
+                    priority
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {/* Title */}
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground-light mb-4 animate-fade-in-up">
+              רמאל <span className="text-gradient-gold">ברברשופ</span>
+            </h1>
+            
+            {/* Subtitle */}
+            <p className="text-lg sm:text-xl md:text-2xl text-foreground-muted mb-6 animate-fade-in-up animation-delay-100">
+              חווית טיפוח ייחודית לגבר המודרני
+            </p>
+            
+            {/* Decorative line */}
+            <div className="flex items-center justify-center gap-4 mb-8 animate-fade-in-up animation-delay-200">
+              <div className="h-px w-16 bg-gradient-to-r from-transparent to-accent-gold/50" />
+              <div className="w-2 h-2 rounded-full bg-accent-gold" />
+              <div className="h-px w-16 bg-gradient-to-l from-transparent to-accent-gold/50" />
+            </div>
+            
+            {/* Description */}
+            <p className="text-foreground-muted leading-relaxed text-sm sm:text-base max-w-2xl mx-auto mb-10 animate-fade-in-up animation-delay-300">
+              רמאל ברברשופ הוא מקום ייחודי במינו, עם תפיסה חדשנית ומקורית של עולם הספא והטיפוח הגברי.
+              אנו מציעים לכם חוויה ייחודית של טיפוח וספא לגברים בלבד,
+              באווירה נעימה ומרגיעה, עם צוות מקצועי ומנוסה.
+            </p>
+            
+            {/* CTA Button */}
+            <a
+              href="#team"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-accent-gold text-background-dark font-medium rounded-xl hover:bg-accent-gold/90 transition-all hover:scale-105 shadow-gold animate-fade-in-up animation-delay-400"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="w-5 h-5"
+              >
+                <circle cx="6" cy="6" r="3" />
+                <circle cx="6" cy="18" r="3" />
+                <line x1="20" y1="4" x2="8.12" y2="15.88" />
+                <line x1="14.47" y1="14.48" x2="20" y2="20" />
+                <line x1="8.12" y1="8.12" x2="12" y2="12" />
+              </svg>
+              קבע תור עכשיו
+            </a>
+          </div>
+          
+          {/* Scroll indicator */}
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+            <div className="flex flex-col items-center gap-2 text-foreground-muted">
+              <span className="text-xs">גלול למטה</span>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent-gold">
+                <path d="M12 5v14M5 12l7 7 7-7"/>
+              </svg>
             </div>
           </div>
         </section>
 
         {/* Team Section */}
-        <section className="index-body py-12">
-          <div className="content-style px-4 md:px-[10vw] py-8">
-            <h1 className="text-white">הצוות שלנו</h1>
-          </div>
-          
-          <div className="flex flex-wrap justify-center items-center gap-5 px-4 py-5">
-            {barbers?.map((barber) => (
-              <BarberCard key={barber.id} barber={barber} />
-            ))}
+        <section id="team" className="index-body py-16 sm:py-20 lg:py-24 bg-background-dark">
+          <div className="container-mobile">
+            <SectionTitle className="mb-12">הצוות שלנו</SectionTitle>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 justify-items-center">
+              {barbers?.map((barber, index) => (
+                <div
+                  key={barber.id}
+                  className="w-full max-w-sm animate-fade-in-up"
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  <BarberCard barber={barber} />
+                </div>
+              ))}
+            </div>
+            
+            {(!barbers || barbers.length === 0) && (
+              <div className="text-center py-12">
+                <p className="text-foreground-muted">אין ספרים זמינים כרגע</p>
+              </div>
+            )}
           </div>
         </section>
 
@@ -65,7 +165,8 @@ export default async function HomePage() {
         {/* Contact Section */}
         <ContactSection />
       </main>
+      
+      <Footer />
     </>
   )
 }
-

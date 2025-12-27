@@ -5,9 +5,12 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/useAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { AppHeader } from '@/components/AppHeader'
-import { toast } from 'react-toastify'
-import { cn } from '@/lib/utils'
-import { FaCalendarAlt, FaClock, FaCut, FaUser, FaTimes, FaCheck, FaHistory } from 'react-icons/fa'
+import { Footer } from '@/components/Footer'
+import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
+import { GlassCard } from '@/components/ui/GlassCard'
+import { toast } from 'sonner'
+import { cn, formatDateHebrew, formatTime as formatTimeUtil } from '@/lib/utils'
+import { FaCalendarAlt, FaClock, FaCut, FaUser, FaTimes, FaHistory, FaChevronRight } from 'react-icons/fa'
 import type { ReservationWithDetails } from '@/types/database'
 
 type TabType = 'upcoming' | 'past' | 'cancelled'
@@ -28,29 +31,38 @@ export default function MyAppointmentsPage() {
   }, [isInitialized, isLoggedIn, router])
 
   useEffect(() => {
-    if (customer?.id) {
+    if (customer?.id || customer?.phone) {
       fetchReservations()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customer?.id])
+  }, [customer?.id, customer?.phone])
 
   const fetchReservations = async () => {
-    if (!customer?.id) return
+    if (!customer) return
     
     setLoading(true)
     
     try {
       const supabase = createClient()
       
-      const { data, error } = await supabase
+      // Fetch by customer_id OR by phone number (fallback for old reservations)
+      let query = supabase
         .from('reservations')
         .select(`
           *,
           services (*),
           users (*)
         `)
-        .eq('customer_id', customer.id)
-        .order('date_timestamp', { ascending: false })
+        .order('time_timestamp', { ascending: false })
+      
+      if (customer.id) {
+        // Use OR to get reservations by customer_id or phone
+        query = query.or(`customer_id.eq.${customer.id},customer_phone.eq.${customer.phone}`)
+      } else if (customer.phone) {
+        query = query.eq('customer_phone', customer.phone)
+      }
+      
+      const { data, error } = await query
       
       if (error) {
         console.error('Error fetching reservations:', error)
@@ -61,6 +73,7 @@ export default function MyAppointmentsPage() {
       setReservations((data as ReservationWithDetails[]) || [])
     } catch (err) {
       console.error('Error fetching reservations:', err)
+      toast.error('שגיאה בטעינת התורים')
     } finally {
       setLoading(false)
     }
@@ -75,19 +88,40 @@ export default function MyAppointmentsPage() {
     try {
       const supabase = createClient()
       
+      // Perform the update
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from('reservations') as any)
+      const { data, error } = await (supabase
+        .from('reservations') as any)
         .update({ status: 'cancelled' })
         .eq('id', reservationId)
+        .select('id, status') as { data: { id: string; status: string }[] | null; error: unknown }
       
       if (error) {
         console.error('Error cancelling reservation:', error)
-        toast.error('שגיאה בביטול התור')
+        console.error('Error details:', JSON.stringify(error, null, 2))
+        toast.error(`שגיאה בביטול התור: ${(error as Error)?.message || 'נסה שוב'}`)
+        return
+      }
+      
+      // Verify the update actually happened
+      if (!data || data.length === 0) {
+        console.error('No data returned after update - cancellation may have failed')
+        toast.error('שגיאה בביטול התור - לא נמצא התור')
+        return
+      }
+      
+      // Check if status was actually updated
+      const updated = data[0]
+      if (updated.status !== 'cancelled') {
+        console.error('Status was not updated to cancelled:', updated)
+        toast.error('שגיאה בביטול התור - הסטטוס לא עודכן')
         return
       }
       
       toast.success('התור בוטל בהצלחה')
-      fetchReservations()
+      
+      // Refresh data from server to ensure sync
+      await fetchReservations()
     } catch (err) {
       console.error('Error cancelling reservation:', err)
       toast.error('שגיאה בביטול התור')
@@ -96,33 +130,44 @@ export default function MyAppointmentsPage() {
     }
   }
 
+  // Normalize timestamp - handle both seconds and milliseconds
+  const normalizeTimestamp = (ts: number): number => {
+    if (ts < 946684800000) {
+      return ts * 1000
+    }
+    return ts
+  }
+
   const formatDate = (timestamp: number): string => {
-    const date = new Date(timestamp)
-    return date.toLocaleDateString('he-IL', { 
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    })
+    return formatDateHebrew(normalizeTimestamp(timestamp))
   }
 
   const formatTime = (timestamp: number): string => {
-    const date = new Date(timestamp)
-    return date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
+    return formatTimeUtil(normalizeTimestamp(timestamp))
   }
 
   const isUpcoming = (reservation: ReservationWithDetails): boolean => {
     const now = Date.now()
-    return reservation.time_timestamp > now && reservation.status === 'confirmed'
+    const resTime = normalizeTimestamp(reservation.time_timestamp)
+    return resTime > now && reservation.status === 'confirmed'
   }
 
   const isPast = (reservation: ReservationWithDetails): boolean => {
     const now = Date.now()
-    return reservation.time_timestamp <= now && reservation.status !== 'cancelled'
+    const resTime = normalizeTimestamp(reservation.time_timestamp)
+    return resTime <= now && reservation.status !== 'cancelled'
   }
 
   const isCancelled = (reservation: ReservationWithDetails): boolean => {
     return reservation.status === 'cancelled'
+  }
+
+  // Get status display text
+  const getStatusText = (reservation: ReservationWithDetails): string => {
+    if (reservation.status === 'cancelled') return 'בוטל'
+    if (reservation.status === 'completed') return 'הושלם'
+    if (isUpcoming(reservation)) return 'קרוב'
+    return 'הסתיים'
   }
 
   const filteredReservations = reservations.filter(r => {
@@ -134,14 +179,19 @@ export default function MyAppointmentsPage() {
     }
   })
 
+  const tabs = [
+    { key: 'upcoming' as TabType, label: 'קרובים', icon: FaCalendarAlt, count: reservations.filter(isUpcoming).length },
+    { key: 'past' as TabType, label: 'עברו', icon: FaHistory, count: reservations.filter(isPast).length },
+    { key: 'cancelled' as TabType, label: 'בוטלו', icon: FaTimes, count: reservations.filter(isCancelled).length },
+  ]
+
   if (!isInitialized || isLoading) {
     return (
       <>
         <AppHeader />
         <main className="relative top-24 min-h-screen px-4 py-8">
-          <div className="flex flex-col items-center justify-center gap-4 py-12">
-            <div className="w-8 h-8 border-2 border-accent-gold border-t-transparent rounded-full animate-spin" />
-            <p className="text-foreground-muted">טוען...</p>
+          <div className="flex flex-col items-center justify-center py-20">
+            <ScissorsLoader size="lg" text="טוען..." />
           </div>
         </main>
       </>
@@ -156,188 +206,177 @@ export default function MyAppointmentsPage() {
     <>
       <AppHeader />
       
-      <main className="relative top-24 min-h-screen px-4 py-8 pb-24">
-        <div className="max-w-2xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-2xl md:text-3xl text-foreground-light font-medium">
-              התורים שלי
-            </h1>
-            <p className="text-foreground-muted mt-2">
-              שלום {customer?.fullname}, כאן תוכל לצפות ולנהל את התורים שלך
-            </p>
-          </div>
-          
-          {/* Tabs */}
-          <div className="flex gap-2 mb-6 bg-background-card rounded-xl p-1">
-            <button
-              onClick={() => setActiveTab('upcoming')}
-              className={cn(
-                'flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2',
-                activeTab === 'upcoming'
-                  ? 'bg-accent-gold text-background-dark'
-                  : 'text-foreground-muted hover:text-foreground-light'
-              )}
-            >
-              <FaCalendarAlt className="w-3.5 h-3.5" />
-              <span>קרובים</span>
-            </button>
-            
-            <button
-              onClick={() => setActiveTab('past')}
-              className={cn(
-                'flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2',
-                activeTab === 'past'
-                  ? 'bg-accent-gold text-background-dark'
-                  : 'text-foreground-muted hover:text-foreground-light'
-              )}
-            >
-              <FaHistory className="w-3.5 h-3.5" />
-              <span>עברו</span>
-            </button>
-            
-            <button
-              onClick={() => setActiveTab('cancelled')}
-              className={cn(
-                'flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2',
-                activeTab === 'cancelled'
-                  ? 'bg-accent-gold text-background-dark'
-                  : 'text-foreground-muted hover:text-foreground-light'
-              )}
-            >
-              <FaTimes className="w-3.5 h-3.5" />
-              <span>בוטלו</span>
-            </button>
-          </div>
-          
-          {/* Content */}
-          {loading ? (
-            <div className="flex flex-col items-center gap-4 py-12">
-              <div className="w-8 h-8 border-2 border-accent-gold border-t-transparent rounded-full animate-spin" />
-              <p className="text-foreground-muted">טוען תורים...</p>
-            </div>
-          ) : filteredReservations.length === 0 ? (
-            <div className="text-center py-12 bg-background-card rounded-xl border border-white/10">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-foreground-muted/10 flex items-center justify-center">
-                <FaCalendarAlt className="w-8 h-8 text-foreground-muted" />
-              </div>
-              <p className="text-foreground-muted">
-                {activeTab === 'upcoming' && 'אין תורים קרובים'}
-                {activeTab === 'past' && 'אין תורים שעברו'}
-                {activeTab === 'cancelled' && 'אין תורים מבוטלים'}
+      <main className="relative top-20 sm:top-24 min-h-screen bg-background-dark">
+        <div className="container-mobile py-6 sm:py-8 pb-24">
+          <div className="max-w-2xl mx-auto">
+            {/* Header */}
+            <div className="text-center mb-6 sm:mb-8">
+              <h1 className="text-2xl sm:text-3xl text-foreground-light font-medium">
+                התורים שלי
+              </h1>
+              <p className="text-foreground-muted mt-2 text-sm sm:text-base">
+                שלום {customer?.fullname}, כאן תוכל לצפות ולנהל את התורים שלך
               </p>
-              {activeTab === 'upcoming' && (
-                <button
-                  onClick={() => router.push('/')}
-                  className="mt-4 px-6 py-2 bg-accent-gold text-background-dark rounded-lg font-medium hover:bg-accent-gold/90 transition-colors"
-                >
-                  קבע תור חדש
-                </button>
-              )}
             </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {filteredReservations.map((reservation) => (
-                <div
-                  key={reservation.id}
+            
+            {/* Tabs - horizontal scroll on mobile */}
+            <div className="flex gap-1 sm:gap-2 mb-6 bg-background-card rounded-xl p-1 overflow-x-auto scrollbar-hide">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
                   className={cn(
-                    'bg-background-card border rounded-xl p-5 transition-all',
-                    reservation.status === 'cancelled' 
-                      ? 'border-red-500/30 opacity-70' 
-                      : isUpcoming(reservation)
-                        ? 'border-accent-gold/30'
-                        : 'border-white/10'
+                    'flex-1 min-w-[90px] py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap',
+                    activeTab === tab.key
+                      ? 'bg-accent-gold text-background-dark'
+                      : 'text-foreground-muted hover:text-foreground-light'
                   )}
                 >
-                  {/* Status Badge */}
-                  <div className="flex justify-between items-start mb-4">
-                    <div className={cn(
-                      'px-3 py-1 rounded-full text-xs font-medium',
-                      reservation.status === 'cancelled' 
-                        ? 'bg-red-500/20 text-red-400'
-                        : reservation.status === 'completed'
-                          ? 'bg-green-500/20 text-green-400'
-                          : isUpcoming(reservation)
-                            ? 'bg-accent-gold/20 text-accent-gold'
-                            : 'bg-blue-500/20 text-blue-400'
+                  <tab.icon className="w-3.5 h-3.5" />
+                  <span>{tab.label}</span>
+                  {tab.count > 0 && (
+                    <span className={cn(
+                      'text-xs px-1.5 py-0.5 rounded-full',
+                      activeTab === tab.key
+                        ? 'bg-background-dark/20'
+                        : 'bg-white/10'
                     )}>
-                      {reservation.status === 'cancelled' && 'בוטל'}
-                      {reservation.status === 'completed' && 'הושלם'}
-                      {reservation.status === 'confirmed' && isUpcoming(reservation) && 'מאושר'}
-                      {reservation.status === 'confirmed' && !isUpcoming(reservation) && 'הסתיים'}
-                    </div>
-                    
-                    {isUpcoming(reservation) && (
-                      <button
-                        onClick={() => handleCancelReservation(reservation.id)}
-                        disabled={cancellingId === reservation.id}
-                        className={cn(
-                          'px-3 py-1 rounded-lg text-xs font-medium transition-all',
-                          cancellingId === reservation.id
-                            ? 'bg-foreground-muted/20 text-foreground-muted cursor-not-allowed'
-                            : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
-                        )}
-                      >
-                        {cancellingId === reservation.id ? 'מבטל...' : 'בטל תור'}
-                      </button>
-                    )}
-                  </div>
-                  
-                  {/* Details */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <FaCalendarAlt className="w-4 h-4 text-accent-gold flex-shrink-0" />
-                      <span className="text-foreground-light">
-                        {formatDate(reservation.date_timestamp)}
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <FaClock className="w-4 h-4 text-accent-gold flex-shrink-0" />
-                      <span className="text-foreground-light" dir="ltr">
-                        {formatTime(reservation.time_timestamp)}
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <FaCut className="w-4 h-4 text-accent-gold flex-shrink-0" />
-                      <span className="text-foreground-light">
-                        {reservation.services?.name_he || 'שירות'}
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <FaUser className="w-4 h-4 text-accent-gold flex-shrink-0" />
-                      <span className="text-foreground-light">
-                        {reservation.users?.fullname || 'ספר'}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  {/* Price */}
-                  {reservation.services?.price && (
-                    <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
-                      <span className="text-foreground-muted text-sm">מחיר:</span>
-                      <span className="text-accent-gold font-bold">₪{reservation.services.price}</span>
-                    </div>
+                      {tab.count}
+                    </span>
                   )}
-                </div>
+                </button>
               ))}
             </div>
-          )}
-          
-          {/* Back Button */}
-          <div className="mt-8 text-center">
-            <button
-              onClick={() => router.push('/')}
-              className="text-foreground-muted hover:text-foreground-light text-sm transition-colors"
-            >
-              ← חזרה לדף הבית
-            </button>
+            
+            {/* Content */}
+            {loading ? (
+              <div className="flex flex-col items-center py-16">
+                <ScissorsLoader size="md" text="טוען תורים..." />
+              </div>
+            ) : filteredReservations.length === 0 ? (
+              <GlassCard className="text-center py-12">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-white/5 flex items-center justify-center">
+                  <FaCalendarAlt className="w-8 h-8 text-foreground-muted" />
+                </div>
+                <p className="text-foreground-muted mb-4">
+                  {activeTab === 'upcoming' && 'אין תורים קרובים'}
+                  {activeTab === 'past' && 'אין תורים שעברו'}
+                  {activeTab === 'cancelled' && 'אין תורים מבוטלים'}
+                </p>
+                {activeTab === 'upcoming' && (
+                  <button
+                    onClick={() => router.push('/')}
+                    className="px-6 py-3 bg-accent-gold text-background-dark rounded-xl font-medium hover:bg-accent-gold/90 transition-all hover:scale-[1.02]"
+                  >
+                    קבע תור חדש
+                  </button>
+                )}
+              </GlassCard>
+            ) : (
+              <div className="flex flex-col gap-3 sm:gap-4">
+                {filteredReservations.map((reservation) => (
+                  <GlassCard
+                    key={reservation.id}
+                    variant="default"
+                    padding="md"
+                    className={cn(
+                      'transition-all',
+                      reservation.status === 'cancelled' 
+                        ? 'border-red-500/30 opacity-70' 
+                        : isUpcoming(reservation)
+                          ? 'border-accent-gold/30'
+                          : ''
+                    )}
+                  >
+                    {/* Status Badge & Cancel Button */}
+                    <div className="flex justify-between items-start mb-4">
+                      <div className={cn(
+                        'px-3 py-1 rounded-full text-xs font-medium',
+                        reservation.status === 'cancelled' 
+                          ? 'bg-red-500/20 text-red-400'
+                          : reservation.status === 'completed'
+                            ? 'bg-green-500/20 text-green-400'
+                            : isUpcoming(reservation)
+                              ? 'bg-accent-gold/20 text-accent-gold'
+                              : 'bg-blue-500/20 text-blue-400'
+                      )}>
+                        {getStatusText(reservation)}
+                      </div>
+                      
+                      {isUpcoming(reservation) && (
+                        <button
+                          onClick={() => handleCancelReservation(reservation.id)}
+                          disabled={cancellingId === reservation.id}
+                          className={cn(
+                            'px-3 py-1.5 rounded-lg text-xs font-medium transition-all touch-btn',
+                            cancellingId === reservation.id
+                              ? 'bg-foreground-muted/20 text-foreground-muted cursor-not-allowed'
+                              : 'bg-red-500/10 text-red-400 hover:bg-red-500/20 active:scale-95'
+                          )}
+                        >
+                          {cancellingId === reservation.id ? 'מבטל...' : 'בטל תור'}
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* Details - responsive grid */}
+                    <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:gap-4">
+                      <div className="flex items-center gap-2">
+                        <FaCalendarAlt className="w-4 h-4 text-accent-gold flex-shrink-0" />
+                        <span className="text-foreground-light text-sm truncate">
+                          {formatDate(reservation.date_timestamp)}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <FaClock className="w-4 h-4 text-accent-gold flex-shrink-0" />
+                        <span className="text-foreground-light text-sm" dir="ltr">
+                          {formatTime(reservation.time_timestamp)}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <FaCut className="w-4 h-4 text-accent-gold flex-shrink-0" />
+                        <span className="text-foreground-light text-sm truncate">
+                          {reservation.services?.name_he || 'שירות'}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <FaUser className="w-4 h-4 text-accent-gold flex-shrink-0" />
+                        <span className="text-foreground-light text-sm truncate">
+                          {reservation.users?.fullname || 'ספר'}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Price */}
+                    {reservation.services?.price && (
+                      <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
+                        <span className="text-foreground-muted text-sm">מחיר:</span>
+                        <span className="text-accent-gold font-bold">₪{reservation.services.price}</span>
+                      </div>
+                    )}
+                  </GlassCard>
+                ))}
+              </div>
+            )}
+            
+            {/* Back Button */}
+            <div className="mt-8 text-center">
+              <button
+                onClick={() => router.push('/')}
+                className="inline-flex items-center gap-2 text-foreground-muted hover:text-foreground-light text-sm transition-colors py-2"
+              >
+                <FaChevronRight className="w-3 h-3" />
+                <span>חזרה לדף הבית</span>
+              </button>
+            </div>
           </div>
         </div>
       </main>
+      
+      <Footer />
     </>
   )
 }
-

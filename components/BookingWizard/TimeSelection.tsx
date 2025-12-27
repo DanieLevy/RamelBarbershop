@@ -3,18 +3,46 @@
 import { useEffect, useState } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { createClient } from '@/lib/supabase/client'
-import { formatTime, cn } from '@/lib/utils'
-import type { TimeSlot } from '@/types/database'
+import { formatTime, cn, parseTimeString, timestampToIsraelDate, generateTimeSlots } from '@/lib/utils'
+import type { TimeSlot, BarbershopSettings, BarberSchedule } from '@/types/database'
+import { format } from 'date-fns'
+import { FaChevronRight, FaChevronDown, FaChevronUp } from 'react-icons/fa'
+import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 
 interface TimeSelectionProps {
   barberId: string
+  shopSettings?: BarbershopSettings | null
+  barberSchedule?: BarberSchedule | null
 }
 
-export function TimeSelection({ barberId }: TimeSelectionProps) {
-  const { date, timeTimestamp, setTime, nextStep, prevStep } = useBookingStore()
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([])
+interface EnrichedTimeSlot extends TimeSlot {
+  reservedBy?: string
+}
+
+export function TimeSelection({ barberId, shopSettings, barberSchedule }: TimeSelectionProps) {
+  const { date, timeTimestamp, setTime, nextStep, prevStep, service } = useBookingStore()
+  const [availableSlots, setAvailableSlots] = useState<EnrichedTimeSlot[]>([])
+  const [reservedSlots, setReservedSlots] = useState<EnrichedTimeSlot[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showReserved, setShowReserved] = useState(false)
+
+  // Get work hours from barber schedule or shop settings
+  const getWorkHours = (): { start: string; end: string } => {
+    if (barberSchedule?.work_hours_start && barberSchedule?.work_hours_end) {
+      return {
+        start: barberSchedule.work_hours_start,
+        end: barberSchedule.work_hours_end,
+      }
+    }
+    if (shopSettings?.work_hours_start && shopSettings?.work_hours_end) {
+      return {
+        start: shopSettings.work_hours_start,
+        end: shopSettings.work_hours_end,
+      }
+    }
+    return { start: '09:00', end: '19:00' }
+  }
 
   useEffect(() => {
     const fetchTimeSlots = async () => {
@@ -25,22 +53,71 @@ export function TimeSelection({ barberId }: TimeSelectionProps) {
       
       try {
         const supabase = createClient()
+        const workHours = getWorkHours()
+        const { hour: startHour, minute: startMinute } = parseTimeString(workHours.start)
+        const { hour: endHour, minute: endMinute } = parseTimeString(workHours.end)
         
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data, error: rpcError } = await (supabase.rpc as any)('get_available_time_slots', {
-          p_barber_id: barberId,
-          p_date_timestamp: date.dateTimestamp,
-        }) as { data: TimeSlot[] | null; error: unknown }
+        // Generate all possible time slots
+        const allSlots = generateTimeSlots(
+          date.dateTimestamp,
+          startHour,
+          startMinute,
+          endHour,
+          endMinute,
+          30 // 30 minute intervals
+        )
         
-        if (rpcError) {
-          console.error('RPC error:', rpcError)
-          // Fall back to generating slots client-side
-          const slots = generateFallbackSlots(date.dateTimestamp)
-          setTimeSlots(slots)
-          return
+        // Get date string for query
+        const dayStart = new Date(date.dateTimestamp)
+        dayStart.setHours(0, 0, 0, 0)
+        const dayEnd = new Date(date.dateTimestamp)
+        dayEnd.setHours(23, 59, 59, 999)
+        
+        // Fetch existing reservations for this barber and date
+        const { data: reservations, error: resError } = await supabase
+          .from('reservations')
+          .select('time_timestamp, customer_name, status')
+          .eq('barber_id', barberId)
+          .gte('time_timestamp', dayStart.getTime())
+          .lte('time_timestamp', dayEnd.getTime())
+          .neq('status', 'cancelled') as { data: { time_timestamp: number; customer_name: string; status: string }[] | null; error: unknown }
+        
+        if (resError) {
+          console.error('Error fetching reservations:', resError)
         }
         
-        setTimeSlots(data || [])
+        // Create a set of reserved timestamps
+        const reservedTimestamps = new Set<number>()
+        const reservedMap = new Map<number, string>()
+        
+        if (reservations) {
+          for (const res of reservations) {
+            reservedTimestamps.add(res.time_timestamp)
+            reservedMap.set(res.time_timestamp, res.customer_name)
+          }
+        }
+        
+        // Split slots into available and reserved
+        const available: EnrichedTimeSlot[] = []
+        const reserved: EnrichedTimeSlot[] = []
+        
+        for (const slot of allSlots) {
+          if (reservedTimestamps.has(slot.timestamp)) {
+            reserved.push({
+              time_timestamp: slot.timestamp,
+              is_available: false,
+              reservedBy: reservedMap.get(slot.timestamp),
+            })
+          } else {
+            available.push({
+              time_timestamp: slot.timestamp,
+              is_available: true,
+            })
+          }
+        }
+        
+        setAvailableSlots(available)
+        setReservedSlots(reserved)
       } catch (err) {
         console.error('Error fetching time slots:', err)
         setError('שגיאה בטעינת השעות')
@@ -50,7 +127,8 @@ export function TimeSelection({ barberId }: TimeSelectionProps) {
     }
 
     fetchTimeSlots()
-  }, [barberId, date])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [barberId, date, service])
 
   const handleSelect = (timestamp: number) => {
     setTime(timestamp)
@@ -62,69 +140,106 @@ export function TimeSelection({ barberId }: TimeSelectionProps) {
   return (
     <div className="flex flex-col gap-6">
       <div className="text-center">
-        <h2 className="text-xl text-foreground-light font-medium">בחר שעה</h2>
+        <h2 className="text-xl sm:text-2xl text-foreground-light font-medium">בחר שעה</h2>
         <p className="text-foreground-muted text-sm mt-1">
           {date.dayName} {date.dayNum}
         </p>
       </div>
       
       {loading ? (
-        <div className="flex justify-center py-8">
-          <div className="w-8 h-8 border-2 border-accent-gold border-t-transparent rounded-full animate-spin" />
+        <div className="flex justify-center py-12">
+          <ScissorsLoader size="md" text="טוען שעות פנויות..." />
         </div>
       ) : error ? (
-        <p className="text-center text-red-400">{error}</p>
-      ) : timeSlots.length === 0 ? (
-        <p className="text-center text-foreground-muted">אין שעות פנויות ביום זה</p>
+        <div className="text-center py-8">
+          <p className="text-red-400 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-accent-gold hover:underline text-sm"
+          >
+            נסה שוב
+          </button>
+        </div>
+      ) : availableSlots.length === 0 && reservedSlots.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-foreground-muted">אין שעות זמינות ביום זה</p>
+        </div>
       ) : (
-        <div className="grid grid-cols-4 gap-2">
-          {timeSlots.map((slot) => (
-            <button
-              key={slot.time_timestamp}
-              onClick={() => slot.is_available && handleSelect(slot.time_timestamp)}
-              disabled={!slot.is_available}
-              className={cn(
-                'p-3 rounded-lg text-sm font-medium transition-all',
-                !slot.is_available
-                  ? 'bg-background-card/50 text-foreground-muted/50 cursor-not-allowed line-through'
-                  : timeTimestamp === slot.time_timestamp
-                  ? 'bg-accent-gold text-background-dark'
-                  : 'bg-background-card border border-white/10 text-foreground-light hover:border-accent-gold cursor-pointer'
+        <div className="flex flex-col gap-4">
+          {/* Available Slots */}
+          {availableSlots.length > 0 ? (
+            <div>
+              <p className="text-sm text-foreground-muted mb-3 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                שעות פנויות ({availableSlots.length})
+              </p>
+              {/* Mobile: 3 columns, Tablet: 4 columns, Desktop: 5 columns */}
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                {availableSlots.map((slot) => (
+                  <button
+                    key={slot.time_timestamp}
+                    onClick={() => handleSelect(slot.time_timestamp)}
+                    className={cn(
+                      'py-3 px-2 rounded-xl text-sm font-medium transition-all cursor-pointer',
+                      'active:scale-95 hover:scale-[1.02]',
+                      timeTimestamp === slot.time_timestamp
+                        ? 'bg-accent-gold text-background-dark shadow-gold'
+                        : 'bg-background-card border border-white/10 text-foreground-light hover:border-accent-gold'
+                    )}
+                  >
+                    {formatTime(slot.time_timestamp)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-4">
+              <p className="text-foreground-muted">אין שעות פנויות ביום זה</p>
+            </div>
+          )}
+          
+          {/* Reserved Slots (expandable) */}
+          {reservedSlots.length > 0 && (
+            <div className="mt-2">
+              <button
+                onClick={() => setShowReserved(!showReserved)}
+                className="flex items-center gap-2 text-sm text-foreground-muted hover:text-foreground-light transition-colors py-2"
+              >
+                {showReserved ? (
+                  <FaChevronUp className="w-3 h-3" />
+                ) : (
+                  <FaChevronDown className="w-3 h-3" />
+                )}
+                <span className="w-2 h-2 rounded-full bg-red-400" />
+                שעות תפוסות ({reservedSlots.length})
+              </button>
+              
+              {showReserved && (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 mt-2 animate-fade-in">
+                  {reservedSlots.map((slot) => (
+                    <div
+                      key={slot.time_timestamp}
+                      className="py-3 px-2 rounded-xl text-sm font-medium bg-background-card/30 text-foreground-muted/50 line-through cursor-not-allowed text-center"
+                      title={slot.reservedBy ? `תפוס: ${slot.reservedBy}` : 'תפוס'}
+                    >
+                      {formatTime(slot.time_timestamp)}
+                    </div>
+                  ))}
+                </div>
               )}
-            >
-              {formatTime(slot.time_timestamp)}
-            </button>
-          ))}
+            </div>
+          )}
         </div>
       )}
       
+      {/* Back button */}
       <button
         onClick={prevStep}
-        className="text-foreground-muted hover:text-foreground-light transition-colors text-sm mt-2"
+        className="flex items-center justify-center gap-2 text-foreground-muted hover:text-foreground-light transition-colors text-sm py-2"
       >
-        ← חזור לבחירת תאריך
+        <FaChevronRight className="w-3 h-3" />
+        <span>חזור לבחירת תאריך</span>
       </button>
     </div>
   )
 }
-
-// Fallback function to generate time slots if RPC fails
-function generateFallbackSlots(dateTimestamp: number): TimeSlot[] {
-  const slots: TimeSlot[] = []
-  const baseDate = new Date(dateTimestamp * 1000)
-  baseDate.setHours(9, 0, 0, 0)
-  
-  for (let hour = 9; hour < 20; hour++) {
-    for (let minute = 0; minute < 60; minute += 30) {
-      const slotDate = new Date(baseDate)
-      slotDate.setHours(hour, minute, 0, 0)
-      slots.push({
-        time_timestamp: Math.floor(slotDate.getTime() / 1000),
-        is_available: true,
-      })
-    }
-  }
-  
-  return slots
-}
-

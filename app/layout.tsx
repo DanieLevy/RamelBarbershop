@@ -1,16 +1,31 @@
-import type { Metadata } from 'next'
-import { ToastContainer } from 'react-toastify'
-import 'react-toastify/dist/ReactToastify.css'
+import type { Metadata, Viewport } from 'next'
+import { Toaster } from 'sonner'
 import './globals.css'
 import { Providers } from './providers'
 import { AuthProvider } from '@/components/AuthProvider'
+import { MobileBottomNav } from '@/components/ui/MobileBottomNav'
 
 export const metadata: Metadata = {
   title: 'Ramel BarberShop',
   description: 'מספרה מקצועית בירושלים - רמאל ברברשופ',
   icons: {
     icon: '/icon.png',
+    apple: '/icon.png',
   },
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Ramel Barbershop',
+  },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: '#080b0d',
 }
 
 export default function RootLayout({
@@ -21,30 +36,32 @@ export default function RootLayout({
   return (
     <html lang="he" dir="rtl">
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         {/* Unregister stale service workers */}
         <script src="/unregister-sw.js" defer />
       </head>
-      <body className="min-h-screen">
+      <body className="min-h-screen bg-background-dark" suppressHydrationWarning>
         <Providers>
           <AuthProvider>
             {children}
+            <MobileBottomNav />
           </AuthProvider>
-          <ToastContainer
-            position="bottom-right"
-            autoClose={5000}
-            hideProgressBar={false}
-            newestOnTop={false}
-            closeOnClick
-            rtl
-            pauseOnFocusLoss
-            draggable
-            pauseOnHover
-            theme="light"
+          <Toaster
+            position="bottom-center"
+            dir="rtl"
+            closeButton
+            richColors
+            theme="dark"
+            toastOptions={{
+              className: 'mb-16 md:mb-0',
+              style: {
+                background: '#1a1a1a',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: '#F2F2F2',
+              },
+            }}
           />
         </Providers>
       </body>
     </html>
   )
 }
-

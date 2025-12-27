@@ -3,10 +3,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { useAuthStore } from '@/store/useAuthStore'
-import { sendPhoneOtp, verifyOtp, clearRecaptchaVerifier } from '@/lib/firebase/config'
+import { sendPhoneOtp, verifyOtp, clearRecaptchaVerifier, isTestUser, TEST_USER } from '@/lib/firebase/config'
 import { createClient } from '@/lib/supabase/client'
 import { getOrCreateCustomer } from '@/lib/services/customer.service'
-import { toast } from 'react-toastify'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
 const RECAPTCHA_CONTAINER_ID = 'recaptcha-container'
@@ -291,6 +291,15 @@ export function OTPVerification() {
         <p className="text-foreground-muted/70 text-xs mt-1">
           אימות הטלפון הכרחי להשלמת ההזמנה
         </p>
+        
+        {/* Test user hint */}
+        {isTestUser(customer.phone || '') && (
+          <div className="mt-3 px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+            <p className="text-blue-400 text-xs">
+              🧪 משתמש בדיקה - הקוד הוא: <span className="font-mono font-bold">{TEST_USER.otpCode}</span>
+            </p>
+          </div>
+        )}
       </div>
       
       <div id={RECAPTCHA_CONTAINER_ID} className="flex justify-center" />

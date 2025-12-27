@@ -7,6 +7,34 @@ import {
   type Auth
 } from 'firebase/auth'
 
+// Test user configuration for development
+export const TEST_USER = {
+  phone: '+972502879998', // 0502879998 in Israeli format
+  phoneRaw: '0502879998',
+  otpCode: '123456',
+  name: 'דניאל לוי',
+}
+
+// Check if a phone number is the test user
+export function isTestUser(phone: string): boolean {
+  const normalized = phone.replace(/\D/g, '')
+  return normalized === TEST_USER.phoneRaw || 
+         normalized === TEST_USER.phoneRaw.replace(/^0/, '972') ||
+         phone === TEST_USER.phone
+}
+
+// Mock confirmation result for test user
+class MockConfirmationResult {
+  verificationId = 'test-verification-id'
+  
+  async confirm(code: string): Promise<{ user: { uid: string } }> {
+    if (code === TEST_USER.otpCode || code === TEST_USER.otpCode.slice(0, 4)) {
+      return { user: { uid: 'test-user-uid-' + Date.now() } }
+    }
+    throw { code: 'auth/invalid-verification-code' }
+  }
+}
+
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -83,6 +111,14 @@ export async function sendPhoneOtp(
   phoneNumber: string,
   containerId: string = 'recaptcha-container'
 ): Promise<{ success: boolean; confirmation?: ConfirmationResult; error?: string }> {
+  // Check if this is the test user - bypass real OTP
+  if (isTestUser(phoneNumber)) {
+    console.log('📱 Test user detected - bypassing real OTP')
+    // Return mock confirmation for test user
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return { success: true, confirmation: new MockConfirmationResult() as any }
+  }
+
   try {
     const authInstance = getFirebaseAuth()
     

@@ -6,6 +6,8 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+export type UserRole = 'admin' | 'barber'
+
 export interface Database {
   public: {
     Tables: {
@@ -16,7 +18,11 @@ export interface Database {
           fullname: string
           img_url: string | null
           phone: string | null
+          email: string | null
+          password_hash: string | null
+          role: UserRole
           is_barber: boolean
+          is_active: boolean
           created_at: string
           updated_at: string
         }
@@ -26,7 +32,11 @@ export interface Database {
           fullname: string
           img_url?: string | null
           phone?: string | null
+          email?: string | null
+          password_hash?: string | null
+          role?: UserRole
           is_barber?: boolean
+          is_active?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -36,7 +46,11 @@ export interface Database {
           fullname?: string
           img_url?: string | null
           phone?: string | null
+          email?: string | null
+          password_hash?: string | null
+          role?: UserRole
           is_barber?: boolean
+          is_active?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -70,6 +84,148 @@ export interface Database {
           updated_at?: string
         }
       }
+      barbershop_settings: {
+        Row: {
+          id: string
+          name: string
+          phone: string | null
+          address: string | null
+          description: string | null
+          work_hours_start: string
+          work_hours_end: string
+          open_days: string[]
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          phone?: string | null
+          address?: string | null
+          description?: string | null
+          work_hours_start?: string
+          work_hours_end?: string
+          open_days?: string[]
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          phone?: string | null
+          address?: string | null
+          description?: string | null
+          work_hours_start?: string
+          work_hours_end?: string
+          open_days?: string[]
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      barbershop_closures: {
+        Row: {
+          id: string
+          start_date: string
+          end_date: string
+          reason: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          start_date: string
+          end_date: string
+          reason?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          start_date?: string
+          end_date?: string
+          reason?: string | null
+          created_at?: string
+        }
+      }
+      barber_schedules: {
+        Row: {
+          id: string
+          barber_id: string
+          work_days: string[]
+          work_hours_start: string
+          work_hours_end: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          barber_id: string
+          work_days?: string[]
+          work_hours_start?: string
+          work_hours_end?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          barber_id?: string
+          work_days?: string[]
+          work_hours_start?: string
+          work_hours_end?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      barber_closures: {
+        Row: {
+          id: string
+          barber_id: string
+          start_date: string
+          end_date: string
+          reason: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          barber_id: string
+          start_date: string
+          end_date: string
+          reason?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          barber_id?: string
+          start_date?: string
+          end_date?: string
+          reason?: string | null
+          created_at?: string
+        }
+      }
+      barber_messages: {
+        Row: {
+          id: string
+          barber_id: string
+          message: string
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          barber_id: string
+          message: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          barber_id?: string
+          message?: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
       work_days: {
         Row: {
           id: string
@@ -99,6 +255,7 @@ export interface Database {
       services: {
         Row: {
           id: string
+          barber_id: string | null
           name: string
           name_he: string
           description: string | null
@@ -109,6 +266,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          barber_id?: string | null
           name: string
           name_he: string
           description?: string | null
@@ -119,6 +277,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          barber_id?: string | null
           name?: string
           name_he?: string
           description?: string | null
@@ -191,6 +350,11 @@ export interface Database {
 // Convenience types
 export type User = Database['public']['Tables']['users']['Row']
 export type Customer = Database['public']['Tables']['customers']['Row']
+export type BarbershopSettings = Database['public']['Tables']['barbershop_settings']['Row']
+export type BarbershopClosure = Database['public']['Tables']['barbershop_closures']['Row']
+export type BarberSchedule = Database['public']['Tables']['barber_schedules']['Row']
+export type BarberClosure = Database['public']['Tables']['barber_closures']['Row']
+export type BarberMessage = Database['public']['Tables']['barber_messages']['Row']
 export type WorkDay = Database['public']['Tables']['work_days']['Row']
 export type Service = Database['public']['Tables']['services']['Row']
 export type Reservation = Database['public']['Tables']['reservations']['Row']
@@ -200,21 +364,37 @@ export interface BarberWithWorkDays extends User {
   work_days: WorkDay[]
 }
 
+export interface BarberWithSchedule extends User {
+  barber_schedules?: BarberSchedule[]
+  barber_closures?: BarberClosure[]
+  barber_messages?: BarberMessage[]
+}
+
 export interface TimeSlot {
   time_timestamp: number
   is_available: boolean
 }
 
-// Session storage type
+// Session storage type for customers
 export interface StoredSession {
   customerId: string
   phone: string
   fullname: string
-  expiresAt: number // Unix timestamp in milliseconds
+  expiresAt: number
+}
+
+// Session storage type for barbers
+export interface BarberSession {
+  barberId: string
+  email: string
+  fullname: string
+  role: UserRole
+  expiresAt: number
 }
 
 // Reservation with service details
 export interface ReservationWithDetails extends Reservation {
   services?: Service
   users?: User
+  customers?: Customer
 }

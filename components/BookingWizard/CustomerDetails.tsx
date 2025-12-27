@@ -3,10 +3,20 @@
 import { useState } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { cn } from '@/lib/utils'
+import { TEST_USER } from '@/lib/firebase/config'
 
 export function CustomerDetails() {
   const { customer, setCustomer, nextStep, prevStep } = useBookingStore()
   const [errors, setErrors] = useState<{ fullname?: string; phone?: string }>({})
+  
+  // Helper to fill test user data
+  const fillTestUser = () => {
+    setCustomer({ 
+      fullname: TEST_USER.name, 
+      phone: TEST_USER.phoneRaw 
+    })
+    setErrors({})
+  }
 
   const validateAndSubmit = () => {
     const newErrors: typeof errors = {}
@@ -104,6 +114,16 @@ export function CustomerDetails() {
       >
         ← חזור לבחירת שעה
       </button>
+      
+      {/* Dev helper - fill test user */}
+      {process.env.NODE_ENV === 'development' && (
+        <button
+          onClick={fillTestUser}
+          className="mt-2 text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center justify-center gap-1"
+        >
+          🧪 מלא משתמש בדיקה
+        </button>
+      )}
     </div>
   )
 }

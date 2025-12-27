@@ -3,10 +3,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
 import { findCustomerByPhone } from '@/lib/services/customer.service'
-import { sendPhoneOtp, verifyOtp, clearRecaptchaVerifier } from '@/lib/firebase/config'
-import { toast } from 'react-toastify'
+import { sendPhoneOtp, verifyOtp, clearRecaptchaVerifier, isTestUser, TEST_USER } from '@/lib/firebase/config'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { FaTimes } from 'react-icons/fa'
+import { FaTimes, FaCut } from 'react-icons/fa'
+import { useRouter } from 'next/navigation'
 import type { ConfirmationResult } from 'firebase/auth'
 
 interface LoginModalProps {
@@ -19,6 +20,7 @@ type Step = 'phone' | 'name' | 'otp'
 const RECAPTCHA_CONTAINER_ID = 'login-recaptcha-container'
 
 export function LoginModal({ isOpen, onClose }: LoginModalProps) {
+  const router = useRouter()
   const { login } = useAuthStore()
   
   const [step, setStep] = useState<Step>('phone')
@@ -210,8 +212,8 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="relative w-full max-w-md mx-4 bg-background-dark border border-white/10 rounded-2xl p-6 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="relative w-full sm:max-w-md sm:mx-4 bg-background-darker sm:bg-background-dark border-t sm:border border-white/10 sm:rounded-2xl rounded-t-2xl p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto animate-slide-in-up sm:animate-fade-in">
         {/* Close button */}
         <button
           onClick={onClose}
@@ -238,21 +240,21 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               <label htmlFor="phone" className="text-foreground-light text-sm">
                 מספר טלפון
               </label>
-              <input
-                id="phone"
-                type="tel"
-                dir="ltr"
-                value={phone}
-                onChange={(e) => {
-                  setPhone(e.target.value)
-                  setError(null)
-                }}
-                placeholder="05XXXXXXXX"
-                className={cn(
-                  'w-full p-3 rounded-xl bg-background-card border text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold transition-all text-left',
-                  error ? 'border-red-400' : 'border-white/10'
-                )}
-              />
+                <input
+                  id="phone"
+                  type="tel"
+                  dir="ltr"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value)
+                    setError(null)
+                  }}
+                  placeholder="05XXXXXXXX"
+                  className={cn(
+                    'w-full p-3.5 rounded-xl bg-background-card border text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold transition-all text-left text-base',
+                    error ? 'border-red-400' : 'border-white/10'
+                  )}
+                />
               {error && <p className="text-red-400 text-xs">{error}</p>}
             </div>
             
@@ -268,6 +270,19 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             >
               {loading ? 'בודק...' : 'המשך'}
             </button>
+            
+            {/* Dev helper - fill test user */}
+            {process.env.NODE_ENV === 'development' && (
+              <button
+                onClick={() => {
+                  setPhone(TEST_USER.phoneRaw)
+                  setError(null)
+                }}
+                className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center justify-center gap-1"
+              >
+                🧪 מלא טלפון בדיקה
+              </button>
+            )}
           </div>
         )}
         
@@ -283,20 +298,20 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               <label htmlFor="fullname" className="text-foreground-light text-sm">
                 שם מלא
               </label>
-              <input
-                id="fullname"
-                type="text"
-                value={fullname}
-                onChange={(e) => {
-                  setFullname(e.target.value)
-                  setError(null)
-                }}
-                placeholder="הזן את שמך"
-                className={cn(
-                  'w-full p-3 rounded-xl bg-background-card border text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold transition-all',
-                  error ? 'border-red-400' : 'border-white/10'
-                )}
-              />
+                <input
+                  id="fullname"
+                  type="text"
+                  value={fullname}
+                  onChange={(e) => {
+                    setFullname(e.target.value)
+                    setError(null)
+                  }}
+                  placeholder="הזן את שמך"
+                  className={cn(
+                    'w-full p-3.5 rounded-xl bg-background-card border text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold transition-all text-base',
+                    error ? 'border-red-400' : 'border-white/10'
+                  )}
+                />
               {error && <p className="text-red-400 text-xs">{error}</p>}
             </div>
             
@@ -329,7 +344,16 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               קוד אימות נשלח ל-{phone}
             </p>
             
-            <div className="flex justify-center gap-2" dir="ltr">
+            {/* Test user hint */}
+            {isTestUser(phone) && (
+              <div className="px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                <p className="text-blue-400 text-xs text-center">
+                  🧪 משתמש בדיקה - הקוד הוא: <span className="font-mono font-bold">{TEST_USER.otpCode}</span>
+                </p>
+              </div>
+            )}
+            
+            <div className="flex justify-center gap-2 xs:gap-3" dir="ltr">
               {otp.map((digit, index) => (
                 <input
                   key={index}
@@ -342,7 +366,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                   onKeyDown={(e) => handleOtpKeyDown(index, e)}
                   disabled={loading}
                   className={cn(
-                    'w-11 h-12 text-center text-lg font-bold rounded-lg bg-background-card border-2 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold transition-all',
+                    'w-10 h-12 xs:w-11 xs:h-13 text-center text-lg font-bold rounded-lg bg-background-card border-2 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold transition-all',
                     error ? 'border-red-400' : digit ? 'border-accent-gold/50' : 'border-white/20'
                   )}
                 />
@@ -390,6 +414,20 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             </button>
           </div>
         )}
+        
+        {/* Barber Login Link */}
+        <div className="mt-6 pt-4 border-t border-white/10">
+          <button
+            onClick={() => {
+              onClose()
+              router.push('/barber/login')
+            }}
+            className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-foreground-muted hover:text-accent-gold transition-colors"
+          >
+            <FaCut className="w-3.5 h-3.5" />
+            <span>כניסה לספרים</span>
+          </button>
+        </div>
       </div>
     </div>
   )
