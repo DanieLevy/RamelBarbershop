@@ -31,7 +31,7 @@ export default async function HomePage() {
       <AppHeader />
       
       <main className="relative">
-        {/* Hero Section */}
+        {/* Hero Section - index-header class gets safe-area padding in PWA standalone mode via CSS */}
         <section className="index-header relative min-h-[100dvh] w-full flex flex-col items-center justify-center overflow-hidden">
           {/* Background with gradient overlay */}
           <div className="absolute inset-0 bg-background-dark">

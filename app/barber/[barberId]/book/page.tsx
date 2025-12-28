@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { AppHeader } from '@/components/AppHeader'
-import { Footer } from '@/components/Footer'
 import { BookingWizardClient } from '@/components/BookingWizard/BookingWizardClient'
 import type { BarberWithWorkDays, Service, BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure, BarberMessage } from '@/types/database'
 
@@ -71,7 +70,7 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
     <>
       <AppHeader barberImgUrl={barber.img_url || undefined} />
       
-      <main className="pt-20 sm:pt-24 min-h-screen bg-background-dark">
+      <main className="pt-16 sm:pt-20 min-h-screen bg-background-dark pb-20">
         <BookingWizardClient
           barberId={barberId}
           barber={barber}
@@ -84,8 +83,6 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
           preSelectedServiceId={preSelectedServiceId}
         />
       </main>
-      
-      <Footer />
     </>
   )
 }

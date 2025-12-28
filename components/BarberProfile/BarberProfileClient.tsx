@@ -3,196 +3,212 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { Phone, Clock, Scissors, ChevronLeft } from 'lucide-react'
-import { cn, formatPrice } from '@/lib/utils'
-import { GlassCard } from '@/components/ui/GlassCard'
-import type { BarberWithWorkDays, Service } from '@/types/database'
+import { Phone, Clock, ChevronLeft, Calendar, MapPin } from 'lucide-react'
+import { cn, formatPrice, formatOpeningHours } from '@/lib/utils'
+import type { BarberWithWorkDays, Service, BarbershopSettings } from '@/types/database'
 
 interface BarberProfileClientProps {
   barber: BarberWithWorkDays
   services: Service[]
+  shopSettings?: BarbershopSettings | null
 }
 
-export function BarberProfileClient({ barber, services }: BarberProfileClientProps) {
+// Hebrew day names for working days display
+const DAY_NAMES_SHORT: Record<string, string> = {
+  sunday: 'א׳',
+  monday: 'ב׳',
+  tuesday: 'ג׳',
+  wednesday: 'ד׳',
+  thursday: 'ה׳',
+  friday: 'ו׳',
+  saturday: 'ש׳',
+}
+
+export function BarberProfileClient({ barber, services, shopSettings }: BarberProfileClientProps) {
   const router = useRouter()
   const [selectedService, setSelectedService] = useState<string | null>(null)
 
   const handleServiceSelect = (serviceId: string) => {
-    setSelectedService(serviceId)
-  }
-
-  const handleBookNow = () => {
-    if (selectedService) {
-      router.push(`/barber/${barber.id}/book?service=${selectedService}`)
-    }
-  }
-
-  const handleServiceBookNow = (serviceId: string) => {
     router.push(`/barber/${barber.id}/book?service=${serviceId}`)
   }
 
   // Get working days
   const workingDays = barber.work_days?.filter(d => d.is_working) || []
-  const hasWorkingDays = workingDays.length > 0
+  const workingDayNames = workingDays.map(d => DAY_NAMES_SHORT[d.day_of_week.toLowerCase()] || d.day_of_week)
+
+  // Format opening hours from shop settings
+  const openingHours = shopSettings?.open_days && shopSettings?.work_hours_start && shopSettings?.work_hours_end
+    ? formatOpeningHours(shopSettings.open_days, shopSettings.work_hours_start, shopSettings.work_hours_end)
+    : null
 
   return (
-    <div className="container-mobile py-6 sm:py-8">
-      {/* Barber Profile Card */}
-      <GlassCard className="mb-6 sm:mb-8 overflow-hidden">
-        <div className="flex flex-col sm:flex-row gap-6">
-          {/* Barber Image */}
-          <div className="flex-shrink-0 flex justify-center sm:justify-start">
-            <div className="relative">
-              {/* Decorative ring */}
-              <div className="absolute -inset-2 rounded-full bg-gradient-to-br from-accent-gold/30 to-accent-orange/20 blur-sm" />
-              
-              <div className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-full overflow-hidden border-4 border-accent-gold/40 shadow-gold-lg">
-                <Image
-                  src={barber.img_url || '/icon.png'}
-                  alt={barber.fullname}
-                  fill
-                  className="object-cover"
-                  priority
-                />
+    <div className="flex flex-col min-h-screen">
+      {/* Hero Banner - Wide image with rounded bottom */}
+      <div className="relative w-full h-64 sm:h-80 md:h-96 overflow-hidden">
+        {/* Background Image */}
+        <Image
+          src={barber.img_url || '/icon.png'}
+          alt={barber.fullname}
+          fill
+          className="object-cover"
+          priority
+          sizes="100vw"
+        />
+        
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-background-dark via-background-dark/40 to-transparent" />
+        
+        {/* Bottom rounded edge mask */}
+        <div 
+          className="absolute bottom-0 left-0 right-0 h-8 bg-background-dark"
+          style={{ 
+            borderTopLeftRadius: '2rem',
+            borderTopRightRadius: '2rem',
+          }}
+        />
+      </div>
+
+      {/* Content */}
+      <div className="container-mobile flex-1 -mt-4 relative z-10 pb-24">
+        {/* Barber Name & Quick Info */}
+        <div className="text-center mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground-light mb-1">
+            {barber.fullname}
+          </h1>
+          
+          {/* Working Days Pills */}
+          {workingDayNames.length > 0 && (
+            <div className="flex items-center justify-center gap-1 mt-3">
+              <Calendar size={14} strokeWidth={1.5} className="text-accent-gold ml-2" />
+              <div className="flex gap-1">
+                {workingDayNames.map((day, i) => (
+                  <span
+                    key={i}
+                    className="text-xs px-2 py-1 rounded-full bg-white/5 text-foreground-muted border border-white/10"
+                  >
+                    {day}
+                  </span>
+                ))}
               </div>
             </div>
-          </div>
-          
-          {/* Barber Info */}
-          <div className="flex-1 text-center sm:text-right">
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground-light mb-2">
-              {barber.fullname}
-            </h1>
-            
-            <p className="text-foreground-muted text-sm sm:text-base mb-4">
-              ספר מקצועי
-            </p>
-            
-            {/* Contact Info */}
-            <div className="space-y-2">
-              {barber.phone && (
-                <a 
-                  href={`tel:${barber.phone}`}
-                  className="inline-flex items-center gap-2 text-foreground-muted hover:text-accent-gold transition-colors"
-                >
-                  <Phone size={16} strokeWidth={1.5} className="text-accent-gold" />
-                  <span dir="ltr" className="text-sm">{barber.phone}</span>
-                </a>
-              )}
-              
-              {hasWorkingDays && (
-                <div className="flex items-center justify-center sm:justify-start gap-2 text-foreground-muted">
-                  <Clock size={16} strokeWidth={1.5} className="text-accent-gold" />
-                  <span className="text-sm">
-                    {workingDays.length} ימי עבודה בשבוע
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
+          )}
         </div>
-      </GlassCard>
 
-      {/* Services Section */}
-      <div className="mb-6">
-        <h2 className="text-xl sm:text-2xl font-semibold text-foreground-light mb-4 flex items-center gap-2">
-          <Scissors size={22} strokeWidth={1.5} className="text-accent-gold" />
-          שירותים זמינים
-        </h2>
-        
-        {services.length === 0 ? (
-          <GlassCard className="text-center py-8">
-            <p className="text-foreground-muted">אין שירותים זמינים כרגע</p>
-          </GlassCard>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {services.map((service) => {
-              const isSelected = selectedService === service.id
-              
-              return (
-                <button
-                  key={service.id}
-                  onClick={() => handleServiceSelect(service.id)}
-                  className={cn(
-                    'relative p-4 sm:p-5 rounded-2xl border text-right transition-all',
-                    'hover:scale-[1.02] active:scale-[0.98]',
-                    isSelected
-                      ? 'bg-accent-gold/20 border-accent-gold/50 shadow-gold'
-                      : 'bg-background-card border-white/10 hover:border-accent-gold/30'
-                  )}
-                >
-                  {/* Selection indicator */}
-                  {isSelected && (
-                    <div className="absolute top-3 left-3 w-6 h-6 rounded-full bg-accent-gold flex items-center justify-center">
-                      <svg className="w-4 h-4 text-background-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  )}
-                  
-                  <div className="flex flex-col gap-2">
-                    <h3 className="text-lg font-medium text-foreground-light">
-                      {service.name_he}
-                    </h3>
-                    
-                    {service.description && (
-                      <p className="text-foreground-muted text-sm line-clamp-2">
-                        {service.description}
-                      </p>
+        {/* Info Cards Row */}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          {/* Phone Card */}
+          {barber.phone && (
+            <a
+              href={`tel:${barber.phone}`}
+              className="flex items-center gap-3 p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-accent-gold/30 transition-all active:scale-95"
+            >
+              <div className="w-10 h-10 rounded-full bg-accent-gold/20 flex items-center justify-center flex-shrink-0">
+                <Phone size={18} strokeWidth={1.5} className="text-accent-gold" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-foreground-muted">התקשר</p>
+                <p className="text-sm text-foreground-light font-medium truncate" dir="ltr">
+                  {barber.phone}
+                </p>
+              </div>
+            </a>
+          )}
+
+          {/* Hours Card */}
+          {openingHours && openingHours.length > 0 && (
+            <div className="flex items-center gap-3 p-4 rounded-2xl bg-white/5 border border-white/10">
+              <div className="w-10 h-10 rounded-full bg-accent-gold/20 flex items-center justify-center flex-shrink-0">
+                <Clock size={18} strokeWidth={1.5} className="text-accent-gold" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-foreground-muted">שעות פעילות</p>
+                <p className="text-sm text-foreground-light font-medium">
+                  {shopSettings?.work_hours_start?.slice(0, 5)} - {shopSettings?.work_hours_end?.slice(0, 5)}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+
+        {/* Services Section */}
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-foreground-light mb-4">
+            שירותים
+          </h2>
+          
+          {services.length === 0 ? (
+            <div className="text-center py-8 rounded-2xl bg-white/5 border border-white/10">
+              <p className="text-foreground-muted text-sm">אין שירותים זמינים כרגע</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {services.map((service) => {
+                const isSelected = selectedService === service.id
+                
+                return (
+                  <div
+                    key={service.id}
+                    className={cn(
+                      'relative rounded-2xl border transition-all overflow-hidden',
+                      isSelected
+                        ? 'bg-accent-gold/10 border-accent-gold/40'
+                        : 'bg-white/5 border-white/10'
                     )}
-                    
-                    <div className="flex items-center justify-between mt-2 pt-3 border-t border-white/10">
-                      <div className="flex items-center gap-3 text-sm text-foreground-muted">
-                        <span className="flex items-center gap-1">
-                          <Clock size={14} strokeWidth={1.5} />
-                          {service.duration} דק&apos;
-                        </span>
+                  >
+                    {/* Service Content - Clickable area */}
+                    <div className="p-4 flex items-center justify-between gap-4">
+                      {/* Left: Service Info */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base font-medium text-foreground-light">
+                          {service.name_he}
+                        </h3>
+                        
+                        {service.description && (
+                          <p className="text-foreground-muted text-xs mt-0.5 line-clamp-1">
+                            {service.description}
+                          </p>
+                        )}
+                        
+                        {/* Duration & Price */}
+                        <div className="flex items-center gap-4 mt-2">
+                          <span className="text-xs text-foreground-muted flex items-center gap-1">
+                            <Clock size={12} strokeWidth={1.5} />
+                            {service.duration} דק׳
+                          </span>
+                          <span className="text-accent-gold font-bold">
+                            {formatPrice(service.price)}
+                          </span>
+                        </div>
                       </div>
                       
-                      <span className="text-accent-gold font-bold text-lg">
-                        {formatPrice(service.price)}
-                      </span>
+                      {/* Right: Book Button */}
+                      <button
+                        onClick={() => handleServiceSelect(service.id)}
+                        className={cn(
+                          'px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex-shrink-0',
+                          'bg-accent-gold/10 text-accent-gold border border-accent-gold/30',
+                          'hover:bg-accent-gold hover:text-background-dark active:scale-95'
+                        )}
+                      >
+                        הזמן
+                      </button>
                     </div>
                   </div>
-                  
-                  {/* Quick book button */}
-                  <div className="mt-4 pt-3 border-t border-white/10">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleServiceBookNow(service.id)
-                      }}
-                      className={cn(
-                        'w-full py-2.5 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2',
-                        'bg-accent-gold/10 text-accent-gold hover:bg-accent-gold hover:text-background-dark'
-                      )}
-                    >
-                      הזמן עכשיו
-                      <ChevronLeft size={16} strokeWidth={2} />
-                    </button>
-                  </div>
-                </button>
-              )
-            })}
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Location hint if available */}
+        {shopSettings?.address_text && (
+          <div className="flex items-center justify-center gap-2 text-foreground-muted text-sm py-4">
+            <MapPin size={14} strokeWidth={1.5} className="text-accent-gold" />
+            <span>{shopSettings.address_text}</span>
           </div>
         )}
       </div>
-
-      {/* Sticky Book Now Button */}
-      {selectedService && (
-        <div className="fixed bottom-20 md:bottom-16 left-0 right-0 p-4 bg-gradient-to-t from-background-dark via-background-dark to-transparent z-40">
-          <div className="container-mobile">
-            <button
-              onClick={handleBookNow}
-              className="w-full py-4 rounded-2xl bg-accent-gold text-background-dark font-bold text-lg shadow-gold hover:bg-accent-gold/90 transition-all flex items-center justify-center gap-2"
-            >
-              המשך להזמנה
-              <ChevronLeft size={20} strokeWidth={2.5} />
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
-

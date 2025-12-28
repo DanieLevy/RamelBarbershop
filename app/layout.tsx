@@ -46,7 +46,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="he" dir="rtl" suppressHydrationWarning>
+    <html lang="he" dir="rtl" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         <PWAHead />
       </head>

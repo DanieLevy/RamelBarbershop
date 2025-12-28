@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { AppHeader } from '@/components/AppHeader'
-import { Footer } from '@/components/Footer'
 import { BarberProfileClient } from '@/components/BarberProfile/BarberProfileClient'
 import type { BarberWithWorkDays, Service, BarbershopSettings } from '@/types/database'
 
@@ -43,14 +42,13 @@ export default async function BarberPage({ params }: BarberPageProps) {
     <>
       <AppHeader barberImgUrl={barber.img_url || undefined} />
       
-      <main className="pt-16 sm:pt-20 min-h-screen bg-background-dark">
+      <main className="min-h-screen bg-background-dark">
         <BarberProfileClient 
           barber={barber} 
           services={services || []} 
+          shopSettings={shopSettings}
         />
       </main>
-      
-      <Footer settings={shopSettings} />
     </>
   )
 }

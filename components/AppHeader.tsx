@@ -328,16 +328,16 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
       <header
         className={cn(
           'fixed left-0 right-0 z-50 transition-all duration-500',
-          // In standalone mode, html has padding-top for safe area, so header uses top:0
-          // In browser mode, header is at top:0 normally
+          // PWA standalone mode: positioned below notch via CSS var
+          // Browser mode: positioned at top
         )}
         style={{
           // Dynamic background based on scroll - starts fully transparent
           backgroundColor: `rgba(8, 11, 13, ${scrollProgress * 0.95})`,
           backdropFilter: `blur(${scrollProgress * 20}px)`,
           WebkitBackdropFilter: `blur(${scrollProgress * 20}px)`,
-          // top is handled by CSS in globals.css for standalone mode
-          top: 0,
+          // Use CSS custom property for safe area - falls back to 0 in browser
+          top: 'var(--header-top-offset, 0px)',
         }}
       >
         {/* Top accent line */}
