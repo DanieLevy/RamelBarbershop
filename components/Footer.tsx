@@ -198,8 +198,15 @@ export function Footer({ settings }: FooterProps) {
 
       {/* Bottom bar */}
       <div className="border-t border-white/5">
-        <div className="container-mobile py-4 flex items-center justify-center text-xs text-foreground-muted">
+        <div className="container-mobile py-4 flex items-center justify-between text-xs text-foreground-muted">
           <p>© {currentYear} {shopName}. כל הזכויות שמורות.</p>
+          {/* Debug link - remove before production */}
+          <Link 
+            href="/debug" 
+            className="text-foreground-muted/50 hover:text-accent-gold transition-colors"
+          >
+            Debug
+          </Link>
         </div>
       </div>
 

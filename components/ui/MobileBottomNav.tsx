@@ -3,9 +3,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { Home, Search, Calendar, User, LayoutDashboard, Users, LogIn, Scissors } from 'lucide-react'
+import { Home, Search, Calendar, User, LayoutDashboard, Users, LogIn, Scissors, Bell } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useCurrentUser, type UserType } from '@/hooks/useCurrentUser'
+import { usePushNotifications } from '@/hooks/usePushNotifications'
+import { usePWA } from '@/hooks/usePWA'
 import { LoginModal } from '@/components/LoginModal'
 
 interface NavItem {
@@ -23,6 +25,19 @@ export function MobileBottomNav() {
   
   // Use unified auth hook
   const { type: userRole, isInitialized } = useCurrentUser()
+  
+  // Push notifications state for badge
+  const push = usePushNotifications()
+  const pwa = usePWA()
+  
+  // Show badge on profile when notifications need setup
+  // Only show when: in PWA, logged in, push supported but not subscribed
+  const showNotificationBadge = 
+    pwa.isStandalone && 
+    userRole === 'customer' && 
+    push.isSupported && 
+    !push.isSubscribed &&
+    push.permission !== 'denied'
   
   // UI State
   const [isVisible, setIsVisible] = useState(true)
@@ -287,11 +302,23 @@ export function MobileBottomNav() {
                 aria-label={item.label}
                 aria-current={isActive ? 'page' : undefined}
               >
-                <Icon
-                  size={20}
-                  strokeWidth={isActive ? 2.5 : 1.5}
-                  className="flex-shrink-0"
-                />
+                {/* Icon container with optional badge */}
+                <div className="relative flex-shrink-0">
+                  <Icon
+                    size={20}
+                    strokeWidth={isActive ? 2.5 : 1.5}
+                  />
+                  
+                  {/* Notification badge for profile tab */}
+                  {item.id === 'profile' && showNotificationBadge && !isActive && (
+                    <div className="absolute -top-1.5 -right-1.5 flex items-center justify-center">
+                      <span className="relative flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border border-background-dark" />
+                      </span>
+                    </div>
+                  )}
+                </div>
                 
                 {/* Label - Mobile: only visible when active. Desktop: always visible */}
                 <span className={cn(

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { usePWA } from './usePWA'
+import { useBugReporter } from './useBugReporter'
 import type { DeviceInfo, DeviceType } from '@/lib/push/types'
 
 interface PushNotificationState {
@@ -69,6 +70,7 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
   const { customer, isLoggedIn: isCustomerLoggedIn } = useAuthStore()
   const { barber, isLoggedIn: isBarberLoggedIn } = useBarberAuthStore()
   const { isStandalone, deviceOS } = usePWA()
+  const { report } = useBugReporter('PushNotifications')
   
   const [state, setState] = useState<PushNotificationState>({
     isSupported: false,
@@ -298,6 +300,13 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
       return true
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'שגיאה לא ידועה'
+      
+      // Report error to bug tracking
+      report(
+        err instanceof Error ? err : new Error(errorMessage),
+        'Subscribing to push notifications'
+      )
+      
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -305,7 +314,7 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
       }))
       return false
     }
-  }, [state, isIOS, isStandalone, requestPermission, isCustomerLoggedIn, isBarberLoggedIn, customer, barber, fetchServerStatus])
+  }, [state, isIOS, isStandalone, requestPermission, isCustomerLoggedIn, isBarberLoggedIn, customer, barber, fetchServerStatus, report])
 
   /**
    * Unsubscribe from push notifications
@@ -346,6 +355,13 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
       return true
     } catch (err) {
       console.error('[Push] Unsubscribe error:', err)
+      
+      // Report error
+      report(
+        err instanceof Error ? err : new Error('Unsubscribe failed'),
+        'Unsubscribing from push notifications'
+      )
+      
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -353,7 +369,7 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
       }))
       return false
     }
-  }, [state, getCurrentSubscription, fetchServerStatus])
+  }, [state, getCurrentSubscription, fetchServerStatus, report])
 
   /**
    * Remove a specific device
@@ -384,6 +400,13 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
       return true
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'שגיאה לא ידועה'
+      
+      // Report error
+      report(
+        err instanceof Error ? err : new Error(errorMessage),
+        `Removing push notification device: ${deviceId}`
+      )
+      
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -391,7 +414,7 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
       }))
       return false
     }
-  }, [])
+  }, [report])
 
   /**
    * Refresh status from server

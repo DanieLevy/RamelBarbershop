@@ -4,6 +4,7 @@ import { createContext, useContext, type ReactNode } from 'react'
 import { usePWA, wasInstallDismissed, getVisitCount } from '@/hooks/usePWA'
 import { InstallBanner } from './InstallBanner'
 import { UpdateModal } from './UpdateModal'
+import { NotificationPermissionModal } from './NotificationPermissionModal'
 
 // PWA Context
 interface PWAContextType {
@@ -75,6 +76,9 @@ export function PWAProvider({ children }: PWAProviderProps) {
           instructions={pwa.getInstallInstructions()}
         />
       )}
+      
+      {/* Notification Permission Modal - Shows in PWA for logged-in users */}
+      <NotificationPermissionModal />
     </PWAContext.Provider>
   )
 }

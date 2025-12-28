@@ -17,7 +17,9 @@ import {
   AlertTriangle,
   Info,
   RefreshCw,
-  Download
+  Download,
+  Settings2,
+  XCircle
 } from 'lucide-react'
 
 interface NotificationSettingsProps {
@@ -99,26 +101,64 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
     }
   }
 
-  // Get permission status display
-  const getPermissionStatus = () => {
+  // Get overall status color and message
+  const getOverallStatus = () => {
     if (!push.isSupported) {
-      return { color: 'text-red-400', text: 'לא נתמך', icon: AlertTriangle }
+      return {
+        status: 'unsupported',
+        color: 'text-red-400',
+        bgColor: 'bg-red-500/10 border-red-500/30',
+        icon: XCircle,
+        title: 'לא נתמך במכשיר',
+        message: 'הדפדפן או המכשיר שלך אינו תומך בהתראות. נסה להשתמש בדפדפן מודרני כמו Chrome, Firefox או Safari.'
+      }
     }
     
-    switch (push.permission) {
-      case 'granted':
-        return { color: 'text-green-400', text: 'מאושר', icon: CheckCircle }
-      case 'denied':
-        return { color: 'text-red-400', text: 'נדחה', icon: AlertTriangle }
-      case 'default':
-        return { color: 'text-amber-400', text: 'לא נבקש', icon: Info }
-      default:
-        return { color: 'text-foreground-muted', text: 'לא זמין', icon: Info }
+    if (push.permission === 'denied') {
+      return {
+        status: 'denied',
+        color: 'text-red-400',
+        bgColor: 'bg-red-500/10 border-red-500/30',
+        icon: XCircle,
+        title: 'ההתראות נחסמו',
+        message: 'חסמת את ההתראות בהגדרות המכשיר. כדי להפעיל מחדש, יש לפתוח את הגדרות הדפדפן ולאפשר התראות עבור האפליקציה.'
+      }
+    }
+    
+    if (push.isIOS && !pwa.isStandalone) {
+      return {
+        status: 'pwa_required',
+        color: 'text-amber-400',
+        bgColor: 'bg-amber-500/10 border-amber-500/30',
+        icon: Download,
+        title: 'נדרשת התקנה',
+        message: 'באייפון, יש להתקין את האפליקציה למסך הבית כדי לקבל התראות. לחץ על כפתור השיתוף (⎙) ובחר "הוסף למסך הבית".'
+      }
+    }
+    
+    if (push.isSubscribed) {
+      return {
+        status: 'active',
+        color: 'text-green-400',
+        bgColor: 'bg-green-500/10 border-green-500/30',
+        icon: CheckCircle,
+        title: 'התראות פעילות',
+        message: `המכשיר שלך רשום לקבלת התראות. תקבל תזכורות על תורים, עדכונים על שינויים והודעות חשובות.`
+      }
+    }
+    
+    return {
+      status: 'inactive',
+      color: 'text-foreground-muted',
+      bgColor: 'bg-white/5 border-white/10',
+      icon: BellOff,
+      title: 'התראות כבויות',
+      message: 'הפעל התראות כדי לקבל תזכורות על תורים קרובים, עדכונים על שינויים והודעות מהברברשופ.'
     }
   }
 
-  const permissionStatus = getPermissionStatus()
-  const PermissionIcon = permissionStatus.icon
+  const overallStatus = getOverallStatus()
+  const StatusIcon = overallStatus.icon
 
   return (
     <div className={cn('space-y-4', className)}>
@@ -138,143 +178,205 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
         </button>
       </div>
 
-      {/* Status Card */}
+      {/* Overall Status Card */}
+      <GlassCard padding="md" className={cn('border', overallStatus.bgColor)}>
+        <div className="flex items-start gap-4">
+          <div className={cn(
+            'w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0',
+            overallStatus.status === 'active' ? 'bg-green-500/20' :
+            overallStatus.status === 'denied' || overallStatus.status === 'unsupported' ? 'bg-red-500/20' :
+            overallStatus.status === 'pwa_required' ? 'bg-amber-500/20' :
+            'bg-white/10'
+          )}>
+            <StatusIcon size={24} className={overallStatus.color} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className={cn('font-medium', overallStatus.color)}>
+              {overallStatus.title}
+            </h3>
+            <p className="text-sm text-foreground-muted mt-1 leading-relaxed">
+              {overallStatus.message}
+            </p>
+          </div>
+        </div>
+      </GlassCard>
+
+      {/* Detailed Status Section */}
       <GlassCard padding="md" className="space-y-4">
+        <div className="flex items-center gap-2 text-foreground-muted mb-2">
+          <Settings2 size={14} />
+          <span className="text-xs font-medium">סטטוס מפורט</span>
+        </div>
+
         {/* PWA Status */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between py-2 border-b border-white/5">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
-              <Download size={14} className="text-foreground-muted" />
-            </div>
+            <Download size={16} className="text-foreground-muted" />
             <div>
               <p className="text-sm text-foreground-light">אפליקציה מותקנת</p>
-              <p className="text-xs text-foreground-muted">נדרש להתראות באייפון</p>
+              <p className="text-xs text-foreground-muted">
+                {pwa.isStandalone || pwa.isInstalled 
+                  ? 'האפליקציה מותקנת על המכשיר' 
+                  : 'משתמש דרך דפדפן'}
+              </p>
             </div>
           </div>
-          <span className={cn(
-            'text-xs font-medium px-2 py-1 rounded-full',
+          <div className={cn(
+            'flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full',
             pwa.isStandalone || pwa.isInstalled
               ? 'bg-green-500/20 text-green-400'
               : 'bg-amber-500/20 text-amber-400'
           )}>
-            {pwa.isStandalone || pwa.isInstalled ? 'כן' : 'לא'}
-          </span>
+            {pwa.isStandalone || pwa.isInstalled ? (
+              <><CheckCircle size={12} /> מותקן</>
+            ) : (
+              <><Info size={12} /> לא מותקן</>
+            )}
+          </div>
         </div>
 
         {/* Permission Status */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between py-2 border-b border-white/5">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
-              <PermissionIcon size={14} className={permissionStatus.color} />
-            </div>
+            {push.permission === 'granted' ? (
+              <CheckCircle size={16} className="text-green-400" />
+            ) : push.permission === 'denied' ? (
+              <XCircle size={16} className="text-red-400" />
+            ) : (
+              <Info size={16} className="text-amber-400" />
+            )}
             <div>
-              <p className="text-sm text-foreground-light">הרשאת התראות</p>
-              <p className="text-xs text-foreground-muted">הרשאה מהמכשיר</p>
-            </div>
-          </div>
-          <span className={cn(
-            'text-xs font-medium px-2 py-1 rounded-full',
-            push.permission === 'granted' ? 'bg-green-500/20' : 'bg-white/10',
-            permissionStatus.color
-          )}>
-            {permissionStatus.text}
-          </span>
-        </div>
-
-        {/* Subscription Status */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
-              {push.isSubscribed ? (
-                <Bell size={14} className="text-accent-gold" />
-              ) : (
-                <BellOff size={14} className="text-foreground-muted" />
-              )}
-            </div>
-            <div>
-              <p className="text-sm text-foreground-light">התראות פעילות</p>
+              <p className="text-sm text-foreground-light">הרשאת מכשיר</p>
               <p className="text-xs text-foreground-muted">
-                {push.devices.length} מכשירים מחוברים
+                {push.permission === 'granted' 
+                  ? 'המכשיר מאפשר קבלת התראות'
+                  : push.permission === 'denied'
+                  ? 'ההרשאה נחסמה בהגדרות המכשיר'
+                  : 'טרם נתבקשה הרשאה'}
               </p>
             </div>
           </div>
-          <span className={cn(
-            'text-xs font-medium px-2 py-1 rounded-full',
+          <div className={cn(
+            'flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full',
+            push.permission === 'granted' ? 'bg-green-500/20 text-green-400' :
+            push.permission === 'denied' ? 'bg-red-500/20 text-red-400' :
+            'bg-amber-500/20 text-amber-400'
+          )}>
+            {push.permission === 'granted' ? 'מאושר' :
+             push.permission === 'denied' ? 'נחסם' :
+             'ממתין'}
+          </div>
+        </div>
+
+        {/* Subscription Status */}
+        <div className="flex items-center justify-between py-2">
+          <div className="flex items-center gap-3">
+            {push.isSubscribed ? (
+              <Bell size={16} className="text-accent-gold" />
+            ) : (
+              <BellOff size={16} className="text-foreground-muted" />
+            )}
+            <div>
+              <p className="text-sm text-foreground-light">רישום להתראות</p>
+              <p className="text-xs text-foreground-muted">
+                {push.isSubscribed 
+                  ? `${push.devices.length} מכשיר${push.devices.length !== 1 ? 'ים' : ''} רשומים`
+                  : 'לא רשום לקבלת התראות'}
+              </p>
+            </div>
+          </div>
+          <div className={cn(
+            'flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full',
             push.isSubscribed
               ? 'bg-green-500/20 text-green-400'
               : 'bg-white/10 text-foreground-muted'
           )}>
-            {push.isSubscribed ? 'פעיל' : 'כבוי'}
-          </span>
+            {push.isSubscribed ? (
+              <><CheckCircle size={12} /> פעיל</>
+            ) : (
+              <>כבוי</>
+            )}
+          </div>
         </div>
       </GlassCard>
 
-      {/* iOS Warning */}
-      {push.isIOS && !pwa.isStandalone && (
-        <GlassCard padding="sm" className="border-amber-500/30 bg-amber-500/5">
-          <div className="flex items-start gap-3">
-            <AlertTriangle size={18} className="text-amber-400 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-sm text-amber-400 font-medium">
-                נדרשת התקנת האפליקציה
-              </p>
-              <p className="text-xs text-amber-400/80 mt-1">
-                באייפון, יש להתקין את האפליקציה למסך הבית כדי לקבל התראות.
-                לחצו על כפתור השיתוף ובחרו &quot;הוסף למסך הבית&quot;.
-              </p>
-            </div>
-          </div>
+      {/* Benefits Info (when not subscribed) */}
+      {!push.isSubscribed && push.isSupported && push.permission !== 'denied' && (
+        <GlassCard padding="md" className="bg-accent-gold/5 border-accent-gold/20">
+          <h4 className="text-sm font-medium text-accent-gold mb-3 flex items-center gap-2">
+            <Bell size={14} />
+            למה להפעיל התראות?
+          </h4>
+          <ul className="space-y-2">
+            <li className="flex items-start gap-2 text-sm text-foreground-muted">
+              <span className="text-green-400 mt-0.5">✓</span>
+              <span>תזכורת לפני התור שלך - לעולם לא תשכח</span>
+            </li>
+            <li className="flex items-start gap-2 text-sm text-foreground-muted">
+              <span className="text-green-400 mt-0.5">✓</span>
+              <span>עדכון מיידי אם יש שינוי בתור שלך</span>
+            </li>
+            <li className="flex items-start gap-2 text-sm text-foreground-muted">
+              <span className="text-green-400 mt-0.5">✓</span>
+              <span>הודעות על מבצעים והטבות מיוחדות</span>
+            </li>
+          </ul>
+          <p className="text-xs text-foreground-muted/70 mt-3">
+            💡 אנחנו לא שולחים ספאם - רק הודעות חשובות שקשורות אליך!
+          </p>
         </GlassCard>
       )}
 
       {/* Enable/Disable Button */}
-      <GlassCard padding="md">
-        {!push.isSupported ? (
-          <div className="text-center py-4">
-            <AlertTriangle size={24} className="text-red-400 mx-auto mb-2" />
-            <p className="text-foreground-muted text-sm">
-              הדפדפן/מכשיר שלך אינו תומך בהתראות
+      {push.isSupported && push.permission !== 'denied' && (
+        <GlassCard padding="md">
+          {!push.isSubscribed ? (
+            <button
+              onClick={handleEnableNotifications}
+              disabled={isEnabling || (push.isIOS && !pwa.isStandalone)}
+              className={cn(
+                'w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold transition-all',
+                isEnabling || (push.isIOS && !pwa.isStandalone)
+                  ? 'bg-foreground-muted/20 text-foreground-muted cursor-not-allowed'
+                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90 shadow-gold'
+              )}
+            >
+              {isEnabling ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>מפעיל התראות...</span>
+                </>
+              ) : (
+                <>
+                  <Bell size={18} />
+                  <span>הפעל התראות עכשיו</span>
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={handleDisableNotifications}
+              disabled={push.isLoading}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-medium bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-all"
+            >
+              <BellOff size={18} />
+              <span>בטל התראות</span>
+            </button>
+          )}
+          
+          {push.isIOS && !pwa.isStandalone && (
+            <p className="text-xs text-foreground-muted text-center mt-3">
+              💡 התקן את האפליקציה קודם כדי להפעיל התראות
             </p>
-          </div>
-        ) : !push.isSubscribed ? (
-          <button
-            onClick={handleEnableNotifications}
-            disabled={isEnabling || (push.isIOS && !pwa.isStandalone)}
-            className={cn(
-              'w-full flex items-center justify-center gap-2 py-3 rounded-xl font-medium transition-all',
-              isEnabling || (push.isIOS && !pwa.isStandalone)
-                ? 'bg-foreground-muted/20 text-foreground-muted cursor-not-allowed'
-                : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
-            )}
-          >
-            {isEnabling ? (
-              <>
-                <Loader2 size={18} className="animate-spin" />
-                <span>מפעיל התראות...</span>
-              </>
-            ) : (
-              <>
-                <Bell size={18} />
-                <span>הפעל התראות</span>
-              </>
-            )}
-          </button>
-        ) : (
-          <button
-            onClick={handleDisableNotifications}
-            disabled={push.isLoading}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-medium bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-all"
-          >
-            <BellOff size={18} />
-            <span>בטל התראות</span>
-          </button>
-        )}
-      </GlassCard>
+          )}
+        </GlassCard>
+      )}
 
       {/* Connected Devices */}
       {push.devices.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-sm font-medium text-foreground-muted">
+          <h3 className="text-sm font-medium text-foreground-muted flex items-center gap-2">
+            <Smartphone size={14} />
             מכשירים מחוברים ({push.devices.length})
           </h3>
 
@@ -309,6 +411,10 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
               </div>
             </GlassCard>
           ))}
+          
+          <p className="text-xs text-foreground-muted/70 text-center">
+            כל מכשיר רשום יקבל התראות בנפרד
+          </p>
         </div>
       )}
 
@@ -324,4 +430,3 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
     </div>
   )
 }
-
