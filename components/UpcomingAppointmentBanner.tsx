@@ -5,8 +5,7 @@ import Link from 'next/link'
 import { useAuthStore } from '@/store/useAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatTime } from '@/lib/utils'
-import { format, isSameDay, addDays } from 'date-fns'
-import { he } from 'date-fns/locale'
+import { isSameDay, addDays } from 'date-fns'
 import { Calendar, Clock, ChevronLeft, Scissors } from 'lucide-react'
 import type { Reservation, Service, User } from '@/types/database'
 
@@ -19,6 +18,22 @@ export function UpcomingAppointmentBanner() {
   const { customer, isLoggedIn, isInitialized } = useAuthStore()
   const [nextAppointment, setNextAppointment] = useState<ReservationWithDetails | null>(null)
   const [loading, setLoading] = useState(true)
+  const [scrollProgress, setScrollProgress] = useState(0)
+
+  // Scroll listener for fade effect
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollY = window.scrollY
+      // Start fading at 50px, fully hidden at 150px
+      const progress = Math.min(scrollY / 100, 1)
+      setScrollProgress(progress)
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    handleScroll() // Initial check
+    
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   useEffect(() => {
     if (isInitialized && isLoggedIn && customer?.id) {
@@ -65,7 +80,7 @@ export function UpcomingAppointmentBanner() {
     }
   }
 
-  // Don't show if not logged in or no upcoming appointment
+  // Don't show if not logged in, no upcoming appointment, or fully scrolled
   if (!isInitialized || loading || !isLoggedIn || !nextAppointment) {
     return null
   }
@@ -81,7 +96,7 @@ export function UpcomingAppointmentBanner() {
     } else if (isSameDay(date, tomorrow)) {
       return 'מחר'
     } else {
-      return format(date, 'EEEE d/M', { locale: he })
+      return date.toLocaleDateString('he-IL', { weekday: 'short', day: 'numeric', month: 'short' })
     }
   }
 
@@ -89,13 +104,23 @@ export function UpcomingAppointmentBanner() {
   const timeStr = formatTime(nextAppointment.time_timestamp)
   const isToday = isSameDay(new Date(nextAppointment.time_timestamp), new Date())
 
+  // Hide completely when scrolled
+  if (scrollProgress >= 1) {
+    return null
+  }
+
   return (
     <Link
       href="/my-appointments"
       className={cn(
-        'block w-full py-2 px-4 transition-colors',
+        'block w-full py-2 px-4 transition-all duration-300',
         'bg-accent-gold/10 hover:bg-accent-gold/15 border-b border-accent-gold/20'
       )}
+      style={{
+        opacity: 1 - scrollProgress,
+        transform: `translateY(${-scrollProgress * 20}px)`,
+        pointerEvents: scrollProgress > 0.5 ? 'none' : 'auto',
+      }}
     >
       <div className="container-mobile flex items-center justify-between gap-3">
         {/* Info */}
@@ -130,4 +155,3 @@ export function UpcomingAppointmentBanner() {
     </Link>
   )
 }
-

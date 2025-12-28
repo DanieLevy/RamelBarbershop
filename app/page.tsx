@@ -42,7 +42,8 @@ export default async function HomePage() {
       <AppHeader />
       
       {/* Upcoming Appointment Banner - Fixed below header for logged-in customers */}
-      <div className="fixed top-[calc(var(--header-top-offset,0px)+56px)] left-0 right-0 z-40">
+      {/* z-30 to stay below header (z-50) and not interfere with dropdowns */}
+      <div className="fixed top-[calc(var(--header-top-offset,0px)+56px)] left-0 right-0 z-30">
         <UpcomingAppointmentBanner />
       </div>
       

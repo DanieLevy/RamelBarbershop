@@ -84,7 +84,7 @@ export function InstallBanner({
               התקינו את האפליקציה
             </h3>
             <p className="text-xs text-foreground-muted mt-0.5">
-              גישה מהירה לקביעת תורים
+              גישה מהירה + התראות על תורים
             </p>
           </div>
 
@@ -165,7 +165,7 @@ export function InstallBanner({
         </h2>
 
         <p className="text-foreground-muted text-sm mb-6">
-          התקינו את האפליקציה למסך הבית לגישה מהירה ונוחה
+          התקינו את האפליקציה למסך הבית לגישה מהירה, התראות על תורים ועוד
         </p>
 
         {/* Installation Steps */}

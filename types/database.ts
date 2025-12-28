@@ -529,3 +529,64 @@ export interface ReservationWithDetails extends Reservation {
   users?: User
   customers?: Customer
 }
+
+// =============================================================================
+// PUSH NOTIFICATIONS
+// =============================================================================
+
+// Device types for push notifications
+export type PushDeviceType = 'ios' | 'android' | 'desktop'
+
+// Push subscription database record
+export interface PushSubscription {
+  id: string
+  customer_id: string | null
+  barber_id: string | null
+  endpoint: string
+  p256dh: string
+  auth: string
+  device_type: PushDeviceType
+  device_name: string | null
+  user_agent: string | null
+  is_active: boolean
+  consecutive_failures: number
+  last_delivery_status: 'success' | 'failed' | 'pending' | null
+  last_used: string
+  created_at: string
+}
+
+// Customer notification settings database record
+export interface CustomerNotificationSettings {
+  id: string
+  customer_id: string
+  pwa_installed: boolean
+  notifications_enabled: boolean
+  reminder_enabled: boolean
+  cancellation_alerts_enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+// Notification payload for sending
+export interface NotificationPayload {
+  title: string
+  body: string
+  icon?: string
+  badge?: string
+  image?: string
+  url?: string
+  tag?: string
+  requireInteraction?: boolean
+  actions?: Array<{ action: string; title: string; icon?: string }>
+  data?: Record<string, unknown>
+  badgeCount?: number
+}
+
+// Push notification device info for display
+export interface PushDeviceInfo {
+  id: string
+  deviceType: PushDeviceType
+  deviceName: string | null
+  lastUsed: string
+  createdAt: string
+}

@@ -21,6 +21,7 @@ import {
   ChevronRight
 } from 'lucide-react'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { NotificationSettings } from '@/components/profile/NotificationSettings'
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -271,8 +272,11 @@ export default function ProfilePage() {
               </GlassCard>
             </div>
             
+            {/* Notification Settings */}
+            <NotificationSettings className="mt-6" />
+            
             {/* Actions */}
-            <div className="space-y-3">
+            <div className="space-y-3 mt-6">
               {/* View Appointments */}
               <button
                 onClick={() => router.push('/my-appointments')}
