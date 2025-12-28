@@ -10,9 +10,10 @@ import { User, Calendar, LogOut, Menu, X, Home, Phone, MapPin, Scissors, Chevron
 
 interface AppHeaderProps {
   barberImgUrl?: string
+  isWizardPage?: boolean
 }
 
-export function AppHeader({ barberImgUrl }: AppHeaderProps) {
+export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps) {
   const router = useRouter()
   const pathname = usePathname()
   
@@ -440,33 +441,22 @@ export function AppHeader({ barberImgUrl }: AppHeaderProps) {
 
           {isBarberPage && (
             <nav className="flex items-center justify-between">
-              {/* Back button */}
+              {/* Home button - clearly indicates going to home, not back */}
               <button
                 onClick={() => router.push('/')}
                 className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-white/10 transition-colors text-foreground-light"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 16 16"
-                  className="w-4 h-4 fill-current"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M1.22 8a.75.75 0 0 1 0-1.06L6.47 2.7a.75.75 0 1 1 1.06 1.06L3.81 7h10.44a.75.75 0 0 1 0 1.5H3.81l3.72 3.72a.75.75 0 1 1-1.06 1.06L1.22 8Z"
-                  />
-                </svg>
-                <span className="text-sm">חזור</span>
+                <Home size={16} strokeWidth={1.5} className="text-accent-gold" />
+                <span className="text-sm hidden sm:inline">בית</span>
               </button>
 
-              {/* Title */}
+              {/* Title - different for wizard vs profile */}
               <h1 className="text-base sm:text-lg font-medium text-foreground-light">
-                הזמנת תור
+                {isWizardPage ? 'הזמנת תור' : 'פרופיל ספר'}
               </h1>
 
               {/* Right side */}
               <div className="flex items-center gap-2">
-                <UserButton compact />
-                
                 {/* Barber avatar */}
                 <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden shadow-md border-2 border-accent-gold/40">
                   <Image

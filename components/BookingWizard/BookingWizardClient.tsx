@@ -121,12 +121,13 @@ export function BookingWizardClient({
   }
 
   return (
-    <div className="flex flex-col items-center gap-6 px-4 py-6">
+    <div className="flex flex-col gap-4 px-4 pt-4 pb-6">
+      {/* Step Indicator - Minimal */}
       <StepIndicator />
       
-      {/* Barber Messages */}
+      {/* Barber Messages - Only on service selection step */}
       {barberMessages.length > 0 && step === 1 && (
-        <div className="w-full max-w-md space-y-2">
+        <div className="w-full max-w-md mx-auto space-y-2">
           {barberMessages.map((msg) => (
             <div 
               key={msg.id} 
@@ -139,25 +140,26 @@ export function BookingWizardClient({
         </div>
       )}
       
-      {/* Show logged-in badge */}
+      {/* Logged-in badge */}
       {isUserLoggedIn && loggedInCustomer && step === 1 && (
-        <div className="w-full max-w-md bg-accent-gold/10 border border-accent-gold/30 rounded-xl p-3 text-center">
+        <div className="w-full max-w-md mx-auto bg-accent-gold/10 border border-accent-gold/30 rounded-xl p-3 text-center">
           <p className="text-accent-gold text-sm">
             מחובר כ-<strong>{loggedInCustomer.fullname}</strong> • לא נדרש אימות נוסף
           </p>
         </div>
       )}
       
-      {/* Show message if no services */}
+      {/* No services message */}
       {services.length === 0 && step === 1 && (
-        <div className="w-full max-w-md bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-center">
+        <div className="w-full max-w-md mx-auto bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-center">
           <p className="text-red-400 text-sm">
             אין שירותים זמינים לספר זה כרגע. אנא נסה שוב מאוחר יותר.
           </p>
         </div>
       )}
       
-      <div className="w-full max-w-md">
+      {/* Main Step Content */}
+      <div className="w-full max-w-md mx-auto">
         {renderStep()}
       </div>
     </div>

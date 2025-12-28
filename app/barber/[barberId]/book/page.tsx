@@ -68,9 +68,16 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
   
   return (
     <>
-      <AppHeader barberImgUrl={barber.img_url || undefined} />
+      <AppHeader barberImgUrl={barber.img_url || undefined} isWizardPage />
       
-      <main className="pt-16 sm:pt-20 min-h-screen bg-background-dark pb-20">
+      {/* Main content - safe area handled via CSS variable */}
+      <main 
+        className="min-h-screen bg-background-dark pb-24"
+        style={{
+          // Account for header + safe area
+          paddingTop: 'calc(var(--header-top-offset, 0px) + 4rem)',
+        }}
+      >
         <BookingWizardClient
           barberId={barberId}
           barber={barber}

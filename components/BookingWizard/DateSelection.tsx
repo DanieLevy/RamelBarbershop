@@ -439,13 +439,17 @@ export function DateSelection({
           {selectedDate && <ChevronLeft size={18} strokeWidth={2} />}
         </button>
 
-        {/* Back Button */}
+        {/* Back Button - Goes back to barber profile/service selection */}
         <button
-          onClick={prevStep}
+          onClick={() => {
+            // If we came from service selection on barber profile, go back there
+            // prevStep would go to service selection step in wizard
+            prevStep()
+          }}
           className="flex items-center justify-center gap-2 text-foreground-muted hover:text-foreground-light transition-colors text-sm py-2"
         >
           <ChevronRight size={14} strokeWidth={1.5} />
-          <span>חזרה</span>
+          <span>חזרה לבחירת שירות</span>
         </button>
       </div>
     </div>
