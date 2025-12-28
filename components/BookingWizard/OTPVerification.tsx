@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { getOrCreateCustomer } from '@/lib/services/customer.service'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useBugReporter } from '@/hooks/useBugReporter'
 
 const RECAPTCHA_CONTAINER_ID = 'recaptcha-container'
 const RESEND_COOLDOWN_SECONDS = 60
@@ -29,6 +30,7 @@ export function OTPVerification() {
   } = useBookingStore()
   
   const { login } = useAuthStore()
+  const { report } = useBugReporter('OTPVerification')
 
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [sending, setSending] = useState(false)
@@ -119,6 +121,7 @@ export function OTPVerification() {
       }
     } catch (err) {
       console.error('Unexpected OTP send error:', err)
+      await report(err, 'Sending OTP during booking wizard')
       if (isMountedRef.current) {
         setError('שגיאה בלתי צפויה - נסה שוב')
         setRetryCount(prev => prev + 1)

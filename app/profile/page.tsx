@@ -20,10 +20,12 @@ import {
   History,
   ChevronRight
 } from 'lucide-react'
+import { useBugReporter } from '@/hooks/useBugReporter'
 
 export default function ProfilePage() {
   const router = useRouter()
   const { customer, isLoggedIn, isLoading, isInitialized, logout } = useAuthStore()
+  const { report } = useBugReporter('ProfilePage')
   
   const [editingName, setEditingName] = useState(false)
   const [newName, setNewName] = useState('')
@@ -68,6 +70,7 @@ export default function ProfilePage() {
       setAppointmentCount(count || 0)
     } catch (err) {
       console.error('Error fetching stats:', err)
+      await report(err, 'Fetching customer profile stats')
     } finally {
       setLoadingStats(false)
     }
@@ -98,6 +101,7 @@ export default function ProfilePage() {
       
       if (error) {
         console.error('Error updating name:', error)
+        await report(new Error(error.message), 'Updating customer name')
         toast.error('שגיאה בעדכון השם')
         return
       }
@@ -111,6 +115,7 @@ export default function ProfilePage() {
       setEditingName(false)
     } catch (err) {
       console.error('Error updating name:', err)
+      await report(err, 'Updating customer name (exception)')
       toast.error('שגיאה בעדכון השם')
     } finally {
       setSavingName(false)

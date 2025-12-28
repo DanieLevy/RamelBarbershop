@@ -13,6 +13,7 @@ import { Calendar, Clock, Scissors, User, X, History, ChevronRight, LogIn } from
 import type { LucideIcon } from 'lucide-react'
 import type { ReservationWithDetails } from '@/types/database'
 import { LoginModal } from '@/components/LoginModal'
+import { useBugReporter } from '@/hooks/useBugReporter'
 
 type TabType = 'upcoming' | 'past' | 'cancelled'
 
@@ -26,6 +27,7 @@ interface Tab {
 export default function MyAppointmentsPage() {
   const router = useRouter()
   const { customer, isLoggedIn, isLoading, isInitialized } = useAuthStore()
+  const { report } = useBugReporter('MyAppointmentsPage')
   
   const [reservations, setReservations] = useState<ReservationWithDetails[]>([])
   const [loading, setLoading] = useState(true)
@@ -72,6 +74,7 @@ export default function MyAppointmentsPage() {
       
       if (error) {
         console.error('Error fetching reservations:', error)
+        await report(new Error(error.message), 'Fetching customer reservations')
         toast.error('שגיאה בטעינת התורים')
         return
       }
@@ -79,6 +82,7 @@ export default function MyAppointmentsPage() {
       setReservations((data as ReservationWithDetails[]) || [])
     } catch (err) {
       console.error('Error fetching reservations:', err)
+      await report(err, 'Fetching customer reservations (exception)')
       toast.error('שגיאה בטעינת התורים')
     } finally {
       setLoading(false)
@@ -105,6 +109,7 @@ export default function MyAppointmentsPage() {
       if (error) {
         console.error('Error cancelling reservation:', error)
         console.error('Error details:', JSON.stringify(error, null, 2))
+        await report(new Error((error as Error)?.message || 'Unknown cancellation error'), 'Cancelling customer reservation')
         toast.error(`שגיאה בביטול התור: ${(error as Error)?.message || 'נסה שוב'}`)
         return
       }
@@ -130,6 +135,7 @@ export default function MyAppointmentsPage() {
       await fetchReservations()
     } catch (err) {
       console.error('Error cancelling reservation:', err)
+      await report(err, 'Cancelling customer reservation (exception)')
       toast.error('שגיאה בביטול התור')
     } finally {
       setCancellingId(null)

@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Plus, Trash, Calendar, Clock } from 'lucide-react'
 import type { BarberSchedule, BarberClosure, BarbershopSettings } from '@/types/database'
+import { useBugReporter } from '@/hooks/useBugReporter'
 
 const DAYS = [
   { key: 'sunday', label: 'ראשון' },
@@ -20,6 +21,7 @@ const DAYS = [
 
 export default function MySchedulePage() {
   const { barber } = useBarberAuthStore()
+  const { report } = useBugReporter('MySchedulePage')
   
   const [schedule, setSchedule] = useState<BarberSchedule | null>(null)
   const [closures, setClosures] = useState<BarberClosure[]>([])
@@ -143,6 +145,7 @@ export default function MySchedulePage() {
       
       if (error) {
         console.error('Error updating schedule:', error)
+        await report(new Error(error.message), 'Updating barber schedule')
         toast.error('שגיאה בעדכון הלוח')
       } else {
         toast.success('הלוח עודכן בהצלחה!')
@@ -154,6 +157,7 @@ export default function MySchedulePage() {
       
       if (error) {
         console.error('Error creating schedule:', error)
+        await report(new Error(error.message), 'Creating barber schedule')
         toast.error('שגיאה ביצירת הלוח')
       } else {
         toast.success('הלוח נשמר בהצלחה!')
@@ -190,6 +194,7 @@ export default function MySchedulePage() {
     
     if (error) {
       console.error('Error adding closure:', error)
+      await report(new Error(error.message), 'Adding barber closure')
       toast.error('שגיאה בהוספת יום סגירה')
     } else {
       toast.success('יום הסגירה נוסף בהצלחה!')
@@ -215,6 +220,7 @@ export default function MySchedulePage() {
     
     if (error) {
       console.error('Error deleting closure:', error)
+      await report(new Error(error.message), 'Deleting barber closure')
       toast.error('שגיאה במחיקה')
     } else {
       toast.success('נמחק בהצלחה')

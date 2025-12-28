@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { uploadProductImage, deleteProductImage } from '@/lib/storage/upload'
 import { toast } from 'sonner'
 import { cn, formatPrice } from '@/lib/utils'
+import { useBugReporter } from '@/hooks/useBugReporter'
 import { 
   Plus, 
   Pencil, 
@@ -26,6 +27,7 @@ export default function ProductsPage() {
   const router = useRouter()
   const { isAdmin } = useBarberAuthStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { report } = useBugReporter('ProductsPage')
   
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -67,6 +69,7 @@ export default function ProductsPage() {
       setProducts((data as Product[]) || [])
     } catch (error) {
       console.error('Error fetching products:', error)
+      await report(error, 'Fetching products list')
       toast.error('שגיאה בטעינת המוצרים')
     } finally {
       setLoading(false)
@@ -200,6 +203,7 @@ export default function ProductsPage() {
       fetchProducts()
     } catch (error) {
       console.error('Error saving product:', error)
+      await report(error, 'Saving product')
       toast.error('שגיאה בשמירת המוצר')
     } finally {
       setSaving(false)
@@ -233,6 +237,7 @@ export default function ProductsPage() {
       fetchProducts()
     } catch (error) {
       console.error('Error deleting product:', error)
+      await report(error, 'Deleting product')
       toast.error('שגיאה במחיקת המוצר')
     }
   }
@@ -252,6 +257,7 @@ export default function ProductsPage() {
       fetchProducts()
     } catch (error) {
       console.error('Error toggling product:', error)
+      await report(error, 'Toggling product visibility')
       toast.error('שגיאה בעדכון המוצר')
     }
   }

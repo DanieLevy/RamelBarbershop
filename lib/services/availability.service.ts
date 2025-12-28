@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 import type { BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure, BarberMessage } from '@/types/database'
+import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
 
 /**
  * Get barbershop settings
@@ -14,6 +15,7 @@ export async function getBarbershopSettings(): Promise<BarbershopSettings | null
   
   if (error) {
     console.error('Error fetching barbershop settings:', error)
+    await reportSupabaseError(error, 'Fetching barbershop settings', { table: 'barbershop_settings', operation: 'select' })
     return null
   }
   
@@ -33,6 +35,7 @@ export async function getBarbershopClosures(): Promise<BarbershopClosure[]> {
   
   if (error) {
     console.error('Error fetching barbershop closures:', error)
+    await reportSupabaseError(error, 'Fetching barbershop closures', { table: 'barbershop_closures', operation: 'select' })
     return []
   }
   
@@ -53,6 +56,7 @@ export async function getBarberSchedule(barberId: string): Promise<BarberSchedul
   
   if (error && error.code !== 'PGRST116') {
     console.error('Error fetching barber schedule:', error)
+    await reportSupabaseError(error, 'Fetching barber schedule', { table: 'barber_schedules', operation: 'select' })
   }
   
   return data as BarberSchedule | null
@@ -72,6 +76,7 @@ export async function getBarberClosures(barberId: string): Promise<BarberClosure
   
   if (error) {
     console.error('Error fetching barber closures:', error)
+    await reportSupabaseError(error, 'Fetching barber closures', { table: 'barber_closures', operation: 'select' })
     return []
   }
   
@@ -92,6 +97,7 @@ export async function getBarberMessages(barberId: string): Promise<BarberMessage
   
   if (error) {
     console.error('Error fetching barber messages:', error)
+    await reportSupabaseError(error, 'Fetching barber messages', { table: 'barber_messages', operation: 'select' })
     return []
   }
   

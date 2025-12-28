@@ -8,10 +8,12 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Plus, Trash, Calendar } from 'lucide-react'
 import type { BarbershopClosure } from '@/types/database'
+import { useBugReporter } from '@/hooks/useBugReporter'
 
 export default function ClosuresPage() {
   const router = useRouter()
   const { isAdmin } = useBarberAuthStore()
+  const { report } = useBugReporter('ClosuresPage')
   
   const [closures, setClosures] = useState<BarbershopClosure[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,6 +42,7 @@ export default function ClosuresPage() {
     
     if (error) {
       console.error('Error fetching closures:', error)
+      await report(new Error(error.message), 'Fetching barbershop closures')
     }
     
     setClosures((data as BarbershopClosure[]) || [])
@@ -69,6 +72,7 @@ export default function ClosuresPage() {
     
     if (error) {
       console.error('Error adding closure:', error)
+      await report(new Error(error.message), 'Adding barbershop closure')
       toast.error('שגיאה בהוספת יום סגירה')
     } else {
       toast.success('יום הסגירה נוסף בהצלחה!')
@@ -94,6 +98,7 @@ export default function ClosuresPage() {
     
     if (error) {
       console.error('Error deleting closure:', error)
+      await report(new Error(error.message), 'Deleting barbershop closure')
       toast.error('שגיאה במחיקה')
     } else {
       toast.success('נמחק בהצלחה')

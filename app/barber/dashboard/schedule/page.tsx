@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { BarbershopSettings } from '@/types/database'
+import { useBugReporter } from '@/hooks/useBugReporter'
 
 const DAYS = [
   { key: 'sunday', label: 'ראשון' },
@@ -21,6 +22,7 @@ const DAYS = [
 export default function GlobalSchedulePage() {
   const router = useRouter()
   const { isAdmin } = useBarberAuthStore()
+  const { report } = useBugReporter('GlobalSchedulePage')
   
   const [settings, setSettings] = useState<BarbershopSettings | null>(null)
   const [loading, setLoading] = useState(true)
@@ -48,6 +50,7 @@ export default function GlobalSchedulePage() {
     
     if (error) {
       console.error('Error fetching settings:', error)
+      await report(new Error(error.message), 'Fetching barbershop schedule settings')
       toast.error('שגיאה בטעינת ההגדרות')
       return
     }
@@ -86,6 +89,7 @@ export default function GlobalSchedulePage() {
     
     if (error) {
       console.error('Error saving schedule:', error)
+      await report(new Error(error.message), 'Saving barbershop schedule settings')
       toast.error('שגיאה בשמירת שעות הפתיחה')
     } else {
       toast.success('שעות הפתיחה נשמרו בהצלחה!')

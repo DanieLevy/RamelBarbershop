@@ -6,6 +6,7 @@ import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useBugReporter } from '@/hooks/useBugReporter'
 import { 
   Store, 
   MapPin, 
@@ -24,6 +25,7 @@ type SectionKey = 'basic' | 'hero' | 'location' | 'contact'
 export default function SettingsPage() {
   const router = useRouter()
   const { isAdmin } = useBarberAuthStore()
+  const { report } = useBugReporter('SettingsPage')
   
   const [settings, setSettings] = useState<BarbershopSettings | null>(null)
   const [loading, setLoading] = useState(true)
@@ -82,6 +84,7 @@ export default function SettingsPage() {
     
     if (error) {
       console.error('Error fetching settings:', error)
+      await report(new Error(error.message), 'Fetching barbershop settings')
       toast.error('שגיאה בטעינת ההגדרות')
       return
     }
@@ -183,6 +186,7 @@ export default function SettingsPage() {
     
     if (error) {
       console.error('Error saving settings:', error)
+      await report(new Error(error.message), 'Saving barbershop settings')
       toast.error('שגיאה בשמירת ההגדרות')
     } else {
       toast.success('ההגדרות נשמרו בהצלחה!')

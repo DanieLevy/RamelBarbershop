@@ -6,8 +6,8 @@
 
 import type { BugReportData, BugReportPayload, BugSeverity, UserContext, EnvironmentInfo } from './types'
 
-// App version - updated during build
-const APP_VERSION = '1.0.0'
+// App version - synced from package.json
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '2.0.0'
 
 /**
  * Generate a unique report ID

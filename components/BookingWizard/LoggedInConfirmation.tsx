@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import type { BarberWithWorkDays } from '@/types/database'
 import { cn, formatTime } from '@/lib/utils'
 import { Check, Calendar, Clock, Scissors, User, Phone } from 'lucide-react'
+import { useBugReporter } from '@/hooks/useBugReporter'
 
 interface LoggedInConfirmationProps {
   barber: BarberWithWorkDays
@@ -21,6 +22,7 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
     prevStep,
     reset,
   } = useBookingStore()
+  const { report } = useBugReporter('LoggedInConfirmation')
   
   const [isCreating, setIsCreating] = useState(false)
   const [isCreated, setIsCreated] = useState(false)
@@ -65,6 +67,7 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
       
       if (insertError) {
         console.error('Error creating reservation:', insertError)
+        await report(new Error(insertError.message), 'Creating reservation for logged-in customer')
         setError('שגיאה ביצירת התור. נסה שוב.')
         toast.error('שגיאה ביצירת התור')
         hasCreatedRef.current = false
@@ -75,6 +78,7 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
       toast.success('התור נקבע בהצלחה!')
     } catch (err) {
       console.error('Unexpected error creating reservation:', err)
+      await report(err, 'Creating reservation (exception)')
       setError('שגיאה בלתי צפויה. נסה שוב.')
       hasCreatedRef.current = false
     } finally {

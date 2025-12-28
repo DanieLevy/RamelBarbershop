@@ -7,6 +7,7 @@ import { formatTime, cn, parseTimeString, generateTimeSlots } from '@/lib/utils'
 import type { TimeSlot, BarbershopSettings, BarberSchedule } from '@/types/database'
 import { ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
+import { useBugReporter } from '@/hooks/useBugReporter'
 
 interface TimeSelectionProps {
   barberId: string
@@ -25,6 +26,7 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule }: TimeSe
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showReserved, setShowReserved] = useState(false)
+  const { report } = useBugReporter('TimeSelection')
 
   // Get work hours from barber schedule or shop settings
   const getWorkHours = (): { start: string; end: string } => {
@@ -83,6 +85,7 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule }: TimeSe
         
         if (resError) {
           console.error('Error fetching reservations:', resError)
+          await report(new Error((resError as Error)?.message || 'Unknown reservation fetch error'), 'Fetching reservations for time slots')
         }
         
         // Create a set of reserved timestamps
@@ -119,6 +122,7 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule }: TimeSe
         setReservedSlots(reserved)
       } catch (err) {
         console.error('Error fetching time slots:', err)
+        await report(err, 'Fetching time slots (exception)')
         setError('שגיאה בטעינת השעות')
       } finally {
         setLoading(false)

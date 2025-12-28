@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { Calendar, Clock, CheckCircle, XCircle } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Reservation, Service } from '@/types/database'
+import { useBugReporter } from '@/hooks/useBugReporter'
 
 interface DashboardStats {
   todayReservations: number
@@ -21,6 +22,7 @@ interface UpcomingReservation extends Reservation {
 
 export default function DashboardPage() {
   const { barber, isAdmin } = useBarberAuthStore()
+  const { report } = useBugReporter('DashboardPage')
   const [stats, setStats] = useState<DashboardStats>({
     todayReservations: 0,
     upcomingReservations: 0,
@@ -83,6 +85,7 @@ export default function DashboardPage() {
       setUpcomingList(upcoming.slice(0, 5))
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
+      await report(error, 'Fetching barber dashboard data')
     } finally {
       setLoading(false)
     }
