@@ -375,6 +375,8 @@ export interface Database {
           day_name: string
           day_num: string
           status: 'confirmed' | 'cancelled' | 'completed'
+          cancelled_by: 'customer' | 'barber' | null
+          cancellation_reason: string | null
           created_at: string
         }
         Insert: {
@@ -389,6 +391,8 @@ export interface Database {
           day_name: string
           day_num: string
           status?: 'confirmed' | 'cancelled' | 'completed'
+          cancelled_by?: 'customer' | 'barber' | null
+          cancellation_reason?: string | null
           created_at?: string
         }
         Update: {
@@ -398,6 +402,8 @@ export interface Database {
           customer_id?: string | null
           customer_name?: string
           customer_phone?: string
+          cancelled_by?: 'customer' | 'barber' | null
+          cancellation_reason?: string | null
           date_timestamp?: number
           time_timestamp?: number
           day_name?: string

@@ -98,11 +98,14 @@ export default function MyAppointmentsPage() {
     try {
       const supabase = createClient()
       
-      // Perform the update
+      // Perform the update - track that customer cancelled
       const { data, error } = await (supabase
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .from('reservations') as any)
-        .update({ status: 'cancelled' })
+        .update({ 
+          status: 'cancelled',
+          cancelled_by: 'customer'
+        })
         .eq('id', reservationId)
         .select('id, status') as { data: { id: string; status: string }[] | null; error: unknown }
       
@@ -420,6 +423,20 @@ export default function MyAppointmentsPage() {
                         </span>
                       </div>
                     </div>
+                    
+                    {/* Cancellation Reason (when cancelled by barber) */}
+                    {reservation.status === 'cancelled' && reservation.cancelled_by === 'barber' && (
+                      <div className="mt-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                        <p className="text-red-400 text-xs">
+                          <span className="font-medium">בוטל על ידי הספר</span>
+                          {reservation.cancellation_reason && (
+                            <span className="block mt-1 text-red-300/80">
+                              סיבה: {reservation.cancellation_reason}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    )}
                     
                     {/* Price */}
                     {reservation.services?.price && (

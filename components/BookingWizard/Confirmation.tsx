@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useBookingStore } from '@/store/useBookingStore'
-import { formatTime } from '@/lib/utils'
+import { formatTime, formatDateHebrew } from '@/lib/utils'
 import type { User } from '@/types/database'
 import { CheckCircle, Calendar, Clock, Scissors, User as UserIcon, Phone } from 'lucide-react'
 
@@ -27,13 +27,16 @@ export function Confirmation({ barber: _barber }: ConfirmationProps) {
   }
 
   const sendWhatsAppReminder = () => {
+    // Format full date with month and year
+    const fullDate = date?.dateTimestamp ? formatDateHebrew(date.dateTimestamp) : `${date?.dayName} ${date?.dayNum}`
+    
     const message = encodeURIComponent(
       `היי ${customer.fullname}! 🎉\n` +
       `התור שלך נקבע בהצלחה:\n\n` +
-      `📅 ${date?.dayName} ${date?.dayNum}\n` +
-      `⏰ ${timeTimestamp ? formatTime(timeTimestamp) : ''}\n` +
-      `💇 ${service?.name_he}\n` +
-      `💰 ₪${service?.price}\n\n` +
+      `📅 תאריך: ${fullDate}\n` +
+      `⏰ שעה: ${timeTimestamp ? formatTime(timeTimestamp) : ''}\n` +
+      `💇 שירות: ${service?.name_he}\n` +
+      `💰 מחיר: ₪${service?.price}\n\n` +
       `אנחנו ממתינים לך!\n` +
       `רמאל ברברשופ 💈`
     )

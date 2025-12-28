@@ -69,12 +69,15 @@ export default function RootLayout({
             theme="dark"
             toastOptions={{
               className: 'mb-16 md:mb-0',
-              style: {
-                background: 'var(--glass-bg-strong)',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#F2F2F2',
-                fontFamily: 'Ploni, Rubik, sans-serif',
+              classNames: {
+                toast: 'bg-background-card/95 backdrop-blur-xl border border-white/10 text-foreground-light font-ploni shadow-xl',
+                title: 'text-foreground-light font-medium text-sm',
+                description: 'text-foreground-muted text-xs',
+                closeButton: '!bg-white/10 hover:!bg-white/20 !border-0 !w-5 !h-5 !p-0 !right-2 !top-2 [&>svg]:!w-3 [&>svg]:!h-3',
+                success: '!border-green-500/30 [&>[data-icon]]:text-green-400',
+                error: '!border-red-500/30 [&>[data-icon]]:text-red-400',
+                warning: '!border-amber-500/30 [&>[data-icon]]:text-amber-400',
+                info: '!border-blue-500/30 [&>[data-icon]]:text-blue-400',
               },
             }}
           />

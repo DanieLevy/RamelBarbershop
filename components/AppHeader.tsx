@@ -334,13 +334,27 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
         )}
         style={{
           // Dynamic background based on scroll - starts fully transparent
-          backgroundColor: `rgba(8, 11, 13, ${scrollProgress * 0.95})`,
-          backdropFilter: `blur(${scrollProgress * 20}px)`,
-          WebkitBackdropFilter: `blur(${scrollProgress * 20}px)`,
+          // On barber pages, start with a very subtle dark background for readability
+          backgroundColor: isBarberPage 
+            ? `rgba(8, 11, 13, ${Math.max(0.4, scrollProgress * 0.95)})` 
+            : `rgba(8, 11, 13, ${scrollProgress * 0.95})`,
+          backdropFilter: `blur(${isBarberPage ? Math.max(8, scrollProgress * 20) : scrollProgress * 20}px)`,
+          WebkitBackdropFilter: `blur(${isBarberPage ? Math.max(8, scrollProgress * 20) : scrollProgress * 20}px)`,
           // Use CSS custom property for safe area - falls back to 0 in browser
           top: 'var(--header-top-offset, 0px)',
         }}
       >
+        {/* Bottom fade gradient for barber pages - very light fade out effect */}
+        {isBarberPage && (
+          <div 
+            className="absolute bottom-0 left-0 right-0 h-4 pointer-events-none"
+            style={{
+              background: 'linear-gradient(to bottom, transparent, rgba(8, 11, 13, 0.3))',
+              transform: 'translateY(100%)',
+            }}
+          />
+        )}
+        
         {/* Top accent line */}
         <div 
           className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-accent-gold to-transparent transition-opacity duration-500"
