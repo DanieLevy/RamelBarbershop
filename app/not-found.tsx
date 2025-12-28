@@ -51,13 +51,8 @@ export default function NotFound() {
 
         {/* Message */}
         <h2 className="text-2xl sm:text-3xl font-medium text-foreground-light mb-3">
-          אופס! קיצוץ שלא הצליח
+          אופס! הדף שחיפשת לא נמצא
         </h2>
-        <p className="text-foreground-muted mb-8 text-sm sm:text-base">
-          נראה שהדף שחיפשת נגזר מהאתר שלנו.
-          <br />
-          בוא נחזיר אותך למסלול.
-        </p>
 
         {/* CTA Button */}
         <Link
@@ -78,11 +73,6 @@ export default function NotFound() {
           </svg>
           חזרה לדף הבית
         </Link>
-
-        {/* Fun message */}
-        <p className="mt-8 text-foreground-muted/50 text-xs">
-          &ldquo;Hair we go again...&rdquo; 💈
-        </p>
       </div>
 
       {/* Decorative elements */}

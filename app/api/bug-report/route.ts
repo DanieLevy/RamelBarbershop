@@ -52,45 +52,57 @@ export async function POST(request: NextRequest) {
       critical: '🔴',
     }[payload.severity || 'medium']
 
+    // Truncate action for tags (max 256 chars for Resend tags)
+    const truncatedAction = payload.action.substring(0, 50).replace(/[^a-zA-Z0-9-_]/g, '_')
+    
     // Send email via Resend
-    const { data, error } = await resend.emails.send({
-      from: 'Ramel Bug Reporter <onboarding@resend.dev>',
-      to: [TO_EMAIL],
-      subject: `${severityEmoji} [Bug] ${payload.error.name}: ${payload.error.message.substring(0, 50)}${payload.error.message.length > 50 ? '...' : ''}`,
-      html: htmlContent,
-      text: textContent,
-      tags: [
-        { name: 'reportId', value: payload.reportId },
-        { name: 'severity', value: payload.severity || 'medium' },
-        { name: 'action', value: payload.action.substring(0, 50) },
-      ],
-    })
+    try {
+      const { data, error } = await resend.emails.send({
+        from: 'Ramel Bug Reporter <onboarding@resend.dev>',
+        to: [TO_EMAIL],
+        subject: `${severityEmoji} [Bug] ${payload.error.name}: ${payload.error.message.substring(0, 50)}${payload.error.message.length > 50 ? '...' : ''}`,
+        html: htmlContent,
+        text: textContent,
+        tags: [
+          { name: 'reportId', value: payload.reportId },
+          { name: 'severity', value: payload.severity || 'medium' },
+          { name: 'action', value: truncatedAction },
+        ],
+      })
 
-    if (error) {
-      console.error('[BugReport] Failed to send email:', error)
-      
-      // Still log the report even if email fails
-      console.log('[BugReport] Report (email failed):', JSON.stringify(payload, null, 2))
-      
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Failed to send email',
+      if (error) {
+        console.error('[BugReport] Resend API error:', JSON.stringify(error, null, 2))
+        
+        // Still log the report even if email fails - but return success so the UI shows report was logged
+        console.log('[BugReport] Report (email failed, logged locally):', JSON.stringify(payload, null, 2))
+        
+        return NextResponse.json({
+          success: true,
           reportId: payload.reportId,
-          details: error.message,
-        },
-        { status: 500 }
-      )
+          message: 'Bug report logged (email delivery failed)',
+          emailError: error.message,
+        })
+      }
+
+      console.log('[BugReport] Email sent successfully:', data?.id)
+
+      return NextResponse.json({
+        success: true,
+        reportId: payload.reportId,
+        emailId: data?.id,
+        message: 'Bug report sent successfully',
+      })
+    } catch (resendError) {
+      console.error('[BugReport] Resend exception:', resendError)
+      console.log('[BugReport] Report (logged locally due to exception):', JSON.stringify(payload, null, 2))
+      
+      // Return success since we logged it - don't fail the whole thing
+      return NextResponse.json({
+        success: true,
+        reportId: payload.reportId,
+        message: 'Bug report logged (email service unavailable)',
+      })
     }
-
-    console.log('[BugReport] Email sent successfully:', data?.id)
-
-    return NextResponse.json({
-      success: true,
-      reportId: payload.reportId,
-      emailId: data?.id,
-      message: 'Bug report sent successfully',
-    })
 
   } catch (error) {
     console.error('[BugReport] Server error:', error)

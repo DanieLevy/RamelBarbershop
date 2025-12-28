@@ -1,9 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { reportBug, getEnvironmentInfo } from '@/lib/bug-reporter'
+import { useState, useEffect } from 'react'
+import { getEnvironmentInfo, type EnvironmentInfo } from '@/lib/bug-reporter'
 import { trySafe, reportSupabaseError, reportFirebaseError } from '@/lib/bug-reporter/helpers'
-import { useBugReporter } from '@/hooks/useBugReporter'
 import { Bug, Database, Flame, Server, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -18,11 +17,15 @@ interface TestResult {
 }
 
 export default function DebugPage() {
-  const { report } = useBugReporter('DebugPage')
-  
   const [test1, setTest1] = useState<TestResult>({ status: 'idle' })
   const [test2, setTest2] = useState<TestResult>({ status: 'idle' })
   const [test3, setTest3] = useState<TestResult>({ status: 'idle' })
+  const [envInfo, setEnvInfo] = useState<EnvironmentInfo | null>(null)
+
+  // Get environment info on client side only to avoid hydration mismatch
+  useEffect(() => {
+    setEnvInfo(getEnvironmentInfo())
+  }, [])
 
   // Test 1: Simulate a Database/API Error
   const runTest1 = async () => {
@@ -331,7 +334,7 @@ export default function DebugPage() {
             Environment Info
           </h4>
           <pre className="text-xs text-foreground-muted bg-black/30 p-3 rounded-lg overflow-x-auto">
-            {JSON.stringify(getEnvironmentInfo(), null, 2)}
+            {envInfo ? JSON.stringify(envInfo, null, 2) : 'Loading...'}
           </pre>
         </div>
       </div>
