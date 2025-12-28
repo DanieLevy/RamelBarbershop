@@ -164,58 +164,61 @@ export default function BarbersPage() {
         </button>
       </div>
 
-      {/* Add/Edit Form */}
+      {/* Add/Edit Form - Mobile-friendly stacked layout */}
       {showForm && (
-        <div className="bg-background-card border border-white/10 rounded-2xl p-6 mb-6">
+        <div className="bg-background-card border border-white/10 rounded-2xl p-4 sm:p-6 mb-6">
           <h3 className="text-lg font-medium text-foreground-light mb-4">
             {editingId ? 'עריכת ספר' : 'הוסף ספר חדש'}
           </h3>
           
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="flex flex-col gap-2">
-              <label className="text-foreground-light text-sm">שם מלא *</label>
-              <input
-                type="text"
-                value={fullname}
-                onChange={(e) => setFullname(e.target.value)}
-                className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold"
-              />
+          {/* Stacked on mobile, grid on larger screens */}
+          <div className="space-y-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-foreground-light text-sm">שם מלא *</label>
+                <input
+                  type="text"
+                  value={fullname}
+                  onChange={(e) => setFullname(e.target.value)}
+                  className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-foreground-light text-sm">אימייל *</label>
+                <input
+                  type="email"
+                  dir="ltr"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-left"
+                />
+              </div>
             </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-foreground-light text-sm">אימייל *</label>
-              <input
-                type="email"
-                dir="ltr"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-left"
-              />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="flex flex-col gap-2">
-              <label className="text-foreground-light text-sm">טלפון</label>
-              <input
-                type="tel"
-                dir="ltr"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="05X-XXXXXXX"
-                className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-left"
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-foreground-light text-sm">
-                {editingId ? 'סיסמה חדשה (השאר ריק אם לא לשנות)' : 'סיסמה *'}
-              </label>
-              <input
-                type="password"
-                dir="ltr"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-left"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-foreground-light text-sm">טלפון</label>
+                <input
+                  type="tel"
+                  dir="ltr"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="05X-XXXXXXX"
+                  className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-left"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-foreground-light text-sm text-wrap">
+                  {editingId ? 'סיסמה חדשה (ריק = ללא שינוי)' : 'סיסמה *'}
+                </label>
+                <input
+                  type="password"
+                  dir="ltr"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-left"
+                />
+              </div>
             </div>
           </div>
 
@@ -224,7 +227,7 @@ export default function BarbersPage() {
               onClick={handleSubmit}
               disabled={saving}
               className={cn(
-                'flex-1 py-3 rounded-xl font-medium transition-all',
+                'flex-1 py-3 rounded-xl font-medium transition-all text-sm sm:text-base',
                 saving
                   ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                   : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
@@ -234,7 +237,7 @@ export default function BarbersPage() {
             </button>
             <button
               onClick={resetForm}
-              className="px-6 py-3 rounded-xl bg-background-dark border border-white/10 text-foreground-muted hover:text-foreground-light transition-colors"
+              className="px-4 sm:px-6 py-3 rounded-xl bg-background-dark border border-white/10 text-foreground-muted hover:text-foreground-light transition-colors text-sm sm:text-base"
             >
               ביטול
             </button>
@@ -242,8 +245,8 @@ export default function BarbersPage() {
         </div>
       )}
 
-      {/* Barbers List */}
-      <div className="bg-background-card border border-white/10 rounded-2xl p-6">
+      {/* Barbers List - Compact mobile-friendly cards */}
+      <div className="bg-background-card border border-white/10 rounded-2xl p-4 sm:p-6">
         {barbers.length === 0 ? (
           <div className="text-center py-8">
             <User size={48} strokeWidth={1} className="text-foreground-muted/30 mx-auto mb-3" />
@@ -255,14 +258,15 @@ export default function BarbersPage() {
               <div
                 key={barber.id}
                 className={cn(
-                  'flex items-center justify-between p-4 rounded-xl border',
+                  'p-3 sm:p-4 rounded-xl border',
                   barber.is_active
                     ? 'bg-background-dark border-white/5'
                     : 'bg-background-dark/50 border-white/5 opacity-60'
                 )}
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full overflow-hidden bg-background-card">
+                {/* Top Row: Avatar, Name, Badges */}
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden bg-background-card flex-shrink-0">
                     {barber.img_url ? (
                       <Image
                         src={barber.img_url}
@@ -273,60 +277,73 @@ export default function BarbersPage() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <User size={24} strokeWidth={1.5} className="text-foreground-muted" />
+                        <User size={20} strokeWidth={1.5} className="text-foreground-muted" />
                       </div>
                     )}
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-foreground-light font-medium">{barber.fullname}</p>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-foreground-light font-medium text-sm sm:text-base truncate">
+                        {barber.fullname}
+                      </p>
                       {barber.role === 'admin' && (
                         <span title="מנהל">
-                          <Crown size={16} strokeWidth={1.5} className="text-accent-gold" />
+                          <Crown size={14} strokeWidth={1.5} className="text-accent-gold flex-shrink-0" />
                         </span>
                       )}
                       {!barber.is_active && (
-                        <span className="text-xs text-red-400 bg-red-500/20 px-2 py-0.5 rounded">
+                        <span className="text-[10px] text-red-400 bg-red-500/20 px-1.5 py-0.5 rounded flex-shrink-0">
                           מושבת
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 text-foreground-muted text-sm">
-                      <span className="flex items-center gap-1">
-                        <Mail size={12} strokeWidth={1.5} />
-                        {barber.email}
-                      </span>
-                      {barber.phone && (
-                        <span className="flex items-center gap-1">
-                          <Phone size={12} strokeWidth={1.5} />
-                          {barber.phone}
-                        </span>
-                      )}
-                    </div>
+                    {/* Email - truncated on mobile */}
+                    <p className="text-xs text-foreground-muted truncate mt-0.5">
+                      {barber.email}
+                    </p>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleEdit(barber)}
-                    className="p-2 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition-colors"
-                    title="ערוך"
-                  >
-                    <Pencil size={16} strokeWidth={1.5} />
-                  </button>
-                  {barber.id !== currentBarber?.id && (
-                    <button
-                      onClick={() => handleToggleActive(barber)}
-                      className={cn(
-                        'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
-                        barber.is_active
-                          ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
-                          : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
-                      )}
+                {/* Actions Row */}
+                <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                  {/* Phone - if exists */}
+                  {barber.phone ? (
+                    <a
+                      href={`tel:${barber.phone}`}
+                      className="flex items-center gap-1.5 text-xs text-foreground-muted hover:text-accent-gold transition-colors"
                     >
-                      {barber.is_active ? 'השבת' : 'הפעל'}
-                    </button>
+                      <Phone size={12} strokeWidth={1.5} />
+                      <span className="hidden sm:inline">{barber.phone}</span>
+                      <span className="sm:hidden">התקשר</span>
+                    </a>
+                  ) : (
+                    <span className="text-xs text-foreground-muted/50">ללא טלפון</span>
                   )}
+                  
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleEdit(barber)}
+                      className="p-2 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition-colors"
+                      title="ערוך"
+                    >
+                      <Pencil size={14} strokeWidth={1.5} />
+                    </button>
+                    {barber.id !== currentBarber?.id && (
+                      <button
+                        onClick={() => handleToggleActive(barber)}
+                        className={cn(
+                          'px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-medium transition-colors',
+                          barber.is_active
+                            ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
+                            : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
+                        )}
+                      >
+                        {barber.is_active ? 'השבת' : 'הפעל'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

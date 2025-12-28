@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useBookingStore } from '@/store/useBookingStore'
 import type { WorkDay, BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure } from '@/types/database'
 import { cn } from '@/lib/utils'
@@ -61,7 +62,8 @@ export function DateSelection({
   barberSchedule, 
   barberClosures = [] 
 }: DateSelectionProps) {
-  const { date: selectedDate, setDate, nextStep, prevStep } = useBookingStore()
+  const router = useRouter()
+  const { date: selectedDate, setDate, nextStep, barberId } = useBookingStore()
   const [currentMonth, setCurrentMonth] = useState(() => new Date())
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null)
   const [unavailableInfo, setUnavailableInfo] = useState<UnavailableInfo>({ show: false, reason: '' })
@@ -442,9 +444,12 @@ export function DateSelection({
         {/* Back Button - Goes back to barber profile/service selection */}
         <button
           onClick={() => {
-            // If we came from service selection on barber profile, go back there
-            // prevStep would go to service selection step in wizard
-            prevStep()
+            // Navigate back to barber profile page for service selection
+            if (barberId) {
+              router.push(`/barber/${barberId}`)
+            } else {
+              router.back()
+            }
           }}
           className="flex items-center justify-center gap-2 text-foreground-muted hover:text-foreground-light transition-colors text-sm py-2"
         >

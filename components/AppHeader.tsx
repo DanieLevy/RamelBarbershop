@@ -482,8 +482,14 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
             onClick={() => setShowMobileMenu(false)}
           />
           
-          {/* Drawer */}
-          <div className="fixed top-0 right-0 bottom-0 w-[280px] bg-background-darker z-[100] md:hidden animate-slide-in-right shadow-2xl">
+          {/* Drawer - with safe area handling for notch */}
+          <div 
+            className="fixed top-0 right-0 bottom-0 w-[280px] bg-background-darker z-[100] md:hidden animate-slide-in-right shadow-2xl"
+            style={{
+              // Account for notch at top
+              paddingTop: 'var(--header-top-offset, 0px)',
+            }}
+          >
             {/* Header with gradient */}
             <div className="relative p-5 border-b border-white/10 bg-gradient-to-br from-accent-gold/10 via-transparent to-accent-orange/5">
               <button

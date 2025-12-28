@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { AppHeader } from '@/components/AppHeader'
 import { BarberProfileClient } from '@/components/BarberProfile/BarberProfileClient'
-import type { BarberWithWorkDays, Service, BarbershopSettings } from '@/types/database'
+import type { BarberWithWorkDays, Service, BarbershopSettings, BarberMessage } from '@/types/database'
 
 interface BarberPageProps {
   params: Promise<{ barberId: string }>
@@ -32,11 +32,18 @@ export default async function BarberPage({ params }: BarberPageProps) {
     .eq('is_active', true)
     .order('price', { ascending: true }) as { data: Service[] | null }
   
-  // Fetch barbershop settings for footer
+  // Fetch barbershop settings
   const { data: shopSettings } = await supabase
     .from('barbershop_settings')
     .select('*')
     .single() as { data: BarbershopSettings | null }
+  
+  // Fetch barber messages
+  const { data: barberMessages } = await supabase
+    .from('barber_messages')
+    .select('*')
+    .eq('barber_id', barberId)
+    .eq('is_active', true) as { data: BarberMessage[] | null }
   
   return (
     <>
@@ -47,6 +54,7 @@ export default async function BarberPage({ params }: BarberPageProps) {
           barber={barber} 
           services={services || []} 
           shopSettings={shopSettings}
+          barberMessages={barberMessages || []}
         />
       </main>
     </>

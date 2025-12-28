@@ -106,8 +106,14 @@ export function DashboardSidebar({ isMobileOpen, onMobileClose }: DashboardSideb
           onClick={onMobileClose}
         />
         
-        {/* Drawer */}
-        <aside className="fixed top-0 right-0 bottom-0 w-72 bg-background-darker border-l border-white/10 z-50 lg:hidden animate-slide-in-right flex flex-col">
+        {/* Drawer - with safe area handling */}
+        <aside 
+          className="fixed top-0 right-0 bottom-0 w-72 bg-background-darker border-l border-white/10 z-50 lg:hidden animate-slide-in-right flex flex-col"
+          style={{
+            // Account for notch at top
+            paddingTop: 'var(--header-top-offset, 0px)',
+          }}
+        >
           {/* Header with close button */}
           <div className="p-4 border-b border-white/10 flex items-center justify-between">
             <div className="flex items-center gap-3">

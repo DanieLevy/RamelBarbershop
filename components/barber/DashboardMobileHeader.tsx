@@ -10,7 +10,13 @@ interface DashboardMobileHeaderProps {
 
 export function DashboardMobileHeader({ barberName, onMenuToggle }: DashboardMobileHeaderProps) {
   return (
-    <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-background-darker/95 backdrop-blur-lg border-b border-white/10">
+    <header 
+      className="lg:hidden fixed left-0 right-0 z-40 bg-background-darker/95 backdrop-blur-lg border-b border-white/10"
+      style={{
+        // Account for notch/safe area
+        top: 'var(--header-top-offset, 0px)',
+      }}
+    >
       <div className="flex items-center justify-between px-4 h-16">
         {/* Menu button */}
         <button
