@@ -434,7 +434,7 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
                   קבע תור
                 </button>
                 
-                <UserButton compact={!isScrolled} />
+                <UserButton compact={isScrolled} />
               </div>
             </nav>
           )}

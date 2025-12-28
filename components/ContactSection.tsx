@@ -1,8 +1,8 @@
 'use client'
 
-import { Phone, Clock, Mail } from 'lucide-react'
-import { SectionTitle } from '@/components/ui/SectionTitle'
+import { Phone, Mail } from 'lucide-react'
 import { GlassCard } from '@/components/ui/GlassCard'
+import { SectionDivider } from '@/components/ui/SectionDivider'
 import { formatOpeningHours } from '@/lib/utils'
 import type { BarbershopSettings } from '@/types/database'
 
@@ -119,9 +119,9 @@ export function ContactSection({ settings }: ContactSectionProps) {
   const openingHoursDisplay = formatOpeningHours(openDays, workStart, workEnd, '14:00')
 
   return (
-    <section className="index-contact py-16 sm:py-20 lg:py-24 bg-background-dark">
+    <section className="index-contact py-10 sm:py-12 lg:py-16 bg-background-darker">
       <div className="container-mobile">
-        <SectionTitle className="mb-12">צור קשר</SectionTitle>
+        <SectionDivider title="צור קשר" className="mb-8" />
         
         <div className="max-w-4xl mx-auto">
           {/* Main contact grid */}
@@ -176,14 +176,11 @@ export function ContactSection({ settings }: ContactSectionProps) {
             ))}
           </div>
           
+          {/* Divider before opening hours */}
+          <SectionDivider title="שעות פעילות" className="max-w-md mx-auto mt-6" />
+          
           {/* Opening hours */}
           <GlassCard className="max-w-md mx-auto">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-accent-gold/20 flex items-center justify-center">
-                <Clock size={20} strokeWidth={1.5} className="text-accent-gold" />
-              </div>
-              <h3 className="text-foreground-light font-medium text-lg">שעות פעילות</h3>
-            </div>
             
             <div className="space-y-2 text-sm">
               {openingHoursDisplay.map((item, index) => (

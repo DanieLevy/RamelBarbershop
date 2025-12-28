@@ -3,16 +3,19 @@ import { AppHeader } from '@/components/AppHeader'
 import { BarberCard } from '@/components/BarberCard'
 import { ContactSection } from '@/components/ContactSection'
 import { LocationSection } from '@/components/LocationSection'
+import { ProductsCarousel } from '@/components/ProductsCarousel'
 import { Footer } from '@/components/Footer'
-import { SectionTitle } from '@/components/ui/SectionTitle'
+import { SectionDivider } from '@/components/ui/SectionDivider'
 import Image from 'next/image'
-import type { BarberWithWorkDays, BarbershopSettings } from '@/types/database'
+import type { BarberWithWorkDays, BarbershopSettings, Product } from '@/types/database'
 
 export default async function HomePage() {
   const supabase = await createClient()
   
-  // Fetch barbers and settings in parallel for better performance
-  const [barbersResult, settingsResult] = await Promise.all([
+  // Fetch barbers, settings, and products in parallel for better performance
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any
+  const [barbersResult, settingsResult, productsResult] = await Promise.all([
     supabase
       .from('users')
       .select('*, work_days(*)')
@@ -20,11 +23,17 @@ export default async function HomePage() {
     supabase
       .from('barbershop_settings')
       .select('*')
-      .single()
+      .single(),
+    db
+      .from('products')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
   ])
   
   const barbers = barbersResult.data as BarberWithWorkDays[] | null
   const settings = settingsResult.data as BarbershopSettings | null
+  const products = productsResult.data as Product[] | null
 
   return (
     <>
@@ -154,9 +163,9 @@ export default async function HomePage() {
         </section>
 
         {/* Team Section */}
-        <section id="team" className="index-body py-16 sm:py-20 lg:py-24 bg-background-dark">
+        <section id="team" className="index-body py-10 sm:py-12 lg:py-16 bg-background-dark">
           <div className="container-mobile">
-            <SectionTitle className="mb-12">הצוות שלנו</SectionTitle>
+            <SectionDivider title="הצוות שלנו" className="mb-8" />
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 justify-items-center">
               {barbers?.map((barber, index) => (
@@ -177,6 +186,11 @@ export default async function HomePage() {
             )}
           </div>
         </section>
+
+        {/* Products Section - Only shows if there are products */}
+        {products && products.length > 0 && (
+          <ProductsCarousel products={products} />
+        )}
 
         {/* Location Section */}
         <LocationSection settings={settings} />

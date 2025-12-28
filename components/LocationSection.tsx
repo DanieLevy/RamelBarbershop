@@ -1,7 +1,7 @@
 'use client'
 
 import { MapPin, Navigation } from 'lucide-react'
-import { SectionTitle } from '@/components/ui/SectionTitle'
+import { SectionDivider } from '@/components/ui/SectionDivider'
 import { GlassCard } from '@/components/ui/GlassCard'
 import type { BarbershopSettings } from '@/types/database'
 
@@ -41,9 +41,9 @@ export function LocationSection({ settings }: LocationSectionProps) {
   const addressLine2 = addressParts.slice(1).join(', ') || ''
 
   return (
-    <section className="index-location py-16 sm:py-20 lg:py-24 bg-background-darker">
+    <section className="index-location py-10 sm:py-12 lg:py-16 bg-background-dark">
       <div className="container-mobile">
-        <SectionTitle className="mb-12">המיקום שלנו</SectionTitle>
+        <SectionDivider title="המיקום שלנו" className="mb-8" />
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           {/* Address Card */}

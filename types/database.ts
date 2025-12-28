@@ -403,6 +403,44 @@ export interface Database {
           created_at?: string
         }
       }
+      products: {
+        Row: {
+          id: string
+          name: string
+          name_he: string
+          description: string | null
+          price: number
+          image_url: string | null
+          is_active: boolean
+          display_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          name_he: string
+          description?: string | null
+          price: number
+          image_url?: string | null
+          is_active?: boolean
+          display_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          name_he?: string
+          description?: string | null
+          price?: number
+          image_url?: string | null
+          is_active?: boolean
+          display_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Functions: {
       get_available_time_slots: {
@@ -431,6 +469,9 @@ export type WorkDay = Database['public']['Tables']['work_days']['Row']
 export type Service = Database['public']['Tables']['services']['Row']
 export type Reservation = Database['public']['Tables']['reservations']['Row']
 export type ReservationInsert = Database['public']['Tables']['reservations']['Insert']
+export type Product = Database['public']['Tables']['products']['Row']
+export type ProductInsert = Database['public']['Tables']['products']['Insert']
+export type ProductUpdate = Database['public']['Tables']['products']['Update']
 
 export interface BarberWithWorkDays extends User {
   work_days: WorkDay[]
