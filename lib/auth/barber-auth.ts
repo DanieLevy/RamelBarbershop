@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { createClient } from '@/lib/supabase/client'
 import type { User, BarberSession } from '@/types/database'
+import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
 
 const SALT_ROUNDS = 10
 const SESSION_KEY = 'ramel_barber_session'
@@ -42,6 +43,10 @@ export async function loginBarber(
   
   if (error) {
     console.error('Login error:', error)
+    await reportSupabaseError(error, 'Barber Login - Database Query', {
+      table: 'users',
+      operation: 'select',
+    })
     return { success: false, error: 'שגיאה בהתחברות. נסה שוב.' }
   }
   
@@ -137,6 +142,10 @@ export async function validateBarberSession(): Promise<User | null> {
   
   if (error) {
     console.error('Error validating session:', error)
+    await reportSupabaseError(error, 'Barber Session Validation', {
+      table: 'users',
+      operation: 'select',
+    })
     clearBarberSession()
     return null
   }
@@ -167,6 +176,10 @@ export async function setBarberPassword(
   
   if (error) {
     console.error('Error setting password:', error)
+    await reportSupabaseError(error, 'Setting Barber Password', {
+      table: 'users',
+      operation: 'update',
+    })
     return { success: false, error: 'שגיאה בעדכון הסיסמה' }
   }
   
@@ -223,6 +236,10 @@ export async function createBarber(data: {
   
   if (error) {
     console.error('Error creating barber:', error)
+    await reportSupabaseError(error, 'Creating New Barber', {
+      table: 'users',
+      operation: 'insert',
+    })
     const errorMessage = error.message || 'שגיאה ביצירת המשתמש'
     return { success: false, error: errorMessage }
   }
@@ -255,6 +272,10 @@ export async function createBarber(data: {
   
   if (workDaysError) {
     console.error('Error creating default work_days:', workDaysError)
+    await reportSupabaseError(workDaysError, 'Creating Default Work Days for New Barber', {
+      table: 'work_days',
+      operation: 'insert',
+    })
     // Don't fail the barber creation, just log the error
   }
   
@@ -270,6 +291,10 @@ export async function createBarber(data: {
   
   if (scheduleError) {
     console.error('Error creating default barber_schedule:', scheduleError)
+    await reportSupabaseError(scheduleError, 'Creating Default Schedule for New Barber', {
+      table: 'barber_schedules',
+      operation: 'insert',
+    })
     // Don't fail the barber creation, just log the error
   }
   
@@ -298,6 +323,10 @@ export async function updateBarber(
   
   if (error) {
     console.error('Error updating barber:', error)
+    await reportSupabaseError(error, 'Updating Barber Profile', {
+      table: 'users',
+      operation: 'update',
+    })
     return { success: false, error: 'שגיאה בעדכון המשתמש' }
   }
   
@@ -322,6 +351,10 @@ export async function getAllBarbers(): Promise<User[]> {
       console.error('Error code:', error.code)
       console.error('Error message:', error.message)
       console.error('Error details:', JSON.stringify(error, null, 2))
+      await reportSupabaseError(error, 'Fetching All Barbers', {
+        table: 'users',
+        operation: 'select',
+      })
       throw error
     }
     

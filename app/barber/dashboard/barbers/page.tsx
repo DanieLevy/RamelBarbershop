@@ -10,10 +10,12 @@ import { cn } from '@/lib/utils'
 import { Plus, Pencil, User, Phone, Crown, GripVertical } from 'lucide-react'
 import type { User as UserType } from '@/types/database'
 import Image from 'next/image'
+import { useBugReporter } from '@/hooks/useBugReporter'
 
 export default function BarbersPage() {
   const router = useRouter()
   const { isAdmin, barber: currentBarber } = useBarberAuthStore()
+  const { report } = useBugReporter('BarbersPage')
   
   const [barbers, setBarbers] = useState<UserType[]>([])
   const [loading, setLoading] = useState(true)
@@ -49,6 +51,7 @@ export default function BarbersPage() {
       setBarbers(sorted)
     } catch (error) {
       console.error('Error fetching barbers:', error)
+      await report(error, 'Fetching all barbers list')
       toast.error('שגיאה בטעינת הספרים')
     } finally {
       setLoading(false)
@@ -74,9 +77,10 @@ export default function BarbersPage() {
       toast.success('סדר הספרים עודכן')
     } catch (error) {
       console.error('Error saving order:', error)
+      await report(error, 'Saving barbers display order')
       toast.error('שגיאה בשמירת הסדר')
     }
-  }, [])
+  }, [report])
 
   // Handle drag start
   const handleDragStart = useCallback((index: number, e: React.MouseEvent | React.TouchEvent) => {

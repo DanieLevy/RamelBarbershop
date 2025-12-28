@@ -6,6 +6,7 @@ import { AuthProvider } from '@/components/AuthProvider'
 import { MobileBottomNav } from '@/components/ui/MobileBottomNav'
 import { PWAProvider } from '@/components/pwa/PWAProvider'
 import { PWAHead } from '@/components/pwa/PWAHead'
+import ErrorBoundary from '@/components/ErrorBoundary'
 
 export const metadata: Metadata = {
   title: 'רמאל ברברשופ - Ramel Barbershop',
@@ -54,7 +55,9 @@ export default function RootLayout({
         <Providers>
           <AuthProvider>
             <PWAProvider>
-              {children}
+              <ErrorBoundary component="RootLayout">
+                {children}
+              </ErrorBoundary>
               <MobileBottomNav />
             </PWAProvider>
           </AuthProvider>

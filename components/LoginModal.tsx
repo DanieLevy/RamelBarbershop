@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { X, Scissors, AlertTriangle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { ConfirmationResult } from 'firebase/auth'
+import { useBugReporter } from '@/hooks/useBugReporter'
 
 interface LoginModalProps {
   isOpen: boolean
@@ -24,6 +25,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const router = useRouter()
   const { login } = useAuthStore()
   const { isLoggedIn: isBarberLoggedIn, barber, logout: barberLogout } = useBarberAuthStore()
+  const { report } = useBugReporter('LoginModal')
   
   const [step, setStep] = useState<Step>('phone')
   const [phone, setPhone] = useState('')
@@ -117,6 +119,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       await sendOtpToPhone(phoneClean)
     } catch (err) {
       console.error('Phone check error:', err)
+      await report(err, 'Customer phone check/lookup')
       setError('שגיאה בבדיקת המספר')
       setLoading(false)
     }
@@ -161,6 +164,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       }
     } catch (err) {
       console.error('OTP send error:', err)
+      await report(err, 'Sending OTP to customer phone')
       setError('שגיאה בשליחת הקוד')
     }
     
@@ -222,6 +226,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       }
     } catch (err) {
       console.error('Verify error:', err)
+      await report(err, 'Verifying customer OTP code')
       setError('שגיאה באימות')
     }
     

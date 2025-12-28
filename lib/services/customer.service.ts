@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 import type { Customer } from '@/types/database'
+import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
 
 /**
  * Find a customer by phone number
@@ -47,6 +48,7 @@ export async function createCustomer(
   
   if (error) {
     console.error('Error creating customer:', error)
+    await reportSupabaseError(error, 'Creating new customer', { table: 'customers', operation: 'insert' })
     return null
   }
   
@@ -98,6 +100,7 @@ export async function updateLastLogin(
   
   if (error) {
     console.error('Error updating last login:', error)
+    await reportSupabaseError(error, 'Updating customer last login', { table: 'customers', operation: 'update' })
   }
 }
 
@@ -141,6 +144,7 @@ export async function updateCustomer(
   
   if (error) {
     console.error('Error updating customer:', error)
+    await reportSupabaseError(error, 'Updating customer profile', { table: 'customers', operation: 'update' })
     return null
   }
   

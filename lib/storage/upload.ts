@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { reportBug, getEnvironmentInfo } from '@/lib/bug-reporter'
 
 const AVATARS_BUCKET = 'avatars'
 const PRODUCTS_BUCKET = 'products'
@@ -53,6 +54,11 @@ export async function uploadAvatar(file: File, barberId: string): Promise<Upload
     
     if (error) {
       console.error('Storage upload error:', error)
+      await reportBug(new Error(error.message), 'Avatar upload to storage', {
+        environment: getEnvironmentInfo(),
+        additionalData: { bucket: AVATARS_BUCKET, barberId, fileType: file.type, fileSize: file.size },
+        severity: 'high',
+      })
       return { 
         success: false, 
         error: `שגיאה בהעלאת התמונה: ${error.message}` 
@@ -71,6 +77,10 @@ export async function uploadAvatar(file: File, barberId: string): Promise<Upload
     }
   } catch (err) {
     console.error('Unexpected upload error:', err)
+    await reportBug(err, 'Unexpected avatar upload error', {
+      environment: getEnvironmentInfo(),
+      severity: 'high',
+    })
     return { 
       success: false, 
       error: 'שגיאה בלתי צפויה בהעלאת התמונה' 
@@ -92,6 +102,11 @@ export async function deleteAvatar(path: string): Promise<{ success: boolean; er
     
     if (error) {
       console.error('Storage delete error:', error)
+      await reportBug(new Error(error.message), 'Avatar delete from storage', {
+        environment: getEnvironmentInfo(),
+        additionalData: { bucket: AVATARS_BUCKET, path },
+        severity: 'medium',
+      })
       return { 
         success: false, 
         error: `שגיאה במחיקת התמונה: ${error.message}` 
@@ -101,6 +116,10 @@ export async function deleteAvatar(path: string): Promise<{ success: boolean; er
     return { success: true }
   } catch (err) {
     console.error('Unexpected delete error:', err)
+    await reportBug(err, 'Unexpected avatar delete error', {
+      environment: getEnvironmentInfo(),
+      severity: 'medium',
+    })
     return { 
       success: false, 
       error: 'שגיאה בלתי צפויה במחיקת התמונה' 
@@ -173,6 +192,11 @@ export async function uploadProductImage(file: File, productId: string): Promise
     
     if (error) {
       console.error('Product image upload error:', error)
+      await reportBug(new Error(error.message), 'Product image upload to storage', {
+        environment: getEnvironmentInfo(),
+        additionalData: { bucket: PRODUCTS_BUCKET, productId, fileType: file.type, fileSize: file.size },
+        severity: 'high',
+      })
       return { 
         success: false, 
         error: `שגיאה בהעלאת התמונה: ${error.message}` 
@@ -191,6 +215,10 @@ export async function uploadProductImage(file: File, productId: string): Promise
     }
   } catch (err) {
     console.error('Unexpected product upload error:', err)
+    await reportBug(err, 'Unexpected product image upload error', {
+      environment: getEnvironmentInfo(),
+      severity: 'high',
+    })
     return { 
       success: false, 
       error: 'שגיאה בלתי צפויה בהעלאת התמונה' 
@@ -212,6 +240,11 @@ export async function deleteProductImage(path: string): Promise<{ success: boole
     
     if (error) {
       console.error('Product image delete error:', error)
+      await reportBug(new Error(error.message), 'Product image delete from storage', {
+        environment: getEnvironmentInfo(),
+        additionalData: { bucket: PRODUCTS_BUCKET, path },
+        severity: 'medium',
+      })
       return { 
         success: false, 
         error: `שגיאה במחיקת התמונה: ${error.message}` 
@@ -221,6 +254,10 @@ export async function deleteProductImage(path: string): Promise<{ success: boole
     return { success: true }
   } catch (err) {
     console.error('Unexpected product delete error:', err)
+    await reportBug(err, 'Unexpected product image delete error', {
+      environment: getEnvironmentInfo(),
+      severity: 'medium',
+    })
     return { 
       success: false, 
       error: 'שגיאה בלתי צפויה במחיקת התמונה' 

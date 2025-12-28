@@ -8,6 +8,7 @@ import { cn, formatTime as formatTimeUtil, formatDateHebrew, nowInIsrael } from 
 import { startOfDay, endOfDay } from 'date-fns'
 import { Calendar, Phone, Check, X, Clock } from 'lucide-react'
 import type { Reservation, Service } from '@/types/database'
+import { useBugReporter } from '@/hooks/useBugReporter'
 
 interface ReservationWithService extends Reservation {
   services?: Service
@@ -17,6 +18,7 @@ type TabType = 'upcoming' | 'today' | 'past' | 'cancelled'
 
 export default function ReservationsPage() {
   const { barber } = useBarberAuthStore()
+  const { report } = useBugReporter('ReservationsPage')
   
   const [reservations, setReservations] = useState<ReservationWithService[]>([])
   const [loading, setLoading] = useState(true)
@@ -46,6 +48,7 @@ export default function ReservationsPage() {
       
       if (error) {
         console.error('Error fetching reservations:', error)
+        await report(new Error(error.message), 'Fetching barber reservations')
         toast.error('שגיאה בטעינת התורים')
         return
       }
@@ -53,6 +56,7 @@ export default function ReservationsPage() {
       setReservations((data as ReservationWithService[]) || [])
     } catch (err) {
       console.error('Error fetching reservations:', err)
+      await report(err, 'Fetching barber reservations (exception)')
       toast.error('שגיאה בטעינת התורים')
     } finally {
       setLoading(false)
@@ -75,6 +79,7 @@ export default function ReservationsPage() {
       if (error) {
         console.error('Error updating reservation:', error)
         console.error('Error details:', JSON.stringify(error, null, 2))
+        await report(error instanceof Error ? error : new Error(String(error)), 'Updating reservation status', 'high')
         toast.error(`שגיאה בעדכון הסטטוס: ${(error as Error)?.message || 'נסה שוב'}`)
         return
       }

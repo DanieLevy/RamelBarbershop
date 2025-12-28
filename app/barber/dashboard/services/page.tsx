@@ -7,9 +7,11 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Plus, Pencil, Trash2, Scissors } from 'lucide-react'
 import type { Service } from '@/types/database'
+import { useBugReporter } from '@/hooks/useBugReporter'
 
 export default function ServicesPage() {
   const { barber } = useBarberAuthStore()
+  const { report } = useBugReporter('ServicesPage')
   
   const [services, setServices] = useState<Service[]>([])
   const [loading, setLoading] = useState(true)
@@ -46,6 +48,7 @@ export default function ServicesPage() {
     if (error) {
       console.error('Error fetching services:', error)
       console.error('Error details:', JSON.stringify(error, null, 2))
+      await report(new Error(error.message), 'Fetching barber services')
     }
     
     setServices((data as Service[]) || [])

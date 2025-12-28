@@ -10,9 +10,11 @@ import { cn } from '@/lib/utils'
 import { User, Camera, Bell, Plus, Trash, Pencil, Upload } from 'lucide-react'
 import type { BarberMessage } from '@/types/database'
 import Image from 'next/image'
+import { useBugReporter } from '@/hooks/useBugReporter'
 
 export default function ProfilePage() {
   const { barber, setBarber } = useBarberAuthStore()
+  const { report } = useBugReporter('ProfilePage')
   
   const [loading, setLoading] = useState(true)
   const [savingProfile, setSavingProfile] = useState(false)
@@ -61,6 +63,7 @@ export default function ProfilePage() {
     
     if (error) {
       console.error('Error fetching messages:', error)
+      await report(new Error(error.message), 'Fetching barber messages')
     }
     
     setMessages((data as BarberMessage[]) || [])
