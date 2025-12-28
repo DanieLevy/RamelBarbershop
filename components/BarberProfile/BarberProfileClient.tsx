@@ -36,8 +36,12 @@ export function BarberProfileClient({
     router.push(`/barber/${barber.id}/book?service=${serviceId}`)
   }
 
-  // Get working days
-  const workingDays = barber.work_days?.filter(d => d.is_working) || []
+  // Get working days - intersect barber's work days with shop's open days
+  // A barber can only work on days when the shop is open
+  const shopOpenDays = shopSettings?.open_days || []
+  const workingDays = barber.work_days?.filter(d => 
+    d.is_working && shopOpenDays.includes(d.day_of_week.toLowerCase())
+  ) || []
   const workingDayNames = workingDays.map(d => DAY_NAMES_SHORT[d.day_of_week.toLowerCase()] || d.day_of_week)
 
   // Format working hours
