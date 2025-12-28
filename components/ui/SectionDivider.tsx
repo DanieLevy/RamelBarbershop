@@ -39,7 +39,7 @@ export function SectionDivider({
       
       {/* Center element */}
       {effectiveVariant === 'title' && title ? (
-        <span className="text-xs sm:text-sm text-accent-gold font-medium tracking-wide whitespace-nowrap">
+        <span className="text-base sm:text-lg lg:text-xl text-accent-gold font-medium tracking-wide whitespace-nowrap">
           {title}
         </span>
       ) : (

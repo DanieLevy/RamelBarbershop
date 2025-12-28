@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { getAllBarbers, createBarber, updateBarber, setBarberPassword } from '@/lib/auth/barber-auth'
+import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { Plus, Pencil, User, Mail, Phone, Crown } from 'lucide-react'
+import { Plus, Pencil, User, Phone, Crown, GripVertical } from 'lucide-react'
 import type { User as UserType } from '@/types/database'
 import Image from 'next/image'
 
@@ -19,6 +20,11 @@ export default function BarbersPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  
+  // Drag state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const dragRef = useRef<{ startY: number; currentY: number } | null>(null)
   
   // Form state
   const [username, setUsername] = useState('')
@@ -38,7 +44,9 @@ export default function BarbersPage() {
   const fetchBarbers = async () => {
     try {
       const data = await getAllBarbers()
-      setBarbers(data)
+      // Sort by display_order
+      const sorted = data.sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+      setBarbers(sorted)
     } catch (error) {
       console.error('Error fetching barbers:', error)
       toast.error('שגיאה בטעינת הספרים')
@@ -46,6 +54,100 @@ export default function BarbersPage() {
       setLoading(false)
     }
   }
+
+  // Save new order to database
+  const saveOrder = useCallback(async (newOrder: UserType[]) => {
+    try {
+      const supabase = createClient()
+      
+      // Update each barber's display_order
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const db = supabase as any
+      const updates = newOrder.map((barber, index) => 
+        db
+          .from('users')
+          .update({ display_order: index })
+          .eq('id', barber.id)
+      )
+      
+      await Promise.all(updates)
+      toast.success('סדר הספרים עודכן')
+    } catch (error) {
+      console.error('Error saving order:', error)
+      toast.error('שגיאה בשמירת הסדר')
+    }
+  }, [])
+
+  // Handle drag start
+  const handleDragStart = useCallback((index: number, e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault()
+    setDraggedIndex(index)
+    
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    dragRef.current = { startY: clientY, currentY: clientY }
+  }, [])
+
+  // Handle drag move
+  const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
+    if (draggedIndex === null || !dragRef.current) return
+    
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    dragRef.current.currentY = clientY
+    
+    // Calculate which index we're over
+    const cards = document.querySelectorAll('[data-barber-card]')
+    cards.forEach((card, index) => {
+      const rect = card.getBoundingClientRect()
+      const midY = rect.top + rect.height / 2
+      
+      if (clientY > rect.top && clientY < rect.bottom) {
+        if (clientY < midY && index < draggedIndex!) {
+          setDragOverIndex(index)
+        } else if (clientY > midY && index > draggedIndex!) {
+          setDragOverIndex(index)
+        } else {
+          setDragOverIndex(null)
+        }
+      }
+    })
+  }, [draggedIndex])
+
+  // Handle drag end
+  const handleDragEnd = useCallback(() => {
+    if (draggedIndex !== null && dragOverIndex !== null && draggedIndex !== dragOverIndex) {
+      // Reorder the array
+      const newBarbers = [...barbers]
+      const [removed] = newBarbers.splice(draggedIndex, 1)
+      newBarbers.splice(dragOverIndex, 0, removed)
+      
+      setBarbers(newBarbers)
+      saveOrder(newBarbers)
+    }
+    
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+    dragRef.current = null
+  }, [draggedIndex, dragOverIndex, barbers, saveOrder])
+
+  // Add event listeners for drag
+  useEffect(() => {
+    if (draggedIndex !== null) {
+      const handleMove = (e: MouseEvent | TouchEvent) => handleDragMove(e)
+      const handleEnd = () => handleDragEnd()
+      
+      document.addEventListener('mousemove', handleMove)
+      document.addEventListener('mouseup', handleEnd)
+      document.addEventListener('touchmove', handleMove, { passive: false })
+      document.addEventListener('touchend', handleEnd)
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMove)
+        document.removeEventListener('mouseup', handleEnd)
+        document.removeEventListener('touchmove', handleMove)
+        document.removeEventListener('touchend', handleEnd)
+      }
+    }
+  }, [draggedIndex, handleDragMove, handleDragEnd])
 
   const resetForm = () => {
     setUsername('')
@@ -150,10 +252,10 @@ export default function BarbersPage() {
 
   return (
     <div className="max-w-3xl">
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-medium text-foreground-light">ניהול ספרים</h1>
-          <p className="text-foreground-muted mt-1">הוסף ונהל את צוות הספרים</p>
+          <p className="text-foreground-muted mt-1">הוסף ונהל את צוות הספרים. גרור לשינוי סדר</p>
         </div>
         <button
           onClick={() => { resetForm(); setShowForm(true) }}
@@ -245,7 +347,7 @@ export default function BarbersPage() {
         </div>
       )}
 
-      {/* Barbers List - Compact mobile-friendly cards */}
+      {/* Barbers List - Draggable cards */}
       <div className="bg-background-card border border-white/10 rounded-2xl p-4 sm:p-6">
         {barbers.length === 0 ? (
           <div className="text-center py-8">
@@ -254,18 +356,31 @@ export default function BarbersPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {barbers.map((barber) => (
+            {barbers.map((barber, index) => (
               <div
                 key={barber.id}
+                data-barber-card
                 className={cn(
-                  'p-3 sm:p-4 rounded-xl border',
+                  'p-3 sm:p-4 rounded-xl border transition-all',
                   barber.is_active
                     ? 'bg-background-dark border-white/5'
-                    : 'bg-background-dark/50 border-white/5 opacity-60'
+                    : 'bg-background-dark/50 border-white/5 opacity-60',
+                  // Drag states
+                  draggedIndex === index && 'opacity-50 scale-[0.98] shadow-lg shadow-accent-gold/20',
+                  dragOverIndex === index && 'border-accent-gold/50 bg-accent-gold/5'
                 )}
               >
-                {/* Top Row: Avatar, Name, Badges */}
+                {/* Top Row: Drag Handle, Avatar, Name, Badges */}
                 <div className="flex items-center gap-3 mb-2">
+                  {/* Drag Handle */}
+                  <div
+                    onMouseDown={(e) => handleDragStart(index, e)}
+                    onTouchStart={(e) => handleDragStart(index, e)}
+                    className="cursor-grab active:cursor-grabbing touch-none p-1 -mr-1 text-foreground-muted/30 hover:text-foreground-muted transition-colors"
+                  >
+                    <GripVertical size={18} strokeWidth={1.5} />
+                  </div>
+                  
                   <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden bg-background-card flex-shrink-0">
                     {barber.img_url ? (
                       <Image
@@ -273,7 +388,7 @@ export default function BarbersPage() {
                         alt={barber.fullname}
                         width={48}
                         height={48}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover object-center"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
@@ -306,7 +421,7 @@ export default function BarbersPage() {
                 </div>
                 
                 {/* Actions Row */}
-                <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                <div className="flex items-center justify-between pt-2 border-t border-white/5 mr-7">
                   {/* Phone - if exists */}
                   {barber.phone ? (
                     <a
@@ -348,6 +463,13 @@ export default function BarbersPage() {
               </div>
             ))}
           </div>
+        )}
+        
+        {/* Drag hint */}
+        {barbers.length > 1 && (
+          <p className="text-xs text-foreground-muted/50 text-center mt-4">
+            גרור את הכרטיסים לשינוי סדר ההצגה בדף הבית
+          </p>
         )}
       </div>
     </div>

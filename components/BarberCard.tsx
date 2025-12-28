@@ -4,7 +4,8 @@ import { useState, useTransition } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { BarberWithWorkDays } from '@/types/database'
-import { Calendar, Loader2 } from 'lucide-react'
+import { Calendar, Loader2, ChevronLeft } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface BarberCardProps {
   barber: BarberWithWorkDays
@@ -33,7 +34,7 @@ export function BarberCard({ barber }: BarberCardProps) {
     >
       {/* Loading overlay */}
       {showLoader && (
-        <div className="absolute inset-0 z-10 bg-background-dark/80 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+        <div className="absolute inset-0 z-20 bg-background-dark/80 backdrop-blur-sm rounded-2xl flex items-center justify-center">
           <div className="flex flex-col items-center gap-2">
             <Loader2 size={32} strokeWidth={1.5} className="text-accent-gold animate-spin" />
             <span className="text-accent-gold text-sm">טוען...</span>
@@ -41,63 +42,63 @@ export function BarberCard({ barber }: BarberCardProps) {
         </div>
       )}
       
-      {/* Card container */}
-      <div className="relative bg-background-card backdrop-blur-lg border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 hover:border-accent-gold/40 hover:shadow-gold cursor-pointer">
-        {/* Top decorative bar */}
-        <div className="h-1 w-full bg-gradient-to-r from-accent-gold via-accent-orange to-accent-gold" />
+      {/* Card container - Modern glass design */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-white/[0.08] to-white/[0.02] border border-white/10 transition-all duration-500 hover:border-accent-gold/40 hover:shadow-[0_0_40px_-10px] hover:shadow-accent-gold/30 group-hover:scale-[1.02]">
         
-        {/* Content */}
-        <div className="p-5 sm:p-6">
-          {/* Mobile: Horizontal layout, Desktop: Vertical */}
-          <div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-5">
-            {/* Avatar with decorative frame */}
-            <div className="relative flex-shrink-0">
-              {/* Glow effect on hover */}
-              <div className="absolute inset-0 rounded-full bg-accent-gold/0 group-hover:bg-accent-gold/20 blur-xl transition-all duration-300" />
-              
-              {/* Avatar frame */}
-              <div className="relative">
-                {/* Outer ring */}
-                <div className="absolute -inset-1 rounded-full bg-gradient-to-br from-accent-gold/50 via-brand-primary to-accent-gold/50 opacity-50 group-hover:opacity-100 transition-opacity" />
-                
-                {/* Avatar */}
-                <div className="relative w-20 h-20 sm:w-28 sm:h-28 rounded-full overflow-hidden border-2 border-background-dark">
-                  <Image
-                    src={barber.img_url || '/icon.png'}
-                    alt={barber.fullname}
-                    width={112}
-                    height={112}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              </div>
-            </div>
-            
-            {/* Info */}
-            <div className="flex-1 text-right sm:text-center">
-              {/* Name */}
-              <h3 className="text-lg sm:text-xl font-medium text-foreground-light mb-3 group-hover:text-accent-gold transition-colors">
-                {barber.fullname}
-              </h3>
-            </div>
-          </div>
+        {/* Hero Image Section - Large featured image */}
+        <div className="relative h-56 sm:h-64 overflow-hidden">
+          {/* Background Image */}
+          <Image
+            src={barber.img_url || '/icon.png'}
+            alt={barber.fullname}
+            fill
+            className="object-cover object-top transition-transform duration-700 group-hover:scale-110"
+            sizes="(max-width: 640px) 100vw, 400px"
+          />
           
-          {/* Book button */}
-          <div className="w-full mt-5 flex items-center justify-center gap-2 py-3 px-4 bg-accent-gold/10 border border-accent-gold/30 text-accent-gold rounded-xl font-medium transition-all group-hover:bg-accent-gold group-hover:text-background-dark group-hover:scale-[1.02] group-hover:border-accent-gold">
-            {showLoader ? (
-              <Loader2 size={18} strokeWidth={1.5} className="animate-spin" />
-            ) : (
-              <Calendar size={18} strokeWidth={1.5} />
-            )}
-            <span>{showLoader ? 'טוען...' : 'קבע תור'}</span>
+          {/* Gradient Overlays */}
+          <div className="absolute inset-0 bg-gradient-to-t from-background-dark via-background-dark/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-background-dark/30 via-transparent to-transparent" />
+          
+          {/* Top Decorative Line */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-accent-gold to-transparent opacity-60 group-hover:opacity-100 transition-opacity" />
+          
+          {/* Barber Name Overlay - Positioned at bottom of image */}
+          <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5">
+            <h3 className="text-xl sm:text-2xl font-bold text-foreground-light drop-shadow-lg group-hover:text-accent-gold transition-colors duration-300">
+              {barber.fullname}
+            </h3>
           </div>
         </div>
         
-        {/* Corner decorations */}
-        <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-accent-gold/20 rounded-tl-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-        <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-accent-gold/20 rounded-tr-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-accent-gold/20 rounded-bl-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-accent-gold/20 rounded-br-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+        {/* Action Section - Clean CTA */}
+        <div className="p-4 sm:p-5 bg-background-dark/50 backdrop-blur-sm">
+          <div className={cn(
+            'flex items-center justify-between py-3 px-4 rounded-xl transition-all duration-300',
+            'bg-accent-gold/10 border border-accent-gold/30',
+            'group-hover:bg-accent-gold group-hover:border-accent-gold'
+          )}>
+            <div className="flex items-center gap-3">
+              {showLoader ? (
+                <Loader2 size={20} strokeWidth={1.5} className="text-accent-gold group-hover:text-background-dark animate-spin" />
+              ) : (
+                <Calendar size={20} strokeWidth={1.5} className="text-accent-gold group-hover:text-background-dark transition-colors" />
+              )}
+              <span className="font-medium text-accent-gold group-hover:text-background-dark transition-colors">
+                {showLoader ? 'טוען...' : 'קבע תור עכשיו'}
+              </span>
+            </div>
+            <ChevronLeft 
+              size={18} 
+              strokeWidth={2} 
+              className="text-accent-gold/50 group-hover:text-background-dark group-hover:translate-x-[-4px] transition-all duration-300" 
+            />
+          </div>
+        </div>
+        
+        {/* Decorative corner accents - visible on hover */}
+        <div className="absolute top-2 left-2 w-4 h-4 border-t border-l border-accent-gold/0 rounded-tl-lg group-hover:border-accent-gold/50 transition-colors duration-300" />
+        <div className="absolute top-2 right-2 w-4 h-4 border-t border-r border-accent-gold/0 rounded-tr-lg group-hover:border-accent-gold/50 transition-colors duration-300" />
       </div>
     </Link>
   )

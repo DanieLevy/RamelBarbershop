@@ -19,7 +19,8 @@ export default async function HomePage() {
     supabase
       .from('users')
       .select('*, work_days(*)')
-      .eq('is_barber', true),
+      .eq('is_barber', true)
+      .order('display_order', { ascending: true }),
     supabase
       .from('barbershop_settings')
       .select('*')
@@ -153,7 +154,7 @@ export default async function HomePage() {
           <div className="w-full flex justify-center absolute bottom-4 sm:bottom-6">
             <div className="animate-bounce">
               <div className="flex flex-col items-center gap-2 text-foreground-muted">
-                <span className="text-xs">גלול למטה</span>
+                <span className="text-base sm:text-lg">גלול למטה</span>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent-gold">
                   <path d="M7 13l5 5 5-5M7 6l5 5 5-5"/>
                 </svg>

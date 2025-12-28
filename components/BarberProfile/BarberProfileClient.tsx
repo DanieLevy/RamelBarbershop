@@ -69,11 +69,12 @@ export function BarberProfileClient({
           {/* Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-background-dark via-background-dark/20 to-transparent" />
           
-          {/* Floating Phone Button - Small icon, fixed position */}
+          {/* Floating Phone Button - Small icon, accounts for notch */}
           {barber.phone && (
             <a
-              href={`tel:${barber.phone}`}
-              className="absolute top-4 left-4 w-11 h-11 rounded-full bg-accent-gold flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+              href={`tel:${barber.phone.startsWith('+') ? barber.phone : '+972' + barber.phone.replace(/^0/, '')}`}
+              className="absolute left-4 w-11 h-11 rounded-full bg-accent-gold flex items-center justify-center shadow-lg active:scale-95 transition-transform z-20"
+              style={{ top: 'calc(var(--header-top-offset, 0px) + 1rem)' }}
               aria-label="התקשר לספר"
             >
               <Phone size={20} strokeWidth={1.5} className="text-background-dark" />

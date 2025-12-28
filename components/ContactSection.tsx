@@ -119,13 +119,13 @@ export function ContactSection({ settings }: ContactSectionProps) {
   const openingHoursDisplay = formatOpeningHours(openDays, workStart, workEnd, '14:00')
 
   return (
-    <section className="index-contact py-10 sm:py-12 lg:py-16 bg-background-darker">
+    <section className="index-contact py-10 sm:py-12 lg:py-16 bg-[#080b0d]">
       <div className="container-mobile">
         <SectionDivider title="צור קשר" className="mb-8" />
         
         <div className="max-w-4xl mx-auto">
           {/* Main contact grid */}
-          <div className={`grid ${gridCols} gap-4 sm:gap-6 mb-10`}>
+          <div className={`grid ${gridCols} gap-4 sm:gap-6 mb-6`}>
             {/* Phone card */}
             {showPhone && (
               <GlassCard

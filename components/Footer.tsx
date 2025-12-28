@@ -90,7 +90,7 @@ export function Footer({ settings }: FooterProps) {
   const telLink = formattedPhone.startsWith('+') ? formattedPhone : '+972' + formattedPhone.replace(/^0/, '')
 
   return (
-    <footer className="bg-background-darker border-t border-white/10">
+    <footer className="bg-[#080b0d] border-t border-white/10">
       {/* Main footer content */}
       <div className="container-mobile py-10 md:py-12">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
