@@ -7,13 +7,15 @@ import { createClient } from '@/lib/supabase/client'
 import { AppHeader } from '@/components/AppHeader'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { GlassCard } from '@/components/ui/GlassCard'
+import { AppointmentDetailModal } from '@/components/barber/AppointmentDetailModal'
 import { toast } from 'sonner'
-import { cn, formatDateHebrew, formatTime as formatTimeUtil } from '@/lib/utils'
-import { Calendar, Clock, Scissors, User, X, History, ChevronRight, LogIn } from 'lucide-react'
+import { cn, formatTime as formatTimeUtil } from '@/lib/utils'
+import { Calendar, Clock, Scissors, User, X, History, ChevronRight, LogIn, Info, Phone, AlertCircle } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { ReservationWithDetails } from '@/types/database'
 import { LoginModal } from '@/components/LoginModal'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { isSameDay, addDays } from 'date-fns'
 
 type TabType = 'upcoming' | 'past' | 'cancelled'
 
@@ -34,9 +36,10 @@ export default function MyAppointmentsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('upcoming')
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [showLoginModal, setShowLoginModal] = useState(false)
-
-  // No longer redirect - show login prompt instead
-  // useEffect removed
+  const [detailModal, setDetailModal] = useState<{
+    isOpen: boolean
+    reservation: ReservationWithDetails | null
+  }>({ isOpen: false, reservation: null })
 
   useEffect(() => {
     if (customer?.id || customer?.phone) {
@@ -53,18 +56,12 @@ export default function MyAppointmentsPage() {
     try {
       const supabase = createClient()
       
-      // Fetch by customer_id OR by phone number (fallback for old reservations)
       let query = supabase
         .from('reservations')
-        .select(`
-          *,
-          services (*),
-          users (*)
-        `)
+        .select(`*, services (*), users (*)`)
         .order('time_timestamp', { ascending: false })
       
       if (customer.id) {
-        // Use OR to get reservations by customer_id or phone
         query = query.or(`customer_id.eq.${customer.id},customer_phone.eq.${customer.phone}`)
       } else if (customer.phone) {
         query = query.eq('customer_phone', customer.phone)
@@ -98,43 +95,25 @@ export default function MyAppointmentsPage() {
     try {
       const supabase = createClient()
       
-      // Perform the update - track that customer cancelled
-      const { data, error } = await (supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from('reservations') as any)
-        .update({ 
-          status: 'cancelled',
-          cancelled_by: 'customer'
-        })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.from('reservations') as any)
+        .update({ status: 'cancelled', cancelled_by: 'customer' })
         .eq('id', reservationId)
         .select('id, status') as { data: { id: string; status: string }[] | null; error: unknown }
       
       if (error) {
         console.error('Error cancelling reservation:', error)
-        console.error('Error details:', JSON.stringify(error, null, 2))
         await report(new Error((error as Error)?.message || 'Unknown cancellation error'), 'Cancelling customer reservation')
-        toast.error(`שגיאה בביטול התור: ${(error as Error)?.message || 'נסה שוב'}`)
+        toast.error(`שגיאה בביטול התור`)
         return
       }
       
-      // Verify the update actually happened
       if (!data || data.length === 0) {
-        console.error('No data returned after update - cancellation may have failed')
         toast.error('שגיאה בביטול התור - לא נמצא התור')
         return
       }
       
-      // Check if status was actually updated
-      const updated = data[0]
-      if (updated.status !== 'cancelled') {
-        console.error('Status was not updated to cancelled:', updated)
-        toast.error('שגיאה בביטול התור - הסטטוס לא עודכן')
-        return
-      }
-      
       toast.success('התור בוטל בהצלחה')
-      
-      // Refresh data from server to ensure sync
       await fetchReservations()
     } catch (err) {
       console.error('Error cancelling reservation:', err)
@@ -145,20 +124,10 @@ export default function MyAppointmentsPage() {
     }
   }
 
-  // Normalize timestamp - handle both seconds and milliseconds
+  // Normalize timestamp
   const normalizeTimestamp = (ts: number): number => {
-    if (ts < 946684800000) {
-      return ts * 1000
-    }
+    if (ts < 946684800000) return ts * 1000
     return ts
-  }
-
-  const formatDate = (timestamp: number): string => {
-    return formatDateHebrew(normalizeTimestamp(timestamp))
-  }
-
-  const formatTime = (timestamp: number): string => {
-    return formatTimeUtil(normalizeTimestamp(timestamp))
   }
 
   const isUpcoming = (reservation: ReservationWithDetails): boolean => {
@@ -177,12 +146,21 @@ export default function MyAppointmentsPage() {
     return reservation.status === 'cancelled'
   }
 
-  // Get status display text
-  const getStatusText = (reservation: ReservationWithDetails): string => {
-    if (reservation.status === 'cancelled') return 'בוטל'
-    if (reservation.status === 'completed') return 'הושלם'
-    if (isUpcoming(reservation)) return 'קרוב'
-    return 'הסתיים'
+  // Smart date/time display
+  const getSmartDateTime = (timestamp: number): { date: string; time: string; isToday: boolean } => {
+    const normalizedTs = normalizeTimestamp(timestamp)
+    const resDate = new Date(normalizedTs)
+    const today = new Date()
+    const tomorrow = addDays(today, 1)
+    const isToday = isSameDay(resDate, today)
+    const isTomorrow = isSameDay(resDate, tomorrow)
+    
+    let dateStr = ''
+    if (isToday) dateStr = 'היום'
+    else if (isTomorrow) dateStr = 'מחר'
+    else dateStr = resDate.toLocaleDateString('he-IL', { weekday: 'short', day: 'numeric', month: 'short' })
+    
+    return { date: dateStr, time: formatTimeUtil(normalizedTs), isToday }
   }
 
   const filteredReservations = reservations.filter(r => {
@@ -222,24 +200,20 @@ export default function MyAppointmentsPage() {
           <div className="container-mobile py-8 sm:py-12 pb-24">
             <div className="max-w-md mx-auto">
               <GlassCard className="text-center py-12 px-6">
-                {/* Icon */}
                 <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-accent-gold/10 flex items-center justify-center">
                   <Calendar size={40} strokeWidth={1} className="text-accent-gold" />
                 </div>
                 
-                {/* Title */}
                 <h1 className="text-2xl text-foreground-light font-medium mb-3">
                   התורים שלי
                 </h1>
                 
-                {/* Description */}
                 <p className="text-foreground-muted mb-8 leading-relaxed">
                   התחבר כדי לראות את התורים שלך,
                   <br />
                   לנהל הזמנות ולקבל תזכורות
                 </p>
                 
-                {/* Login Button */}
                 <button
                   onClick={() => setShowLoginModal(true)}
                   className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-accent-gold text-background-dark rounded-xl font-medium hover:bg-accent-gold/90 transition-all hover:scale-[1.02]"
@@ -248,11 +222,8 @@ export default function MyAppointmentsPage() {
                   <span>התחבר עכשיו</span>
                 </button>
                 
-                {/* Or book new */}
                 <div className="mt-6 pt-6 border-t border-white/10">
-                  <p className="text-foreground-muted text-sm mb-3">
-                    עדיין לא קבעת תור?
-                  </p>
+                  <p className="text-foreground-muted text-sm mb-3">עדיין לא קבעת תור?</p>
                   <button
                     onClick={() => router.push('/')}
                     className="text-accent-gold hover:underline text-sm font-medium"
@@ -265,10 +236,7 @@ export default function MyAppointmentsPage() {
           </div>
         </main>
         
-        <LoginModal 
-          isOpen={showLoginModal} 
-          onClose={() => setShowLoginModal(false)} 
-        />
+        <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
       </>
     )
   }
@@ -281,17 +249,17 @@ export default function MyAppointmentsPage() {
         <div className="container-mobile py-6 sm:py-8 pb-24">
           <div className="max-w-2xl mx-auto">
             {/* Header */}
-            <div className="text-center mb-6 sm:mb-8">
-              <h1 className="text-2xl sm:text-3xl text-foreground-light font-medium">
+            <div className="mb-6">
+              <h1 className="text-xl sm:text-2xl text-foreground-light font-medium">
                 התורים שלי
               </h1>
-              <p className="text-foreground-muted mt-2 text-sm sm:text-base">
-                שלום {customer?.fullname}, כאן תוכל לצפות ולנהל את התורים שלך
+              <p className="text-foreground-muted text-sm mt-0.5">
+                שלום {customer?.fullname}
               </p>
             </div>
             
-            {/* Tabs - horizontal scroll on mobile */}
-            <div className="flex gap-1 sm:gap-2 mb-6 bg-background-card rounded-xl p-1 overflow-x-auto scrollbar-hide">
+            {/* Tabs - Compact Pills */}
+            <div className="flex gap-1.5 mb-4 p-1 bg-white/[0.03] rounded-xl border border-white/[0.06]">
               {tabs.map((tab) => {
                 const Icon = tab.icon
                 return (
@@ -299,24 +267,22 @@ export default function MyAppointmentsPage() {
                     key={tab.key}
                     onClick={() => setActiveTab(tab.key)}
                     className={cn(
-                      'flex-1 min-w-[90px] py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap',
+                      'flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5',
                       activeTab === tab.key
-                        ? 'bg-accent-gold text-background-dark'
+                        ? 'bg-white/[0.1] text-foreground-light shadow-sm'
                         : 'text-foreground-muted hover:text-foreground-light'
                     )}
                   >
                     <Icon size={14} strokeWidth={1.5} />
-                    <span>{tab.label}</span>
-                    {tab.count > 0 && (
-                      <span className={cn(
-                        'text-xs px-1.5 py-0.5 rounded-full',
-                        activeTab === tab.key
-                          ? 'bg-background-dark/20'
-                          : 'bg-white/10'
-                      )}>
-                        {tab.count}
-                      </span>
-                    )}
+                    {tab.label}
+                    <span className={cn(
+                      'px-1.5 py-0.5 rounded text-xs min-w-[20px]',
+                      activeTab === tab.key
+                        ? 'bg-accent-gold/20 text-accent-gold'
+                        : 'bg-white/[0.08] text-foreground-muted'
+                    )}>
+                      {tab.count}
+                    </span>
                   </button>
                 )
               })}
@@ -347,106 +313,106 @@ export default function MyAppointmentsPage() {
                 )}
               </GlassCard>
             ) : (
-              <div className="flex flex-col gap-3 sm:gap-4">
-                {filteredReservations.map((reservation) => (
-                  <GlassCard
-                    key={reservation.id}
-                    variant="default"
-                    padding="md"
-                    className={cn(
-                      'transition-all',
-                      reservation.status === 'cancelled' 
-                        ? 'border-red-500/30 opacity-70' 
-                        : isUpcoming(reservation)
-                          ? 'border-accent-gold/30'
-                          : ''
-                    )}
-                  >
-                    {/* Status Badge & Cancel Button */}
-                    <div className="flex justify-between items-start mb-4">
-                      <div className={cn(
-                        'px-3 py-1 rounded-full text-xs font-medium',
-                        reservation.status === 'cancelled' 
-                          ? 'bg-red-500/20 text-red-400'
-                          : reservation.status === 'completed'
-                            ? 'bg-green-500/20 text-green-400'
-                            : isUpcoming(reservation)
-                              ? 'bg-accent-gold/20 text-accent-gold'
-                              : 'bg-blue-500/20 text-blue-400'
-                      )}>
-                        {getStatusText(reservation)}
-                      </div>
-                      
-                      {isUpcoming(reservation) && (
-                        <button
-                          onClick={() => handleCancelReservation(reservation.id)}
-                          disabled={cancellingId === reservation.id}
-                          className={cn(
-                            'px-3 py-1.5 rounded-lg text-xs font-medium transition-all touch-btn',
-                            cancellingId === reservation.id
-                              ? 'bg-foreground-muted/20 text-foreground-muted cursor-not-allowed'
-                              : 'bg-red-500/10 text-red-400 hover:bg-red-500/20 active:scale-95'
+              <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden">
+                <div className="divide-y divide-white/[0.04]">
+                  {filteredReservations.map((reservation) => {
+                    const smartDate = getSmartDateTime(reservation.time_timestamp)
+                    const upcoming = isUpcoming(reservation)
+                    const cancelled = isCancelled(reservation)
+                    
+                    return (
+                      <div
+                        key={reservation.id}
+                        onClick={() => setDetailModal({ isOpen: true, reservation })}
+                        className={cn(
+                          'flex items-center gap-3 px-3 sm:px-4 py-3 transition-all cursor-pointer hover:bg-white/[0.03]',
+                          cancelled && 'opacity-60'
+                        )}
+                      >
+                        {/* Status Line */}
+                        <div className={cn(
+                          'w-1 h-12 rounded-full shrink-0',
+                          cancelled ? 'bg-red-500/60' : upcoming ? 'bg-accent-gold' : 'bg-foreground-muted/30'
+                        )} />
+                        
+                        {/* Main Content */}
+                        <div className="flex-1 min-w-0">
+                          {/* Barber & Service */}
+                          <div className="flex items-center gap-2 mb-1">
+                            <User className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+                            <span className="font-medium text-foreground-light text-sm truncate">
+                              {reservation.users?.fullname || 'ספר'}
+                            </span>
+                          </div>
+                          
+                          {/* Service & Time */}
+                          <p className="text-foreground-muted text-xs flex items-center gap-1.5">
+                            <Scissors size={11} />
+                            <span className="truncate max-w-[80px]">{reservation.services?.name_he || 'שירות'}</span>
+                            <span className="text-foreground-muted/50">•</span>
+                            <Clock size={11} />
+                            <span>{smartDate.time}</span>
+                            <span className={cn(smartDate.isToday && 'text-accent-gold')}>
+                              {smartDate.date}
+                            </span>
+                          </p>
+                          
+                          {/* Cancelled info */}
+                          {cancelled && reservation.cancelled_by && (
+                            <div className="flex items-center gap-1 mt-1.5 text-xs text-red-400/80">
+                              <AlertCircle className="w-3 h-3" />
+                              <span>
+                                בוטל ע&quot;י {reservation.cancelled_by === 'barber' ? 'הספר' : 'אתה'}
+                              </span>
+                            </div>
                           )}
-                        >
-                          {cancellingId === reservation.id ? 'מבטל...' : 'בטל תור'}
-                        </button>
-                      )}
-                    </div>
-                    
-                    {/* Details - responsive grid */}
-                    <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:gap-4">
-                      <div className="flex items-center gap-2">
-                        <Calendar size={16} strokeWidth={1.5} className="text-accent-gold flex-shrink-0" />
-                        <span className="text-foreground-light text-sm truncate">
-                          {formatDate(reservation.date_timestamp)}
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Clock size={16} strokeWidth={1.5} className="text-accent-gold flex-shrink-0" />
-                        <span className="text-foreground-light text-sm" dir="ltr">
-                          {formatTime(reservation.time_timestamp)}
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Scissors size={16} strokeWidth={1.5} className="text-accent-gold flex-shrink-0" />
-                        <span className="text-foreground-light text-sm truncate">
-                          {reservation.services?.name_he || 'שירות'}
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <User size={16} strokeWidth={1.5} className="text-accent-gold flex-shrink-0" />
-                        <span className="text-foreground-light text-sm truncate">
-                          {reservation.users?.fullname || 'ספר'}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    {/* Cancellation Reason (when cancelled by barber) */}
-                    {reservation.status === 'cancelled' && reservation.cancelled_by === 'barber' && (
-                      <div className="mt-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                        <p className="text-red-400 text-xs">
-                          <span className="font-medium">בוטל על ידי הספר</span>
-                          {reservation.cancellation_reason && (
-                            <span className="block mt-1 text-red-300/80">
-                              סיבה: {reservation.cancellation_reason}
+                        </div>
+                        
+                        {/* Actions */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          {/* Info */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setDetailModal({ isOpen: true, reservation })
+                            }}
+                            className="p-2 rounded-lg hover:bg-white/[0.08] transition-colors"
+                            aria-label="פרטים"
+                          >
+                            <Info size={16} strokeWidth={1.5} className="text-foreground-muted" />
+                          </button>
+                          
+                          {/* Cancel - only for upcoming */}
+                          {upcoming && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleCancelReservation(reservation.id)
+                              }}
+                              disabled={cancellingId === reservation.id}
+                              className={cn(
+                                'p-2 rounded-lg transition-colors',
+                                cancellingId === reservation.id
+                                  ? 'opacity-50 cursor-not-allowed'
+                                  : 'hover:bg-red-500/10 text-red-400'
+                              )}
+                              aria-label="בטל"
+                            >
+                              <X size={16} strokeWidth={1.5} />
+                            </button>
+                          )}
+                          
+                          {/* Cancelled Badge */}
+                          {cancelled && (
+                            <span className="px-2 py-1 rounded-lg bg-red-500/15 text-red-400 text-xs shrink-0">
+                              בוטל
                             </span>
                           )}
-                        </p>
+                        </div>
                       </div>
-                    )}
-                    
-                    {/* Price */}
-                    {reservation.services?.price && (
-                      <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
-                        <span className="text-foreground-muted text-sm">מחיר:</span>
-                        <span className="text-accent-gold font-bold">₪{reservation.services.price}</span>
-                      </div>
-                    )}
-                  </GlassCard>
-                ))}
+                    )
+                  })}
+                </div>
               </div>
             )}
             
@@ -463,6 +429,14 @@ export default function MyAppointmentsPage() {
           </div>
         </div>
       </main>
+
+      {/* Detail Modal */}
+      <AppointmentDetailModal
+        isOpen={detailModal.isOpen}
+        onClose={() => setDetailModal({ isOpen: false, reservation: null })}
+        reservation={detailModal.reservation}
+        variant="customer"
+      />
     </>
   )
 }

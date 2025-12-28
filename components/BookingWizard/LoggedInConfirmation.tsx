@@ -8,6 +8,7 @@ import type { BarberWithWorkDays } from '@/types/database'
 import { cn, formatTime } from '@/lib/utils'
 import { Check, Calendar, Clock, Scissors, User, Phone } from 'lucide-react'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { BlockedUserModal } from './BlockedUserModal'
 
 interface LoggedInConfirmationProps {
   barber: BarberWithWorkDays
@@ -27,6 +28,7 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
   const [isCreating, setIsCreating] = useState(false)
   const [isCreated, setIsCreated] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isBlocked, setIsBlocked] = useState(false)
   
   const hasCreatedRef = useRef(false)
 
@@ -50,6 +52,19 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
     
     try {
       const supabase = createClient()
+      
+      // Check if customer is blocked
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: customerData } = await (supabase.from('customers') as any)
+        .select('is_blocked')
+        .eq('id', loggedInCustomer.id)
+        .single()
+      
+      if ((customerData as { is_blocked?: boolean })?.is_blocked) {
+        setIsBlocked(true)
+        setIsCreating(false)
+        return
+      }
       
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: insertError } = await (supabase.from('reservations') as any).insert({
@@ -84,6 +99,11 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
     } finally {
       setIsCreating(false)
     }
+  }
+
+  // Show blocked modal if customer is blocked
+  if (isBlocked) {
+    return <BlockedUserModal isOpen={true} />
   }
 
   if (isCreating) {

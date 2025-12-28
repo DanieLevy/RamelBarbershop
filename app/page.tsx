@@ -6,6 +6,7 @@ import { LocationSection } from '@/components/LocationSection'
 import { ProductsCarousel } from '@/components/ProductsCarousel'
 import { Footer } from '@/components/Footer'
 import { SectionDivider } from '@/components/ui/SectionDivider'
+import { UpcomingAppointmentBanner } from '@/components/UpcomingAppointmentBanner'
 import Image from 'next/image'
 import type { BarberWithWorkDays, BarbershopSettings, Product } from '@/types/database'
 
@@ -39,6 +40,11 @@ export default async function HomePage() {
   return (
     <>
       <AppHeader />
+      
+      {/* Upcoming Appointment Banner - Fixed below header for logged-in customers */}
+      <div className="fixed top-[calc(var(--header-top-offset,0px)+56px)] left-0 right-0 z-40">
+        <UpcomingAppointmentBanner />
+      </div>
       
       <main className="relative">
         {/* Hero Section - index-header class gets safe-area padding in PWA standalone mode via CSS */}

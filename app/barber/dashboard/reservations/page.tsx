@@ -4,20 +4,22 @@ import { useEffect, useState, useMemo } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { cn, formatTime as formatTimeUtil, formatDateHebrew, nowInIsrael } from '@/lib/utils'
-import { startOfDay, endOfDay, addDays, format, isSameDay } from 'date-fns'
+import { cn, formatTime as formatTimeUtil, nowInIsrael } from '@/lib/utils'
+import { startOfDay, endOfDay, addDays, format, isSameDay, startOfWeek, endOfWeek } from 'date-fns'
 import { he } from 'date-fns/locale'
-import { Calendar, Phone, X, Clock, ChevronLeft, ChevronRight, Users, Scissors, Ban } from 'lucide-react'
+import { Calendar, Phone, X, Clock, Users, Ban, Info } from 'lucide-react'
 import type { Reservation, Service } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { CancelReservationModal } from '@/components/barber/CancelReservationModal'
 import { BulkCancelModal } from '@/components/barber/BulkCancelModal'
+import { AppointmentDetailModal } from '@/components/barber/AppointmentDetailModal'
 
 interface ReservationWithService extends Reservation {
   services?: Service
 }
 
-type TabType = 'all' | 'upcoming' | 'past' | 'cancelled'
+type TabType = 'upcoming' | 'past' | 'cancelled'
+type QuickDateType = 'today' | 'tomorrow' | 'week' | 'all' | 'custom'
 
 export default function ReservationsPage() {
   const { barber } = useBarberAuthStore()
@@ -25,13 +27,12 @@ export default function ReservationsPage() {
   
   const [reservations, setReservations] = useState<ReservationWithService[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<TabType>('all')
+  const [activeTab, setActiveTab] = useState<TabType>('upcoming')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   
   // Date filter state
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-  const [dateRangeEnd, setDateRangeEnd] = useState<Date | null>(null)
-  const [isRangeMode, setIsRangeMode] = useState(false)
+  const [quickDate, setQuickDate] = useState<QuickDateType>('today')
+  const [customDate, setCustomDate] = useState<Date | null>(null)
   
   // Modal states
   const [cancelModal, setCancelModal] = useState<{
@@ -43,6 +44,11 @@ export default function ReservationsPage() {
     isOpen: boolean
     reservations: ReservationWithService[]
   }>({ isOpen: false, reservations: [] })
+
+  const [detailModal, setDetailModal] = useState<{
+    isOpen: boolean
+    reservation: ReservationWithService | null
+  }>({ isOpen: false, reservation: null })
 
   useEffect(() => {
     if (barber?.id) {
@@ -124,7 +130,6 @@ export default function ReservationsPage() {
     try {
       const supabase = createClient()
       
-      // Cancel all reservations
       for (const res of toCancel) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (supabase.from('reservations') as any)
@@ -148,7 +153,7 @@ export default function ReservationsPage() {
     }
   }
 
-  // Normalize timestamp - handle both seconds and milliseconds
+  // Normalize timestamp
   const normalizeTs = (ts: number): number => {
     if (ts < 946684800000) return ts * 1000
     return ts
@@ -160,10 +165,28 @@ export default function ReservationsPage() {
 
   const now = Date.now()
   const israelNow = nowInIsrael()
-  const todayStart = startOfDay(israelNow)
-  const todayEnd = endOfDay(israelNow)
 
-  // Smart date display: "היום 14:30" or "28/12 14:30"
+  // Get date range based on quickDate
+  const getDateRange = (): { start: Date | null; end: Date | null } => {
+    switch (quickDate) {
+      case 'today':
+        return { start: startOfDay(israelNow), end: endOfDay(israelNow) }
+      case 'tomorrow':
+        const tomorrow = addDays(israelNow, 1)
+        return { start: startOfDay(tomorrow), end: endOfDay(tomorrow) }
+      case 'week':
+        return { start: startOfWeek(israelNow, { weekStartsOn: 0 }), end: endOfWeek(israelNow, { weekStartsOn: 0 }) }
+      case 'custom':
+        if (customDate) {
+          return { start: startOfDay(customDate), end: endOfDay(customDate) }
+        }
+        return { start: null, end: null }
+      default:
+        return { start: null, end: null }
+    }
+  }
+
+  // Smart date display
   const getSmartDateTime = (timestamp: number): { date: string; time: string; isToday: boolean } => {
     const normalizedTs = normalizeTs(timestamp)
     const resDate = new Date(normalizedTs)
@@ -179,27 +202,19 @@ export default function ReservationsPage() {
       dateStr = format(resDate, 'dd/MM', { locale: he })
     }
     
-    return {
-      date: dateStr,
-      time: formatTime(normalizedTs),
-      isToday,
-    }
+    return { date: dateStr, time: formatTime(normalizedTs), isToday }
   }
 
-  // Filter reservations by date and tab
+  // Filter reservations
   const filteredReservations = useMemo(() => {
     let filtered = [...reservations]
+    const { start, end } = getDateRange()
     
     // Date filter
-    if (selectedDate) {
-      const startMs = startOfDay(selectedDate).getTime()
-      const endMs = isRangeMode && dateRangeEnd 
-        ? endOfDay(dateRangeEnd).getTime()
-        : endOfDay(selectedDate).getTime()
-      
+    if (start && end) {
       filtered = filtered.filter(res => {
         const resTime = normalizeTs(res.time_timestamp)
-        return resTime >= startMs && resTime <= endMs
+        return resTime >= start.getTime() && resTime <= end.getTime()
       })
     }
     
@@ -218,55 +233,57 @@ export default function ReservationsPage() {
       case 'cancelled':
         filtered = filtered.filter(res => res.status === 'cancelled')
         break
-      // 'all' - no additional filter
     }
     
     return filtered
-  }, [reservations, selectedDate, dateRangeEnd, isRangeMode, activeTab, now])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reservations, quickDate, customDate, activeTab, now])
 
-  // Get reservations for bulk cancel (only confirmed, selected date)
+  // Bulk cancellable reservations
   const bulkCancellableReservations = useMemo(() => {
-    if (!selectedDate) return []
-    
-    const startMs = startOfDay(selectedDate).getTime()
-    const endMs = isRangeMode && dateRangeEnd 
-      ? endOfDay(dateRangeEnd).getTime()
-      : endOfDay(selectedDate).getTime()
+    const { start, end } = getDateRange()
+    if (!start || !end) return []
     
     return reservations.filter(res => {
       const resTime = normalizeTs(res.time_timestamp)
-      return resTime >= startMs && resTime <= endMs && res.status === 'confirmed'
+      return resTime >= start.getTime() && resTime <= end.getTime() && res.status === 'confirmed'
     })
-  }, [reservations, selectedDate, dateRangeEnd, isRangeMode])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reservations, quickDate, customDate])
+
+  // Tab counts
+  const getTabCounts = () => {
+    const { start, end } = getDateRange()
+    let base = [...reservations]
+    
+    if (start && end) {
+      base = base.filter(res => {
+        const resTime = normalizeTs(res.time_timestamp)
+        return resTime >= start.getTime() && resTime <= end.getTime()
+      })
+    }
+    
+    return {
+      upcoming: base.filter(r => normalizeTs(r.time_timestamp) > now && r.status === 'confirmed').length,
+      past: base.filter(r => normalizeTs(r.time_timestamp) < now && r.status !== 'cancelled').length,
+      cancelled: base.filter(r => r.status === 'cancelled').length
+    }
+  }
+
+  const counts = getTabCounts()
 
   const tabs: { key: TabType; label: string; count: number }[] = [
-    { 
-      key: 'all', 
-      label: 'הכל', 
-      count: filteredReservations.filter(r => r.status !== 'cancelled').length 
-    },
-    { 
-      key: 'upcoming', 
-      label: 'קרובים', 
-      count: filteredReservations.filter(r => normalizeTs(r.time_timestamp) > now && r.status === 'confirmed').length 
-    },
-    { 
-      key: 'past', 
-      label: 'קודמים', 
-      count: filteredReservations.filter(r => normalizeTs(r.time_timestamp) < now && r.status !== 'cancelled').length 
-    },
-    { 
-      key: 'cancelled', 
-      label: 'מבוטלים', 
-      count: filteredReservations.filter(r => r.status === 'cancelled').length 
-    },
+    { key: 'upcoming', label: 'קרובים', count: counts.upcoming },
+    { key: 'past', label: 'קודמים', count: counts.past },
+    { key: 'cancelled', label: 'מבוטלים', count: counts.cancelled },
   ]
 
-  // Quick date buttons
-  const quickDates = [
-    { label: 'היום', date: israelNow },
-    { label: 'מחר', date: addDays(israelNow, 1) },
-    { label: 'הכל', date: null },
+  // Quick date chips
+  const quickDateChips: { key: QuickDateType; label: string }[] = [
+    { key: 'today', label: 'היום' },
+    { key: 'tomorrow', label: 'מחר' },
+    { key: 'week', label: 'השבוע' },
+    { key: 'all', label: 'הכל' },
   ]
 
   if (loading) {
@@ -280,113 +297,72 @@ export default function ReservationsPage() {
   return (
     <div className="max-w-3xl">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-medium text-foreground-light">תורים של לקוחות</h1>
-        <p className="text-foreground-muted mt-1">ניהול תורים שנקבעו על ידי לקוחות</p>
+      <div className="mb-4">
+        <h1 className="text-xl sm:text-2xl font-medium text-foreground-light">תורים של לקוחות</h1>
+        <p className="text-foreground-muted text-sm mt-0.5">ניהול תורים שנקבעו על ידי לקוחות</p>
       </div>
 
-      {/* Date Filter Section */}
-      <div className="mb-6 p-4 bg-background-card border border-white/10 rounded-xl">
-        <div className="flex flex-wrap items-center gap-3 mb-3">
-          <span className="text-foreground-muted text-sm">סינון לפי תאריך:</span>
-          
-          {/* Quick Buttons */}
-          {quickDates.map((qd) => (
+      {/* Date Filter Chips - Horizontal Scroll */}
+      <div className="mb-4 -mx-4 px-4">
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          {quickDateChips.map((chip) => (
             <button
-              key={qd.label}
+              key={chip.key}
               onClick={() => {
-                setSelectedDate(qd.date)
-                setDateRangeEnd(null)
-                setIsRangeMode(false)
+                setQuickDate(chip.key)
+                setCustomDate(null)
               }}
               className={cn(
-                'px-3 py-1.5 rounded-lg text-sm font-medium transition-all',
-                (qd.date === null && selectedDate === null) || 
-                (qd.date && selectedDate && isSameDay(qd.date, selectedDate) && !isRangeMode)
-                  ? 'bg-accent-gold text-background-dark'
-                  : 'bg-white/5 text-foreground-muted hover:text-foreground-light hover:bg-white/10'
+                'px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all shrink-0',
+                quickDate === chip.key
+                  ? 'bg-accent-gold text-background-dark shadow-lg shadow-accent-gold/20'
+                  : 'bg-white/[0.05] text-foreground-muted hover:bg-white/[0.1] border border-white/[0.08]'
               )}
             >
-              {qd.label}
+              {chip.label}
             </button>
           ))}
           
-          {/* Date Picker */}
-          <input
-            type="date"
-            value={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''}
-            onChange={(e) => {
-              const date = e.target.value ? new Date(e.target.value) : null
-              setSelectedDate(date)
-              if (!isRangeMode) setDateRangeEnd(null)
-            }}
-            className="px-3 py-1.5 rounded-lg text-sm bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold/50"
-          />
-          
-          {/* Range Mode Toggle */}
-          <button
-            onClick={() => setIsRangeMode(!isRangeMode)}
-            className={cn(
-              'px-3 py-1.5 rounded-lg text-sm transition-all',
-              isRangeMode
-                ? 'bg-accent-gold/20 text-accent-gold border border-accent-gold/30'
-                : 'bg-white/5 text-foreground-muted hover:text-foreground-light border border-transparent'
-            )}
-          >
-            טווח תאריכים
-          </button>
-        </div>
-        
-        {/* Date Range End */}
-        {isRangeMode && selectedDate && (
-          <div className="flex items-center gap-2 mt-2">
-            <span className="text-foreground-muted text-sm">עד:</span>
+          {/* Custom Date Picker Chip */}
+          <div className="relative shrink-0">
             <input
               type="date"
-              value={dateRangeEnd ? format(dateRangeEnd, 'yyyy-MM-dd') : ''}
-              onChange={(e) => setDateRangeEnd(e.target.value ? new Date(e.target.value) : null)}
-              min={format(selectedDate, 'yyyy-MM-dd')}
-              className="px-3 py-1.5 rounded-lg text-sm bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold/50"
+              value={customDate ? format(customDate, 'yyyy-MM-dd') : ''}
+              onChange={(e) => {
+                const date = e.target.value ? new Date(e.target.value) : null
+                setCustomDate(date)
+                if (date) setQuickDate('custom')
+              }}
+              className={cn(
+                'w-32 px-4 py-2 rounded-full text-sm font-medium transition-all cursor-pointer',
+                'bg-white/[0.05] border border-white/[0.08] text-foreground-light',
+                'focus:outline-none focus:ring-2 focus:ring-accent-gold/50',
+                quickDate === 'custom' && 'bg-accent-gold/20 border-accent-gold/30 text-accent-gold'
+              )}
             />
           </div>
-        )}
-        
-        {/* Bulk Cancel Button */}
-        {selectedDate && bulkCancellableReservations.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-white/10">
-            <button
-              onClick={() => setBulkCancelModal({
-                isOpen: true,
-                reservations: bulkCancellableReservations
-              })}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors text-sm"
-            >
-              <Ban size={16} strokeWidth={1.5} />
-              בטל את כל התורים ({bulkCancellableReservations.length})
-            </button>
-          </div>
-        )}
+        </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+      {/* Tabs - Compact Pills */}
+      <div className="flex gap-1.5 mb-4 p-1 bg-white/[0.03] rounded-xl border border-white/[0.06]">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={cn(
-              'px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5',
+              'flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5',
               activeTab === tab.key
-                ? 'bg-accent-gold text-background-dark'
-                : 'bg-background-card border border-white/10 text-foreground-muted hover:text-foreground-light'
+                ? 'bg-white/[0.1] text-foreground-light shadow-sm'
+                : 'text-foreground-muted hover:text-foreground-light'
             )}
           >
             {tab.label}
             <span className={cn(
-              'px-1.5 py-0.5 rounded text-xs',
+              'px-1.5 py-0.5 rounded text-xs min-w-[20px]',
               activeTab === tab.key
-                ? 'bg-background-dark/20 text-background-dark'
-                : 'bg-white/10 text-foreground-muted'
+                ? 'bg-accent-gold/20 text-accent-gold'
+                : 'bg-white/[0.08] text-foreground-muted'
             )}>
               {tab.count}
             </span>
@@ -394,98 +370,119 @@ export default function ReservationsPage() {
         ))}
       </div>
 
+      {/* Bulk Cancel Button */}
+      {quickDate !== 'all' && bulkCancellableReservations.length > 1 && (
+        <button
+          onClick={() => setBulkCancelModal({
+            isOpen: true,
+            reservations: bulkCancellableReservations
+          })}
+          className="w-full mb-4 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors text-sm font-medium"
+        >
+          <Ban size={16} strokeWidth={1.5} />
+          בטל את כל התורים ({bulkCancellableReservations.length})
+        </button>
+      )}
+
       {/* Reservations List */}
-      <div className="bg-background-card border border-white/10 rounded-2xl overflow-hidden">
+      <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden">
         {filteredReservations.length === 0 ? (
           <div className="text-center py-12">
-            <Calendar size={48} strokeWidth={1} className="text-foreground-muted/30 mx-auto mb-3" />
-            <p className="text-foreground-muted">אין תורים להציג</p>
+            <Calendar size={40} strokeWidth={1} className="text-foreground-muted/30 mx-auto mb-3" />
+            <p className="text-foreground-muted text-sm">אין תורים להציג</p>
           </div>
         ) : (
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-white/[0.04]">
             {filteredReservations.map((res) => {
               const smartDate = getSmartDateTime(res.time_timestamp)
               const isUpcoming = normalizeTs(res.time_timestamp) > now && res.status === 'confirmed'
+              const isCancelled = res.status === 'cancelled'
               
               return (
                 <div
                   key={res.id}
+                  onClick={() => setDetailModal({ isOpen: true, reservation: res })}
                   className={cn(
-                    'flex items-center gap-3 px-4 py-3 transition-all',
-                    res.status === 'cancelled' && 'opacity-60',
-                    isUpcoming && 'bg-accent-gold/5'
+                    'flex items-center gap-3 px-3 sm:px-4 py-3 transition-all cursor-pointer hover:bg-white/[0.03]',
+                    isCancelled && 'opacity-60'
                   )}
                 >
-                  {/* Status Indicator */}
+                  {/* Status Line */}
                   <div className={cn(
-                    'w-1.5 h-10 rounded-full flex-shrink-0',
-                    res.status === 'cancelled'
-                      ? 'bg-red-500'
-                      : res.status === 'completed'
-                        ? 'bg-green-500'
-                        : isUpcoming
-                          ? 'bg-accent-gold'
-                          : 'bg-blue-500'
+                    'w-1 h-10 rounded-full shrink-0',
+                    isCancelled ? 'bg-red-500/60' : isUpcoming ? 'bg-accent-gold' : 'bg-foreground-muted/30'
                   )} />
                   
-                  {/* Customer Name */}
+                  {/* Main Content */}
                   <div className="flex-1 min-w-0">
                     <p className={cn(
-                      'text-foreground-light font-medium truncate',
-                      res.status === 'cancelled' && 'line-through'
+                      'text-foreground-light font-medium text-sm truncate',
+                      isCancelled && 'line-through'
                     )}>
                       {res.customer_name}
                     </p>
-                    <p className="text-foreground-muted text-xs truncate">
-                      {res.services?.name_he || 'שירות'}
+                    <p className="text-foreground-muted text-xs truncate flex items-center gap-1.5">
+                      <span>{res.services?.name_he || 'שירות'}</span>
+                      <span className="text-foreground-muted/50">•</span>
+                      <Clock size={11} className="inline" />
+                      <span>{smartDate.time}</span>
+                      <span className={cn(smartDate.isToday && 'text-accent-gold')}>
+                        {smartDate.date}
+                      </span>
                     </p>
                   </div>
                   
-                  {/* Date & Time */}
-                  <div className="text-left flex-shrink-0">
-                    <p className={cn(
-                      'text-sm font-medium',
-                      smartDate.isToday ? 'text-accent-gold' : 'text-foreground-light'
-                    )}>
-                      {smartDate.time}
-                    </p>
-                    <p className="text-foreground-muted text-xs">
-                      {smartDate.date}
-                    </p>
-                  </div>
-                  
-                  {/* Phone Icon */}
-                  <a
-                    href={`tel:${res.customer_phone}`}
-                    className="p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
-                    title={res.customer_phone}
-                  >
-                    <Phone size={16} strokeWidth={1.5} className="text-accent-gold" />
-                  </a>
-                  
-                  {/* Cancel Button - only for confirmed upcoming */}
-                  {res.status === 'confirmed' && (
+                  {/* Actions */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {/* Info icon */}
                     <button
-                      onClick={() => setCancelModal({ isOpen: true, reservation: res })}
-                      disabled={updatingId === res.id}
-                      className={cn(
-                        'p-2 rounded-full transition-colors flex-shrink-0',
-                        updatingId === res.id
-                          ? 'text-foreground-muted cursor-not-allowed'
-                          : 'text-red-400 hover:bg-red-500/10'
-                      )}
-                      title="בטל תור"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDetailModal({ isOpen: true, reservation: res })
+                      }}
+                      className="p-2 rounded-lg hover:bg-white/[0.08] transition-colors"
+                      aria-label="פרטים"
                     >
-                      <X size={16} strokeWidth={1.5} />
+                      <Info size={16} strokeWidth={1.5} className="text-foreground-muted" />
                     </button>
-                  )}
-                  
-                  {/* Cancelled Badge */}
-                  {res.status === 'cancelled' && (
-                    <span className="px-2 py-1 rounded-lg bg-red-500/20 text-red-400 text-xs flex-shrink-0">
-                      בוטל
-                    </span>
-                  )}
+                    
+                    {/* Phone */}
+                    <a
+                      href={`tel:${res.customer_phone}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="p-2 rounded-lg hover:bg-accent-gold/10 transition-colors"
+                      aria-label="התקשר"
+                    >
+                      <Phone size={16} strokeWidth={1.5} className="text-accent-gold" />
+                    </a>
+                    
+                    {/* Cancel */}
+                    {res.status === 'confirmed' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setCancelModal({ isOpen: true, reservation: res })
+                        }}
+                        disabled={updatingId === res.id}
+                        className={cn(
+                          'p-2 rounded-lg transition-colors',
+                          updatingId === res.id
+                            ? 'opacity-50 cursor-not-allowed'
+                            : 'hover:bg-red-500/10 text-red-400'
+                        )}
+                        aria-label="בטל"
+                      >
+                        <X size={16} strokeWidth={1.5} />
+                      </button>
+                    )}
+                    
+                    {/* Cancelled Badge */}
+                    {isCancelled && (
+                      <span className="px-2 py-1 rounded-lg bg-red-500/15 text-red-400 text-xs shrink-0">
+                        בוטל
+                      </span>
+                    )}
+                  </div>
                 </div>
               )
             })}
@@ -493,7 +490,7 @@ export default function ReservationsPage() {
         )}
       </div>
 
-      {/* Cancel Reservation Modal */}
+      {/* Modals */}
       <CancelReservationModal
         isOpen={cancelModal.isOpen}
         reservation={cancelModal.reservation}
@@ -506,14 +503,20 @@ export default function ReservationsPage() {
         isLoading={updatingId === cancelModal.reservation?.id}
       />
 
-      {/* Bulk Cancel Modal */}
       <BulkCancelModal
         isOpen={bulkCancelModal.isOpen}
         reservations={bulkCancelModal.reservations}
-        selectedDate={selectedDate}
+        selectedDate={quickDate === 'custom' ? customDate : quickDate === 'today' ? israelNow : quickDate === 'tomorrow' ? addDays(israelNow, 1) : null}
         onClose={() => setBulkCancelModal({ isOpen: false, reservations: [] })}
         onConfirm={handleBulkCancel}
         isLoading={updatingId === 'bulk'}
+      />
+
+      <AppointmentDetailModal
+        isOpen={detailModal.isOpen}
+        onClose={() => setDetailModal({ isOpen: false, reservation: null })}
+        reservation={detailModal.reservation}
+        variant="barber"
       />
     </div>
   )

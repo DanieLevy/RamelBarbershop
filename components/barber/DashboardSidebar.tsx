@@ -40,6 +40,7 @@ const navItems: NavItem[] = [
 const adminNavItems: NavItem[] = [
   { label: 'הגדרות המספרה', href: '/barber/dashboard/settings', icon: Settings, adminOnly: true },
   { label: 'ניהול ספרים', href: '/barber/dashboard/barbers', icon: Users, adminOnly: true },
+  { label: 'ניהול לקוחות', href: '/barber/dashboard/users', icon: User, adminOnly: true },
   { label: 'מוצרים', href: '/barber/dashboard/products', icon: Package, adminOnly: true },
   { label: 'שעות פתיחה', href: '/barber/dashboard/schedule', icon: CalendarCheck, adminOnly: true },
   { label: 'ימי סגירה', href: '/barber/dashboard/closures', icon: XCircle, adminOnly: true },

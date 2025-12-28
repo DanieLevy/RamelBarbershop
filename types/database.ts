@@ -67,6 +67,9 @@ export interface Database {
           last_login_at: string
           created_at: string
           updated_at: string
+          is_blocked: boolean
+          blocked_at: string | null
+          blocked_reason: string | null
         }
         Insert: {
           id?: string
@@ -76,6 +79,9 @@ export interface Database {
           last_login_at?: string
           created_at?: string
           updated_at?: string
+          is_blocked?: boolean
+          blocked_at?: string | null
+          blocked_reason?: string | null
         }
         Update: {
           id?: string
@@ -85,6 +91,9 @@ export interface Database {
           last_login_at?: string
           created_at?: string
           updated_at?: string
+          is_blocked?: boolean
+          blocked_at?: string | null
+          blocked_reason?: string | null
         }
       }
       barbershop_settings: {

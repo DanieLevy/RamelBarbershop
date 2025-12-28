@@ -4,16 +4,22 @@ import { useEffect, useState } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Calendar, Clock, CheckCircle, XCircle } from 'lucide-react'
+import { cn, formatTime as formatTimeUtil, nowInIsrael } from '@/lib/utils'
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, isSameDay, addDays, startOfMonth, endOfMonth } from 'date-fns'
+import { 
+  Calendar, Clock, TrendingDown, Users, 
+  Scissors, Settings, CalendarOff, Store,
+  ChevronLeft, Phone, Package
+} from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Reservation, Service } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
 
 interface DashboardStats {
-  todayReservations: number
-  upcomingReservations: number
-  completedToday: number
-  cancelledToday: number
+  todayAppointments: number
+  weekAppointments: number
+  newCustomersMonth: number
+  cancellationRate: number
 }
 
 interface UpcomingReservation extends Reservation {
@@ -24,13 +30,15 @@ export default function DashboardPage() {
   const { barber, isAdmin } = useBarberAuthStore()
   const { report } = useBugReporter('DashboardPage')
   const [stats, setStats] = useState<DashboardStats>({
-    todayReservations: 0,
-    upcomingReservations: 0,
-    completedToday: 0,
-    cancelledToday: 0,
+    todayAppointments: 0,
+    weekAppointments: 0,
+    newCustomersMonth: 0,
+    cancellationRate: 0,
   })
   const [upcomingList, setUpcomingList] = useState<UpcomingReservation[]>([])
   const [loading, setLoading] = useState(true)
+
+  const israelNow = nowInIsrael()
 
   useEffect(() => {
     if (barber?.id) {
@@ -46,42 +54,63 @@ export default function DashboardPage() {
     const supabase = createClient()
     
     const now = Date.now()
-    const todayStart = new Date()
-    todayStart.setHours(0, 0, 0, 0)
-    const todayEnd = new Date()
-    todayEnd.setHours(23, 59, 59, 999)
+    const todayStart = startOfDay(israelNow)
+    const todayEnd = endOfDay(israelNow)
+    const weekStart = startOfWeek(israelNow, { weekStartsOn: 0 })
+    const weekEnd = endOfWeek(israelNow, { weekStartsOn: 0 })
+    const monthStart = startOfMonth(israelNow)
+    const monthEnd = endOfMonth(israelNow)
     
     try {
-      // Fetch all reservations for this barber
+      // Fetch reservations for stats
       const { data: reservations } = await supabase
         .from('reservations')
         .select('*, services(*)')
         .eq('barber_id', barber.id)
-        .gte('time_timestamp', todayStart.getTime())
+        .gte('time_timestamp', monthStart.getTime())
         .order('time_timestamp', { ascending: true })
       
       const allRes = (reservations || []) as UpcomingReservation[]
       
-      // Calculate stats
+      // Today's confirmed appointments
       const todayRes = allRes.filter(
-        r => r.time_timestamp >= todayStart.getTime() && r.time_timestamp <= todayEnd.getTime()
+        r => r.time_timestamp >= todayStart.getTime() && 
+             r.time_timestamp <= todayEnd.getTime() &&
+             r.status === 'confirmed'
       )
       
+      // Week's confirmed appointments
+      const weekRes = allRes.filter(
+        r => r.time_timestamp >= weekStart.getTime() && 
+             r.time_timestamp <= weekEnd.getTime() &&
+             r.status === 'confirmed'
+      )
+      
+      // Month stats for cancellation rate
+      const monthRes = allRes.filter(
+        r => r.time_timestamp >= monthStart.getTime() && 
+             r.time_timestamp <= monthEnd.getTime()
+      )
+      const cancelledMonth = monthRes.filter(r => r.status === 'cancelled')
+      const cancellationRate = monthRes.length > 0 
+        ? Math.round((cancelledMonth.length / monthRes.length) * 100) 
+        : 0
+
+      // Unique customers this month (by phone)
+      const uniquePhones = new Set(monthRes.map(r => r.customer_phone))
+      
+      // Upcoming reservations
       const upcoming = allRes.filter(
         r => r.time_timestamp > now && r.status === 'confirmed'
       )
       
-      const completed = todayRes.filter(r => r.status === 'completed')
-      const cancelled = todayRes.filter(r => r.status === 'cancelled')
-      
       setStats({
-        todayReservations: todayRes.filter(r => r.status === 'confirmed').length,
-        upcomingReservations: upcoming.length,
-        completedToday: completed.length,
-        cancelledToday: cancelled.length,
+        todayAppointments: todayRes.length,
+        weekAppointments: weekRes.length,
+        newCustomersMonth: uniquePhones.size,
+        cancellationRate,
       })
       
-      // Get next 5 upcoming reservations
       setUpcomingList(upcoming.slice(0, 5))
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
@@ -91,149 +120,167 @@ export default function DashboardPage() {
     }
   }
 
-  const formatTime = (timestamp: number): string => {
-    return new Date(timestamp).toLocaleTimeString('he-IL', {
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+  // Smart date/time display
+  const getSmartDateTime = (timestamp: number): { date: string; time: string; isToday: boolean } => {
+    const resDate = new Date(timestamp)
+    const isToday = isSameDay(resDate, israelNow)
+    const isTomorrow = isSameDay(resDate, addDays(israelNow, 1))
+    
+    let dateStr = ''
+    if (isToday) dateStr = 'היום'
+    else if (isTomorrow) dateStr = 'מחר'
+    else dateStr = resDate.toLocaleDateString('he-IL', { weekday: 'short', day: 'numeric', month: 'short' })
+    
+    return { 
+      date: dateStr, 
+      time: formatTimeUtil(timestamp), 
+      isToday 
+    }
   }
 
-  const formatDate = (timestamp: number): string => {
-    return new Date(timestamp).toLocaleDateString('he-IL', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-    })
-  }
+  // Admin quick actions
+  const adminActions: { href: string; icon: LucideIcon; label: string }[] = [
+    { href: '/barber/dashboard/barbers', icon: Users, label: 'ספרים' },
+    { href: '/barber/dashboard/users', icon: Users, label: 'לקוחות' },
+    { href: '/barber/dashboard/schedule', icon: Clock, label: 'שעות' },
+    { href: '/barber/dashboard/closures', icon: CalendarOff, label: 'סגירות' },
+    { href: '/barber/dashboard/products', icon: Package, label: 'מוצרים' },
+    { href: '/barber/dashboard/settings', icon: Store, label: 'הגדרות' },
+  ]
 
   return (
-    <div className="max-w-6xl">
+    <div className="max-w-4xl">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl md:text-3xl font-medium text-foreground-light">
+      <div className="mb-6">
+        <h1 className="text-xl sm:text-2xl font-medium text-foreground-light">
           שלום, {barber?.fullname}! 👋
         </h1>
-        <p className="text-foreground-muted mt-1">
-          הנה סיכום היום שלך
-        </p>
+        <p className="text-foreground-muted text-sm mt-0.5">הנה סיכום הפעילות שלך</p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {/* Stats Grid - 2x2 on mobile */}
+      <div className="grid grid-cols-2 gap-3 mb-6">
         <StatCard
           icon={Calendar}
-          label="תורים להיום"
-          value={stats.todayReservations}
+          label="תורים היום"
+          value={stats.todayAppointments.toString()}
           color="gold"
           loading={loading}
         />
         <StatCard
           icon={Clock}
-          label="תורים קרובים"
-          value={stats.upcomingReservations}
+          label="תורים השבוע"
+          value={stats.weekAppointments.toString()}
           color="blue"
           loading={loading}
         />
         <StatCard
-          icon={CheckCircle}
-          label="הושלמו היום"
-          value={stats.completedToday}
+          icon={Users}
+          label="לקוחות החודש"
+          value={stats.newCustomersMonth.toString()}
           color="green"
           loading={loading}
         />
         <StatCard
-          icon={XCircle}
-          label="בוטלו היום"
-          value={stats.cancelledToday}
-          color="red"
+          icon={TrendingDown}
+          label="אחוז ביטולים"
+          value={`${stats.cancellationRate}%`}
+          color={stats.cancellationRate > 20 ? 'red' : 'muted'}
           loading={loading}
         />
       </div>
 
-      {/* Upcoming Reservations */}
-      <div className="bg-background-card border border-white/10 rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium text-foreground-light">התורים הקרובים</h2>
+      {/* Upcoming Appointments - Compact Cards */}
+      <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden mb-6">
+        <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
+          <h2 className="font-medium text-foreground-light">התורים הקרובים</h2>
           <Link
             href="/barber/dashboard/reservations"
-            className="text-accent-gold text-sm hover:underline"
+            className="flex items-center gap-1 text-accent-gold text-sm hover:underline"
           >
-            הצג הכל →
+            הצג הכל
+            <ChevronLeft size={14} />
           </Link>
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="w-8 h-8 border-2 border-accent-gold border-t-transparent rounded-full animate-spin" />
+          <div className="flex items-center justify-center py-10">
+            <div className="w-6 h-6 border-2 border-accent-gold border-t-transparent rounded-full animate-spin" />
           </div>
         ) : upcomingList.length === 0 ? (
-          <div className="text-center py-8">
-            <Calendar size={48} strokeWidth={1} className="text-foreground-muted/30 mx-auto mb-3" />
-            <p className="text-foreground-muted">אין תורים קרובים</p>
+          <div className="text-center py-10">
+            <Calendar size={36} strokeWidth={1} className="text-foreground-muted/30 mx-auto mb-2" />
+            <p className="text-foreground-muted text-sm">אין תורים קרובים</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {upcomingList.map((res) => (
-              <div
-                key={res.id}
-                className="flex items-center justify-between p-4 bg-background-dark rounded-xl border border-white/5"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-accent-gold/20 flex items-center justify-center">
-                    <Calendar size={20} strokeWidth={1.5} className="text-accent-gold" />
-                  </div>
-                  <div>
-                    <p className="text-foreground-light font-medium">
+          <div className="divide-y divide-white/[0.04]">
+            {upcomingList.map((res) => {
+              const smartDate = getSmartDateTime(res.time_timestamp)
+              
+              return (
+                <div
+                  key={res.id}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors"
+                >
+                  {/* Status line */}
+                  <div className={cn(
+                    'w-1 h-10 rounded-full shrink-0',
+                    smartDate.isToday ? 'bg-accent-gold' : 'bg-foreground-muted/30'
+                  )} />
+                  
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-foreground-light font-medium text-sm truncate">
                       {res.customer_name}
                     </p>
-                    <p className="text-foreground-muted text-sm">
-                      {res.services?.name_he || 'שירות'}
+                    <p className="text-foreground-muted text-xs truncate flex items-center gap-1.5">
+                      <Scissors size={10} />
+                      <span>{res.services?.name_he || 'שירות'}</span>
+                      <span className="text-foreground-muted/50">•</span>
+                      <Clock size={10} />
+                      <span>{smartDate.time}</span>
+                      <span className={cn(smartDate.isToday && 'text-accent-gold')}>
+                        {smartDate.date}
+                      </span>
                     </p>
                   </div>
+                  
+                  {/* Phone */}
+                  <a
+                    href={`tel:${res.customer_phone}`}
+                    className="p-2 rounded-lg hover:bg-accent-gold/10 transition-colors shrink-0"
+                    aria-label="התקשר"
+                  >
+                    <Phone size={16} strokeWidth={1.5} className="text-accent-gold" />
+                  </a>
                 </div>
-                <div className="text-left">
-                  <p className="text-foreground-light font-medium" dir="ltr">
-                    {formatTime(res.time_timestamp)}
-                  </p>
-                  <p className="text-foreground-muted text-sm">
-                    {formatDate(res.time_timestamp)}
-                  </p>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
 
-      {/* Admin Quick Actions */}
+      {/* Admin Quick Actions - Compact Grid */}
       {isAdmin && (
-        <div className="mt-8 p-6 bg-accent-gold/10 border border-accent-gold/30 rounded-2xl">
-          <h3 className="text-lg font-medium text-accent-gold mb-3">פעולות מנהל מהירות</h3>
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/barber/dashboard/barbers"
-              className="px-4 py-2 bg-background-dark rounded-lg text-sm text-foreground-light hover:bg-white/5 transition-colors"
-            >
-              ניהול ספרים
-            </Link>
-            <Link
-              href="/barber/dashboard/schedule"
-              className="px-4 py-2 bg-background-dark rounded-lg text-sm text-foreground-light hover:bg-white/5 transition-colors"
-            >
-              שעות פתיחה
-            </Link>
-            <Link
-              href="/barber/dashboard/closures"
-              className="px-4 py-2 bg-background-dark rounded-lg text-sm text-foreground-light hover:bg-white/5 transition-colors"
-            >
-              ימי סגירה
-            </Link>
-            <Link
-              href="/barber/dashboard/settings"
-              className="px-4 py-2 bg-background-dark rounded-lg text-sm text-foreground-light hover:bg-white/5 transition-colors"
-            >
-              הגדרות מספרה
-            </Link>
+        <div className="bg-accent-gold/5 border border-accent-gold/20 rounded-2xl p-4">
+          <h3 className="text-sm font-medium text-accent-gold mb-3">פעולות מנהל</h3>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            {adminActions.map((action) => (
+              <Link
+                key={action.href}
+                href={action.href}
+                className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-background-dark/50 hover:bg-background-dark transition-colors group"
+              >
+                <action.icon 
+                  size={20} 
+                  strokeWidth={1.5} 
+                  className="text-foreground-muted group-hover:text-accent-gold transition-colors" 
+                />
+                <span className="text-xs text-foreground-muted group-hover:text-foreground-light transition-colors">
+                  {action.label}
+                </span>
+              </Link>
+            ))}
           </div>
         </div>
       )}
@@ -250,27 +297,31 @@ function StatCard({
 }: {
   icon: LucideIcon
   label: string
-  value: number
-  color: 'gold' | 'blue' | 'green' | 'red'
+  value: string
+  color: 'gold' | 'blue' | 'green' | 'red' | 'muted'
   loading: boolean
 }) {
   const colorClasses = {
-    gold: 'bg-accent-gold/20 text-accent-gold',
-    blue: 'bg-blue-500/20 text-blue-400',
-    green: 'bg-green-500/20 text-green-400',
-    red: 'bg-red-500/20 text-red-400',
+    gold: 'bg-accent-gold/15 text-accent-gold',
+    blue: 'bg-blue-500/15 text-blue-400',
+    green: 'bg-green-500/15 text-green-400',
+    red: 'bg-red-500/15 text-red-400',
+    muted: 'bg-foreground-muted/15 text-foreground-muted',
   }
 
   return (
-    <div className="bg-background-card border border-white/10 rounded-xl p-5">
-      <div className={`w-10 h-10 rounded-lg ${colorClasses[color]} flex items-center justify-center mb-3`}>
-        <Icon size={20} strokeWidth={1.5} />
+    <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
+      <div className={cn(
+        'w-9 h-9 rounded-lg flex items-center justify-center mb-2.5',
+        colorClasses[color]
+      )}>
+        <Icon size={18} strokeWidth={1.5} />
       </div>
-      <p className="text-foreground-muted text-sm">{label}</p>
+      <p className="text-foreground-muted text-xs mb-0.5">{label}</p>
       {loading ? (
-        <div className="h-8 w-12 bg-foreground-muted/20 rounded animate-pulse mt-1" />
+        <div className="h-7 w-10 bg-foreground-muted/20 rounded animate-pulse" />
       ) : (
-        <p className="text-2xl font-bold text-foreground-light mt-1">{value}</p>
+        <p className="text-xl font-bold text-foreground-light">{value}</p>
       )}
     </div>
   )

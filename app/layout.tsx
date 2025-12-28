@@ -73,7 +73,7 @@ export default function RootLayout({
                 toast: 'bg-background-card/95 backdrop-blur-xl border border-white/10 text-foreground-light font-ploni shadow-xl',
                 title: 'text-foreground-light font-medium text-sm',
                 description: 'text-foreground-muted text-xs',
-                closeButton: '!bg-white/10 hover:!bg-white/20 !border-0 !w-5 !h-5 !p-0 !right-2 !top-2 [&>svg]:!w-3 [&>svg]:!h-3',
+                closeButton: '!bg-transparent hover:!bg-white/10 !border-0 !w-4 !h-4 !p-0 !m-0 !right-1.5 !top-1.5 [&>svg]:!w-2.5 [&>svg]:!h-2.5 !text-foreground-muted hover:!text-foreground-light !transition-colors',
                 success: '!border-green-500/30 [&>[data-icon]]:text-green-400',
                 error: '!border-red-500/30 [&>[data-icon]]:text-red-400',
                 warning: '!border-amber-500/30 [&>[data-icon]]:text-amber-400',
