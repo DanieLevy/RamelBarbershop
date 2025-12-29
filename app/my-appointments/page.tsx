@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/store/useAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { AppHeader } from '@/components/AppHeader'
@@ -26,16 +26,39 @@ interface Tab {
   count: number
 }
 
+// Wrap the main component to use Suspense for useSearchParams
 export default function MyAppointmentsPage() {
+  return (
+    <Suspense fallback={
+      <>
+        <AppHeader />
+        <main className="relative top-24 min-h-screen px-4 py-8">
+          <div className="flex flex-col items-center justify-center py-20">
+            <ScissorsLoader size="lg" text="טוען..." />
+          </div>
+        </main>
+      </>
+    }>
+      <MyAppointmentsContent />
+    </Suspense>
+  )
+}
+
+function MyAppointmentsContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { customer, isLoggedIn, isLoading, isInitialized } = useAuthStore()
   const { report } = useBugReporter('MyAppointmentsPage')
+  
+  // Get highlight param from URL (from push notification deep link)
+  const highlightId = searchParams.get('highlight')
   
   const [reservations, setReservations] = useState<ReservationWithDetails[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabType>('upcoming')
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [showLoginModal, setShowLoginModal] = useState(false)
+  const [highlightedId, setHighlightedId] = useState<string | null>(null)
   const [detailModal, setDetailModal] = useState<{
     isOpen: boolean
     reservation: ReservationWithDetails | null
@@ -47,6 +70,46 @@ export default function MyAppointmentsPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customer?.id, customer?.phone])
+
+  // Handle highlight param from push notification deep link
+  useEffect(() => {
+    if (!highlightId || loading || reservations.length === 0) return
+    
+    // Find the highlighted reservation
+    const targetReservation = reservations.find(r => r.id === highlightId)
+    
+    if (targetReservation) {
+      // Set visual highlight
+      setHighlightedId(highlightId)
+      
+      // Determine which tab the reservation belongs to
+      const now = Date.now()
+      const resTime = targetReservation.time_timestamp < 946684800000 
+        ? targetReservation.time_timestamp * 1000 
+        : targetReservation.time_timestamp
+      
+      if (targetReservation.status === 'cancelled') {
+        setActiveTab('cancelled')
+      } else if (resTime <= now) {
+        setActiveTab('past')
+      } else {
+        setActiveTab('upcoming')
+      }
+      
+      // Auto-open the detail modal
+      setTimeout(() => {
+        setDetailModal({ isOpen: true, reservation: targetReservation })
+      }, 300)
+      
+      // Clear the highlight param from URL without page reload
+      window.history.replaceState({}, '', '/my-appointments')
+      
+      // Clear visual highlight after 5 seconds
+      setTimeout(() => {
+        setHighlightedId(null)
+      }, 5000)
+    }
+  }, [highlightId, loading, reservations])
 
   const fetchReservations = async () => {
     if (!customer) return
@@ -319,6 +382,7 @@ export default function MyAppointmentsPage() {
                     const smartDate = getSmartDateTime(reservation.time_timestamp)
                     const upcoming = isUpcoming(reservation)
                     const cancelled = isCancelled(reservation)
+                    const isHighlighted = highlightedId === reservation.id
                     
                     return (
                       <div
@@ -326,7 +390,8 @@ export default function MyAppointmentsPage() {
                         onClick={() => setDetailModal({ isOpen: true, reservation })}
                         className={cn(
                           'flex items-center gap-3 px-3 sm:px-4 py-3 transition-all cursor-pointer hover:bg-white/[0.03]',
-                          cancelled && 'opacity-60'
+                          cancelled && 'opacity-60',
+                          isHighlighted && 'bg-accent-gold/10 ring-2 ring-accent-gold/50 ring-inset animate-pulse'
                         )}
                       >
                         {/* Status Line */}

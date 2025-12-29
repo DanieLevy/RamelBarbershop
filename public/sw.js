@@ -1,6 +1,6 @@
 // Service Worker for Ramel Barbershop PWA
 // Version is updated automatically during build
-const APP_VERSION = '2.0.0-2025.12.29.1039';
+const APP_VERSION = '2.0.0-2025.12.29.1100';
 const CACHE_NAME = `ramel-pwa-${APP_VERSION}`;
 
 // Assets to cache (minimal - only critical for app shell)
@@ -219,6 +219,7 @@ self.addEventListener('push', (event) => {
 
 /**
  * Handle notification click
+ * Supports deep linking for reminders and cancellations
  */
 self.addEventListener('notificationclick', (event) => {
   console.log('[SW] Notification clicked:', event.action);
@@ -234,6 +235,27 @@ self.addEventListener('notificationclick', (event) => {
     // User dismissed, just clear badge
     event.waitUntil(updateBadge(0));
     return;
+  }
+
+  // Handle rebook action - go to home page to book new appointment
+  if (event.action === 'rebook') {
+    event.waitUntil(
+      Promise.all([
+        updateBadge(0),
+        openOrFocusWindow('/')
+      ])
+    );
+    return;
+  }
+
+  // For reminder notifications, ensure we use the deep link URL
+  if (notificationData.type === 'reminder' && notificationData.reservationId) {
+    targetUrl = `/my-appointments?highlight=${notificationData.reservationId}`;
+  }
+  
+  // For cancellation notifications to customer, use deep link
+  if (notificationData.type === 'cancellation' && notificationData.cancelledBy === 'barber' && notificationData.reservationId) {
+    targetUrl = `/my-appointments?highlight=${notificationData.reservationId}`;
   }
 
   if (event.action === 'view' || !event.action) {

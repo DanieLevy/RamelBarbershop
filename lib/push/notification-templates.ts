@@ -55,10 +55,14 @@ export function getNotificationTemplate(
 
 /**
  * Appointment reminder template
+ * Includes deep link with highlight param to focus on the specific appointment
  */
 function getReminderTemplate(context: ReminderContext): NotificationPayload {
   const time = formatTime(context.appointmentTime)
   const date = formatShortDate(context.appointmentTime)
+  
+  // Deep link with highlight param for focused view
+  const deepLinkUrl = `/my-appointments?highlight=${context.reservationId}`
   
   return {
     title: '⏰ תזכורת לתור',
@@ -66,13 +70,14 @@ function getReminderTemplate(context: ReminderContext): NotificationPayload {
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-72x72.png',
     tag: `reminder-${context.reservationId}`,
-    url: '/my-appointments',
+    url: deepLinkUrl,
     requireInteraction: true,
     data: {
       type: 'reminder',
       reservationId: context.reservationId,
       appointmentTime: context.appointmentTime,
-      date
+      date,
+      url: deepLinkUrl
     },
     actions: [
       { action: 'view', title: 'צפה בתור' },
@@ -113,19 +118,23 @@ function getCancellationTemplate(context: CancellationContext): NotificationPayl
   }
   
   // Notification to customer when barber cancels
+  // Deep link with highlight param to show the cancelled appointment
+  const deepLinkUrl = `/my-appointments?highlight=${context.reservationId}`
+  
   return {
     title: '❌ התור שלך בוטל',
     body: `${context.barberName} ביטל את התור שלך ל${context.serviceName} ב${date} בשעה ${time}`,
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-72x72.png',
     tag: `cancel-${context.reservationId}`,
-    url: '/my-appointments',
+    url: deepLinkUrl,
     requireInteraction: true,
     data: {
       type: 'cancellation',
       reservationId: context.reservationId,
       cancelledBy: 'barber',
-      reason: context.reason
+      reason: context.reason,
+      url: deepLinkUrl
     },
     actions: [
       { action: 'rebook', title: 'קבע תור חדש' },
