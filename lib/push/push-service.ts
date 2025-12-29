@@ -252,6 +252,17 @@ class PushNotificationService {
   }): Promise<SendNotificationResult> {
     const { type, recipientType, recipientId, reservationId, senderId, payload, metadata } = params
 
+    // Validate recipientId - must be a valid UUID, not empty
+    if (!recipientId || recipientId.trim() === '') {
+      console.error(`[PushService] Cannot send ${type} notification: recipientId is empty`)
+      return { 
+        success: false, 
+        sent: 0, 
+        failed: 0, 
+        errors: [`Invalid recipientId for ${recipientType}`] 
+      }
+    }
+
     // Create log entry
     const logId = await this.createNotificationLog({
       notification_type: type,

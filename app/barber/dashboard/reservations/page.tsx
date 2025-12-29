@@ -115,6 +115,7 @@ export default function ReservationsPage() {
       
       // Send push notification to customer (fire and forget)
       if (reservation?.customer_id) {
+        console.log('[Barber Cancel] Sending push notification to customer:', reservation.customer_id)
         fetch('/api/push/notify-cancellation', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -129,7 +130,12 @@ export default function ReservationsPage() {
             appointmentTime: reservation.time_timestamp,
             reason
           })
-        }).catch(err => console.log('Push notification error:', err))
+        })
+          .then(res => res.json())
+          .then(data => console.log('[Barber Cancel] Push notification result:', data))
+          .catch(err => console.error('[Barber Cancel] Push notification error:', err))
+      } else {
+        console.log('[Barber Cancel] No customer_id found, cannot send push notification')
       }
       
       toast.success('התור בוטל בהצלחה')
@@ -164,6 +170,7 @@ export default function ReservationsPage() {
         
         // Send push notification to each customer (fire and forget)
         if (res.customer_id) {
+          console.log('[Bulk Cancel] Sending push notification to customer:', res.customer_id)
           fetch('/api/push/notify-cancellation', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -178,7 +185,10 @@ export default function ReservationsPage() {
               appointmentTime: res.time_timestamp,
               reason
             })
-          }).catch(err => console.log('Push notification error:', err))
+          })
+            .then(r => r.json())
+            .then(data => console.log('[Bulk Cancel] Push result:', data))
+            .catch(err => console.error('[Bulk Cancel] Push error:', err))
         }
       }
       

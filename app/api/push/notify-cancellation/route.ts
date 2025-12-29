@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
     
     // Validate required fields
     if (!reservationId || !barberId || !cancelledBy || !customerName || !serviceName || !appointmentTime) {
+      console.log('[API notify-cancellation] Missing required fields:', { reservationId, barberId, cancelledBy, customerName, serviceName, appointmentTime })
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
         { status: 400 }
@@ -40,6 +41,16 @@ export async function POST(request: NextRequest) {
     if (cancelledBy !== 'customer' && cancelledBy !== 'barber') {
       return NextResponse.json(
         { success: false, error: 'Invalid cancelledBy value' },
+        { status: 400 }
+      )
+    }
+    
+    // When barber cancels, customerId is required to notify the customer
+    // When customer cancels, barberId is required to notify the barber
+    if (cancelledBy === 'barber' && !customerId) {
+      console.log('[API notify-cancellation] Barber cancelled but no customerId provided - cannot notify customer')
+      return NextResponse.json(
+        { success: false, error: 'customerId required when barber cancels' },
         { status: 400 }
       )
     }
@@ -55,6 +66,13 @@ export async function POST(request: NextRequest) {
       appointmentTime,
       reason
     }
+    
+    console.log('[API notify-cancellation] Sending cancellation notification:', {
+      type: 'cancellation',
+      cancelledBy,
+      recipientType: cancelledBy === 'customer' ? 'barber' : 'customer',
+      recipientId: cancelledBy === 'customer' ? barberId : customerId
+    })
     
     const result = await pushService.sendCancellationAlert(context)
     
