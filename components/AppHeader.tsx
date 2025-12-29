@@ -17,7 +17,6 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
   const router = useRouter()
   const pathname = usePathname()
   
-  // Use unified auth hook
   const { type: userType, customer, barber, isLoggedIn, isLoading, isAdmin, displayName, logout } = useCurrentUser()
   
   const [scrollProgress, setScrollProgress] = useState(0)
@@ -29,11 +28,8 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
   const isHomePage = pathname === '/'
   const isBarberPage = pathname.includes('/barber') && !pathname.includes('/dashboard')
 
-  // Track scroll progress for smooth transitions
   const handleScroll = useCallback(() => {
-    const scrollY = window.scrollY
-    // Calculate progress: 0 at top, 1 when scrolled past 100px
-    const progress = Math.min(scrollY / 100, 1)
+    const progress = Math.min(window.scrollY / 100, 1)
     setScrollProgress(progress)
   }, [])
 
@@ -43,24 +39,20 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
     return () => window.removeEventListener('scroll', handleScroll)
   }, [handleScroll])
 
-  // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setShowUserMenu(false)
       }
     }
-
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Close mobile menu on route change
   useEffect(() => {
     setShowMobileMenu(false)
   }, [pathname])
 
-  // Prevent body scroll when mobile menu is open
   useEffect(() => {
     if (showMobileMenu) {
       document.body.style.overflow = 'hidden'
@@ -105,13 +97,10 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
     setShowMobileMenu(false)
   }
 
-  // Derived values based on scroll
   const isScrolled = scrollProgress > 0.3
   const showHeaderLogo = scrollProgress > 0.5
 
-  // User button component - handles both customer and barber states
   const UserButton = ({ compact = false }: { compact?: boolean }) => {
-    // Not logged in - show login button
     if (!isLoggedIn) {
       return (
         <button
@@ -132,7 +121,6 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
       )
     }
 
-    // Logged in as barber
     if (userType === 'barber' && barber) {
       return (
         <div className="relative" ref={menuRef}>
@@ -229,7 +217,6 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
       )
     }
 
-    // Logged in as customer
     if (userType === 'customer' && customer) {
       return (
         <div className="relative" ref={menuRef}>
@@ -293,18 +280,15 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
       )
     }
 
-    // Fallback (shouldn't happen)
     return null
   }
 
-  // Mobile menu items - dynamic based on user type
   const getMobileMenuItems = () => {
     const baseItems = [
       { label: 'בית', icon: Home, action: () => router.push('/') },
     ]
 
     if (userType === 'barber') {
-      // Barber-specific menu items
       return [
         ...baseItems,
         { label: 'לוח בקרה', icon: LayoutDashboard, action: () => router.push('/barber/dashboard') },
@@ -313,7 +297,6 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
       ]
     }
 
-    // Guest and customer - show navigation items
     return [
       ...baseItems,
       { label: 'הצוות שלנו', icon: Scissors, action: () => scrollToSection('index-body') },
@@ -327,21 +310,14 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
   return (
     <>
       <header
-        className={cn(
-          'fixed left-0 right-0 z-50 transition-all duration-500',
-          // PWA standalone mode: positioned below notch via CSS var
-          // Browser mode: positioned at top
-        )}
+        className="fixed left-0 right-0 z-50 transition-all duration-500"
         style={{
-          // Dynamic background based on scroll - starts fully transparent
           backgroundColor: `rgba(8, 11, 13, ${scrollProgress * 0.95})`,
           backdropFilter: `blur(${scrollProgress * 20}px)`,
           WebkitBackdropFilter: `blur(${scrollProgress * 20}px)`,
-          // Use CSS custom property for safe area - falls back to 0 in browser
           top: 'var(--header-top-offset, 0px)',
         }}
       >
-        {/* Top accent line */}
         <div 
           className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-accent-gold to-transparent transition-opacity duration-500"
           style={{ opacity: scrollProgress }}
@@ -353,9 +329,7 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
         )}>
           {isHomePage && (
             <nav className="flex items-center justify-between">
-              {/* Left side - Mobile menu + Desktop nav */}
               <div className="flex items-center gap-4">
-                {/* Mobile hamburger */}
                 <button
                   onClick={() => setShowMobileMenu(true)}
                   className="md:hidden p-2 -ml-2 rounded-full hover:bg-white/10 transition-colors"
@@ -364,7 +338,6 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
                   <Menu size={22} strokeWidth={1.5} className="text-foreground-light" />
                 </button>
                 
-                {/* Desktop navigation */}
                 <div className="hidden md:flex items-center gap-6">
                   <button
                     onClick={() => scrollToSection('index-body')}
@@ -387,7 +360,6 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
                 </div>
               </div>
               
-              {/* Center - Logo (appears on scroll) */}
               <div 
                 className={cn(
                   'absolute left-1/2 -translate-x-1/2 transition-all duration-500',
@@ -420,9 +392,7 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
                 </button>
               </div>
               
-              {/* Right side - CTA + User */}
               <div className="flex items-center gap-2 sm:gap-3">
-                {/* Book now button - desktop */}
                 <button
                   onClick={() => scrollToSection('index-body')}
                   className={cn(
@@ -441,7 +411,6 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
 
           {isBarberPage && (
             <nav className="flex items-center justify-between">
-              {/* Home button - clearly indicates going to home, not back */}
               <button
                 onClick={() => router.push('/')}
                 className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-white/10 transition-colors text-foreground-light"
@@ -450,14 +419,11 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
                 <span className="text-sm hidden sm:inline">בית</span>
               </button>
 
-              {/* Title - different for wizard vs profile */}
               <h1 className="text-base sm:text-lg font-medium text-foreground-light">
                 {isWizardPage ? 'הזמנת תור' : 'פרופיל ספר'}
               </h1>
 
-              {/* Right side */}
               <div className="flex items-center gap-2">
-                {/* Barber avatar */}
                 <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden shadow-md border-2 border-accent-gold/40">
                   <Image
                     src={barberImgUrl || '/icon.png'}
@@ -473,24 +439,17 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
         </div>
       </header>
 
-      {/* Mobile Menu Drawer */}
       {showMobileMenu && (
         <>
-          {/* Overlay */}
           <div
             className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] md:hidden animate-fade-in"
             onClick={() => setShowMobileMenu(false)}
           />
           
-          {/* Drawer - with safe area handling for notch */}
           <div 
             className="fixed top-0 right-0 bottom-0 w-[280px] bg-background-darker z-[100] md:hidden animate-slide-in-right shadow-2xl"
-            style={{
-              // Account for notch at top
-              paddingTop: 'var(--header-top-offset, 0px)',
-            }}
+            style={{ paddingTop: 'var(--header-top-offset, 0px)' }}
           >
-            {/* Header with gradient */}
             <div className="relative p-5 border-b border-white/10 bg-gradient-to-br from-accent-gold/10 via-transparent to-accent-orange/5">
               <button
                 onClick={() => setShowMobileMenu(false)}
@@ -517,7 +476,6 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
               </div>
             </div>
             
-            {/* User info if logged in - show different UI for barber vs customer */}
             {isLoggedIn && userType === 'barber' && barber && (
               <div className="p-4 border-b border-white/10 bg-accent-gold/10">
                 <div className="flex items-center gap-3">
@@ -551,7 +509,6 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
               </div>
             )}
             
-            {/* Menu items */}
             <nav className="py-4 px-3">
               <div className="space-y-1">
                 {mobileMenuItems.map((item) => (
@@ -568,7 +525,6 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
               
               <div className="my-4 h-px bg-white/10" />
               
-              {/* Logged in as barber */}
               {isLoggedIn && userType === 'barber' ? (
                 <div className="space-y-1">
                   <button
@@ -580,7 +536,6 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
                   </button>
                 </div>
               ) : isLoggedIn && userType === 'customer' ? (
-                /* Logged in as customer */
                 <div className="space-y-1">
                   <button
                     onClick={handleMyAppointments}
@@ -598,7 +553,6 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
                   </button>
                 </div>
               ) : (
-                /* Not logged in - guest */
                 <button
                   onClick={() => {
                     setShowMobileMenu(false)
@@ -612,7 +566,6 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
               )}
             </nav>
             
-            {/* Footer */}
             <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10 bg-background-darker">
               <p className="text-center text-foreground-muted text-xs">
                 © 2024 רמאל ברברשופ

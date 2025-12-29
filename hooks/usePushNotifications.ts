@@ -8,13 +8,10 @@ import { usePWA } from './usePWA'
 import { useBugReporter } from './useBugReporter'
 import type { DeviceInfo, DeviceType } from '@/lib/push/types'
 
-/**
- * Module-level state to prevent multiple simultaneous API calls across hook instances.
- * This is necessary because multiple components may use usePushNotifications simultaneously.
- */
+// Module-level API call guards
 let globalFetchInProgress = false
 let globalLastFetchTime = 0
-const FETCH_COOLDOWN_MS = 5000 // Minimum time between fetches
+const FETCH_COOLDOWN_MS = 5000
 
 interface PushNotificationState {
   isSupported: boolean
@@ -37,9 +34,6 @@ interface UsePushNotificationsReturn extends PushNotificationState {
   requiresPWA: boolean
 }
 
-/**
- * Convert VAPID key from base64url to ArrayBuffer (required for iOS compatibility)
- */
 const urlBase64ToUint8Array = (base64String: string): ArrayBuffer => {
   const base64 = base64String.trim()
   const padding = '='.repeat((4 - base64.length % 4) % 4)
@@ -52,10 +46,6 @@ const urlBase64ToUint8Array = (base64String: string): ArrayBuffer => {
   return outputArray.buffer
 }
 
-/**
- * Set app badge count (iOS 16.4+, Android)
- * Uses Navigator Badge API - types defined in types/navigator.d.ts
- */
 export const setAppBadge = async (count: number): Promise<boolean> => {
   if (!('setAppBadge' in navigator)) return false
   
@@ -71,22 +61,16 @@ export const setAppBadge = async (count: number): Promise<boolean> => {
   }
 }
 
-/**
- * Hook for managing push notifications
- */
 export const usePushNotifications = (): UsePushNotificationsReturn => {
   const { customer, isLoggedIn: isCustomerLoggedIn } = useAuthStore()
   const { barber, isLoggedIn: isBarberLoggedIn } = useBarberAuthStore()
   const { isStandalone, deviceOS } = usePWA()
   const { report } = useBugReporter('PushNotifications')
   
-  // Extract stable setter references from store to avoid infinite loops
-  // These selectors return stable function references that don't change between renders
   const setStoreSupported = usePushStore(state => state.setSupported)
   const setStorePermission = usePushStore(state => state.setPermission)
   const setStoreSubscribed = usePushStore(state => state.setSubscribed)
   
-  // Guard to prevent multiple initializations
   const hasInitializedRef = useRef(false)
   
   const [state, setState] = useState<PushNotificationState>({

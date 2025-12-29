@@ -15,11 +15,10 @@ import {
   Loader2,
   CheckCircle,
   AlertTriangle,
-  Info,
-  RefreshCw,
-  Download,
-  Settings2,
-  XCircle
+  ChevronDown,
+  ChevronUp,
+  X,
+  HelpCircle
 } from 'lucide-react'
 
 interface NotificationSettingsProps {
@@ -30,27 +29,24 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
   const pwa = usePWA()
   const push = usePushNotifications()
   const [isEnabling, setIsEnabling] = useState(false)
+  const [showDevices, setShowDevices] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
+  const [deviceToRemove, setDeviceToRemove] = useState<{ id: string; name: string } | null>(null)
   const [removingDeviceId, setRemovingDeviceId] = useState<string | null>(null)
 
-  // Handle enable notifications
   const handleEnableNotifications = async () => {
     setIsEnabling(true)
-
     const success = await push.subscribe()
-
     if (success) {
       toast.success('התראות הופעלו בהצלחה!')
     } else if (push.error) {
       toast.error(push.error)
     }
-
     setIsEnabling(false)
   }
 
-  // Handle disable notifications
   const handleDisableNotifications = async () => {
     const success = await push.unsubscribe()
-
     if (success) {
       toast.success('התראות בוטלו')
     } else if (push.error) {
@@ -58,374 +54,307 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
     }
   }
 
-  // Handle remove device
-  const handleRemoveDevice = async (deviceId: string) => {
-    setRemovingDeviceId(deviceId)
-
-    const success = await push.removeDevice(deviceId)
-
+  const confirmRemoveDevice = async () => {
+    if (!deviceToRemove) return
+    setRemovingDeviceId(deviceToRemove.id)
+    const success = await push.removeDevice(deviceToRemove.id)
     if (success) {
       toast.success('המכשיר הוסר בהצלחה')
     } else if (push.error) {
       toast.error(push.error)
     }
-
     setRemovingDeviceId(null)
+    setDeviceToRemove(null)
   }
 
-  // Get device icon component
   const DeviceIcon = ({ type }: { type: string }) => {
     const iconName = getDeviceIcon(type as 'ios' | 'android' | 'desktop')
     if (iconName === 'Monitor') return <Monitor size={16} strokeWidth={1.5} />
     return <Smartphone size={16} strokeWidth={1.5} />
   }
 
-  // Format last used date
   const formatLastUsed = (dateString: string): string => {
     try {
       const date = new Date(dateString)
       const now = new Date()
       const diffMs = now.getTime() - date.getTime()
       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-
       if (diffDays === 0) return 'היום'
       if (diffDays === 1) return 'אתמול'
       if (diffDays < 7) return `לפני ${diffDays} ימים`
-      
-      return date.toLocaleDateString('he-IL', {
-        day: 'numeric',
-        month: 'short'
-      })
+      return date.toLocaleDateString('he-IL', { day: 'numeric', month: 'short' })
     } catch {
       return 'לא ידוע'
     }
   }
 
-  // Get overall status color and message
-  const getOverallStatus = () => {
+  // Determine if notifications are working (simple boolean)
+  const isNotificationsEnabled = push.isSubscribed && push.permission === 'granted'
+  
+  // Determine if there's an issue that needs user attention
+  const hasIssue = !push.isSupported || 
+                   push.permission === 'denied' || 
+                   (push.isIOS && !pwa.isStandalone && !push.isSubscribed)
+
+  // Get issue-specific help content
+  const getIssueHelp = () => {
     if (!push.isSupported) {
       return {
-        status: 'unsupported',
-        color: 'text-red-400',
-        bgColor: 'bg-red-500/10 border-red-500/30',
-        icon: XCircle,
-        title: 'לא נתמך במכשיר',
-        message: 'הדפדפן או המכשיר שלך אינו תומך בהתראות. נסה להשתמש בדפדפן מודרני כמו Chrome, Firefox או Safari.'
+        title: 'דפדפן לא נתמך',
+        message: 'הדפדפן שלך אינו תומך בהתראות.',
+        steps: [
+          'נסה להשתמש בדפדפן Chrome, Firefox או Safari',
+          'ודא שהדפדפן מעודכן לגרסה האחרונה'
+        ]
       }
     }
     
     if (push.permission === 'denied') {
+      if (push.isIOS) {
+        return {
+          title: 'ההתראות נחסמו',
+          message: 'יש לאפשר התראות בהגדרות האייפון:',
+          steps: [
+            'פתח את הגדרות האייפון',
+            'גלול למטה ולחץ על Safari (או האפליקציה)',
+            'הפעל את "התראות" (Notifications)'
+          ]
+        }
+      }
       return {
-        status: 'denied',
-        color: 'text-red-400',
-        bgColor: 'bg-red-500/10 border-red-500/30',
-        icon: XCircle,
         title: 'ההתראות נחסמו',
-        message: 'חסמת את ההתראות בהגדרות המכשיר. כדי להפעיל מחדש, יש לפתוח את הגדרות הדפדפן ולאפשר התראות עבור האפליקציה.'
+        message: 'יש לאפשר התראות בהגדרות הדפדפן:',
+        steps: [
+          'לחץ על סמל המנעול/הגדרות ליד שורת הכתובת',
+          'מצא את "התראות" או "Notifications"',
+          'שנה מ"חסום" ל"אפשר"',
+          'רענן את הדף'
+        ]
       }
     }
     
     if (push.isIOS && !pwa.isStandalone) {
       return {
-        status: 'pwa_required',
-        color: 'text-amber-400',
-        bgColor: 'bg-amber-500/10 border-amber-500/30',
-        icon: Download,
         title: 'נדרשת התקנה',
-        message: 'באייפון, יש להתקין את האפליקציה למסך הבית כדי לקבל התראות. לחץ על כפתור השיתוף (⎙) ובחר "הוסף למסך הבית".'
+        message: 'באייפון, יש להתקין את האפליקציה למסך הבית:',
+        steps: [
+          'לחץ על כפתור השיתוף (⎙) בתחתית המסך',
+          'גלול למטה ובחר "הוסף למסך הבית"',
+          'לחץ "הוסף" בפינה הימנית העליונה',
+          'פתח את האפליקציה ממסך הבית'
+        ]
       }
     }
     
-    if (push.isSubscribed) {
-      return {
-        status: 'active',
-        color: 'text-green-400',
-        bgColor: 'bg-green-500/10 border-green-500/30',
-        icon: CheckCircle,
-        title: 'התראות פעילות',
-        message: `המכשיר שלך רשום לקבלת התראות. תקבל תזכורות על תורים, עדכונים על שינויים והודעות חשובות.`
-      }
-    }
-    
-    return {
-      status: 'inactive',
-      color: 'text-foreground-muted',
-      bgColor: 'bg-white/5 border-white/10',
-      icon: BellOff,
-      title: 'התראות כבויות',
-      message: 'הפעל התראות כדי לקבל תזכורות על תורים קרובים, עדכונים על שינויים והודעות מהברברשופ.'
-    }
+    return null
   }
 
-  const overallStatus = getOverallStatus()
-  const StatusIcon = overallStatus.icon
+  const issueHelp = getIssueHelp()
+  const canEnableNotifications = push.isSupported && 
+                                  push.permission !== 'denied' && 
+                                  (!push.isIOS || pwa.isStandalone)
 
   return (
-    <div className={cn('space-y-4', className)}>
-      {/* Section Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium text-foreground-light flex items-center gap-2">
-          <Bell size={20} strokeWidth={1.5} className="text-accent-gold" />
-          הגדרות התראות
-        </h2>
-        <button
-          onClick={() => push.refreshStatus()}
-          disabled={push.isLoading}
-          className="p-2 text-foreground-muted hover:text-foreground-light transition-colors rounded-lg hover:bg-white/5"
-          aria-label="רענן סטטוס"
-        >
-          <RefreshCw size={16} className={cn(push.isLoading && 'animate-spin')} />
-        </button>
-      </div>
-
-      {/* Overall Status Card */}
-      <GlassCard padding="md" className={cn('border', overallStatus.bgColor)}>
-        <div className="flex items-start gap-4">
-          <div className={cn(
-            'w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0',
-            overallStatus.status === 'active' ? 'bg-green-500/20' :
-            overallStatus.status === 'denied' || overallStatus.status === 'unsupported' ? 'bg-red-500/20' :
-            overallStatus.status === 'pwa_required' ? 'bg-amber-500/20' :
-            'bg-white/10'
-          )}>
-            <StatusIcon size={24} className={overallStatus.color} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className={cn('font-medium', overallStatus.color)}>
-              {overallStatus.title}
-            </h3>
-            <p className="text-sm text-foreground-muted mt-1 leading-relaxed">
-              {overallStatus.message}
-            </p>
-          </div>
-        </div>
-      </GlassCard>
-
-      {/* Detailed Status Section */}
-      <GlassCard padding="md" className="space-y-4">
-        <div className="flex items-center gap-2 text-foreground-muted mb-2">
-          <Settings2 size={14} />
-          <span className="text-xs font-medium">סטטוס מפורט</span>
-        </div>
-
-        {/* PWA Status */}
-        <div className="flex items-center justify-between py-2 border-b border-white/5">
+    <div className={cn('space-y-3', className)}>
+      {/* Main Status Card */}
+      <GlassCard padding="md">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Download size={16} className="text-foreground-muted" />
-            <div>
-              <p className="text-sm text-foreground-light">אפליקציה מותקנת</p>
-              <p className="text-xs text-foreground-muted">
-                {pwa.isStandalone || pwa.isInstalled 
-                  ? 'האפליקציה מותקנת על המכשיר' 
-                  : 'משתמש דרך דפדפן'}
-              </p>
-            </div>
-          </div>
-          <div className={cn(
-            'flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full',
-            pwa.isStandalone || pwa.isInstalled
-              ? 'bg-green-500/20 text-green-400'
-              : 'bg-amber-500/20 text-amber-400'
-          )}>
-            {pwa.isStandalone || pwa.isInstalled ? (
-              <><CheckCircle size={12} /> מותקן</>
-            ) : (
-              <><Info size={12} /> לא מותקן</>
-            )}
-          </div>
-        </div>
-
-        {/* Permission Status */}
-        <div className="flex items-center justify-between py-2 border-b border-white/5">
-          <div className="flex items-center gap-3">
-            {push.permission === 'granted' ? (
-              <CheckCircle size={16} className="text-green-400" />
-            ) : push.permission === 'denied' ? (
-              <XCircle size={16} className="text-red-400" />
-            ) : (
-              <Info size={16} className="text-amber-400" />
-            )}
-            <div>
-              <p className="text-sm text-foreground-light">הרשאת מכשיר</p>
-              <p className="text-xs text-foreground-muted">
-                {push.permission === 'granted' 
-                  ? 'המכשיר מאפשר קבלת התראות'
-                  : push.permission === 'denied'
-                  ? 'ההרשאה נחסמה בהגדרות המכשיר'
-                  : 'טרם נתבקשה הרשאה'}
-              </p>
-            </div>
-          </div>
-          <div className={cn(
-            'flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full',
-            push.permission === 'granted' ? 'bg-green-500/20 text-green-400' :
-            push.permission === 'denied' ? 'bg-red-500/20 text-red-400' :
-            'bg-amber-500/20 text-amber-400'
-          )}>
-            {push.permission === 'granted' ? 'מאושר' :
-             push.permission === 'denied' ? 'נחסם' :
-             'ממתין'}
-          </div>
-        </div>
-
-        {/* Subscription Status */}
-        <div className="flex items-center justify-between py-2">
-          <div className="flex items-center gap-3">
-            {push.isSubscribed ? (
-              <Bell size={16} className="text-accent-gold" />
-            ) : (
-              <BellOff size={16} className="text-foreground-muted" />
-            )}
-            <div>
-              <p className="text-sm text-foreground-light">רישום להתראות</p>
-              <p className="text-xs text-foreground-muted">
-                {push.isSubscribed 
-                  ? `${push.devices.length} מכשיר${push.devices.length !== 1 ? 'ים' : ''} רשומים`
-                  : 'לא רשום לקבלת התראות'}
-              </p>
-            </div>
-          </div>
-          <div className={cn(
-            'flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full',
-            push.isSubscribed
-              ? 'bg-green-500/20 text-green-400'
-              : 'bg-white/10 text-foreground-muted'
-          )}>
-            {push.isSubscribed ? (
-              <><CheckCircle size={12} /> פעיל</>
-            ) : (
-              <>כבוי</>
-            )}
-          </div>
-        </div>
-      </GlassCard>
-
-      {/* Benefits Info (when not subscribed) */}
-      {!push.isSubscribed && push.isSupported && push.permission !== 'denied' && (
-        <GlassCard padding="md" className="bg-accent-gold/5 border-accent-gold/20">
-          <h4 className="text-sm font-medium text-accent-gold mb-3 flex items-center gap-2">
-            <Bell size={14} />
-            למה להפעיל התראות?
-          </h4>
-          <ul className="space-y-2">
-            <li className="flex items-start gap-2 text-sm text-foreground-muted">
-              <span className="text-green-400 mt-0.5">✓</span>
-              <span>תזכורת לפני התור שלך - לעולם לא תשכח</span>
-            </li>
-            <li className="flex items-start gap-2 text-sm text-foreground-muted">
-              <span className="text-green-400 mt-0.5">✓</span>
-              <span>עדכון מיידי אם יש שינוי בתור שלך</span>
-            </li>
-            <li className="flex items-start gap-2 text-sm text-foreground-muted">
-              <span className="text-green-400 mt-0.5">✓</span>
-              <span>הודעות על מבצעים והטבות מיוחדות</span>
-            </li>
-          </ul>
-          <p className="text-xs text-foreground-muted/70 mt-3">
-            💡 אנחנו לא שולחים ספאם - רק הודעות חשובות שקשורות אליך!
-          </p>
-        </GlassCard>
-      )}
-
-      {/* Enable/Disable Button */}
-      {push.isSupported && push.permission !== 'denied' && (
-        <GlassCard padding="md">
-          {!push.isSubscribed ? (
-            <button
-              onClick={handleEnableNotifications}
-              disabled={isEnabling || (push.isIOS && !pwa.isStandalone)}
-              className={cn(
-                'w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold transition-all',
-                isEnabling || (push.isIOS && !pwa.isStandalone)
-                  ? 'bg-foreground-muted/20 text-foreground-muted cursor-not-allowed'
-                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90 shadow-gold'
-              )}
-            >
-              {isEnabling ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
-                  <span>מפעיל התראות...</span>
-                </>
+            <div className={cn(
+              'w-10 h-10 rounded-full flex items-center justify-center',
+              isNotificationsEnabled ? 'bg-green-500/20' : 'bg-white/10'
+            )}>
+              {isNotificationsEnabled ? (
+                <Bell size={20} className="text-green-400" />
               ) : (
-                <>
-                  <Bell size={18} />
-                  <span>הפעל התראות עכשיו</span>
-                </>
+                <BellOff size={20} className="text-foreground-muted" />
               )}
-            </button>
-          ) : (
+            </div>
+            <div>
+              <h3 className="font-medium text-foreground-light">התראות</h3>
+              <p className={cn(
+                'text-sm',
+                isNotificationsEnabled ? 'text-green-400' : 'text-foreground-muted'
+              )}>
+                {isNotificationsEnabled ? 'פעיל' : 'כבוי'}
+              </p>
+            </div>
+          </div>
+          
+          {/* Toggle Button */}
+          {canEnableNotifications && (
             <button
-              onClick={handleDisableNotifications}
-              disabled={push.isLoading}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-medium bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-all"
+              onClick={isNotificationsEnabled ? handleDisableNotifications : handleEnableNotifications}
+              disabled={isEnabling || push.isLoading}
+              className={cn(
+                'relative w-14 h-8 rounded-full transition-colors duration-200',
+                isNotificationsEnabled ? 'bg-green-500' : 'bg-white/20',
+                (isEnabling || push.isLoading) && 'opacity-50 cursor-not-allowed'
+              )}
             >
-              <BellOff size={18} />
-              <span>בטל התראות</span>
+              <div className={cn(
+                'absolute top-1 w-6 h-6 bg-white rounded-full shadow transition-transform duration-200',
+                isNotificationsEnabled ? 'right-1' : 'left-1'
+              )}>
+                {(isEnabling || push.isLoading) && (
+                  <Loader2 size={14} className="animate-spin absolute top-1 left-1 text-background-dark" />
+                )}
+              </div>
             </button>
           )}
           
-          {push.isIOS && !pwa.isStandalone && (
-            <p className="text-xs text-foreground-muted text-center mt-3">
-              💡 התקן את האפליקציה קודם כדי להפעיל התראות
-            </p>
+          {/* Help Button (when there's an issue) */}
+          {hasIssue && (
+            <button
+              onClick={() => setShowHelp(!showHelp)}
+              className={cn(
+                'p-2 rounded-lg transition-colors',
+                showHelp ? 'bg-amber-500/20 text-amber-400' : 'bg-white/10 text-foreground-muted hover:text-amber-400'
+              )}
+            >
+              <HelpCircle size={20} />
+            </button>
           )}
-        </GlassCard>
-      )}
+        </div>
+        
+        {/* Issue Help Section */}
+        {showHelp && issueHelp && (
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <div className="flex items-start gap-3">
+              <AlertTriangle size={18} className="text-amber-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <h4 className="font-medium text-amber-400">{issueHelp.title}</h4>
+                <p className="text-sm text-foreground-muted mt-1">{issueHelp.message}</p>
+                <ol className="mt-3 space-y-2">
+                  {issueHelp.steps.map((step, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-foreground-muted">
+                      <span className="w-5 h-5 rounded-full bg-accent-gold/20 text-accent-gold text-xs flex items-center justify-center flex-shrink-0">
+                        {i + 1}
+                      </span>
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </div>
+          </div>
+        )}
+      </GlassCard>
 
-      {/* Connected Devices */}
+      {/* Connected Devices (Collapsible) */}
       {push.devices.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-medium text-foreground-muted flex items-center gap-2">
-            <Smartphone size={14} />
-            מכשירים מחוברים ({push.devices.length})
-          </h3>
-
-          {push.devices.map((device) => (
-            <GlassCard key={device.id} padding="sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center flex-shrink-0">
+        <GlassCard padding="sm">
+          <button
+            onClick={() => setShowDevices(!showDevices)}
+            className="w-full flex items-center justify-between py-1"
+          >
+            <div className="flex items-center gap-3">
+              <Smartphone size={16} className="text-foreground-muted" />
+              <span className="text-sm text-foreground-light">
+                מכשירים מחוברים ({push.devices.length})
+              </span>
+            </div>
+            {showDevices ? (
+              <ChevronUp size={16} className="text-foreground-muted" />
+            ) : (
+              <ChevronDown size={16} className="text-foreground-muted" />
+            )}
+          </button>
+          
+          {/* Primary Device (always visible) */}
+          {!showDevices && push.devices[0] && (
+            <div className="flex items-center gap-3 mt-3 pt-3 border-t border-white/5">
+              <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
+                <DeviceIcon type={push.devices[0].deviceType} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-foreground-light truncate">
+                  {push.devices[0].deviceName || 'מכשיר ראשי'}
+                </p>
+                <p className="text-xs text-foreground-muted">
+                  {formatLastUsed(push.devices[0].lastUsed)}
+                </p>
+              </div>
+              <CheckCircle size={14} className="text-green-400" />
+            </div>
+          )}
+          
+          {/* Expanded Device List */}
+          {showDevices && (
+            <div className="mt-3 pt-3 border-t border-white/5 space-y-2">
+              {push.devices.map((device) => (
+                <div key={device.id} className="flex items-center gap-3 py-2">
+                  <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
                     <DeviceIcon type={device.deviceType} />
                   </div>
-                  <div className="min-w-0">
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm text-foreground-light truncate">
                       {device.deviceName || 'מכשיר לא מזוהה'}
                     </p>
                     <p className="text-xs text-foreground-muted">
-                      פעיל לאחרונה: {formatLastUsed(device.lastUsed)}
+                      {formatLastUsed(device.lastUsed)}
                     </p>
                   </div>
+                  <button
+                    onClick={() => setDeviceToRemove({ id: device.id, name: device.deviceName || 'מכשיר' })}
+                    disabled={removingDeviceId === device.id}
+                    className="p-2 text-foreground-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                  >
+                    {removingDeviceId === device.id ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Trash2 size={14} />
+                    )}
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleRemoveDevice(device.id)}
-                  disabled={removingDeviceId === device.id}
-                  className="p-2 text-red-400/60 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors flex-shrink-0"
-                  aria-label="הסר מכשיר"
-                >
-                  {removingDeviceId === device.id ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <Trash2 size={16} />
-                  )}
-                </button>
-              </div>
-            </GlassCard>
-          ))}
-          
-          <p className="text-xs text-foreground-muted/70 text-center">
-            כל מכשיר רשום יקבל התראות בנפרד
-          </p>
-        </div>
+              ))}
+            </div>
+          )}
+        </GlassCard>
       )}
 
-      {/* Error Display */}
-      {push.error && (
-        <GlassCard padding="sm" className="border-red-500/30 bg-red-500/5">
-          <div className="flex items-center gap-2 text-red-400">
-            <AlertTriangle size={16} />
-            <p className="text-sm">{push.error}</p>
+      {/* Device Removal Confirmation Modal */}
+      {deviceToRemove && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-background-darker border border-white/10 rounded-2xl max-w-sm w-full p-6 animate-fade-in">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-foreground-light">הסרת מכשיר</h3>
+              <button
+                onClick={() => setDeviceToRemove(null)}
+                className="p-1 text-foreground-muted hover:text-foreground-light"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <p className="text-foreground-muted mb-4">
+              האם להסיר את <span className="text-foreground-light font-medium">{deviceToRemove.name}</span> מרשימת המכשירים?
+            </p>
+            <p className="text-sm text-foreground-muted/70 mb-6">
+              מכשיר זה לא יקבל יותר התראות על תורים ועדכונים.
+            </p>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeviceToRemove(null)}
+                className="flex-1 py-3 rounded-xl bg-white/10 text-foreground-light font-medium hover:bg-white/15 transition-colors"
+              >
+                ביטול
+              </button>
+              <button
+                onClick={confirmRemoveDevice}
+                disabled={removingDeviceId === deviceToRemove.id}
+                className="flex-1 py-3 rounded-xl bg-red-500/20 text-red-400 font-medium border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50"
+              >
+                {removingDeviceId === deviceToRemove.id ? (
+                  <Loader2 size={18} className="animate-spin mx-auto" />
+                ) : (
+                  'הסר מכשיר'
+                )}
+              </button>
+            </div>
           </div>
-        </GlassCard>
+        </div>
       )}
     </div>
   )

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { NotificationSettings } from '@/components/profile/NotificationSettings'
+import { LogoutModal } from '@/components/profile/LogoutModal'
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -33,6 +34,7 @@ export default function ProfilePage() {
   const [savingName, setSavingName] = useState(false)
   const [appointmentCount, setAppointmentCount] = useState(0)
   const [loadingStats, setLoadingStats] = useState(true)
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
 
   // Redirect if not logged in
   useEffect(() => {
@@ -124,6 +126,7 @@ export default function ProfilePage() {
   }
 
   const handleLogout = () => {
+    setShowLogoutModal(false)
     logout()
     router.replace('/')
     toast.success('התנתקת בהצלחה')
@@ -288,7 +291,7 @@ export default function ProfilePage() {
               
               {/* Logout */}
               <button
-                onClick={handleLogout}
+                onClick={() => setShowLogoutModal(true)}
                 className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl font-medium hover:bg-red-500/20 transition-all"
               >
                 <LogOut size={20} strokeWidth={1.5} />
@@ -309,6 +312,12 @@ export default function ProfilePage() {
           </div>
         </div>
       </main>
+      
+      <LogoutModal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleLogout}
+      />
     </>
   )
 }

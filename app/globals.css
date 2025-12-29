@@ -2,11 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* =====================================================
-   iOS Liquid Glass Design System Variables
-   ===================================================== */
+/* Design System Variables */
 :root {
-  /* Glass Effect Variables */
+  /* Glass Effects */
   --glass-blur: 20px;
   --glass-blur-subtle: 12px;
   --glass-blur-strong: 28px;
@@ -20,7 +18,7 @@
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
   --glass-shadow-elevated: 0 16px 48px rgba(0, 0, 0, 0.35);
   
-  /* Glass Border Radii */
+  /* Border Radii */
   --glass-radius-sm: 12px;
   --glass-radius-md: 16px;
   --glass-radius-lg: 20px;
@@ -28,17 +26,17 @@
   --glass-radius-2xl: 28px;
   --glass-radius-3xl: 32px;
   
-  /* Glass Animation Timing */
+  /* Transitions */
   --glass-transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   --glass-transition-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
   
-  /* Safe Area Variables */
+  /* Safe Areas */
   --safe-area-inset-top: 0px;
   --safe-area-inset-right: 0px;
   --safe-area-inset-bottom: 0px;
   --safe-area-inset-left: 0px;
   
-  /* Header positioning - browser mode (no offset) */
+  /* Header */
   --header-top-offset: 0px;
 }
 
@@ -52,9 +50,7 @@
   }
 }
 
-/* =====================================================
-   Ploni Hebrew Font - Primary
-   ===================================================== */
+/* Primary Font - Ploni */
 @font-face {
   font-family: 'Ploni';
   src: url('/fonts/ploni-ultralight-aaa.otf') format('opentype');
@@ -79,9 +75,7 @@
   font-display: swap;
 }
 
-/* =====================================================
-   Fallback Fonts - Rubik & Cereal
-   ===================================================== */
+/* Fallback Font - Rubik */
 @font-face {
   font-family: 'Rubik';
   src: url('/fonts/Rubik/Rubik-Regular.ttf') format('truetype');
@@ -114,33 +108,7 @@
   font-display: swap;
 }
 
-@font-face {
-  font-family: 'AirbnbCereal';
-  src: url('/fonts/Cereal/AirbnbCereal-Book.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'AirbnbCereal';
-  src: url('/fonts/Cereal/AirbnbCereal-Medium.ttf') format('truetype');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'AirbnbCereal';
-  src: url('/fonts/Cereal/AirbnbCereal-Bold.ttf') format('truetype');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-/* =====================================================
-   Base Styles
-   ===================================================== */
+/* Base Styles */
 @layer base {
   * {
     box-sizing: border-box;
@@ -192,11 +160,7 @@
     font-size: 16px !important;
   }
 
-  /* =====================================================
-     Custom Branded Scrollbar - Modern & Minimal
-     ===================================================== */
-  
-  /* Webkit browsers (Chrome, Safari, Edge) */
+  /* Scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -240,11 +204,9 @@
   }
 }
 
-/* =====================================================
-   Component Styles - Liquid Glass System
-   ===================================================== */
+/* Component Styles */
 @layer components {
-  /* Basic Glass Card */
+  /* Glass Card */
   .glass-card {
     background: var(--glass-bg);
     backdrop-filter: blur(var(--glass-blur)) saturate(180%);
@@ -374,11 +336,8 @@
   }
 }
 
-/* =====================================================
-   Utility Styles
-   ===================================================== */
+/* Utilities */
 @layer utilities {
-  /* Legacy content-style for backwards compatibility */
   .content-style h1 {
     @apply section-title;
   }
@@ -437,11 +396,8 @@
   }
 }
 
-/* =====================================================
-   PWA Standalone Mode Styles
-   ===================================================== */
+/* PWA Standalone Mode */
 @media (display-mode: standalone) {
-  /* Set header offset for safe area in standalone mode */
   :root {
     --header-top-offset: env(safe-area-inset-top, 0px);
   }
@@ -480,124 +436,88 @@
   }
 }
 
-/* =====================================================
-   iOS Smooth Scrolling Optimizations
-   For iOS 15+ including iOS 18/26
-   ===================================================== */
-
-/* Global smooth scrolling for all platforms */
+/* iOS Scroll Optimizations */
 html {
   scroll-behavior: smooth;
 }
 
-/* iOS-specific scrolling enhancements */
 @supports (-webkit-touch-callout: none) {
-  /* Main scrollable container optimization */
   html, body {
-    /* Enable momentum-based scrolling on iOS */
     -webkit-overflow-scrolling: touch;
-    /* Prevent scroll chaining to parent */
     overscroll-behavior-y: contain;
   }
 
-  /* Scrollable containers should have touch optimization */
   [data-scroll], 
   .overflow-auto,
   .overflow-y-auto,
   .overflow-x-auto,
   .overflow-scroll {
     -webkit-overflow-scrolling: touch;
-    /* GPU acceleration for smooth scrolling */
     transform: translateZ(0);
     -webkit-transform: translateZ(0);
-    /* Prevent flicker during scroll */
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
   }
 
-  /* Optimize touch response for interactive elements */
   button, a, input, select, textarea {
-    /* Reduce touch delay on iOS */
     touch-action: manipulation;
   }
 
-  /* Smooth scroll containers */
   .smooth-scroll {
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
   }
 }
 
-/* iOS PWA standalone mode - additional optimizations */
 @media (display-mode: standalone) {
   @supports (-webkit-touch-callout: none) {
-    /* Enhanced scroll for standalone mode */
     body {
-      /* Ensure body is scrollable with momentum */
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
-      /* Optimize for touch */
       touch-action: pan-y;
     }
 
-    /* Prevent unwanted gestures */
     html {
-      /* Disable overscroll effects that cause janky feel */
       overscroll-behavior: none;
     }
 
-    /* Make scrolling feel native-like */
-    main, 
-    [role="main"],
-    .main-content {
+    main, [role="main"], .main-content {
       -webkit-overflow-scrolling: touch;
       will-change: scroll-position;
     }
 
-    /* Optimize fixed elements during scroll */
-    header, 
-    nav,
-    .fixed {
-      /* Ensure fixed elements don't cause scroll jank */
+    header, nav, .fixed {
       will-change: transform;
       transform: translateZ(0);
     }
   }
 }
 
-/* Touch optimization for mobile */
+/* Touch Optimization */
 @media (hover: none) {
-  /* Disable hover effects on touch devices */
   .glass-card-hover:hover,
   .glass-interactive:hover {
     transform: none;
     background: var(--glass-bg);
   }
 
-  /* Keep active states */
   .glass-interactive:active {
     transform: scale(0.98);
     background: var(--glass-bg-strong);
   }
 
-  /* Disable focus ring on touch */
   *:focus {
     outline: none;
   }
 }
 
-/* Prevent tap highlight and improve touch response */
 button, [role="button"], a {
   -webkit-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* =====================================================
-   External Component Overrides
-   ===================================================== */
-
-/* Google Maps Dark Mode Filter */
+/* External Component Overrides */
 .map-dark {
   filter: invert(90%) hue-rotate(180deg) brightness(0.9) contrast(0.9);
 }
