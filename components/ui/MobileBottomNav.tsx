@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { Home, Search, Calendar, User, LayoutDashboard, Users, LogIn, Scissors, Bell } from 'lucide-react'
+import { Home, Search, Calendar, User, LayoutDashboard, Users, LogIn, Scissors } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useCurrentUser, type UserType } from '@/hooks/useCurrentUser'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
+import { usePushStore } from '@/store/usePushStore'
 import { usePWA } from '@/hooks/usePWA'
 import { LoginModal } from '@/components/LoginModal'
 
@@ -26,18 +27,24 @@ export function MobileBottomNav() {
   // Use unified auth hook
   const { type: userRole, isInitialized } = useCurrentUser()
   
-  // Push notifications state for badge
+  // Push notifications state for badge - use shared store for real-time sync
   const push = usePushNotifications()
+  const pushStore = usePushStore()
   const pwa = usePWA()
   
   // Show badge on profile when notifications need setup
+  // Use shared store for real-time sync, but fallback to hook state
+  const isSubscribedRealtime = pushStore.isSubscribed || push.isSubscribed
+  const isSupportedRealtime = pushStore.isSupported || push.isSupported
+  const permissionRealtime = pushStore.permission !== 'unavailable' ? pushStore.permission : push.permission
+  
   // Only show when: in PWA, logged in, push supported but not subscribed
   const showNotificationBadge = 
     pwa.isStandalone && 
     userRole === 'customer' && 
-    push.isSupported && 
-    !push.isSubscribed &&
-    push.permission !== 'denied'
+    isSupportedRealtime && 
+    !isSubscribedRealtime &&
+    permissionRealtime !== 'denied'
   
   // UI State
   const [isVisible, setIsVisible] = useState(true)
@@ -154,6 +161,7 @@ export function MobileBottomNav() {
           { id: 'home', label: 'בית', href: '/', icon: Home },
           { id: 'dashboard', label: 'לוח בקרה', href: '/barber/dashboard', icon: LayoutDashboard },
           { id: 'upcoming', label: 'לקוחות קרובים', labelActive: 'לקוחות', href: '/barber/dashboard/reservations', icon: Users },
+          { id: 'profile', label: 'פרופיל', href: '/barber/dashboard/profile', icon: User },
         ]
       case 'customer':
         return [
@@ -177,6 +185,7 @@ export function MobileBottomNav() {
   const getActiveItem = (): string => {
     if (pathname === '/my-appointments') return 'calendar'
     if (pathname === '/profile') return 'profile'
+    if (pathname === '/barber/dashboard/profile') return 'profile'
     if (pathname === '/barber/dashboard') return 'dashboard'
     if (pathname.startsWith('/barber/dashboard/reservations')) return 'upcoming'
     if (pathname.startsWith('/barber/')) return 'login'

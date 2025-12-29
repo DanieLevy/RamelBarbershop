@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
@@ -48,15 +48,7 @@ export default function ProductsPage() {
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
-  useEffect(() => {
-    if (!isAdmin) {
-      router.replace('/barber/dashboard')
-      return
-    }
-    fetchProducts()
-  }, [isAdmin, router])
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       const supabase = createClient()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -74,7 +66,15 @@ export default function ProductsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [report])
+
+  useEffect(() => {
+    if (!isAdmin) {
+      router.replace('/barber/dashboard')
+      return
+    }
+    fetchProducts()
+  }, [isAdmin, router, fetchProducts])
 
   const resetForm = () => {
     setFormData({

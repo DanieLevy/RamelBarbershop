@@ -119,7 +119,7 @@ export function ContactSection({ settings }: ContactSectionProps) {
   const openingHoursDisplay = formatOpeningHours(openDays, workStart, workEnd, '14:00')
 
   return (
-    <section className="index-contact py-10 sm:py-12 lg:py-16 bg-[#080b0d]">
+    <section className="index-contact pt-10 pb-6 sm:pt-12 sm:pb-8 lg:pt-16 lg:pb-10 bg-[#080b0d]">
       <div className="container-mobile">
         <SectionDivider title="צור קשר" className="mb-8" />
         

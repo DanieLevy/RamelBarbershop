@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/client'
 import type { BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure, BarberMessage } from '@/types/database'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
+import { getTodayDateString, getIsraelDateString } from '@/lib/utils'
 
 /**
  * Get barbershop settings
@@ -31,7 +32,7 @@ export async function getBarbershopClosures(): Promise<BarbershopClosure[]> {
   const { data, error } = await supabase
     .from('barbershop_closures')
     .select('*')
-    .gte('end_date', new Date().toISOString().split('T')[0])
+    .gte('end_date', getTodayDateString())
   
   if (error) {
     console.error('Error fetching barbershop closures:', error)
@@ -72,7 +73,7 @@ export async function getBarberClosures(barberId: string): Promise<BarberClosure
     .from('barber_closures')
     .select('*')
     .eq('barber_id', barberId)
-    .gte('end_date', new Date().toISOString().split('T')[0])
+    .gte('end_date', getTodayDateString())
   
   if (error) {
     console.error('Error fetching barber closures:', error)
@@ -114,8 +115,9 @@ export function isDateAvailable(
   barberSchedule: BarberSchedule | null,
   barberClosures: BarberClosure[]
 ): { available: boolean; reason?: string } {
+  // Use Israel timezone for date calculations
+  const dateStr = getIsraelDateString(dateTimestamp)
   const date = new Date(dateTimestamp)
-  const dateStr = date.toISOString().split('T')[0]
   const dayName = getDayName(date.getDay())
   
   // Check if shop is open on this day

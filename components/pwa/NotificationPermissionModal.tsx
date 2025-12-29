@@ -6,7 +6,7 @@ import { usePWA } from '@/hooks/usePWA'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { cn } from '@/lib/utils'
-import { Bell, X, Smartphone, AlertCircle } from 'lucide-react'
+import { Bell, X, Smartphone } from 'lucide-react'
 
 const MODAL_DISMISSED_KEY = 'notification_modal_dismissed'
 const MODAL_SHOW_DELAY = 3000 // 3 seconds after PWA loads

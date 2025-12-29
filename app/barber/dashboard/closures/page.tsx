@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
@@ -24,15 +24,7 @@ export default function ClosuresPage() {
   const [endDate, setEndDate] = useState('')
   const [reason, setReason] = useState('')
 
-  useEffect(() => {
-    if (!isAdmin) {
-      router.replace('/barber/dashboard')
-      return
-    }
-    fetchClosures()
-  }, [isAdmin, router])
-
-  const fetchClosures = async () => {
+  const fetchClosures = useCallback(async () => {
     const supabase = createClient()
     
     const { data, error } = await supabase
@@ -47,7 +39,15 @@ export default function ClosuresPage() {
     
     setClosures((data as BarbershopClosure[]) || [])
     setLoading(false)
-  }
+  }, [report])
+
+  useEffect(() => {
+    if (!isAdmin) {
+      router.replace('/barber/dashboard')
+      return
+    }
+    fetchClosures()
+  }, [isAdmin, router, fetchClosures])
 
   const handleAdd = async () => {
     if (!startDate || !endDate) {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, AlertTriangle, Phone, Calendar, Clock } from 'lucide-react'
+import { X, AlertTriangle, Calendar, Clock } from 'lucide-react'
 import { cn, formatTime, formatDateHebrew } from '@/lib/utils'
 
 interface ReservationInfo {

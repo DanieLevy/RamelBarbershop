@@ -44,6 +44,60 @@ export function israelDateToTimestamp(
 }
 
 /**
+ * Get current timestamp in milliseconds (Israel-aware)
+ * Use this instead of Date.now() when comparing with Israel dates
+ */
+export function nowInIsraelMs(): number {
+  return Date.now()
+}
+
+/**
+ * Check if a timestamp is today in Israel timezone
+ */
+export function isTodayInIsrael(timestamp: number): boolean {
+  const nowIsrael = nowInIsrael()
+  const dateIsrael = timestampToIsraelDate(timestamp)
+  return format(nowIsrael, 'yyyy-MM-dd') === format(dateIsrael, 'yyyy-MM-dd')
+}
+
+/**
+ * Check if a timestamp is in the past (Israel timezone aware)
+ */
+export function isPastInIsrael(timestamp: number): boolean {
+  return timestamp < Date.now()
+}
+
+/**
+ * Check if a date string (YYYY-MM-DD) is today in Israel
+ */
+export function isDateStringToday(dateString: string): boolean {
+  const nowIsrael = nowInIsrael()
+  return format(nowIsrael, 'yyyy-MM-dd') === dateString
+}
+
+/**
+ * Get today's date string in Israel timezone (YYYY-MM-DD)
+ */
+export function getTodayDateString(): string {
+  return format(nowInIsrael(), 'yyyy-MM-dd')
+}
+
+/**
+ * Get ISO date string for a timestamp in Israel timezone
+ */
+export function getIsraelDateString(timestamp: number): string {
+  const date = timestampToIsraelDate(timestamp)
+  return format(date, 'yyyy-MM-dd')
+}
+
+/**
+ * Compare two timestamps by date only (ignoring time) in Israel timezone
+ */
+export function isSameDayInIsrael(timestamp1: number, timestamp2: number): boolean {
+  return getIsraelDateString(timestamp1) === getIsraelDateString(timestamp2)
+}
+
+/**
  * Generate a random ID
  */
 export function makeId(length = 6): string {

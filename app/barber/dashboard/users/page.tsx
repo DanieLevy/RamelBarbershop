@@ -10,7 +10,7 @@ import { format } from 'date-fns'
 import { he } from 'date-fns/locale'
 import { 
   Users, Search, Ban, Trash2, Shield, ShieldOff,
-  Calendar, Phone, User, AlertCircle, X, ChevronLeft, ChevronRight
+  Calendar, Phone, User, X, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import type { Customer } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'

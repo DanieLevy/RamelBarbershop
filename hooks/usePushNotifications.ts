@@ -1,11 +1,20 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
+import { usePushStore } from '@/store/usePushStore'
 import { usePWA } from './usePWA'
 import { useBugReporter } from './useBugReporter'
 import type { DeviceInfo, DeviceType } from '@/lib/push/types'
+
+/**
+ * Module-level state to prevent multiple simultaneous API calls across hook instances.
+ * This is necessary because multiple components may use usePushNotifications simultaneously.
+ */
+let globalFetchInProgress = false
+let globalLastFetchTime = 0
+const FETCH_COOLDOWN_MS = 5000 // Minimum time between fetches
 
 interface PushNotificationState {
   isSupported: boolean
@@ -45,17 +54,16 @@ const urlBase64ToUint8Array = (base64String: string): ArrayBuffer => {
 
 /**
  * Set app badge count (iOS 16.4+, Android)
+ * Uses Navigator Badge API - types defined in types/navigator.d.ts
  */
 export const setAppBadge = async (count: number): Promise<boolean> => {
   if (!('setAppBadge' in navigator)) return false
   
   try {
     if (count > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (navigator as any).setAppBadge(count)
+      await navigator.setAppBadge(count)
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (navigator as any).clearAppBadge()
+      await navigator.clearAppBadge()
     }
     return true
   } catch {
@@ -71,6 +79,15 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
   const { barber, isLoggedIn: isBarberLoggedIn } = useBarberAuthStore()
   const { isStandalone, deviceOS } = usePWA()
   const { report } = useBugReporter('PushNotifications')
+  
+  // Extract stable setter references from store to avoid infinite loops
+  // These selectors return stable function references that don't change between renders
+  const setStoreSupported = usePushStore(state => state.setSupported)
+  const setStorePermission = usePushStore(state => state.setPermission)
+  const setStoreSubscribed = usePushStore(state => state.setSubscribed)
+  
+  // Guard to prevent multiple initializations
+  const hasInitializedRef = useRef(false)
   
   const [state, setState] = useState<PushNotificationState>({
     isSupported: false,
@@ -114,14 +131,33 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
   }, [checkSupport])
 
   /**
-   * Fetch status from server
+   * Fetch status from server.
+   * NOTE: This function should NOT be in useEffect dependencies to prevent infinite loops.
+   * It uses refs to access current auth state instead of depending on auth values directly.
    */
   const fetchServerStatus = useCallback(async () => {
-    const userId = isCustomerLoggedIn ? customer?.id : isBarberLoggedIn ? barber?.id : null
+    // Get current auth state from stores directly (not from hook closure)
+    // This avoids the callback being recreated when auth state changes
+    const authState = useAuthStore.getState()
+    const barberAuthState = useBarberAuthStore.getState()
+    
+    const isCustomer = authState.isLoggedIn && authState.customer?.id
+    const isBarber = barberAuthState.isLoggedIn && barberAuthState.barber?.id
+    
+    const userId = isCustomer ? authState.customer?.id : isBarber ? barberAuthState.barber?.id : null
     if (!userId) return
 
+    // Prevent concurrent fetches and enforce cooldown period
+    const now = Date.now()
+    if (globalFetchInProgress || (now - globalLastFetchTime) < FETCH_COOLDOWN_MS) {
+      return
+    }
+
+    globalFetchInProgress = true
+    globalLastFetchTime = now
+
     try {
-      const param = isCustomerLoggedIn ? 'customerId' : 'barberId'
+      const param = isCustomer ? 'customerId' : 'barberId'
       const response = await fetch(`/api/push/status?${param}=${userId}`)
       const data = await response.json()
 
@@ -136,13 +172,22 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
       }
     } catch (err) {
       console.error('[Push] Error fetching status:', err)
+    } finally {
+      globalFetchInProgress = false
     }
-  }, [isCustomerLoggedIn, isBarberLoggedIn, customer?.id, barber?.id])
+  }, []) // Empty dependency array - uses store.getState() for current values
 
   /**
    * Initialize push notification state
+   * 
+   * CRITICAL: The ref must be set SYNCHRONOUSLY before any async work to prevent
+   * race conditions where the effect re-runs while async operations are pending.
    */
   useEffect(() => {
+    // Prevent multiple initializations - check and set synchronously BEFORE any async work
+    if (hasInitializedRef.current) return
+    hasInitializedRef.current = true // Set immediately to prevent re-entry
+    
     const initialize = async () => {
       const isSupported = checkSupport()
       
@@ -156,10 +201,10 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
         return
       }
 
-      // Check permission
+      // Check permission (synchronous)
       const permission = Notification.permission
 
-      // Check if already subscribed
+      // Check if already subscribed (async)
       const subscription = await getCurrentSubscription()
       const isSubscribed = Boolean(subscription)
 
@@ -171,15 +216,22 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
         pwaInstalled: isStandalone,
         isLoading: false
       }))
+      
+      // Update shared store for cross-component sync using stable setter refs
+      setStoreSupported(true)
+      setStorePermission(permission)
+      setStoreSubscribed(isSubscribed)
 
-      // Fetch server status if logged in
+      // Fetch server status if logged in (uses store.getState() internally, so safe to call)
       if (isCustomerLoggedIn || isBarberLoggedIn) {
         await fetchServerStatus()
       }
     }
 
     initialize()
-  }, [checkSupport, getCurrentSubscription, isStandalone, isCustomerLoggedIn, isBarberLoggedIn, fetchServerStatus])
+    // NOTE: fetchServerStatus is intentionally NOT in dependencies - it uses store.getState()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkSupport, getCurrentSubscription, isStandalone, isCustomerLoggedIn, isBarberLoggedIn, setStoreSupported, setStorePermission, setStoreSubscribed])
 
   /**
    * Request notification permission
@@ -293,8 +345,12 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
         isLoading: false,
         notificationsEnabled: true
       }))
+      
+      // Update shared store immediately for cross-component sync
+      setStoreSubscribed(true)
 
-      // Refresh device list
+      // Reset cooldown and refresh device list (important to get fresh data after subscribe)
+      globalLastFetchTime = 0
       await fetchServerStatus()
 
       return true
@@ -314,7 +370,7 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
       }))
       return false
     }
-  }, [state, isIOS, isStandalone, requestPermission, isCustomerLoggedIn, isBarberLoggedIn, customer, barber, fetchServerStatus, report])
+  }, [state, isIOS, isStandalone, requestPermission, isCustomerLoggedIn, isBarberLoggedIn, customer, barber, fetchServerStatus, report, setStoreSubscribed])
 
   /**
    * Unsubscribe from push notifications
@@ -349,7 +405,8 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
         notificationsEnabled: false
       }))
 
-      // Refresh status
+      // Reset cooldown and refresh status (important to get fresh data after unsubscribe)
+      globalLastFetchTime = 0
       await fetchServerStatus()
 
       return true
@@ -417,7 +474,7 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
   }, [report])
 
   /**
-   * Refresh status from server
+   * Refresh status from server (bypasses cooldown for explicit refresh)
    */
   const refreshStatus = useCallback(async (): Promise<void> => {
     setState(prev => ({ ...prev, isLoading: true }))
@@ -430,7 +487,8 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
       permission: Notification.permission
     }))
 
-    // Fetch from server
+    // Reset cooldown and fetch from server (explicit refresh should always work)
+    globalLastFetchTime = 0
     await fetchServerStatus()
     
     setState(prev => ({ ...prev, isLoading: false }))

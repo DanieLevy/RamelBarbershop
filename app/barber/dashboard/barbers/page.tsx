@@ -35,15 +35,7 @@ export default function BarbersPage() {
   const [password, setPassword] = useState('')
   const [phone, setPhone] = useState('')
 
-  useEffect(() => {
-    if (!isAdmin) {
-      router.replace('/barber/dashboard')
-      return
-    }
-    fetchBarbers()
-  }, [isAdmin, router])
-
-  const fetchBarbers = async () => {
+  const fetchBarbers = useCallback(async () => {
     try {
       const data = await getAllBarbers()
       // Sort by display_order
@@ -56,7 +48,15 @@ export default function BarbersPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [report])
+
+  useEffect(() => {
+    if (!isAdmin) {
+      router.replace('/barber/dashboard')
+      return
+    }
+    fetchBarbers()
+  }, [isAdmin, router, fetchBarbers])
 
   // Save new order to database
   const saveOrder = useCallback(async (newOrder: UserType[]) => {

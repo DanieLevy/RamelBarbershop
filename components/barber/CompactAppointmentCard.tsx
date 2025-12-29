@@ -1,6 +1,6 @@
 'use client'
 
-import { cn, formatDateHebrew, formatTime as formatTimeUtil } from '@/lib/utils'
+import { cn, formatTime as formatTimeUtil } from '@/lib/utils'
 import { Phone, X, Clock, Scissors, User, AlertCircle } from 'lucide-react'
 import type { Reservation, Service, User as UserType } from '@/types/database'
 

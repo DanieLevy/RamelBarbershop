@@ -131,7 +131,7 @@ export function OTPVerification() {
     if (isMountedRef.current) {
       setSending(false)
     }
-  }, [countdown, sending, customer.phone, setOtpConfirmation, formatPhoneNumber, retryCount])
+  }, [countdown, sending, customer.phone, setOtpConfirmation, formatPhoneNumber, retryCount, report])
 
   const handleOtpChange = (index: number, value: string) => {
     if (!/^\d*$/.test(value)) return

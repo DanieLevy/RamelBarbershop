@@ -42,12 +42,13 @@ const detectOS = (): DeviceOS => {
 }
 
 // Check if running in standalone mode
+// Uses Navigator.standalone for iOS - types defined in types/navigator.d.ts
 const checkStandalone = (): boolean => {
   if (typeof window === 'undefined') return false
   
   return (
     window.matchMedia('(display-mode: standalone)').matches ||
-    (window.navigator as Navigator & { standalone?: boolean }).standalone === true ||
+    navigator.standalone === true ||
     document.referrer.includes('android-app://')
   )
 }
@@ -69,6 +70,9 @@ export const usePWA = (): UsePWAReturn => {
 
   const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null)
   const swRegistrationRef = useRef<ServiceWorkerRegistration | null>(null)
+  
+  // Track statechange listeners for cleanup to prevent memory leaks
+  const stateChangeCleanupRef = useRef<Array<{ worker: ServiceWorker; handler: () => void }>>([])
 
   // Initialize PWA state
   useEffect(() => {
@@ -126,7 +130,8 @@ export const usePWA = (): UsePWAReturn => {
 
           console.log('[PWA] New service worker found, tracking state...')
 
-          newWorker.addEventListener('statechange', () => {
+          // Create handler and track it for cleanup
+          const handleStateChange = () => {
             console.log('[PWA] New worker state:', newWorker.state)
             
             if (newWorker.state === 'installed') {
@@ -138,8 +143,16 @@ export const usePWA = (): UsePWAReturn => {
                 // First install - no update needed, just fresh install
                 console.log('[PWA] First install complete')
               }
+              // Remove listener once installed state is reached
+              newWorker.removeEventListener('statechange', handleStateChange)
+              stateChangeCleanupRef.current = stateChangeCleanupRef.current.filter(
+                (item) => item.worker !== newWorker
+              )
             }
-          })
+          }
+          
+          newWorker.addEventListener('statechange', handleStateChange)
+          stateChangeCleanupRef.current.push({ worker: newWorker, handler: handleStateChange })
         })
       } catch (error) {
         console.error('[PWA] Service Worker registration failed:', error)
@@ -172,6 +185,12 @@ export const usePWA = (): UsePWAReturn => {
       if (updateInterval) clearInterval(updateInterval)
       navigator.serviceWorker.removeEventListener('message', handleMessage)
       navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange)
+      
+      // Clean up all tracked statechange listeners to prevent memory leaks
+      stateChangeCleanupRef.current.forEach(({ worker, handler }) => {
+        worker.removeEventListener('statechange', handler)
+      })
+      stateChangeCleanupRef.current = []
     }
   }, [])
 
@@ -251,12 +270,21 @@ export const usePWA = (): UsePWAReturn => {
       console.log('[PWA] Worker still installing, waiting...')
       const worker = registration.installing
       
-      worker.addEventListener('statechange', () => {
+      // Create handler that auto-cleans up after firing
+      const handleStateChange = () => {
         if (worker.state === 'installed') {
           console.log('[PWA] Worker now installed, skip waiting...')
           worker.postMessage({ type: 'SKIP_WAITING' })
+          // Self-cleanup after handling
+          worker.removeEventListener('statechange', handleStateChange)
+          stateChangeCleanupRef.current = stateChangeCleanupRef.current.filter(
+            (item) => item.worker !== worker
+          )
         }
-      })
+      }
+      
+      worker.addEventListener('statechange', handleStateChange)
+      stateChangeCleanupRef.current.push({ worker, handler: handleStateChange })
       return
     }
 

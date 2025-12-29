@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
@@ -32,15 +32,7 @@ export default function GlobalSchedulePage() {
   const [startTime, setStartTime] = useState('09:00')
   const [endTime, setEndTime] = useState('19:00')
 
-  useEffect(() => {
-    if (!isAdmin) {
-      router.replace('/barber/dashboard')
-      return
-    }
-    fetchSettings()
-  }, [isAdmin, router])
-
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     const supabase = createClient()
     
     const { data, error } = await supabase
@@ -61,7 +53,15 @@ export default function GlobalSchedulePage() {
     setStartTime(s.work_hours_start || '09:00')
     setEndTime(s.work_hours_end || '19:00')
     setLoading(false)
-  }
+  }, [report])
+
+  useEffect(() => {
+    if (!isAdmin) {
+      router.replace('/barber/dashboard')
+      return
+    }
+    fetchSettings()
+  }, [isAdmin, router, fetchSettings])
 
   const toggleDay = (day: string) => {
     if (openDays.includes(day)) {

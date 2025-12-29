@@ -150,3 +150,128 @@ export async function updateCustomer(
   
   return data as Customer
 }
+
+/**
+ * Update customer name only
+ */
+export async function updateCustomerName(
+  customerId: string,
+  fullname: string
+): Promise<boolean> {
+  const supabase = createClient()
+  
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from('customers') as any)
+    .update({ fullname: fullname.trim() })
+    .eq('id', customerId)
+  
+  if (error) {
+    console.error('Error updating customer name:', error)
+    await reportSupabaseError(error, 'Updating customer name', { table: 'customers', operation: 'update' })
+    return false
+  }
+  
+  return true
+}
+
+/**
+ * Check if a customer is blocked
+ */
+export async function isCustomerBlocked(customerId: string): Promise<boolean> {
+  const supabase = createClient()
+  
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from('customers') as any)
+    .select('is_blocked')
+    .eq('id', customerId)
+    .single()
+  
+  if (error || !data) {
+    return false
+  }
+  
+  return data.is_blocked === true
+}
+
+/**
+ * Toggle customer blocked status
+ */
+export async function toggleCustomerBlocked(
+  customerId: string,
+  block: boolean,
+  reason?: string
+): Promise<boolean> {
+  const supabase = createClient()
+  
+  const updateData = block
+    ? { is_blocked: true, blocked_at: new Date().toISOString(), blocked_reason: reason || null }
+    : { is_blocked: false, blocked_at: null, blocked_reason: null }
+  
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from('customers') as any)
+    .update(updateData)
+    .eq('id', customerId)
+  
+  if (error) {
+    console.error('Error toggling customer blocked status:', error)
+    await reportSupabaseError(error, 'Toggling customer blocked status', { table: 'customers', operation: 'update' })
+    return false
+  }
+  
+  return true
+}
+
+/**
+ * Get all customers (for admin)
+ */
+export async function getAllCustomers(): Promise<Customer[]> {
+  const supabase = createClient()
+  
+  const { data, error } = await supabase
+    .from('customers')
+    .select('*')
+    .order('created_at', { ascending: false })
+  
+  if (error) {
+    console.error('Error fetching all customers:', error)
+    await reportSupabaseError(error, 'Fetching all customers', { table: 'customers', operation: 'select' })
+    return []
+  }
+  
+  return (data as Customer[]) || []
+}
+
+/**
+ * Delete a customer by ID
+ */
+export async function deleteCustomer(customerId: string): Promise<boolean> {
+  const supabase = createClient()
+  
+  const { error } = await supabase
+    .from('customers')
+    .delete()
+    .eq('id', customerId)
+  
+  if (error) {
+    console.error('Error deleting customer:', error)
+    await reportSupabaseError(error, 'Deleting customer', { table: 'customers', operation: 'delete' })
+    return false
+  }
+  
+  return true
+}
+
+/**
+ * Check if a given ID is a customer (vs barber)
+ */
+export async function isCustomerId(id: string): Promise<boolean> {
+  const supabase = createClient()
+  
+  const { data } = await supabase
+    .from('customers')
+    .select('id')
+    .eq('id', id)
+    .single()
+  
+  return data !== null
+}

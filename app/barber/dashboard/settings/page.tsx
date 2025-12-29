@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
@@ -66,15 +66,7 @@ export default function SettingsPage() {
   const [showFacebook, setShowFacebook] = useState(true)
   const [showTiktok, setShowTiktok] = useState(false)
 
-  useEffect(() => {
-    if (!isAdmin) {
-      router.replace('/barber/dashboard')
-      return
-    }
-    fetchSettings()
-  }, [isAdmin, router])
-
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     const supabase = createClient()
     
     const { data, error } = await supabase
@@ -127,7 +119,15 @@ export default function SettingsPage() {
     setShowTiktok(s.show_tiktok === true)
     
     setLoading(false)
-  }
+  }, [report])
+
+  useEffect(() => {
+    if (!isAdmin) {
+      router.replace('/barber/dashboard')
+      return
+    }
+    fetchSettings()
+  }, [isAdmin, router, fetchSettings])
 
   const toggleSection = (section: SectionKey) => {
     setExpandedSections(prev => 

@@ -43,7 +43,8 @@ export default async function HomePage() {
       
       {/* Upcoming Appointment Banner - Fixed below header for logged-in customers */}
       {/* z-30 to stay below header (z-50) and not interfere with dropdowns */}
-      <div className="fixed top-[calc(var(--header-top-offset,0px)+56px)] left-0 right-0 z-30">
+      {/* Header height: py-3/py-4 (24px/32px) + nav buttons (~46px) = ~70px/78px */}
+      <div className="fixed top-[calc(var(--header-top-offset,0px)+70px)] sm:top-[calc(var(--header-top-offset,0px)+76px)] left-0 right-0 z-30">
         <UpcomingAppointmentBanner />
       </div>
       

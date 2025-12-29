@@ -2,24 +2,48 @@
  * Updates the APP_VERSION in the service worker file.
  * This script runs automatically before each build via npm prebuild.
  * 
- * Version format: YYYY.MM.DD.HHMM (e.g., 2024.12.28.1430)
+ * Version format: MAJOR.MINOR.PATCH-YYYY.MM.DD.HHMM
+ * Example: 2.0.0-2024.12.28.1430
+ * 
+ * This combines the semantic version from package.json with a build timestamp
+ * for cache busting and easy identification of when a build was created.
  */
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const SW_PATH = path.join(__dirname, '..', 'public', 'sw.js');
+const PACKAGE_PATH = path.join(__dirname, '..', 'package.json');
 
-// Generate version based on current timestamp
+// Read package.json for semantic version
+let packageVersion = '2.0.0';
+try {
+  const packageJson = JSON.parse(fs.readFileSync(PACKAGE_PATH, 'utf8'));
+  packageVersion = packageJson.version || '2.0.0';
+} catch (error) {
+  console.warn('⚠️ Could not read package.json, using default version');
+}
+
+// Generate timestamp for build identification
 const now = new Date();
-const version = [
+const timestamp = [
   now.getFullYear(),
   String(now.getMonth() + 1).padStart(2, '0'),
   String(now.getDate()).padStart(2, '0'),
   String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0')
 ].join('.');
 
-console.log(`📦 Updating Service Worker version to: ${version}`);
+// Generate a short build hash for uniqueness
+const buildHash = crypto.randomBytes(4).toString('hex');
+
+// Combine version: semantic-version + timestamp for full traceability
+const version = `${packageVersion}-${timestamp}`;
+
+console.log(`📦 Service Worker Version Update`);
+console.log(`   Package Version: ${packageVersion}`);
+console.log(`   Build Timestamp: ${timestamp}`);
+console.log(`   Full Version:    ${version}`);
 
 try {
   // Read the service worker file
@@ -41,4 +65,3 @@ try {
   console.error('❌ Error updating service worker version:', error.message);
   process.exit(1);
 }
-

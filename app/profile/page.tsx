@@ -232,9 +232,9 @@ export default function ProfilePage() {
                 <div className="w-10 h-10 rounded-full bg-accent-gold/10 flex items-center justify-center flex-shrink-0">
                   <Phone size={18} strokeWidth={1.5} className="text-accent-gold" />
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 text-right">
                   <p className="text-foreground-muted text-xs mb-0.5">מספר טלפון</p>
-                  <p className="text-foreground-light font-medium" dir="ltr">{customer.phone}</p>
+                  <p className="text-foreground-light font-medium">{customer.phone}</p>
                 </div>
               </GlassCard>
               

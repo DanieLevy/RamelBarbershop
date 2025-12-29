@@ -8,7 +8,7 @@ import { cn, formatTime as formatTimeUtil, nowInIsrael } from '@/lib/utils'
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, isSameDay, addDays, startOfMonth, endOfMonth } from 'date-fns'
 import { 
   Calendar, Clock, TrendingDown, Users, 
-  Scissors, Settings, CalendarOff, Store,
+  Scissors, CalendarOff, Store,
   ChevronLeft, Phone, Package
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'

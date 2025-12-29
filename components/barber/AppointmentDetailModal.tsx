@@ -1,7 +1,7 @@
 'use client'
 
 import { cn, formatDateHebrew, formatTime as formatTimeUtil } from '@/lib/utils'
-import { X, Calendar, Clock, Scissors, User, Phone, AlertCircle, CheckCircle, XCircle, History } from 'lucide-react'
+import { X, Calendar, Scissors, User, Phone, AlertCircle, CheckCircle, XCircle, History } from 'lucide-react'
 import type { Reservation, Service, User as UserType, Customer } from '@/types/database'
 
 interface ReservationWithDetails extends Reservation {
