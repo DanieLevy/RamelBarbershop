@@ -151,11 +151,10 @@
     min-width: 44px;
   }
   
-  /* Default button styling - ensure icons center properly */
+  /* Default button styling - flex for alignment, use .icon-btn for centering */
   button {
     display: flex;
     align-items: center;
-    justify-content: center;
   }
   
   /* Toggle switches need smaller dimensions */

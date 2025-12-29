@@ -120,7 +120,7 @@ export function CompactAppointmentCard({
                 e.stopPropagation()
                 onCall(reservation.customer_phone)
               }}
-              className="p-2 rounded-lg bg-white/[0.05] hover:bg-accent-gold/20 text-foreground-muted hover:text-accent-gold transition-all"
+              className="icon-btn p-2 rounded-lg bg-white/[0.05] hover:bg-accent-gold/20 text-foreground-muted hover:text-accent-gold transition-all"
               aria-label="התקשר ללקוח"
             >
               <Phone className="w-4 h-4" />
@@ -136,7 +136,7 @@ export function CompactAppointmentCard({
               }}
               disabled={isCancelling}
               className={cn(
-                'p-2 rounded-lg transition-all',
+                'icon-btn p-2 rounded-lg transition-all',
                 'bg-white/[0.05] hover:bg-red-500/20 text-foreground-muted hover:text-red-400',
                 isCancelling && 'opacity-50 pointer-events-none'
               )}

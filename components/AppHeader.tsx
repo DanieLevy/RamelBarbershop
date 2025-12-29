@@ -453,7 +453,7 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
             <div className="relative p-5 border-b border-white/10 bg-gradient-to-br from-accent-gold/10 via-transparent to-accent-orange/5">
               <button
                 onClick={() => setShowMobileMenu(false)}
-                className="absolute top-4 left-4 p-2 rounded-full bg-white/10 text-foreground-light hover:bg-white/20 transition-colors"
+                className="icon-btn absolute top-4 left-4 p-2 rounded-full bg-white/10 text-foreground-light hover:bg-white/20 transition-colors"
                 aria-label="סגור תפריט"
               >
                 <X size={18} strokeWidth={2} />

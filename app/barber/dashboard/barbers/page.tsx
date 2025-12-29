@@ -444,7 +444,7 @@ export default function BarbersPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleEdit(barber)}
-                      className="p-2 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition-colors"
+                      className="icon-btn p-2 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition-colors"
                       title="ערוך"
                     >
                       <Pencil size={14} strokeWidth={1.5} />

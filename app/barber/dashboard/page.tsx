@@ -248,7 +248,7 @@ export default function DashboardPage() {
                   {/* Phone */}
                   <a
                     href={`tel:${res.customer_phone}`}
-                    className="p-2 rounded-lg hover:bg-accent-gold/10 transition-colors shrink-0"
+                    className="icon-btn p-2 rounded-lg hover:bg-accent-gold/10 transition-colors shrink-0"
                     aria-label="התקשר"
                   >
                     <Phone size={16} strokeWidth={1.5} className="text-accent-gold" />

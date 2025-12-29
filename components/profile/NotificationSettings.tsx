@@ -208,7 +208,7 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
             <button
               onClick={() => setShowHelp(!showHelp)}
               className={cn(
-                'p-2 rounded-lg transition-colors',
+                'icon-btn p-2 rounded-lg transition-colors',
                 showHelp ? 'bg-amber-500/20 text-amber-400' : 'bg-white/10 text-foreground-muted hover:text-amber-400'
               )}
             >

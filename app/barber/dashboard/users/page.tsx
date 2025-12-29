@@ -316,7 +316,7 @@ export default function UsersManagementPage() {
                         type: 'unblock',
                         customer
                       })}
-                      className="p-2 rounded-lg hover:bg-green-500/10 transition-colors"
+                      className="icon-btn p-2 rounded-lg hover:bg-green-500/10 transition-colors"
                       title="הסר חסימה"
                     >
                       <ShieldOff size={16} className="text-green-400" />
@@ -328,7 +328,7 @@ export default function UsersManagementPage() {
                         type: 'block',
                         customer
                       })}
-                      className="p-2 rounded-lg hover:bg-red-500/10 transition-colors"
+                      className="icon-btn p-2 rounded-lg hover:bg-red-500/10 transition-colors"
                       title="חסום משתמש"
                     >
                       <Shield size={16} className="text-foreground-muted hover:text-red-400 transition-colors" />
@@ -340,7 +340,7 @@ export default function UsersManagementPage() {
                       type: 'delete',
                       customer
                     })}
-                    className="p-2 rounded-lg hover:bg-red-500/10 transition-colors"
+                    className="icon-btn p-2 rounded-lg hover:bg-red-500/10 transition-colors"
                     title="מחק משתמש"
                   >
                     <Trash2 size={16} className="text-foreground-muted hover:text-red-400 transition-colors" />
@@ -357,7 +357,7 @@ export default function UsersManagementPage() {
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="p-2 rounded-lg hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="icon-btn p-2 rounded-lg hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronRight size={18} className="text-foreground-muted" />
             </button>
@@ -367,7 +367,7 @@ export default function UsersManagementPage() {
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="p-2 rounded-lg hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="icon-btn p-2 rounded-lg hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft size={18} className="text-foreground-muted" />
             </button>

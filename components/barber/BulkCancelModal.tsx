@@ -64,7 +64,7 @@ export function BulkCancelModal({
           </div>
           <button
             onClick={handleClose}
-            className="p-2 rounded-full hover:bg-white/10 transition-colors"
+            className="icon-btn p-2 rounded-full hover:bg-white/10 transition-colors"
             aria-label="סגור"
           >
             <X size={20} strokeWidth={1.5} className="text-foreground-muted" />

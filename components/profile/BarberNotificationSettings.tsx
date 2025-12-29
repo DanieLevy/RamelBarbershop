@@ -127,7 +127,7 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
           </div>
           <button
             onClick={() => setShowHelp(!showHelp)}
-            className="p-2 rounded-lg text-foreground-muted hover:text-accent-gold hover:bg-white/5 transition-colors"
+            className="icon-btn p-2 rounded-lg text-foreground-muted hover:text-accent-gold hover:bg-white/5 transition-colors"
             aria-label="עזרה"
           >
             <HelpCircle size={18} strokeWidth={1.5} />
@@ -252,7 +252,7 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
           <div className="relative w-full max-w-sm glass-elevated rounded-3xl p-6 text-center">
             <button
               onClick={() => setDeviceToRemove(null)}
-              className="absolute top-4 left-4 p-2 rounded-lg text-foreground-muted hover:text-foreground-light transition-colors"
+              className="icon-btn absolute top-4 left-4 p-2 rounded-lg text-foreground-muted hover:text-foreground-light transition-colors"
             >
               <X size={18} />
             </button>

@@ -514,7 +514,7 @@ export default function ProductsPage() {
                   <button
                     onClick={() => handleToggleActive(product)}
                     className={cn(
-                      'p-2 rounded-lg transition-colors',
+                      'icon-btn p-2 rounded-lg transition-colors',
                       product.is_active
                         ? 'text-foreground-muted hover:text-yellow-400 hover:bg-yellow-400/10'
                         : 'text-foreground-muted hover:text-green-400 hover:bg-green-400/10'
@@ -529,7 +529,7 @@ export default function ProductsPage() {
                   </button>
                   <button
                     onClick={() => handleEdit(product)}
-                    className="p-2 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition-colors"
+                    className="icon-btn p-2 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition-colors"
                     title="ערוך"
                   >
                     <Pencil size={16} strokeWidth={1.5} />

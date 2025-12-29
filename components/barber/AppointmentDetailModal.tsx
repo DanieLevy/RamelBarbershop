@@ -96,7 +96,7 @@ export function AppointmentDetailModal({
           <h2 className="text-lg font-medium text-foreground-light">פרטי התור</h2>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+            className="icon-btn p-2 rounded-lg hover:bg-white/10 transition-colors"
             aria-label="סגור"
           >
             <X className="w-5 h-5 text-foreground-muted" />
