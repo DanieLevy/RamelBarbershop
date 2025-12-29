@@ -5,6 +5,8 @@
  * validates input correctly and handles various scenarios.
  */
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { POST } from '@/app/api/push/notify-cancellation/route'
@@ -66,7 +68,7 @@ describe('/api/push/notify-cancellation', () => {
 
   describe('Input Validation', () => {
     it('should reject request without reservationId', async () => {
-      const { reservationId, ...payload } = validPayloadByCustomer
+      const { reservationId: _reservationId, ...payload } = validPayloadByCustomer
       const request = createRequest(payload)
       
       const response = await POST(request)
@@ -78,7 +80,7 @@ describe('/api/push/notify-cancellation', () => {
     })
 
     it('should reject request without barberId', async () => {
-      const { barberId, ...payload } = validPayloadByCustomer
+      const { barberId: _barberId, ...payload } = validPayloadByCustomer
       const request = createRequest(payload)
       
       const response = await POST(request)
@@ -90,7 +92,7 @@ describe('/api/push/notify-cancellation', () => {
     })
 
     it('should reject request without cancelledBy', async () => {
-      const { cancelledBy, ...payload } = validPayloadByCustomer
+      const { cancelledBy: _cancelledBy, ...payload } = validPayloadByCustomer
       const request = createRequest(payload)
       
       const response = await POST(request)
@@ -102,7 +104,7 @@ describe('/api/push/notify-cancellation', () => {
     })
 
     it('should reject request without customerName', async () => {
-      const { customerName, ...payload } = validPayloadByCustomer
+      const { customerName: _customerName, ...payload } = validPayloadByCustomer
       const request = createRequest(payload)
       
       const response = await POST(request)
@@ -114,7 +116,7 @@ describe('/api/push/notify-cancellation', () => {
     })
 
     it('should reject request without serviceName', async () => {
-      const { serviceName, ...payload } = validPayloadByCustomer
+      const { serviceName: _serviceName, ...payload } = validPayloadByCustomer
       const request = createRequest(payload)
       
       const response = await POST(request)
@@ -126,7 +128,7 @@ describe('/api/push/notify-cancellation', () => {
     })
 
     it('should reject request without appointmentTime', async () => {
-      const { appointmentTime, ...payload } = validPayloadByCustomer
+      const { appointmentTime: _appointmentTime, ...payload } = validPayloadByCustomer
       const request = createRequest(payload)
       
       const response = await POST(request)
@@ -173,7 +175,7 @@ describe('/api/push/notify-cancellation', () => {
 
   describe('Customer Cancellation (notify barber)', () => {
     it('should accept request without customerId when cancelled by customer', async () => {
-      const { customerId, ...payload } = validPayloadByCustomer
+      const { customerId: _customerId, ...payload } = validPayloadByCustomer
       const request = createRequest(payload)
       
       const response = await POST(request)
@@ -212,7 +214,7 @@ describe('/api/push/notify-cancellation', () => {
 
   describe('Barber Cancellation (notify customer)', () => {
     it('should REQUIRE customerId when cancelled by barber', async () => {
-      const { customerId, ...payload } = validPayloadByBarber
+      const { customerId: _customerId, ...payload } = validPayloadByBarber
       const request = createRequest(payload)
       
       const response = await POST(request)

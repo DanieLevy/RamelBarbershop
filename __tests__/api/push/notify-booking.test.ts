@@ -5,6 +5,8 @@
  * validates input correctly and handles various scenarios.
  */
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { POST } from '@/app/api/push/notify-booking/route'
@@ -53,7 +55,7 @@ describe('/api/push/notify-booking', () => {
 
   describe('Input Validation', () => {
     it('should reject request without reservationId', async () => {
-      const { reservationId, ...payload } = validPayload
+      const { reservationId: _reservationId, ...payload } = validPayload
       const request = createRequest(payload)
       
       const response = await POST(request)
@@ -65,7 +67,7 @@ describe('/api/push/notify-booking', () => {
     })
 
     it('should reject request without barberId', async () => {
-      const { barberId, ...payload } = validPayload
+      const { barberId: _barberId, ...payload } = validPayload
       const request = createRequest(payload)
       
       const response = await POST(request)
@@ -77,7 +79,7 @@ describe('/api/push/notify-booking', () => {
     })
 
     it('should reject request without customerName', async () => {
-      const { customerName, ...payload } = validPayload
+      const { customerName: _customerName, ...payload } = validPayload
       const request = createRequest(payload)
       
       const response = await POST(request)
@@ -89,7 +91,7 @@ describe('/api/push/notify-booking', () => {
     })
 
     it('should reject request without serviceName', async () => {
-      const { serviceName, ...payload } = validPayload
+      const { serviceName: _serviceName, ...payload } = validPayload
       const request = createRequest(payload)
       
       const response = await POST(request)
@@ -101,7 +103,7 @@ describe('/api/push/notify-booking', () => {
     })
 
     it('should reject request without appointmentTime', async () => {
-      const { appointmentTime, ...payload } = validPayload
+      const { appointmentTime: _appointmentTime, ...payload } = validPayload
       const request = createRequest(payload)
       
       const response = await POST(request)
@@ -146,7 +148,7 @@ describe('/api/push/notify-booking', () => {
     })
 
     it('should reject request without customerId (no guest bookings)', async () => {
-      const { customerId, ...payload } = validPayload
+      const { customerId: _customerId, ...payload } = validPayload
       const request = createRequest(payload)
       
       const response = await POST(request)

@@ -14,7 +14,6 @@ import {
   Monitor,
   Trash2,
   Loader2,
-  CheckCircle,
   AlertTriangle,
   ChevronDown,
   ChevronUp,
@@ -36,10 +35,10 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
   const [deviceToRemove, setDeviceToRemove] = useState<{ id: string; name: string } | null>(null)
   const [removingDeviceId, setRemovingDeviceId] = useState<string | null>(null)
 
-  // Fetch status on mount
+  // Refresh status on mount
   useEffect(() => {
     if (barber?.id) {
-      push.fetchServerStatus()
+      push.refreshStatus()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [barber?.id])
@@ -213,27 +212,21 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
                 {push.devices.map((device) => (
                   <div
                     key={device.id}
-                    className={cn(
-                      'flex items-center gap-3 p-3 rounded-xl',
-                      device.is_active ? 'bg-white/5' : 'bg-white/[0.02] opacity-50'
-                    )}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-white/5"
                   >
                     <div className="w-8 h-8 rounded-full bg-accent-gold/10 flex items-center justify-center">
-                      <DeviceIcon type={device.device_type} />
+                      <DeviceIcon type={device.deviceType} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-foreground-light text-sm truncate">
-                        {device.device_name || device.device_type}
+                        {device.deviceName || device.deviceType}
                       </p>
                       <p className="text-foreground-muted text-xs">
-                        {formatLastUsed(device.last_used)}
+                        {formatLastUsed(device.lastUsed)}
                       </p>
                     </div>
-                    {device.is_active && (
-                      <CheckCircle size={14} className="text-green-400 flex-shrink-0" />
-                    )}
                     <button
-                      onClick={() => setDeviceToRemove({ id: device.id, name: device.device_name || device.device_type })}
+                      onClick={() => setDeviceToRemove({ id: device.id, name: device.deviceName || device.deviceType })}
                       disabled={removingDeviceId === device.id}
                       className="p-1.5 rounded-lg text-foreground-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
                       aria-label="הסר מכשיר"
