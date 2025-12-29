@@ -13,9 +13,14 @@ const MODAL_SHOW_DELAY = 3000 // 3 seconds after PWA loads
 
 /**
  * Modal that prompts PWA users to enable push notifications
+ * 
+ * IMPORTANT: Push notifications are USER-BASED, not device-based.
+ * This modal only shows to authenticated users because subscriptions
+ * must be tied to a user account for proper notification delivery.
+ * 
  * Only shows when:
+ * - User is logged in (customer or barber) - REQUIRED
  * - User is in PWA standalone mode
- * - User is logged in (customer or barber)
  * - Notifications are supported but not yet subscribed
  * - User hasn't dismissed the modal recently
  */
@@ -32,14 +37,16 @@ export function NotificationPermissionModal() {
   const isLoggedIn = isCustomerLoggedIn || isBarberLoggedIn
   const isInitialized = customerInitialized && barberInitialized
 
-  // Check if we should show the modal
+  // CRITICAL: Check if we should show the modal
+  // Push notifications require an authenticated user
   useEffect(() => {
     if (!isInitialized || push.isLoading) return
 
     // Only show in PWA standalone mode
     if (!pwa.isStandalone) return
 
-    // Only show if user is logged in
+    // CRITICAL: Only show if user is logged in
+    // Subscriptions must be tied to a user account
     if (!isLoggedIn) return
 
     // Only show if push is supported
@@ -93,6 +100,8 @@ export function NotificationPermissionModal() {
     setIsEnabling(false)
   }
 
+  // Never render for non-authenticated users
+  if (!isLoggedIn) return null
   if (!isVisible) return null
 
   return (

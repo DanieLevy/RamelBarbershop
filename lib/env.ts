@@ -38,6 +38,9 @@ const serverEnvSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   BUG_REPORT_TO_EMAIL: z.string().email().optional(),
   
+  // Vercel Cron - required in production for secure cron job execution
+  CRON_SECRET: z.string().min(32, 'CRON_SECRET should be at least 32 characters').optional(),
+  
   // App info
   NEXT_PUBLIC_APP_VERSION: z.string().optional().default('2.0.0'),
   
