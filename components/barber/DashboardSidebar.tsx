@@ -19,6 +19,7 @@ import {
   LogOut,
   X,
   Package,
+  Bell,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -35,6 +36,7 @@ const navItems: NavItem[] = [
   { label: 'השירותים שלי', href: '/barber/dashboard/services', icon: Scissors },
   { label: 'הלו"ז שלי', href: '/barber/dashboard/my-schedule', icon: Clock },
   { label: 'פרופיל', href: '/barber/dashboard/profile', icon: User },
+  { label: 'העדפות', href: '/barber/dashboard/preferences', icon: Bell },
 ]
 
 const adminNavItems: NavItem[] = [

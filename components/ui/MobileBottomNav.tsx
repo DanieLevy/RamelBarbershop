@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { Home, Search, Calendar, User, LayoutDashboard, Users, LogIn, Scissors } from 'lucide-react'
+import { Home, Search, Calendar, User, LayoutDashboard, LogIn, Scissors } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useCurrentUser, type UserType } from '@/hooks/useCurrentUser'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
@@ -160,8 +160,8 @@ export function MobileBottomNav() {
         return [
           { id: 'home', label: 'בית', href: '/', icon: Home },
           { id: 'dashboard', label: 'לוח בקרה', href: '/barber/dashboard', icon: LayoutDashboard },
-          { id: 'upcoming', label: 'לקוחות קרובים', labelActive: 'לקוחות', href: '/barber/dashboard/reservations', icon: Users },
-          { id: 'profile', label: 'פרופיל', href: '/barber/dashboard/profile', icon: User },
+          { id: 'upcoming', label: 'יומן', labelActive: 'יומן', href: '/barber/dashboard/reservations', icon: Calendar },
+          { id: 'profile', label: 'פרופיל', href: '/barber/profile', icon: User },
         ]
       case 'customer':
         return [

@@ -1,15 +1,14 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { updateBarber, setBarberPassword } from '@/lib/auth/barber-auth'
 import { createClient } from '@/lib/supabase/client'
 import { uploadAvatar } from '@/lib/storage/upload'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { User, Camera, Bell, Plus, Trash, Pencil, Upload, Clock, BellRing, CalendarPlus, XCircle } from 'lucide-react'
+import { User, Camera, Bell, Plus, Trash, Pencil, Upload } from 'lucide-react'
 import type { BarberMessage } from '@/types/database'
-import type { BarberNotificationSettings } from '@/lib/push/types'
 import Image from 'next/image'
 import { useBugReporter } from '@/hooks/useBugReporter'
 
@@ -38,58 +37,8 @@ export default function ProfilePage() {
   const [messageText, setMessageText] = useState('')
   const [savingMessage, setSavingMessage] = useState(false)
   
-  // Notification settings
-  const [notifSettings, setNotifSettings] = useState<BarberNotificationSettings | null>(null)
-  const [reminderHours, setReminderHours] = useState(3)
-  const [notifyOnCancel, setNotifyOnCancel] = useState(true)
-  const [notifyOnNewBooking, setNotifyOnNewBooking] = useState(true)
-  const [savingNotifSettings, setSavingNotifSettings] = useState(false)
-  
   // File input ref
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const fetchNotificationSettings = useCallback(async () => {
-    if (!barber?.id) return
-    
-    const supabase = createClient()
-    
-    // Try to get existing settings
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('barber_notification_settings') as any)
-      .select('*')
-      .eq('barber_id', barber.id)
-      .single()
-    
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching notification settings:', error)
-      return
-    }
-    
-    if (data) {
-      const settings = data as BarberNotificationSettings
-      setNotifSettings(settings)
-      setReminderHours(settings.reminder_hours_before)
-      setNotifyOnCancel(settings.notify_on_customer_cancel)
-      setNotifyOnNewBooking(settings.notify_on_new_booking)
-    } else {
-      // Create default settings for this barber
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: newSettings, error: insertError } = await (supabase.from('barber_notification_settings') as any)
-        .insert({ barber_id: barber.id })
-        .select()
-        .single()
-      
-      if (insertError) {
-        console.error('Error creating notification settings:', insertError)
-      } else if (newSettings) {
-        const settings = newSettings as BarberNotificationSettings
-        setNotifSettings(settings)
-        setReminderHours(settings.reminder_hours_before)
-        setNotifyOnCancel(settings.notify_on_customer_cancel)
-        setNotifyOnNewBooking(settings.notify_on_new_booking)
-      }
-    }
-  }, [barber?.id])
 
   useEffect(() => {
     if (barber) {
@@ -97,7 +46,6 @@ export default function ProfilePage() {
       setPhone(barber.phone || '')
       setImgUrl(barber.img_url || '')
       fetchMessages()
-      fetchNotificationSettings()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [barber?.id])
@@ -313,39 +261,6 @@ export default function ProfilePage() {
     setMessageText('')
   }
 
-  const handleSaveNotifSettings = async () => {
-    if (!barber?.id || !notifSettings?.id) return
-    
-    setSavingNotifSettings(true)
-    const supabase = createClient()
-    
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.from('barber_notification_settings') as any)
-      .update({
-        reminder_hours_before: reminderHours,
-        notify_on_customer_cancel: notifyOnCancel,
-        notify_on_new_booking: notifyOnNewBooking,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', notifSettings.id)
-    
-    if (error) {
-      console.error('Error saving notification settings:', error)
-      await report(new Error(error.message), 'Saving barber notification settings')
-      toast.error('שגיאה בשמירת הגדרות ההתראות')
-    } else {
-      toast.success('הגדרות ההתראות נשמרו!')
-      setNotifSettings({
-        ...notifSettings,
-        reminder_hours_before: reminderHours,
-        notify_on_customer_cancel: notifyOnCancel,
-        notify_on_new_booking: notifyOnNewBooking
-      })
-    }
-    
-    setSavingNotifSettings(false)
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -508,111 +423,6 @@ export default function ProfilePage() {
             )}
           >
             {savingPassword ? 'מעדכן...' : 'עדכן סיסמה'}
-          </button>
-        </div>
-      </div>
-
-      {/* Notification Settings Section */}
-      <div className="bg-background-card border border-white/10 rounded-2xl p-6 mb-6">
-        <h3 className="text-lg font-medium text-foreground-light mb-4 flex items-center gap-2">
-          <BellRing size={20} strokeWidth={1.5} className="text-accent-gold" />
-          הגדרות התראות
-        </h3>
-        
-        <p className="text-foreground-muted text-sm mb-6">
-          הגדר מתי ואיך לקוחות יקבלו תזכורות על תורים
-        </p>
-
-        <div className="space-y-5">
-          {/* Reminder Hours */}
-          <div className="flex flex-col gap-2">
-            <label className="text-foreground-light text-sm flex items-center gap-2">
-              <Clock size={14} className="text-foreground-muted" />
-              זמן תזכורת לפני התור
-            </label>
-            <select
-              value={reminderHours}
-              onChange={(e) => setReminderHours(parseInt(e.target.value))}
-              className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold"
-            >
-              {[1, 2, 3, 4, 5, 6, 8, 12, 24].map((hours) => (
-                <option key={hours} value={hours}>
-                  {hours === 1 ? 'שעה אחת' : hours === 24 ? 'יום לפני' : `${hours} שעות`} לפני התור
-                </option>
-              ))}
-            </select>
-            <p className="text-foreground-muted/60 text-xs">
-              הלקוחות שלך יקבלו תזכורת push כמה זמן שבחרת לפני התור
-            </p>
-          </div>
-
-          {/* Notify on Cancel Toggle */}
-          <div className="flex items-center justify-between p-4 bg-background-dark rounded-xl border border-white/5">
-            <div className="flex items-center gap-3">
-              <div className={cn(
-                'w-10 h-10 rounded-xl flex items-center justify-center',
-                notifyOnCancel ? 'bg-red-500/20' : 'bg-white/5'
-              )}>
-                <XCircle size={20} className={notifyOnCancel ? 'text-red-400' : 'text-foreground-muted'} />
-              </div>
-              <div>
-                <p className="text-foreground-light text-sm font-medium">ביטול תור ע&quot;י לקוח</p>
-                <p className="text-foreground-muted text-xs">קבל התראה כשלקוח מבטל תור</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setNotifyOnCancel(!notifyOnCancel)}
-              className={cn(
-                'w-12 h-7 rounded-full transition-colors relative',
-                notifyOnCancel ? 'bg-accent-gold' : 'bg-white/10'
-              )}
-            >
-              <div className={cn(
-                'absolute top-1 w-5 h-5 rounded-full bg-white transition-all',
-                notifyOnCancel ? 'right-1' : 'left-1'
-              )} />
-            </button>
-          </div>
-
-          {/* Notify on New Booking Toggle */}
-          <div className="flex items-center justify-between p-4 bg-background-dark rounded-xl border border-white/5">
-            <div className="flex items-center gap-3">
-              <div className={cn(
-                'w-10 h-10 rounded-xl flex items-center justify-center',
-                notifyOnNewBooking ? 'bg-green-500/20' : 'bg-white/5'
-              )}>
-                <CalendarPlus size={20} className={notifyOnNewBooking ? 'text-green-400' : 'text-foreground-muted'} />
-              </div>
-              <div>
-                <p className="text-foreground-light text-sm font-medium">תור חדש</p>
-                <p className="text-foreground-muted text-xs">קבל התראה כשלקוח קובע תור אצלך</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setNotifyOnNewBooking(!notifyOnNewBooking)}
-              className={cn(
-                'w-12 h-7 rounded-full transition-colors relative',
-                notifyOnNewBooking ? 'bg-accent-gold' : 'bg-white/10'
-              )}
-            >
-              <div className={cn(
-                'absolute top-1 w-5 h-5 rounded-full bg-white transition-all',
-                notifyOnNewBooking ? 'right-1' : 'left-1'
-              )} />
-            </button>
-          </div>
-
-          <button
-            onClick={handleSaveNotifSettings}
-            disabled={savingNotifSettings || !notifSettings}
-            className={cn(
-              'w-full py-3 rounded-xl font-medium transition-all',
-              savingNotifSettings || !notifSettings
-                ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
-                : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
-            )}
-          >
-            {savingNotifSettings ? 'שומר...' : 'שמור הגדרות התראות'}
           </button>
         </div>
       </div>

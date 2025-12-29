@@ -149,9 +149,10 @@ export function DateSelection({
     return { available: true }
   }, [shopSettings, shopClosures, barberSchedule, barberClosures, workDays])
 
-  // Handle date selection
+  // Handle date selection - allows clicking outside-month days if they're available
   const handleSelect = useCallback((day: CalendarDay, index: number) => {
-    if (!day.isCurrentMonth) return
+    // Block past days
+    if (day.isPast) return
     
     const availability = checkAvailability(day)
     
@@ -322,7 +323,8 @@ export function DateSelection({
                 const isSelected = selectedDate?.dateTimestamp === day.dateTimestamp
                 const isUnavailable = !availability.available
                 const isOutsideMonth = !day.isCurrentMonth
-                const isClickable = day.isCurrentMonth && availability.available
+                // Clickable if available and not in the past (outside month days CAN be clicked)
+                const isClickable = availability.available && !day.isPast
                 
                 return (
                   <button
@@ -335,7 +337,7 @@ export function DateSelection({
                     tabIndex={isClickable ? 0 : -1}
                     onClick={() => handleSelect(day, globalIndex)}
                     onKeyDown={(e) => handleKeyDown(e, globalIndex)}
-                    disabled={isOutsideMonth}
+                    disabled={!isClickable}
                     className={cn(
                       // Base styles
                       'aspect-square rounded-xl flex items-center justify-center',
@@ -343,20 +345,17 @@ export function DateSelection({
                       'transition-all duration-200 relative',
                       'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-gold focus-visible:ring-offset-2 focus-visible:ring-offset-background-dark',
                       
-                      // Outside month - muted with diagonal hatch pattern
-                      isOutsideMonth && 'text-foreground-muted/20 cursor-default bg-white/[0.02]',
-                      
-                      // Disabled/Unavailable state
-                      !isOutsideMonth && isUnavailable && [
-                        'bg-white/[0.03] text-foreground-muted/40 cursor-not-allowed',
-                        // Diagonal hatch pattern overlay
+                      // Disabled/Unavailable state (past or not available)
+                      isUnavailable && [
+                        'bg-white/[0.03] cursor-not-allowed',
+                        isOutsideMonth ? 'text-foreground-muted/15' : 'text-foreground-muted/40',
                         'before:absolute before:inset-1 before:rounded-lg',
                         'before:bg-[repeating-linear-gradient(135deg,transparent,transparent_3px,rgba(255,255,255,0.05)_3px,rgba(255,255,255,0.05)_6px)]'
                       ].filter(Boolean).join(' '),
                       
-                      // Default available state
-                      !isOutsideMonth && !isUnavailable && !isSelected && [
-                        'bg-white/5 text-foreground-light',
+                      // Available state (clickable) - slightly muted if outside month
+                      !isUnavailable && !isSelected && [
+                        isOutsideMonth ? 'bg-white/[0.03] text-foreground-muted/60' : 'bg-white/5 text-foreground-light',
                         'hover:bg-white/10 hover:scale-[1.05]',
                         'active:scale-95 cursor-pointer'
                       ].filter(Boolean).join(' '),
@@ -369,7 +368,7 @@ export function DateSelection({
                       ].filter(Boolean).join(' '),
                       
                       // Today indicator (subtle outline when not selected)
-                      day.isToday && !isSelected && !isUnavailable && !isOutsideMonth && 'ring-1 ring-accent-gold/50'
+                      day.isToday && !isSelected && !isUnavailable && 'ring-1 ring-accent-gold/50'
                     )}
                   >
                     {day.dayNum}

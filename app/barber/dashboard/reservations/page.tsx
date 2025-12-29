@@ -491,7 +491,7 @@ export default function ReservationsPage() {
                         e.stopPropagation()
                         setDetailModal({ isOpen: true, reservation: res })
                       }}
-                      className="p-2 rounded-lg hover:bg-white/[0.08] transition-colors"
+                      className="p-2 rounded-lg hover:bg-white/[0.08] transition-colors flex items-center justify-center"
                       aria-label="פרטים"
                     >
                       <Info size={16} strokeWidth={1.5} className="text-foreground-muted" />
@@ -501,7 +501,7 @@ export default function ReservationsPage() {
                     <a
                       href={`tel:${res.customer_phone}`}
                       onClick={(e) => e.stopPropagation()}
-                      className="p-2 rounded-lg hover:bg-accent-gold/10 transition-colors"
+                      className="p-2 rounded-lg hover:bg-accent-gold/10 transition-colors flex items-center justify-center"
                       aria-label="התקשר"
                     >
                       <Phone size={16} strokeWidth={1.5} className="text-accent-gold" />
@@ -516,7 +516,7 @@ export default function ReservationsPage() {
                         }}
                         disabled={updatingId === res.id}
                         className={cn(
-                          'p-2 rounded-lg transition-colors',
+                          'p-2 rounded-lg transition-colors flex items-center justify-center',
                           updatingId === res.id
                             ? 'opacity-50 cursor-not-allowed'
                             : 'hover:bg-red-500/10 text-red-400'

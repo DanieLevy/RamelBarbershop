@@ -62,22 +62,22 @@ export default function RootLayout({
             </PWAProvider>
           </AuthProvider>
           <Toaster
-            position="bottom-center"
+            position="top-center"
             dir="rtl"
             closeButton
             richColors
-            theme="dark"
+            theme="light"
             toastOptions={{
-              className: 'mb-16 md:mb-0',
+              className: 'mt-16 md:mt-0',
               classNames: {
-                toast: 'bg-background-card/95 backdrop-blur-xl border border-white/10 text-foreground-light font-ploni shadow-xl',
-                title: 'text-foreground-light font-medium text-sm',
-                description: 'text-foreground-muted text-xs',
-                closeButton: '!bg-transparent hover:!bg-white/10 !border-0 !w-4 !h-4 !p-0 !m-0 !right-1.5 !top-1.5 [&>svg]:!w-2.5 [&>svg]:!h-2.5 !text-foreground-muted hover:!text-foreground-light !transition-colors',
-                success: '!border-green-500/30 [&>[data-icon]]:text-green-400',
-                error: '!border-red-500/30 [&>[data-icon]]:text-red-400',
-                warning: '!border-amber-500/30 [&>[data-icon]]:text-amber-400',
-                info: '!border-blue-500/30 [&>[data-icon]]:text-blue-400',
+                toast: 'bg-white/95 backdrop-blur-xl border shadow-xl font-ploni rounded-xl',
+                title: 'font-medium text-sm',
+                description: 'text-xs opacity-80',
+                closeButton: '!bg-transparent hover:!bg-black/5 !border-0 !w-4 !h-4 !p-0 !m-0 !right-1.5 !top-1.5 [&>svg]:!w-2.5 [&>svg]:!h-2.5 !text-gray-400 hover:!text-gray-600 !transition-colors',
+                success: '!bg-emerald-50/95 !border-emerald-200 !text-emerald-800 [&>[data-icon]]:text-emerald-500',
+                error: '!bg-rose-50/95 !border-rose-200 !text-rose-800 [&>[data-icon]]:text-rose-500',
+                warning: '!bg-amber-50/95 !border-amber-200 !text-amber-800 [&>[data-icon]]:text-amber-500',
+                info: '!bg-sky-50/95 !border-sky-200 !text-sky-800 [&>[data-icon]]:text-sky-500',
               },
             }}
           />
