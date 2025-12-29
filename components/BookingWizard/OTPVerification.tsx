@@ -9,6 +9,7 @@ import { getOrCreateCustomer } from '@/lib/services/customer.service'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { validateLoggedInReservation } from '@/lib/validation/reservation'
 
 const RECAPTCHA_CONTAINER_ID = 'recaptcha-container'
 const RESEND_COOLDOWN_SECONDS = 60
@@ -248,6 +249,27 @@ export function OTPVerification() {
 
   const createReservation = async (customerId: string): Promise<boolean> => {
     if (!barberId || !service || !date || !timeTimestamp) {
+      console.error('[OTP Booking] Missing required data:', { barberId, service, date, timeTimestamp })
+      return false
+    }
+    
+    // Validate all required fields before proceeding
+    const reservationData = {
+      barber_id: barberId,
+      service_id: service.id,
+      customer_id: customerId,
+      customer_name: customer.fullname,
+      customer_phone: customer.phone,
+      date_timestamp: date.dateTimestamp,
+      time_timestamp: timeTimestamp,
+      day_name: date.dayName,
+      day_num: date.dayNum,
+      status: 'confirmed' as const,
+    }
+    
+    const validation = validateLoggedInReservation(reservationData)
+    if (!validation.valid) {
+      console.error('[OTP Booking] Validation failed:', validation.errors)
       return false
     }
     
@@ -255,18 +277,10 @@ export function OTPVerification() {
       const supabase = createClient()
       
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: insertedData, error: insertError } = await (supabase.from('reservations') as any).insert({
-        barber_id: barberId,
-        service_id: service.id,
-        customer_id: customerId,
-        customer_name: customer.fullname,
-        customer_phone: customer.phone,
-        date_timestamp: date.dateTimestamp,
-        time_timestamp: timeTimestamp,
-        day_name: date.dayName,
-        day_num: date.dayNum,
-        status: 'confirmed',
-      }).select('id').single()
+      const { data: insertedData, error: insertError } = await (supabase.from('reservations') as any)
+        .insert(reservationData)
+        .select('id')
+        .single()
       
       if (insertError) {
         console.error('Error creating reservation:', insertError)
@@ -275,6 +289,7 @@ export function OTPVerification() {
       
       // Send push notification to barber (fire and forget)
       if (insertedData?.id) {
+        console.log('[OTP Booking] Sending push notification to barber:', barberId)
         fetch('/api/push/notify-booking', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -286,7 +301,10 @@ export function OTPVerification() {
             serviceName: service.name_he,
             appointmentTime: timeTimestamp
           })
-        }).catch(err => console.log('Push notification error:', err))
+        })
+          .then(res => res.json())
+          .then(data => console.log('[OTP Booking] Push notification result:', data))
+          .catch(err => console.error('[OTP Booking] Push notification error:', err))
       }
       
       return true

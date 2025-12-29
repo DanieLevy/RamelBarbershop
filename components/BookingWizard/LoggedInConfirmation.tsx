@@ -9,6 +9,7 @@ import { cn, formatTime } from '@/lib/utils'
 import { Check, Calendar, Clock, Scissors, User, Phone } from 'lucide-react'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { BlockedUserModal } from './BlockedUserModal'
+import { validateLoggedInReservation } from '@/lib/validation/reservation'
 
 interface LoggedInConfirmationProps {
   barber: BarberWithWorkDays
@@ -47,6 +48,27 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
       return
     }
     
+    // Validate all required fields before proceeding
+    const reservationData = {
+      barber_id: barber.id,
+      service_id: service.id,
+      customer_id: loggedInCustomer.id,
+      customer_name: loggedInCustomer.fullname,
+      customer_phone: loggedInCustomer.phone,
+      date_timestamp: date.dateTimestamp,
+      time_timestamp: timeTimestamp,
+      day_name: date.dayName,
+      day_num: date.dayNum,
+      status: 'confirmed' as const,
+    }
+    
+    const validation = validateLoggedInReservation(reservationData)
+    if (!validation.valid) {
+      console.error('[Booking] Validation failed:', validation.errors)
+      setError('חסרים נתונים ליצירת התור')
+      return
+    }
+    
     setIsCreating(true)
     setError(null)
     
@@ -67,18 +89,10 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
       }
       
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: insertedData, error: insertError } = await (supabase.from('reservations') as any).insert({
-        barber_id: barber.id,
-        service_id: service.id,
-        customer_id: loggedInCustomer.id,
-        customer_name: loggedInCustomer.fullname,
-        customer_phone: loggedInCustomer.phone,
-        date_timestamp: date.dateTimestamp,
-        time_timestamp: timeTimestamp,
-        day_name: date.dayName,
-        day_num: date.dayNum,
-        status: 'confirmed',
-      }).select('id').single()
+      const { data: insertedData, error: insertError } = await (supabase.from('reservations') as any)
+        .insert(reservationData)
+        .select('id')
+        .single()
       
       if (insertError) {
         console.error('Error creating reservation:', insertError)

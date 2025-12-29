@@ -12,6 +12,9 @@ import type { CancellationContext } from '@/lib/push/types'
 
 export const dynamic = 'force-dynamic'
 
+// UUID validation regex
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -29,10 +32,18 @@ export async function POST(request: NextRequest) {
     } = body
     
     // Validate required fields
-    if (!reservationId || !barberId || !cancelledBy || !customerName || !serviceName || !appointmentTime) {
-      console.log('[API notify-cancellation] Missing required fields:', { reservationId, barberId, cancelledBy, customerName, serviceName, appointmentTime })
+    const missingFields: string[] = []
+    if (!reservationId) missingFields.push('reservationId')
+    if (!barberId) missingFields.push('barberId')
+    if (!cancelledBy) missingFields.push('cancelledBy')
+    if (!customerName) missingFields.push('customerName')
+    if (!serviceName) missingFields.push('serviceName')
+    if (!appointmentTime) missingFields.push('appointmentTime')
+    
+    if (missingFields.length > 0) {
+      console.log('[API notify-cancellation] Missing required fields:', missingFields)
       return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
+        { success: false, error: `Missing required fields: ${missingFields.join(', ')}` },
         { status: 400 }
       )
     }
@@ -45,14 +56,36 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // When barber cancels, customerId is required to notify the customer
-    // When customer cancels, barberId is required to notify the barber
-    if (cancelledBy === 'barber' && !customerId) {
-      console.log('[API notify-cancellation] Barber cancelled but no customerId provided - cannot notify customer')
+    // Validate UUIDs
+    if (!UUID_REGEX.test(reservationId)) {
       return NextResponse.json(
-        { success: false, error: 'customerId required when barber cancels' },
+        { success: false, error: 'Invalid reservationId format' },
         { status: 400 }
       )
+    }
+    
+    if (!UUID_REGEX.test(barberId)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid barberId format' },
+        { status: 400 }
+      )
+    }
+    
+    // When barber cancels, customerId is required to notify the customer
+    if (cancelledBy === 'barber') {
+      if (!customerId) {
+        console.log('[API notify-cancellation] Barber cancelled but no customerId provided')
+        return NextResponse.json(
+          { success: false, error: 'customerId required when barber cancels' },
+          { status: 400 }
+        )
+      }
+      if (!UUID_REGEX.test(customerId)) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid customerId format' },
+          { status: 400 }
+        )
+      }
     }
     
     const context: CancellationContext = {
