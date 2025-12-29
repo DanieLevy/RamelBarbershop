@@ -27,9 +27,10 @@ export async function POST(request: NextRequest) {
       appointmentTime 
     } = body
     
-    // Validate required fields
+    // Validate required fields - ALL bookings require login, so customerId is required
     const missingFields: string[] = []
     if (!reservationId) missingFields.push('reservationId')
+    if (!customerId) missingFields.push('customerId')  // Required - no guest bookings
     if (!barberId) missingFields.push('barberId')
     if (!customerName) missingFields.push('customerName')
     if (!serviceName) missingFields.push('serviceName')
@@ -51,16 +52,16 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    if (!UUID_REGEX.test(barberId)) {
+    if (!UUID_REGEX.test(customerId)) {
       return NextResponse.json(
-        { success: false, error: 'Invalid barberId format' },
+        { success: false, error: 'Invalid customerId format' },
         { status: 400 }
       )
     }
     
-    if (customerId && !UUID_REGEX.test(customerId)) {
+    if (!UUID_REGEX.test(barberId)) {
       return NextResponse.json(
-        { success: false, error: 'Invalid customerId format' },
+        { success: false, error: 'Invalid barberId format' },
         { status: 400 }
       )
     }

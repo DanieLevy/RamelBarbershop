@@ -8,7 +8,7 @@
 export interface ReservationCreateData {
   barber_id: string
   service_id: string
-  customer_id?: string | null
+  customer_id: string  // REQUIRED - all bookings require login
   customer_name: string
   customer_phone: string
   date_timestamp: number
@@ -63,6 +63,11 @@ export function validateReservationData(data: Partial<ReservationCreateData>): R
     errors.push('day_num is required')
   }
 
+  // customer_id is REQUIRED - all bookings require login
+  if (!data.customer_id?.trim()) {
+    errors.push('customer_id is required (all bookings require login)')
+  }
+
   // UUID format validation
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   
@@ -88,7 +93,7 @@ export function validateReservationData(data: Partial<ReservationCreateData>): R
     data: {
       barber_id: data.barber_id!,
       service_id: data.service_id!,
-      customer_id: data.customer_id || null,
+      customer_id: data.customer_id!,  // Now required
       customer_name: data.customer_name!,
       customer_phone: data.customer_phone!,
       date_timestamp: data.date_timestamp!,
@@ -101,24 +106,10 @@ export function validateReservationData(data: Partial<ReservationCreateData>): R
 }
 
 /**
- * Validate that a logged-in user reservation has customer_id
+ * Alias for validateReservationData - kept for compatibility
+ * All reservations now require customer_id (no guest bookings)
  */
-export function validateLoggedInReservation(data: Partial<ReservationCreateData>): ReservationValidationResult {
-  const baseValidation = validateReservationData(data)
-  
-  if (!baseValidation.valid) {
-    return baseValidation
-  }
-  
-  if (!data.customer_id?.trim()) {
-    return {
-      valid: false,
-      errors: ['customer_id is required for logged-in users']
-    }
-  }
-  
-  return baseValidation
-}
+export const validateLoggedInReservation = validateReservationData
 
 /**
  * Type guard to check if reservation has customer_id

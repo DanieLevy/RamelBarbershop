@@ -145,15 +145,17 @@ describe('/api/push/notify-booking', () => {
       expect(data.error).toContain('customerId format')
     })
 
-    it('should accept request without customerId (guest booking)', async () => {
+    it('should reject request without customerId (no guest bookings)', async () => {
       const { customerId, ...payload } = validPayload
       const request = createRequest(payload)
       
       const response = await POST(request)
       const data = await response.json()
       
-      expect(response.status).toBe(200)
-      expect(data.success).toBe(true)
+      // All bookings require login - customerId is mandatory
+      expect(response.status).toBe(400)
+      expect(data.success).toBe(false)
+      expect(data.error).toContain('customerId')
     })
   })
 

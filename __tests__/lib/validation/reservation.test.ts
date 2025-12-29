@@ -20,9 +20,11 @@ const VALID_UUID_3 = '6e0526f0-9e6b-4603-bb7f-e975f046b261'
 
 describe('Reservation Validation', () => {
   describe('validateReservationData', () => {
+    // ALL bookings require login - customer_id is ALWAYS required
     const validData = {
       barber_id: VALID_UUID,
       service_id: VALID_UUID_2,
+      customer_id: VALID_UUID_3,  // Required - no guest bookings
       customer_name: 'דניאל לוי',
       customer_phone: '0501234567',
       date_timestamp: Date.now(),
@@ -115,16 +117,23 @@ describe('Reservation Validation', () => {
       expect(result.errors).toContain('customer_id must be a valid UUID')
     })
 
-    it('should allow null customer_id (guest booking)', () => {
-      const data = { ...validData, customer_id: null }
-      const result = validateReservationData(data)
-      expect(result.valid).toBe(true)
-      expect(result.data?.customer_id).toBeNull()
+    it('should fail validation for missing customer_id (no guest bookings)', () => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { customer_id, ...dataWithoutCustomerId } = validData
+      const result = validateReservationData(dataWithoutCustomerId)
+      expect(result.valid).toBe(false)
+      expect(result.errors.some(e => e.includes('customer_id is required'))).toBe(true)
     })
 
-    it('should allow valid customer_id', () => {
-      const data = { ...validData, customer_id: VALID_UUID_3 }
+    it('should fail validation for empty customer_id', () => {
+      const data = { ...validData, customer_id: '' }
       const result = validateReservationData(data)
+      expect(result.valid).toBe(false)
+      expect(result.errors.some(e => e.includes('customer_id is required'))).toBe(true)
+    })
+
+    it('should pass validation with valid customer_id', () => {
+      const result = validateReservationData(validData)
       expect(result.valid).toBe(true)
       expect(result.data?.customer_id).toBe(VALID_UUID_3)
     })
@@ -154,6 +163,8 @@ describe('Reservation Validation', () => {
   })
 
   describe('validateLoggedInReservation', () => {
+    // validateLoggedInReservation is now an alias for validateReservationData
+    // since ALL bookings require login (no guest bookings)
     const validLoggedInData = {
       barber_id: VALID_UUID,
       service_id: VALID_UUID_2,
@@ -172,18 +183,16 @@ describe('Reservation Validation', () => {
       expect(result.errors).toHaveLength(0)
     })
 
-    it('should fail validation for logged-in user without customer_id', () => {
+    it('should fail validation for empty customer_id', () => {
       const data = { ...validLoggedInData, customer_id: '' }
       const result = validateLoggedInReservation(data)
       expect(result.valid).toBe(false)
-      expect(result.errors).toContain('customer_id is required for logged-in users')
+      expect(result.errors.some(e => e.includes('customer_id is required'))).toBe(true)
     })
 
-    it('should fail validation for null customer_id', () => {
-      const data = { ...validLoggedInData, customer_id: null }
-      const result = validateLoggedInReservation(data)
-      expect(result.valid).toBe(false)
-      expect(result.errors).toContain('customer_id is required for logged-in users')
+    it('should be the same function as validateReservationData', () => {
+      // Confirms they are the same (alias)
+      expect(validateLoggedInReservation).toBe(validateReservationData)
     })
 
     it('should still validate base fields', () => {
