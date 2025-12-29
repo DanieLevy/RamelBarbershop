@@ -153,6 +153,9 @@ function MyAppointmentsContent() {
     const confirmed = window.confirm('האם אתה בטוח שברצונך לבטל את התור?')
     if (!confirmed) return
     
+    // Get reservation details before cancelling for notification
+    const reservation = reservations.find(r => r.id === reservationId)
+    
     setCancellingId(reservationId)
     
     try {
@@ -174,6 +177,24 @@ function MyAppointmentsContent() {
       if (!data || data.length === 0) {
         toast.error('שגיאה בביטול התור - לא נמצא התור')
         return
+      }
+      
+      // Send push notification to barber (fire and forget)
+      if (reservation?.barber_id) {
+        fetch('/api/push/notify-cancellation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reservationId,
+            customerId: customer?.id,
+            barberId: reservation.barber_id,
+            cancelledBy: 'customer',
+            customerName: customer?.fullname || reservation.customer_name,
+            barberName: reservation.users?.fullname || 'הספר',
+            serviceName: reservation.services?.name_he || 'שירות',
+            appointmentTime: reservation.time_timestamp
+          })
+        }).catch(err => console.log('Push notification error:', err))
       }
       
       toast.success('התור בוטל בהצלחה')

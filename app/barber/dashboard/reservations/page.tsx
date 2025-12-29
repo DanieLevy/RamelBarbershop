@@ -91,6 +91,9 @@ export default function ReservationsPage() {
   const handleCancelReservation = async (id: string, reason?: string) => {
     setUpdatingId(id)
     
+    // Get reservation details before cancelling for notification
+    const reservation = reservations.find(r => r.id === id)
+    
     try {
       const supabase = createClient()
       
@@ -108,6 +111,25 @@ export default function ReservationsPage() {
         await report(error instanceof Error ? error : new Error(String(error)), 'Cancelling reservation', 'high')
         toast.error('שגיאה בביטול התור')
         return
+      }
+      
+      // Send push notification to customer (fire and forget)
+      if (reservation?.customer_id) {
+        fetch('/api/push/notify-cancellation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reservationId: id,
+            customerId: reservation.customer_id,
+            barberId: barber?.id,
+            cancelledBy: 'barber',
+            customerName: reservation.customer_name,
+            barberName: barber?.fullname || 'הספר',
+            serviceName: reservation.services?.name_he || 'שירות',
+            appointmentTime: reservation.time_timestamp,
+            reason
+          })
+        }).catch(err => console.log('Push notification error:', err))
       }
       
       toast.success('התור בוטל בהצלחה')
@@ -139,6 +161,25 @@ export default function ReservationsPage() {
             cancellation_reason: reason || null
           })
           .eq('id', res.id)
+        
+        // Send push notification to each customer (fire and forget)
+        if (res.customer_id) {
+          fetch('/api/push/notify-cancellation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              reservationId: res.id,
+              customerId: res.customer_id,
+              barberId: barber?.id,
+              cancelledBy: 'barber',
+              customerName: res.customer_name,
+              barberName: barber?.fullname || 'הספר',
+              serviceName: res.services?.name_he || 'שירות',
+              appointmentTime: res.time_timestamp,
+              reason
+            })
+          }).catch(err => console.log('Push notification error:', err))
+        }
       }
       
       toast.success(`${toCancel.length} תורים בוטלו בהצלחה`)

@@ -67,7 +67,7 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
       }
       
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: insertError } = await (supabase.from('reservations') as any).insert({
+      const { data: insertedData, error: insertError } = await (supabase.from('reservations') as any).insert({
         barber_id: barber.id,
         service_id: service.id,
         customer_id: loggedInCustomer.id,
@@ -78,7 +78,7 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
         day_name: date.dayName,
         day_num: date.dayNum,
         status: 'confirmed',
-      })
+      }).select('id').single()
       
       if (insertError) {
         console.error('Error creating reservation:', insertError)
@@ -87,6 +87,23 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
         toast.error('שגיאה ביצירת התור')
         hasCreatedRef.current = false
         return
+      }
+      
+      // Send push notification to barber (fire and forget)
+      if (insertedData?.id) {
+        fetch('/api/push/notify-booking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reservationId: insertedData.id,
+            customerId: loggedInCustomer.id,
+            barberId: barber.id,
+            customerName: loggedInCustomer.fullname,
+            barberName: barber.fullname,
+            serviceName: service.name_he,
+            appointmentTime: timeTimestamp
+          })
+        }).catch(err => console.log('Push notification error:', err))
       }
       
       setIsCreated(true)
