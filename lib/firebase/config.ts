@@ -169,7 +169,8 @@ export async function sendPhoneOtp(
     } else if (errorCode.includes('auth/network-request-failed')) {
       userFriendlyMessage = 'שגיאת רשת, בדוק את החיבור לאינטרנט'
     } else if (errorCode.includes('auth/captcha-check-failed')) {
-      userFriendlyMessage = 'אימות reCAPTCHA נכשל, נסה שוב'
+      // This usually means the domain is not in Firebase's authorized domains list
+      userFriendlyMessage = 'אימות reCAPTCHA נכשל - יש להוסיף את הדומיין לרשימת הדומיינים המאושרים ב-Firebase'
     } else if (errorCode.includes('auth/missing-phone-number')) {
       userFriendlyMessage = 'מספר טלפון חסר'
     } else if (errorCode.includes('auth/operation-not-allowed')) {

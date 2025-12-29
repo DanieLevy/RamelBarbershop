@@ -11,17 +11,19 @@ export async function findCustomerByPhone(phone: string): Promise<Customer | nul
   // Normalize phone - remove leading 0 if present and ensure consistent format
   const normalizedPhone = phone.replace(/\D/g, '')
   
+  // Use maybeSingle() to avoid 406 error when customer doesn't exist
   const { data, error } = await supabase
     .from('customers')
     .select('*')
     .eq('phone', normalizedPhone)
-    .single()
+    .maybeSingle()
   
-  if (error || !data) {
+  if (error) {
+    console.error('Error finding customer by phone:', error)
     return null
   }
   
-  return data as Customer
+  return data as Customer | null
 }
 
 /**
@@ -110,17 +112,19 @@ export async function updateLastLogin(
 export async function getCustomerById(customerId: string): Promise<Customer | null> {
   const supabase = createClient()
   
+  // Use maybeSingle() to avoid 406 error when customer doesn't exist
   const { data, error } = await supabase
     .from('customers')
     .select('*')
     .eq('id', customerId)
-    .single()
+    .maybeSingle()
   
-  if (error || !data) {
+  if (error) {
+    console.error('Error getting customer by ID:', error)
     return null
   }
   
-  return data as Customer
+  return data as Customer | null
 }
 
 /**

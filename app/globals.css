@@ -144,10 +144,26 @@
     height: auto;
   }
 
-  /* Improve tap targets on mobile */
-  button, a {
+  /* Improve tap targets on mobile - excludes toggle switches and small icon buttons */
+  button:not([role="switch"]):not(.toggle-switch):not(.icon-btn-sm),
+  a:not(.icon-btn-sm) {
     min-height: 44px;
     min-width: 44px;
+  }
+  
+  /* Default button styling - ensure icons center properly */
+  button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  /* Toggle switches need smaller dimensions */
+  button[role="switch"],
+  .toggle-switch {
+    min-height: 28px !important;
+    max-height: 28px !important;
+    min-width: 48px;
   }
 
   /* Prevent iOS zoom on input focus */
@@ -273,20 +289,30 @@
     box-shadow: 0 0 20px rgba(255, 170, 61, 0.2);
   }
 
-  /* Toggle Switch - ensures consistent sizing */
-  .toggle-switch {
-    @apply w-12 h-7 rounded-full transition-colors relative flex-shrink-0;
+  /* Toggle Switch - ensures consistent sizing for all toggle buttons */
+  .toggle-switch,
+  button[role="switch"] {
+    @apply w-12 rounded-full transition-colors relative flex-shrink-0;
+    height: 28px !important;
     min-height: 28px !important;
     max-height: 28px !important;
   }
 
-  .toggle-switch .toggle-knob {
+  .toggle-switch .toggle-knob,
+  button[role="switch"] .toggle-knob {
     @apply absolute top-1 w-5 h-5 rounded-full bg-white transition-all;
   }
 
   /* Icon Button - ensures icon centering */
   .icon-btn {
     @apply flex items-center justify-center flex-shrink-0;
+  }
+  
+  /* Small icon button - for buttons that don't need 44px min-height */
+  .icon-btn-sm {
+    @apply flex items-center justify-center flex-shrink-0;
+    min-height: auto !important;
+    min-width: auto !important;
   }
 
   /* Vintage Border */
