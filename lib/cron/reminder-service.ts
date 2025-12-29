@@ -124,7 +124,8 @@ export async function getAppointmentsForReminders(
     const reminderWindowStart = now + ((reminderHours - 1) * HOUR_MS)
     const reminderWindowEnd = now + (reminderHours * HOUR_MS)
 
-    if (reservation.time_timestamp > reminderWindowStart &&
+    // Use >= for windowStart to include appointments exactly at the boundary
+    if (reservation.time_timestamp >= reminderWindowStart &&
         reservation.time_timestamp <= reminderWindowEnd) {
       appointmentsInWindow.push({
         id: reservation.id,

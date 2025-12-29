@@ -113,7 +113,8 @@ async function getAppointmentsForReminders(): Promise<AppointmentForReminder[]> 
     const windowStart = now + ((reminderHours - 1) * HOUR_MS)
     const windowEnd = now + (reminderHours * HOUR_MS)
 
-    if (res.time_timestamp > windowStart && res.time_timestamp <= windowEnd) {
+    // Use >= for windowStart to include appointments exactly at the boundary
+    if (res.time_timestamp >= windowStart && res.time_timestamp <= windowEnd) {
       appointments.push({
         id: res.id,
         time_timestamp: res.time_timestamp,
