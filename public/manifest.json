@@ -71,29 +71,6 @@
       "purpose": "maskable any"
     }
   ],
-  "screenshots": [
-    {
-      "src": "/screenshots/home-wide.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "דף הבית - מסך רחב"
-    },
-    {
-      "src": "/screenshots/home-narrow.png",
-      "sizes": "750x1334",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "דף הבית - מובייל"
-    },
-    {
-      "src": "/screenshots/booking-narrow.png",
-      "sizes": "750x1334",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "קביעת תור"
-    }
-  ],
   "shortcuts": [
     {
       "name": "קבע תור חדש",
@@ -115,14 +92,5 @@
       "protocol": "web+ramel",
       "url": "/?action=%s"
     }
-  ],
-  "share_target": {
-    "action": "/share-target",
-    "method": "GET",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url"
-    }
-  }
+  ]
 }

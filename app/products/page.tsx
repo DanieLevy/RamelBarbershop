@@ -15,8 +15,7 @@ export default async function ProductsPage() {
   const supabase = await createClient()
   
   // Fetch all active products
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: products } = await (supabase as any)
+  const { data: products } = await supabase
     .from('products')
     .select('*')
     .eq('is_active', true)

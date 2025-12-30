@@ -14,6 +14,7 @@ import { OTPVerification } from './OTPVerification'
 import { Confirmation } from './Confirmation'
 import { LoggedInConfirmation } from './LoggedInConfirmation'
 import { Bell } from 'lucide-react'
+import ErrorBoundary from '@/components/ErrorBoundary'
 
 interface BookingWizardClientProps {
   barberId: string
@@ -179,10 +180,12 @@ export function BookingWizardClient({
         </div>
       )}
       
-      {/* Main Step Content */}
-      <div className="w-full max-w-md mx-auto">
-        {renderStep()}
-      </div>
+      {/* Main Step Content - wrapped in ErrorBoundary for granular error handling */}
+      <ErrorBoundary component={`BookingWizard-Step${step}`}>
+        <div className="w-full max-w-md mx-auto">
+          {renderStep()}
+        </div>
+      </ErrorBoundary>
     </div>
   )
 }

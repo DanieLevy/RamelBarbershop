@@ -173,9 +173,8 @@ export default function ProfilePage() {
     const supabase = createClient()
     
     if (editingMessageId) {
-      const { data, error } = await (supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from('barber_messages') as any)
+      const { data, error } = await supabase
+        .from('barber_messages')
         .update({ message: messageText, updated_at: new Date().toISOString() })
         .eq('id', editingMessageId)
         .select()
@@ -189,9 +188,8 @@ export default function ProfilePage() {
         fetchMessages()
       }
     } else {
-      const { data, error } = await (supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from('barber_messages') as any)
+      const { data, error } = await supabase
+        .from('barber_messages')
         .insert({
           barber_id: barber.id,
           message: messageText,
@@ -215,9 +213,8 @@ export default function ProfilePage() {
   const handleToggleMessage = async (id: string, isActive: boolean) => {
     const supabase = createClient()
     
-    const { data, error } = await (supabase
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .from('barber_messages') as any)
+    const { data, error } = await supabase
+      .from('barber_messages')
       .update({ is_active: !isActive })
       .eq('id', id)
       .select()

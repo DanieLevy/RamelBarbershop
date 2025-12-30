@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs'
 import { createClient } from '@/lib/supabase/client'
-import type { User, BarberSession } from '@/types/database'
+import type { User, BarberSession, UserRole } from '@/types/database'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
 
 const SALT_ROUNDS = 10
@@ -83,7 +83,7 @@ export function saveBarberSession(user: User): void {
     barberId: user.id,
     email: user.email || '',
     fullname: user.fullname,
-    role: user.role,
+    role: user.role as UserRole,
     expiresAt: Date.now() + SESSION_EXPIRY_MS,
   }
   
@@ -169,8 +169,7 @@ export async function setBarberPassword(
   
   const passwordHash = await hashPassword(newPassword)
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase.from('users') as any)
+  const { error } = await supabase.from('users')
     .update({ password_hash: passwordHash, updated_at: new Date().toISOString() })
     .eq('id', barberId)
   
@@ -219,8 +218,7 @@ export async function createBarber(data: {
   
   const passwordHash = await hashPassword(data.password)
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: newUser, error } = await (supabase.from('users') as any)
+  const { data: newUser, error } = await supabase.from('users')
     .insert({
       username: data.username,
       fullname: data.fullname,
@@ -266,8 +264,7 @@ export async function createBarber(data: {
     is_working: defaultOpenDays.includes(day),
   }))
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: workDaysError } = await (supabase.from('work_days') as any)
+  const { error: workDaysError } = await supabase.from('work_days')
     .insert(workDaysInserts)
   
   if (workDaysError) {
@@ -280,8 +277,7 @@ export async function createBarber(data: {
   }
   
   // Create default barber_schedules entry
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: scheduleError } = await (supabase.from('barber_schedules') as any)
+  const { error: scheduleError } = await supabase.from('barber_schedules')
     .insert({
       barber_id: createdUser.id,
       work_days: defaultOpenDays,
@@ -293,6 +289,25 @@ export async function createBarber(data: {
     console.error('Error creating default barber_schedule:', scheduleError)
     await reportSupabaseError(scheduleError, 'Creating Default Schedule for New Barber', {
       table: 'barber_schedules',
+      operation: 'insert',
+    })
+    // Don't fail the barber creation, just log the error
+  }
+  
+  // Create default barber_notification_settings entry
+  const { error: notificationSettingsError } = await supabase.from('barber_notification_settings')
+    .insert({
+      barber_id: createdUser.id,
+      reminder_hours_before: 3,
+      notify_on_customer_cancel: true,
+      notify_on_new_booking: true,
+      broadcast_enabled: true,
+    })
+  
+  if (notificationSettingsError) {
+    console.error('Error creating default barber_notification_settings:', notificationSettingsError)
+    await reportSupabaseError(notificationSettingsError, 'Creating Default Notification Settings for New Barber', {
+      table: 'barber_notification_settings',
       operation: 'insert',
     })
     // Don't fail the barber creation, just log the error
@@ -316,8 +331,7 @@ export async function updateBarber(
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = createClient()
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase.from('users') as any)
+  const { error } = await supabase.from('users')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', barberId)
   

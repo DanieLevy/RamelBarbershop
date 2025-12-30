@@ -51,8 +51,7 @@ export default function ProductsPage() {
   const fetchProducts = useCallback(async () => {
     try {
       const supabase = createClient()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('products')
         .select('*')
         .order('display_order', { ascending: true })
@@ -99,7 +98,7 @@ export default function ProductsPage() {
       description: product.description || '',
       price: product.price.toString(),
       image_url: product.image_url || '',
-      is_active: product.is_active,
+      is_active: product.is_active ?? true,
     })
     setPreviewImage(product.image_url || null)
     setShowForm(true)
@@ -225,8 +224,7 @@ export default function ProductsPage() {
         }
       }
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('products')
         .delete()
         .eq('id', product.id)
@@ -245,8 +243,7 @@ export default function ProductsPage() {
   const handleToggleActive = async (product: Product) => {
     try {
       const supabase = createClient()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('products')
         .update({ is_active: !product.is_active })
         .eq('id', product.id)

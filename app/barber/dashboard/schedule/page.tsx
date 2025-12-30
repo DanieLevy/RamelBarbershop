@@ -85,8 +85,7 @@ export default function GlobalSchedulePage() {
     setSaving(true)
     const supabase = createClient()
     
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.from('barbershop_settings') as any)
+    const { error } = await supabase.from('barbershop_settings')
       .update({
         open_days: openDays,
         work_hours_start: startTime,

@@ -6,490 +6,937 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type UserRole = 'admin' | 'barber'
-
-export interface Database {
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.1"
+  }
   public: {
     Tables: {
-      users: {
-        Row: {
-          id: string
-          username: string
-          fullname: string
-          img_url: string | null
-          phone: string | null
-          email: string | null
-          password_hash: string | null
-          role: UserRole
-          is_barber: boolean
-          is_active: boolean
-          display_order: number
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          username: string
-          fullname: string
-          img_url?: string | null
-          phone?: string | null
-          email?: string | null
-          password_hash?: string | null
-          role?: UserRole
-          is_barber?: boolean
-          is_active?: boolean
-          display_order?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          username?: string
-          fullname?: string
-          img_url?: string | null
-          phone?: string | null
-          email?: string | null
-          password_hash?: string | null
-          role?: UserRole
-          is_barber?: boolean
-          is_active?: boolean
-          display_order?: number
-          created_at?: string
-          updated_at?: string
-        }
-      }
-      customers: {
-        Row: {
-          id: string
-          phone: string
-          fullname: string
-          firebase_uid: string | null
-          last_login_at: string
-          created_at: string
-          updated_at: string
-          is_blocked: boolean
-          blocked_at: string | null
-          blocked_reason: string | null
-        }
-        Insert: {
-          id?: string
-          phone: string
-          fullname: string
-          firebase_uid?: string | null
-          last_login_at?: string
-          created_at?: string
-          updated_at?: string
-          is_blocked?: boolean
-          blocked_at?: string | null
-          blocked_reason?: string | null
-        }
-        Update: {
-          id?: string
-          phone?: string
-          fullname?: string
-          firebase_uid?: string | null
-          last_login_at?: string
-          created_at?: string
-          updated_at?: string
-          is_blocked?: boolean
-          blocked_at?: string | null
-          blocked_reason?: string | null
-        }
-      }
-      barbershop_settings: {
-        Row: {
-          id: string
-          name: string
-          phone: string | null
-          address: string | null
-          description: string | null
-          work_hours_start: string
-          work_hours_end: string
-          open_days: string[]
-          created_at: string
-          updated_at: string
-          // Dynamic content fields
-          hero_title: string | null
-          hero_subtitle: string | null
-          hero_description: string | null
-          // Location fields
-          address_text: string | null
-          address_lat: number | null
-          address_lng: number | null
-          waze_link: string | null
-          google_maps_link: string | null
-          // Contact & Social fields
-          contact_phone: string | null
-          contact_email: string | null
-          contact_whatsapp: string | null
-          social_instagram: string | null
-          social_facebook: string | null
-          social_tiktok: string | null
-          // Visibility toggles
-          show_phone: boolean
-          show_email: boolean
-          show_whatsapp: boolean
-          show_instagram: boolean
-          show_facebook: boolean
-          show_tiktok: boolean
-        }
-        Insert: {
-          id?: string
-          name: string
-          phone?: string | null
-          address?: string | null
-          description?: string | null
-          work_hours_start?: string
-          work_hours_end?: string
-          open_days?: string[]
-          created_at?: string
-          updated_at?: string
-          // Dynamic content fields
-          hero_title?: string | null
-          hero_subtitle?: string | null
-          hero_description?: string | null
-          // Location fields
-          address_text?: string | null
-          address_lat?: number | null
-          address_lng?: number | null
-          waze_link?: string | null
-          google_maps_link?: string | null
-          // Contact & Social fields
-          contact_phone?: string | null
-          contact_email?: string | null
-          contact_whatsapp?: string | null
-          social_instagram?: string | null
-          social_facebook?: string | null
-          social_tiktok?: string | null
-          // Visibility toggles
-          show_phone?: boolean
-          show_email?: boolean
-          show_whatsapp?: boolean
-          show_instagram?: boolean
-          show_facebook?: boolean
-          show_tiktok?: boolean
-        }
-        Update: {
-          id?: string
-          name?: string
-          phone?: string | null
-          address?: string | null
-          description?: string | null
-          work_hours_start?: string
-          work_hours_end?: string
-          open_days?: string[]
-          created_at?: string
-          updated_at?: string
-          // Dynamic content fields
-          hero_title?: string | null
-          hero_subtitle?: string | null
-          hero_description?: string | null
-          // Location fields
-          address_text?: string | null
-          address_lat?: number | null
-          address_lng?: number | null
-          waze_link?: string | null
-          google_maps_link?: string | null
-          // Contact & Social fields
-          contact_phone?: string | null
-          contact_email?: string | null
-          contact_whatsapp?: string | null
-          social_instagram?: string | null
-          social_facebook?: string | null
-          social_tiktok?: string | null
-          // Visibility toggles
-          show_phone?: boolean
-          show_email?: boolean
-          show_whatsapp?: boolean
-          show_instagram?: boolean
-          show_facebook?: boolean
-          show_tiktok?: boolean
-        }
-      }
-      barbershop_closures: {
-        Row: {
-          id: string
-          start_date: string
-          end_date: string
-          reason: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          start_date: string
-          end_date: string
-          reason?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          start_date?: string
-          end_date?: string
-          reason?: string | null
-          created_at?: string
-        }
-      }
-      barber_schedules: {
-        Row: {
-          id: string
-          barber_id: string
-          work_days: string[]
-          work_hours_start: string
-          work_hours_end: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          barber_id: string
-          work_days?: string[]
-          work_hours_start?: string
-          work_hours_end?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          barber_id?: string
-          work_days?: string[]
-          work_hours_start?: string
-          work_hours_end?: string
-          created_at?: string
-          updated_at?: string
-        }
-      }
       barber_closures: {
         Row: {
-          id: string
           barber_id: string
-          start_date: string
+          created_at: string | null
           end_date: string
+          id: string
           reason: string | null
-          created_at: string
+          start_date: string
         }
         Insert: {
-          id?: string
           barber_id: string
-          start_date: string
+          created_at?: string | null
           end_date: string
+          id?: string
           reason?: string | null
-          created_at?: string
+          start_date: string
         }
         Update: {
-          id?: string
           barber_id?: string
-          start_date?: string
+          created_at?: string | null
           end_date?: string
+          id?: string
           reason?: string | null
-          created_at?: string
+          start_date?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "barber_closures_barber_id_fkey"
+            columns: ["barber_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       barber_messages: {
         Row: {
-          id: string
           barber_id: string
-          message: string
+          created_at: string | null
+          id: string
           is_active: boolean
-          created_at: string
-          updated_at: string
+          message: string
+          updated_at: string | null
         }
         Insert: {
-          id?: string
           barber_id: string
-          message: string
+          created_at?: string | null
+          id?: string
           is_active?: boolean
-          created_at?: string
-          updated_at?: string
+          message: string
+          updated_at?: string | null
         }
         Update: {
-          id?: string
           barber_id?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean
           message?: string
-          is_active?: boolean
-          created_at?: string
-          updated_at?: string
+          updated_at?: string | null
         }
+        Relationships: [
+          {
+            foreignKeyName: "barber_messages_barber_id_fkey"
+            columns: ["barber_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      work_days: {
+      barber_notification_settings: {
         Row: {
-          id: string
-          user_id: string
-          day_of_week: string
-          is_working: boolean
-          start_time: string | null
-          end_time: string | null
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          day_of_week: string
-          is_working?: boolean
-          start_time?: string | null
-          end_time?: string | null
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          day_of_week?: string
-          is_working?: boolean
-          start_time?: string | null
-          end_time?: string | null
-        }
-      }
-      services: {
-        Row: {
-          id: string
-          barber_id: string | null
-          name: string
-          name_he: string
-          description: string | null
-          duration: number
-          price: number
-          is_active: boolean
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          barber_id?: string | null
-          name: string
-          name_he: string
-          description?: string | null
-          duration: number
-          price: number
-          is_active?: boolean
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          barber_id?: string | null
-          name?: string
-          name_he?: string
-          description?: string | null
-          duration?: number
-          price?: number
-          is_active?: boolean
-          created_at?: string
-        }
-      }
-      reservations: {
-        Row: {
-          id: string
           barber_id: string
-          service_id: string
-          customer_id: string | null
-          customer_name: string
-          customer_phone: string
-          date_timestamp: number
-          time_timestamp: number
-          day_name: string
-          day_num: string
-          status: 'confirmed' | 'cancelled' | 'completed'
-          cancelled_by: 'customer' | 'barber' | null
-          cancellation_reason: string | null
-          created_at: string
+          broadcast_enabled: boolean
+          created_at: string | null
+          id: string
+          notify_on_customer_cancel: boolean
+          notify_on_new_booking: boolean
+          reminder_hours_before: number
+          updated_at: string | null
         }
         Insert: {
-          id?: string
           barber_id: string
-          service_id: string
-          customer_id?: string | null
-          customer_name: string
-          customer_phone: string
-          date_timestamp: number
-          time_timestamp: number
-          day_name: string
-          day_num: string
-          status?: 'confirmed' | 'cancelled' | 'completed'
-          cancelled_by?: 'customer' | 'barber' | null
-          cancellation_reason?: string | null
-          created_at?: string
+          broadcast_enabled?: boolean
+          created_at?: string | null
+          id?: string
+          notify_on_customer_cancel?: boolean
+          notify_on_new_booking?: boolean
+          reminder_hours_before?: number
+          updated_at?: string | null
         }
         Update: {
-          id?: string
           barber_id?: string
-          service_id?: string
-          customer_id?: string | null
-          customer_name?: string
-          customer_phone?: string
-          cancelled_by?: 'customer' | 'barber' | null
-          cancellation_reason?: string | null
-          date_timestamp?: number
-          time_timestamp?: number
-          day_name?: string
-          day_num?: string
-          status?: 'confirmed' | 'cancelled' | 'completed'
-          created_at?: string
+          broadcast_enabled?: boolean
+          created_at?: string | null
+          id?: string
+          notify_on_customer_cancel?: boolean
+          notify_on_new_booking?: boolean
+          reminder_hours_before?: number
+          updated_at?: string | null
         }
+        Relationships: [
+          {
+            foreignKeyName: "barber_notification_settings_barber_id_fkey"
+            columns: ["barber_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      barber_schedules: {
+        Row: {
+          barber_id: string
+          created_at: string | null
+          id: string
+          updated_at: string | null
+          work_days: string[]
+          work_hours_end: string
+          work_hours_start: string
+        }
+        Insert: {
+          barber_id: string
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          work_days?: string[]
+          work_hours_end?: string
+          work_hours_start?: string
+        }
+        Update: {
+          barber_id?: string
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          work_days?: string[]
+          work_hours_end?: string
+          work_hours_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "barber_schedules_barber_id_fkey"
+            columns: ["barber_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      barbershop_closures: {
+        Row: {
+          created_at: string | null
+          end_date: string
+          id: string
+          reason: string | null
+          start_date: string
+        }
+        Insert: {
+          created_at?: string | null
+          end_date: string
+          id?: string
+          reason?: string | null
+          start_date: string
+        }
+        Update: {
+          created_at?: string | null
+          end_date?: string
+          id?: string
+          reason?: string | null
+          start_date?: string
+        }
+        Relationships: []
+      }
+      barbershop_settings: {
+        Row: {
+          address: string | null
+          address_lat: number | null
+          address_lng: number | null
+          address_text: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          contact_whatsapp: string | null
+          created_at: string | null
+          default_reminder_hours: number | null
+          description: string | null
+          google_maps_link: string | null
+          hero_description: string | null
+          hero_subtitle: string | null
+          hero_title: string | null
+          id: string
+          name: string
+          open_days: string[]
+          phone: string | null
+          show_email: boolean | null
+          show_facebook: boolean | null
+          show_instagram: boolean | null
+          show_phone: boolean | null
+          show_tiktok: boolean | null
+          show_whatsapp: boolean | null
+          social_facebook: string | null
+          social_instagram: string | null
+          social_tiktok: string | null
+          updated_at: string | null
+          waze_link: string | null
+          work_hours_end: string
+          work_hours_start: string
+        }
+        Insert: {
+          address?: string | null
+          address_lat?: number | null
+          address_lng?: number | null
+          address_text?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          contact_whatsapp?: string | null
+          created_at?: string | null
+          default_reminder_hours?: number | null
+          description?: string | null
+          google_maps_link?: string | null
+          hero_description?: string | null
+          hero_subtitle?: string | null
+          hero_title?: string | null
+          id?: string
+          name?: string
+          open_days?: string[]
+          phone?: string | null
+          show_email?: boolean | null
+          show_facebook?: boolean | null
+          show_instagram?: boolean | null
+          show_phone?: boolean | null
+          show_tiktok?: boolean | null
+          show_whatsapp?: boolean | null
+          social_facebook?: string | null
+          social_instagram?: string | null
+          social_tiktok?: string | null
+          updated_at?: string | null
+          waze_link?: string | null
+          work_hours_end?: string
+          work_hours_start?: string
+        }
+        Update: {
+          address?: string | null
+          address_lat?: number | null
+          address_lng?: number | null
+          address_text?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          contact_whatsapp?: string | null
+          created_at?: string | null
+          default_reminder_hours?: number | null
+          description?: string | null
+          google_maps_link?: string | null
+          hero_description?: string | null
+          hero_subtitle?: string | null
+          hero_title?: string | null
+          id?: string
+          name?: string
+          open_days?: string[]
+          phone?: string | null
+          show_email?: boolean | null
+          show_facebook?: boolean | null
+          show_instagram?: boolean | null
+          show_phone?: boolean | null
+          show_tiktok?: boolean | null
+          show_whatsapp?: boolean | null
+          social_facebook?: string | null
+          social_instagram?: string | null
+          social_tiktok?: string | null
+          updated_at?: string | null
+          waze_link?: string | null
+          work_hours_end?: string
+          work_hours_start?: string
+        }
+        Relationships: []
+      }
+      customer_notification_settings: {
+        Row: {
+          cancellation_alerts_enabled: boolean | null
+          created_at: string | null
+          customer_id: string
+          id: string
+          notifications_enabled: boolean | null
+          pwa_installed: boolean | null
+          reminder_enabled: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          cancellation_alerts_enabled?: boolean | null
+          created_at?: string | null
+          customer_id: string
+          id?: string
+          notifications_enabled?: boolean | null
+          pwa_installed?: boolean | null
+          reminder_enabled?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          cancellation_alerts_enabled?: boolean | null
+          created_at?: string | null
+          customer_id?: string
+          id?: string
+          notifications_enabled?: boolean | null
+          pwa_installed?: boolean | null
+          reminder_enabled?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_notification_settings_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customers: {
+        Row: {
+          blocked_at: string | null
+          blocked_reason: string | null
+          created_at: string | null
+          firebase_uid: string | null
+          fullname: string
+          id: string
+          is_blocked: boolean | null
+          last_login_at: string | null
+          phone: string
+          updated_at: string | null
+        }
+        Insert: {
+          blocked_at?: string | null
+          blocked_reason?: string | null
+          created_at?: string | null
+          firebase_uid?: string | null
+          fullname: string
+          id?: string
+          is_blocked?: boolean | null
+          last_login_at?: string | null
+          phone: string
+          updated_at?: string | null
+        }
+        Update: {
+          blocked_at?: string | null
+          blocked_reason?: string | null
+          created_at?: string | null
+          firebase_uid?: string | null
+          fullname?: string
+          id?: string
+          is_blocked?: boolean | null
+          last_login_at?: string | null
+          phone?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      notification_logs: {
+        Row: {
+          body: string
+          created_at: string | null
+          devices_failed: number
+          devices_succeeded: number
+          devices_targeted: number
+          error_message: string | null
+          id: string
+          notification_type: string
+          payload: Json | null
+          recipient_id: string
+          recipient_type: string
+          reservation_id: string | null
+          sender_id: string | null
+          sent_at: string | null
+          status: string
+          title: string
+        }
+        Insert: {
+          body: string
+          created_at?: string | null
+          devices_failed?: number
+          devices_succeeded?: number
+          devices_targeted?: number
+          error_message?: string | null
+          id?: string
+          notification_type: string
+          payload?: Json | null
+          recipient_id: string
+          recipient_type: string
+          reservation_id?: string | null
+          sender_id?: string | null
+          sent_at?: string | null
+          status?: string
+          title: string
+        }
+        Update: {
+          body?: string
+          created_at?: string | null
+          devices_failed?: number
+          devices_succeeded?: number
+          devices_targeted?: number
+          error_message?: string | null
+          id?: string
+          notification_type?: string
+          payload?: Json | null
+          recipient_id?: string
+          recipient_type?: string
+          reservation_id?: string | null
+          sender_id?: string | null
+          sent_at?: string | null
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_logs_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       products: {
         Row: {
+          created_at: string | null
+          description: string | null
+          display_order: number | null
           id: string
+          image_url: string | null
+          is_active: boolean | null
           name: string
           name_he: string
-          description: string | null
           price: number
-          image_url: string | null
-          is_active: boolean
-          display_order: number
-          created_at: string
-          updated_at: string
+          updated_at: string | null
         }
         Insert: {
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
           id?: string
+          image_url?: string | null
+          is_active?: boolean | null
           name: string
           name_he: string
-          description?: string | null
           price: number
-          image_url?: string | null
-          is_active?: boolean
-          display_order?: number
-          created_at?: string
-          updated_at?: string
+          updated_at?: string | null
         }
         Update: {
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
           id?: string
+          image_url?: string | null
+          is_active?: boolean | null
           name?: string
           name_he?: string
-          description?: string | null
           price?: number
-          image_url?: string | null
-          is_active?: boolean
-          display_order?: number
-          created_at?: string
-          updated_at?: string
+          updated_at?: string | null
         }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          barber_id: string | null
+          consecutive_failures: number | null
+          created_at: string | null
+          customer_id: string | null
+          device_name: string | null
+          device_type: string
+          endpoint: string
+          id: string
+          is_active: boolean | null
+          last_delivery_status: string | null
+          last_used: string | null
+          p256dh: string
+          user_agent: string | null
+        }
+        Insert: {
+          auth: string
+          barber_id?: string | null
+          consecutive_failures?: number | null
+          created_at?: string | null
+          customer_id?: string | null
+          device_name?: string | null
+          device_type?: string
+          endpoint: string
+          id?: string
+          is_active?: boolean | null
+          last_delivery_status?: string | null
+          last_used?: string | null
+          p256dh: string
+          user_agent?: string | null
+        }
+        Update: {
+          auth?: string
+          barber_id?: string | null
+          consecutive_failures?: number | null
+          created_at?: string | null
+          customer_id?: string | null
+          device_name?: string | null
+          device_type?: string
+          endpoint?: string
+          id?: string
+          is_active?: boolean | null
+          last_delivery_status?: string | null
+          last_used?: string | null
+          p256dh?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_barber_id_fkey"
+            columns: ["barber_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_subscriptions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reservations: {
+        Row: {
+          barber_id: string
+          cancellation_reason: string | null
+          cancelled_by: string | null
+          created_at: string | null
+          customer_id: string
+          customer_name: string
+          customer_phone: string
+          date_timestamp: number
+          day_name: string
+          day_num: string
+          id: string
+          service_id: string
+          status: string | null
+          time_timestamp: number
+        }
+        Insert: {
+          barber_id: string
+          cancellation_reason?: string | null
+          cancelled_by?: string | null
+          created_at?: string | null
+          customer_id: string
+          customer_name: string
+          customer_phone: string
+          date_timestamp: number
+          day_name: string
+          day_num: string
+          id?: string
+          service_id: string
+          status?: string | null
+          time_timestamp: number
+        }
+        Update: {
+          barber_id?: string
+          cancellation_reason?: string | null
+          cancelled_by?: string | null
+          created_at?: string | null
+          customer_id?: string
+          customer_name?: string
+          customer_phone?: string
+          date_timestamp?: number
+          day_name?: string
+          day_num?: string
+          id?: string
+          service_id?: string
+          status?: string | null
+          time_timestamp?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reservations_barber_id_fkey"
+            columns: ["barber_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservations_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      services: {
+        Row: {
+          barber_id: string | null
+          created_at: string | null
+          description: string | null
+          duration: number
+          id: string
+          is_active: boolean | null
+          name: string
+          name_he: string
+          price: number
+        }
+        Insert: {
+          barber_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          duration: number
+          id?: string
+          is_active?: boolean | null
+          name: string
+          name_he: string
+          price: number
+        }
+        Update: {
+          barber_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          duration?: number
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          name_he?: string
+          price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_barber_id_fkey"
+            columns: ["barber_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          created_at: string | null
+          display_order: number | null
+          email: string | null
+          fullname: string
+          id: string
+          img_url: string | null
+          is_active: boolean
+          is_barber: boolean | null
+          password_hash: string | null
+          phone: string | null
+          role: string
+          updated_at: string | null
+          username: string
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number | null
+          email?: string | null
+          fullname: string
+          id?: string
+          img_url?: string | null
+          is_active?: boolean
+          is_barber?: boolean | null
+          password_hash?: string | null
+          phone?: string | null
+          role?: string
+          updated_at?: string | null
+          username: string
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number | null
+          email?: string | null
+          fullname?: string
+          id?: string
+          img_url?: string | null
+          is_active?: boolean
+          is_barber?: boolean | null
+          password_hash?: string | null
+          phone?: string | null
+          role?: string
+          updated_at?: string | null
+          username?: string
+        }
+        Relationships: []
+      }
+      work_days: {
+        Row: {
+          day_of_week: string
+          end_time: string | null
+          id: string
+          is_working: boolean | null
+          start_time: string | null
+          user_id: string | null
+        }
+        Insert: {
+          day_of_week: string
+          end_time?: string | null
+          id?: string
+          is_working?: boolean | null
+          start_time?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          day_of_week?: string
+          end_time?: string | null
+          id?: string
+          is_working?: boolean | null
+          start_time?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_days_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
+    Views: {
+      [_ in never]: never
+    }
     Functions: {
-      get_available_time_slots: {
-        Args: {
-          p_barber_id: string
-          p_date_timestamp: number
-        }
-        Returns: {
-          time_timestamp: number
-          is_available: boolean
-        }[]
-      }
+      get_available_time_slots:
+        | {
+            Args: {
+              p_barber_id: string
+              p_date: string
+              p_service_duration: number
+            }
+            Returns: {
+              slot_time: string
+            }[]
+          }
+        | {
+            Args: { p_barber_id: string; p_date_timestamp: number }
+            Returns: {
+              is_available: boolean
+              time_timestamp: number
+            }[]
+          }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
     }
   }
 }
 
-// Convenience types
-export type User = Database['public']['Tables']['users']['Row']
-export type Customer = Database['public']['Tables']['customers']['Row']
-export type BarbershopSettings = Database['public']['Tables']['barbershop_settings']['Row']
-export type BarbershopClosure = Database['public']['Tables']['barbershop_closures']['Row']
-export type BarberSchedule = Database['public']['Tables']['barber_schedules']['Row']
-export type BarberClosure = Database['public']['Tables']['barber_closures']['Row']
-export type BarberMessage = Database['public']['Tables']['barber_messages']['Row']
-export type WorkDay = Database['public']['Tables']['work_days']['Row']
-export type Service = Database['public']['Tables']['services']['Row']
-export type Reservation = Database['public']['Tables']['reservations']['Row']
-export type ReservationInsert = Database['public']['Tables']['reservations']['Insert']
-export type Product = Database['public']['Tables']['products']['Row']
-export type ProductInsert = Database['public']['Tables']['products']['Insert']
-export type ProductUpdate = Database['public']['Tables']['products']['Update']
+// =============================================================================
+// SUPABASE GENERATED HELPER TYPES
+// =============================================================================
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const
+
+// =============================================================================
+// CUSTOM CONVENIENCE TYPES
+// =============================================================================
+
+export type UserRole = 'admin' | 'barber'
+
+// Row types (for reading)
+export type User = Tables<'users'>
+export type Customer = Tables<'customers'>
+export type BarbershopSettings = Tables<'barbershop_settings'>
+export type BarbershopClosure = Tables<'barbershop_closures'>
+export type BarberSchedule = Tables<'barber_schedules'>
+export type BarberClosure = Tables<'barber_closures'>
+export type BarberMessage = Tables<'barber_messages'>
+export type WorkDay = Tables<'work_days'>
+export type Service = Tables<'services'>
+export type Reservation = Tables<'reservations'>
+export type Product = Tables<'products'>
+
+// Insert types
+export type ReservationInsert = TablesInsert<'reservations'>
+export type ProductInsert = TablesInsert<'products'>
+
+// Update types
+export type ProductUpdate = TablesUpdate<'products'>
+export type ReservationUpdate = TablesUpdate<'reservations'>
+
+// Push notification types from Database
+export type PushSubscriptionRow = Tables<'push_subscriptions'>
+export type PushSubscriptionInsert = TablesInsert<'push_subscriptions'>
+export type NotificationLog = Tables<'notification_logs'>
+export type NotificationLogInsert = TablesInsert<'notification_logs'>
+export type BarberNotificationSettingsRow = Tables<'barber_notification_settings'>
+export type CustomerNotificationSettingsRow = Tables<'customer_notification_settings'>
+
+// =============================================================================
+// EXTENDED TYPES (with relations)
+// =============================================================================
 
 export interface BarberWithWorkDays extends User {
   work_days: WorkDay[]

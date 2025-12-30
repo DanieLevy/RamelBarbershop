@@ -63,12 +63,12 @@ export default function ClosuresPage() {
     setSaving(true)
     const supabase = createClient()
     
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.from('barbershop_closures') as any).insert({
-      start_date: startDate,
-      end_date: endDate,
-      reason: reason || null,
-    })
+    const { error } = await supabase.from('barbershop_closures')
+      .insert({
+        start_date: startDate,
+        end_date: endDate,
+        reason: reason || null,
+      })
     
     if (error) {
       console.error('Error adding closure:', error)

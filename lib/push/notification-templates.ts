@@ -56,17 +56,37 @@ export function getNotificationTemplate(
 /**
  * Appointment reminder template
  * Includes deep link with highlight param to focus on the specific appointment
+ * Dynamically shows time remaining until appointment
  */
 function getReminderTemplate(context: ReminderContext): NotificationPayload {
   const time = formatTime(context.appointmentTime)
   const date = formatShortDate(context.appointmentTime)
+  const fullDate = formatDate(context.appointmentTime)
+  
+  // Calculate time until appointment
+  const now = Date.now()
+  const msUntil = context.appointmentTime - now
+  const minutesUntil = Math.round(msUntil / 60000)
+  const hoursUntil = Math.round(msUntil / 3600000)
+  
+  // Build dynamic time text
+  let timeUntilText: string
+  if (minutesUntil < 60) {
+    timeUntilText = `בעוד ${minutesUntil} דקות`
+  } else if (hoursUntil === 1) {
+    timeUntilText = 'בעוד שעה'
+  } else if (hoursUntil <= 5) {
+    timeUntilText = `בעוד ${hoursUntil} שעות`
+  } else {
+    timeUntilText = `היום בשעה ${time}`
+  }
   
   // Deep link with highlight param for focused view
   const deepLinkUrl = `/my-appointments?highlight=${context.reservationId}`
   
   return {
-    title: '⏰ תזכורת לתור',
-    body: `יש לך תור היום בשעה ${time} אצל ${context.barberName} ל${context.serviceName}`,
+    title: `⏰ תזכורת: תור ${timeUntilText}`,
+    body: `יש לך תור ל${context.serviceName} אצל ${context.barberName} ב${fullDate} בשעה ${time}`,
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-72x72.png',
     tag: `reminder-${context.reservationId}`,

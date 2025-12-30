@@ -41,7 +41,7 @@ export function ProductCard({ product, size = 'md', className }: ProductCardProp
     lg: 'h-48 sm:h-56',
   }
 
-  const isNew = isNewProduct(product.created_at)
+  const isNew = product.created_at ? isNewProduct(product.created_at) : false
 
   return (
     <Link

@@ -11,6 +11,17 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { pushService } from '@/lib/push/push-service'
 import type { ReminderContext } from '@/lib/push/types'
 
+// Type for reservation with joined data from the reminder query
+interface ReservationWithJoins {
+  id: string
+  time_timestamp: number
+  customer_id: string | null
+  customer_name: string
+  barber_id: string
+  users: { fullname: string } | null
+  services: { name_he: string } | null
+}
+
 // Constants
 const MAX_REMINDER_HOURS = 24
 const HOUR_MS = 3600000
@@ -116,28 +127,34 @@ export async function getAppointmentsForReminders(
     settingsMap.set(s.barber_id, s.reminder_hours_before)
   })
 
-  // Filter appointments that fall within their barber's reminder window
+  // Filter appointments within their barber's reminder window
+  // FIXED: Include ALL appointments from now until reminderHours ahead
+  // The wasReminderAlreadySent check prevents duplicates, so we catch:
+  // 1. Appointments in the normal window
+  // 2. Late-booked appointments that missed earlier windows
   const appointmentsInWindow: AppointmentForReminder[] = []
 
   for (const reservation of data) {
     const reminderHours = settingsMap.get(reservation.barber_id) || 3
-    const reminderWindowStart = now + ((reminderHours - 1) * HOUR_MS)
     const reminderWindowEnd = now + (reminderHours * HOUR_MS)
 
-    // Use >= for windowStart to include appointments exactly at the boundary
-    if (reservation.time_timestamp >= reminderWindowStart &&
-        reservation.time_timestamp <= reminderWindowEnd) {
+    // Include any appointment from NOW until reminderHours ahead
+    // This ensures late-booked appointments still get reminders
+    if (reservation.time_timestamp <= reminderWindowEnd) {
+      const reservationData = reservation as unknown as ReservationWithJoins
+      // Calculate actual hours until appointment for the notification
+      const hoursUntil = Math.round((reservationData.time_timestamp - now) / HOUR_MS)
+      
       appointmentsInWindow.push({
-        id: reservation.id,
-        time_timestamp: reservation.time_timestamp,
-        customer_id: reservation.customer_id!,
-        customer_name: reservation.customer_name,
-        barber_id: reservation.barber_id,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        barber_name: (reservation.users as any)?.fullname || 'הספר',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        service_name: (reservation.services as any)?.name_he || 'שירות',
-        reminder_hours_before: reminderHours
+        id: reservationData.id,
+        time_timestamp: reservationData.time_timestamp,
+        customer_id: reservationData.customer_id!,
+        customer_name: reservationData.customer_name,
+        barber_id: reservationData.barber_id,
+        barber_name: reservationData.users?.fullname || 'הספר',
+        service_name: reservationData.services?.name_he || 'שירות',
+        // Use actual hours until, capped at minimum 1 for display
+        reminder_hours_before: Math.max(1, hoursUntil)
       })
     }
   }

@@ -97,8 +97,7 @@ export default function ReservationsPage() {
     try {
       const supabase = createClient()
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from('reservations') as any)
+      const { error } = await supabase.from('reservations')
         .update({ 
           status: 'cancelled',
           cancelled_by: 'barber',
@@ -159,8 +158,7 @@ export default function ReservationsPage() {
       const supabase = createClient()
       
       for (const res of toCancel) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase.from('reservations') as any)
+        await supabase.from('reservations')
           .update({ 
             status: 'cancelled',
             cancelled_by: 'barber',

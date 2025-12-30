@@ -97,8 +97,7 @@ export default function ProfilePage() {
     try {
       const supabase = createClient()
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from('customers') as any)
+      const { error } = await supabase.from('customers')
         .update({ fullname: newName.trim() })
         .eq('id', customer.id)
       
@@ -249,7 +248,7 @@ export default function ProfilePage() {
                 <div className="flex-1">
                   <p className="text-foreground-muted text-xs mb-0.5">תאריך הרשמה</p>
                   <p className="text-foreground-light font-medium">
-                    {formatDate(customer.created_at)}
+                    {customer.created_at ? formatDate(customer.created_at) : '-'}
                   </p>
                 </div>
               </GlassCard>

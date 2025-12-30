@@ -276,8 +276,7 @@ export function OTPVerification() {
     try {
       const supabase = createClient()
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: insertedData, error: insertError } = await (supabase.from('reservations') as any)
+      const { data: insertedData, error: insertError } = await supabase.from('reservations')
         .insert(reservationData)
         .select('id')
         .single()

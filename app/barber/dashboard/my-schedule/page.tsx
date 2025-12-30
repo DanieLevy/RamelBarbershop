@@ -152,8 +152,7 @@ export default function MySchedulePage() {
     }
     
     if (schedule) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from('barber_schedules') as any)
+      const { error } = await supabase.from('barber_schedules')
         .update(scheduleData)
         .eq('id', schedule.id)
       
@@ -166,8 +165,8 @@ export default function MySchedulePage() {
         fetchData()
       }
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from('barber_schedules') as any).insert(scheduleData)
+      const { error } = await supabase.from('barber_schedules')
+        .insert(scheduleData)
       
       if (error) {
         console.error('Error creating schedule:', error)
@@ -198,13 +197,13 @@ export default function MySchedulePage() {
     setSavingClosure(true)
     const supabase = createClient()
     
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.from('barber_closures') as any).insert({
-      barber_id: barber.id,
-      start_date: closureStartDate,
-      end_date: closureEndDate,
-      reason: closureReason || null,
-    })
+    const { error } = await supabase.from('barber_closures')
+      .insert({
+        barber_id: barber.id,
+        start_date: closureStartDate,
+        end_date: closureEndDate,
+        reason: closureReason || null,
+      })
     
     if (error) {
       console.error('Error adding closure:', error)

@@ -105,16 +105,23 @@ async function getAppointmentsForReminders(): Promise<AppointmentForReminder[]> 
   const settingsMap = new Map<string, number>()
   settingsData?.forEach(s => settingsMap.set(s.barber_id, s.reminder_hours_before))
 
-  // Filter to current window
+  // Filter to appointments within their barber's reminder window
+  // FIXED: Include ALL appointments from now until reminderHours ahead
+  // The wasReminderSent check prevents duplicates, so we catch:
+  // 1. Appointments in the normal window
+  // 2. Late-booked appointments that missed earlier windows
   const appointments: AppointmentForReminder[] = []
 
   for (const res of data) {
     const reminderHours = settingsMap.get(res.barber_id) || 3
-    const windowStart = now + ((reminderHours - 1) * HOUR_MS)
     const windowEnd = now + (reminderHours * HOUR_MS)
 
-    // Use >= for windowStart to include appointments exactly at the boundary
-    if (res.time_timestamp >= windowStart && res.time_timestamp <= windowEnd) {
+    // Include any appointment from NOW until reminderHours ahead
+    // This ensures late-booked appointments still get reminders
+    if (res.time_timestamp <= windowEnd) {
+      // Calculate hours until appointment for the notification message
+      const hoursUntil = Math.round((res.time_timestamp - now) / HOUR_MS)
+      
       appointments.push({
         id: res.id,
         time_timestamp: res.time_timestamp,
@@ -123,7 +130,8 @@ async function getAppointmentsForReminders(): Promise<AppointmentForReminder[]> 
         barber_id: res.barber_id,
         barber_name: (res.users as { fullname?: string })?.fullname || 'הספר',
         service_name: (res.services as { name_he?: string })?.name_he || 'שירות',
-        reminder_hours_before: reminderHours
+        // Use actual hours until, capped at minimum 1 for display
+        reminder_hours_before: Math.max(1, hoursUntil)
       })
     }
   }
@@ -218,9 +226,16 @@ async function sendReminder(apt: AppointmentForReminder): Promise<{ sent: number
 
   const formattedTime = formatTime(apt.time_timestamp)
   
+  // Build dynamic title based on time until appointment
+  const hoursText = apt.reminder_hours_before === 1 ? 'שעה' : `${apt.reminder_hours_before} שעות`
+  const minutesUntil = Math.round((apt.time_timestamp - Date.now()) / 60000)
+  const timeText = minutesUntil < 60 
+    ? `${minutesUntil} דקות` 
+    : hoursText
+
   const payload = JSON.stringify({
     notification: {
-      title: `⏰ תזכורת: תור בעוד ${apt.reminder_hours_before} שעות`,
+      title: `⏰ תזכורת: תור בעוד ${timeText}`,
       body: `היי ${apt.customer_name}, יש לך תור ל${apt.service_name} עם ${apt.barber_name} ב${formattedTime}`,
       icon: '/icons/icon-192x192.png',
       badge: '/icons/icon-72x72.png',

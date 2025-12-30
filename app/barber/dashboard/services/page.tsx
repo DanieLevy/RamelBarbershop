@@ -106,8 +106,7 @@ export default function ServicesPage() {
     
     if (editingId) {
       // Update existing service
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from('services') as any)
+      const { error } = await supabase.from('services')
         .update(serviceData)
         .eq('id', editingId)
         .select()
@@ -122,8 +121,7 @@ export default function ServicesPage() {
       }
     } else {
       // Create new service
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from('services') as any)
+      const { error } = await supabase.from('services')
         .insert(serviceData)
         .select()
       

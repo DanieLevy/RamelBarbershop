@@ -102,7 +102,7 @@ export default function UsersManagementPage() {
       
       setStats({
         total: customersWithStats.length,
-        newThisMonth: customersWithStats.filter(c => new Date(c.created_at) >= monthStart).length,
+        newThisMonth: customersWithStats.filter(c => c.created_at && new Date(c.created_at) >= monthStart).length,
         blocked: customersWithStats.filter(c => c.is_blocked).length
       })
     } catch (err) {
@@ -124,8 +124,7 @@ export default function UsersManagementPage() {
         ? { is_blocked: true, blocked_at: new Date().toISOString() }
         : { is_blocked: false, blocked_at: null, blocked_reason: null }
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from('customers') as any)
+      const { error } = await supabase.from('customers')
         .update(updateData)
         .eq('id', customerId)
       
@@ -153,10 +152,9 @@ export default function UsersManagementPage() {
     try {
       const supabase = createClient()
       
-      // First, update reservations to remove customer_id reference
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase.from('reservations') as any)
-        .update({ customer_id: null })
+      // First, delete the customer's reservations (can't be orphaned)
+      await supabase.from('reservations')
+        .delete()
         .eq('customer_id', customerId)
       
       // Then delete the customer
@@ -303,7 +301,7 @@ export default function UsersManagementPage() {
                     <span className="text-foreground-muted/50">•</span>
                     <span>{customer.reservation_count} תורים</span>
                     <span className="text-foreground-muted/50">•</span>
-                    <span>נרשם {formatDate(customer.created_at)}</span>
+                    <span>נרשם {customer.created_at ? formatDate(customer.created_at) : '-'}</span>
                   </p>
                 </div>
                 

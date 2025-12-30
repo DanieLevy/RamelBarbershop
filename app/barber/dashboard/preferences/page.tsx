@@ -26,8 +26,7 @@ export default function PreferencesPage() {
     setLoading(true)
     const supabase = createClient()
     
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('barber_notification_settings') as any)
+    const { data, error } = await supabase.from('barber_notification_settings')
       .select('*')
       .eq('barber_id', barber.id)
       .single()
@@ -46,8 +45,7 @@ export default function PreferencesPage() {
       setNotifyOnNewBooking(settings.notify_on_new_booking)
     } else {
       // Create default settings for this barber
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: newSettings, error: insertError } = await (supabase.from('barber_notification_settings') as any)
+      const { data: newSettings, error: insertError } = await supabase.from('barber_notification_settings')
         .insert({ barber_id: barber.id })
         .select()
         .single()
@@ -79,8 +77,7 @@ export default function PreferencesPage() {
     try {
       const supabase = createClient()
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from('barber_notification_settings') as any)
+      const { error } = await supabase.from('barber_notification_settings')
         .update({
           reminder_hours_before: reminderHours,
           notify_on_customer_cancel: notifyOnCancel,

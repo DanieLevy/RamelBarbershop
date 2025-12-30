@@ -38,8 +38,7 @@ export async function createCustomer(
   
   const normalizedPhone = phone.replace(/\D/g, '')
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from('customers') as any)
+  const { data, error } = await supabase.from('customers')
     .insert({
       phone: normalizedPhone,
       fullname,
@@ -95,8 +94,7 @@ export async function updateLastLogin(
     updateData.firebase_uid = firebaseUid
   }
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase.from('customers') as any)
+  const { error } = await supabase.from('customers')
     .update(updateData)
     .eq('id', customerId)
   
@@ -136,8 +134,7 @@ export async function updateCustomer(
 ): Promise<Customer | null> {
   const supabase = createClient()
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from('customers') as any)
+  const { data, error } = await supabase.from('customers')
     .update({
       ...updates,
       updated_at: new Date().toISOString(),
@@ -164,8 +161,7 @@ export async function updateCustomerName(
 ): Promise<boolean> {
   const supabase = createClient()
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase.from('customers') as any)
+  const { error } = await supabase.from('customers')
     .update({ fullname: fullname.trim() })
     .eq('id', customerId)
   
@@ -184,8 +180,7 @@ export async function updateCustomerName(
 export async function isCustomerBlocked(customerId: string): Promise<boolean> {
   const supabase = createClient()
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from('customers') as any)
+  const { data, error } = await supabase.from('customers')
     .select('is_blocked')
     .eq('id', customerId)
     .single()
@@ -211,8 +206,7 @@ export async function toggleCustomerBlocked(
     ? { is_blocked: true, blocked_at: new Date().toISOString(), blocked_reason: reason || null }
     : { is_blocked: false, blocked_at: null, blocked_reason: null }
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase.from('customers') as any)
+  const { error } = await supabase.from('customers')
     .update(updateData)
     .eq('id', customerId)
   

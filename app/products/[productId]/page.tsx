@@ -25,8 +25,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const supabase = await createClient()
   
   // Fetch the product
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: product, error } = await (supabase as any)
+  const { data: product, error } = await supabase
     .from('products')
     .select('*')
     .eq('id', productId)
@@ -37,7 +36,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     notFound()
   }
 
-  const isNew = isNewProduct(product.created_at)
+  const isNew = product.created_at ? isNewProduct(product.created_at) : false
 
   return (
     <>

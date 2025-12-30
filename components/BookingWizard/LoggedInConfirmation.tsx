@@ -76,20 +76,18 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
       const supabase = createClient()
       
       // Check if customer is blocked
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: customerData } = await (supabase.from('customers') as any)
+      const { data: customerData } = await supabase.from('customers')
         .select('is_blocked')
         .eq('id', loggedInCustomer.id)
         .single()
       
-      if ((customerData as { is_blocked?: boolean })?.is_blocked) {
+      if (customerData?.is_blocked) {
         setIsBlocked(true)
         setIsCreating(false)
         return
       }
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: insertedData, error: insertError } = await (supabase.from('reservations') as any)
+      const { data: insertedData, error: insertError } = await supabase.from('reservations')
         .insert(reservationData)
         .select('id')
         .single()

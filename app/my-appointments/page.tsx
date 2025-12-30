@@ -16,6 +16,7 @@ import type { ReservationWithDetails } from '@/types/database'
 import { LoginModal } from '@/components/LoginModal'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { isSameDay, addDays } from 'date-fns'
+import ErrorBoundary from '@/components/ErrorBoundary'
 
 type TabType = 'upcoming' | 'past' | 'cancelled'
 
@@ -26,21 +27,23 @@ interface Tab {
   count: number
 }
 
-// Wrap the main component to use Suspense for useSearchParams
+// Wrap the main component to use Suspense for useSearchParams and ErrorBoundary for error handling
 export default function MyAppointmentsPage() {
   return (
-    <Suspense fallback={
-      <>
-        <AppHeader />
-        <main className="relative top-24 min-h-screen px-4 py-8">
-          <div className="flex flex-col items-center justify-center py-20">
-            <ScissorsLoader size="lg" text="טוען..." />
-          </div>
-        </main>
-      </>
-    }>
-      <MyAppointmentsContent />
-    </Suspense>
+    <ErrorBoundary component="MyAppointmentsPage">
+      <Suspense fallback={
+        <>
+          <AppHeader />
+          <main className="relative top-24 min-h-screen px-4 py-8">
+            <div className="flex flex-col items-center justify-center py-20">
+              <ScissorsLoader size="lg" text="טוען..." />
+            </div>
+          </main>
+        </>
+      }>
+        <MyAppointmentsContent />
+      </Suspense>
+    </ErrorBoundary>
   )
 }
 
@@ -161,11 +164,10 @@ function MyAppointmentsContent() {
     try {
       const supabase = createClient()
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.from('reservations') as any)
+      const { data, error } = await supabase.from('reservations')
         .update({ status: 'cancelled', cancelled_by: 'customer' })
         .eq('id', reservationId)
-        .select('id, status') as { data: { id: string; status: string }[] | null; error: unknown }
+        .select('id, status')
       
       if (error) {
         console.error('Error cancelling reservation:', error)

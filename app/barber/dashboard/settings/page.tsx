@@ -143,8 +143,7 @@ export default function SettingsPage() {
     setSaving(true)
     const supabase = createClient()
     
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.from('barbershop_settings') as any)
+    const { error } = await supabase.from('barbershop_settings')
       .update({
         // Basic
         name,

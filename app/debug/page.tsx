@@ -47,9 +47,9 @@ interface PushSubscriptionInfo {
   barber_id: string | null
   device_type: string
   device_name: string | null
-  is_active: boolean
-  last_used: string
-  created_at: string
+  is_active: boolean | null
+  last_used: string | null
+  created_at: string | null
 }
 
 export default function DebugPage() {
@@ -840,8 +840,8 @@ function PushNotificationDebug() {
                       </div>
                     </div>
                     <div className="mt-2 flex items-center gap-3 text-[10px] text-foreground-muted">
-                      <span>Created: {new Date(sub.created_at).toLocaleDateString('he-IL')}</span>
-                      <span>Last: {new Date(sub.last_used).toLocaleDateString('he-IL')}</span>
+                      <span>Created: {sub.created_at ? new Date(sub.created_at).toLocaleDateString('he-IL') : '-'}</span>
+                      <span>Last: {sub.last_used ? new Date(sub.last_used).toLocaleDateString('he-IL') : '-'}</span>
                     </div>
                   </div>
                 ))}
