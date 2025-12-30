@@ -1,9 +1,8 @@
 'use client'
 
-import { useRef, useState, useEffect, useCallback } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { BarberCard } from '@/components/BarberCard'
 import { SectionContainer, SectionHeader, SectionContent } from './SectionContainer'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { BarberWithWorkDays } from '@/types/database'
 
@@ -15,17 +14,16 @@ interface TeamSectionProps {
  * Team Section with horizontal scroll on mobile and grid on desktop
  * 
  * Features:
- * - Auto-scroll animation on mobile (pauses on interaction)
- * - Horizontal scroll carousel on mobile
+ * - RTL-aware auto-scroll animation on mobile (pauses on interaction)
+ * - Smooth swipe gestures
  * - Grid layout on desktop (responsive)
- * - Scroll arrows for navigation
+ * - Infinite loop with duplicated items
  */
 export const TeamSection = ({ barbers }: TeamSectionProps) => {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [isPaused, setIsPaused] = useState(false)
-  const [canScrollLeft, setCanScrollLeft] = useState(false)
-  const [canScrollRight, setCanScrollRight] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const scrollPositionRef = useRef(0)
 
   const barberCount = barbers?.length || 0
 
@@ -39,63 +37,55 @@ export const TeamSection = ({ barbers }: TeamSectionProps) => {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  // Check scroll position for arrow visibility
-  const checkScroll = useCallback(() => {
-    const container = scrollRef.current
-    if (!container) return
-    
-    const { scrollLeft, scrollWidth, clientWidth } = container
-    setCanScrollLeft(scrollLeft > 10)
-    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10)
-  }, [])
-
-  // Auto-scroll effect for mobile
+  // RTL-aware auto-scroll effect for mobile
   useEffect(() => {
     const container = scrollRef.current
     if (!container || !isMobile || isPaused || barberCount < 2) return
 
-    const scrollSpeed = 0.3 // Slow auto-scroll
+    const scrollSpeed = 0.4 // pixels per frame
     let animationId: number
-
+    const isRTL = document.documentElement.dir === 'rtl' || document.documentElement.lang === 'he'
+    
     const autoScroll = () => {
       if (!container) return
       
-      const { scrollLeft, scrollWidth, clientWidth } = container
-      const maxScroll = scrollWidth - clientWidth
+      // Increment our tracked position
+      scrollPositionRef.current += scrollSpeed
       
-      // Reset to start when reaching end
-      if (scrollLeft >= maxScroll - 1) {
-        container.scrollLeft = 0
+      // Reset when we've scrolled the width of original items (half of duplicated)
+      const resetPoint = (barberCount * 296) // card width (280) + gap (16)
+      if (scrollPositionRef.current >= resetPoint) {
+        scrollPositionRef.current = 0
+        container.scrollLeft = isRTL ? 0 : 0
       } else {
-        container.scrollLeft += scrollSpeed
+        // In RTL, we need to scroll in the negative direction
+        if (isRTL) {
+          container.scrollLeft = -scrollPositionRef.current
+        } else {
+          container.scrollLeft = scrollPositionRef.current
+        }
       }
       
       animationId = requestAnimationFrame(autoScroll)
     }
+
+    // Initialize scroll position
+    scrollPositionRef.current = isRTL ? 0 : container.scrollLeft
 
     animationId = requestAnimationFrame(autoScroll)
     
     return () => cancelAnimationFrame(animationId)
   }, [isMobile, isPaused, barberCount])
 
-  useEffect(() => {
-    const container = scrollRef.current
-    if (!container || !isMobile) return
-
-    checkScroll()
-    container.addEventListener('scroll', checkScroll, { passive: true })
-    return () => container.removeEventListener('scroll', checkScroll)
-  }, [isMobile, barbers, checkScroll])
-
-  const scroll = (direction: 'left' | 'right') => {
-    if (!scrollRef.current) return
-    const cardWidth = 300
-    const scrollAmount = direction === 'left' ? -cardWidth : cardWidth
-    scrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' })
-  }
-
   const handleInteractionStart = () => setIsPaused(true)
-  const handleInteractionEnd = () => setIsPaused(false)
+  const handleInteractionEnd = () => {
+    // Sync our ref with actual scroll position when user finishes interacting
+    if (scrollRef.current) {
+      const isRTL = document.documentElement.dir === 'rtl' || document.documentElement.lang === 'he'
+      scrollPositionRef.current = isRTL ? -scrollRef.current.scrollLeft : scrollRef.current.scrollLeft
+    }
+    setIsPaused(false)
+  }
 
   if (!barbers || barbers.length === 0) {
     return (
@@ -130,43 +120,24 @@ export const TeamSection = ({ barbers }: TeamSectionProps) => {
         onTouchStart={handleInteractionStart}
         onTouchEnd={handleInteractionEnd}
       >
-        {/* Scroll arrows */}
-        {canScrollRight && (
-          <button
-            onClick={() => scroll('right')}
-            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-background-dark/90 border border-white/10 flex items-center justify-center text-foreground-light hover:text-accent-gold hover:border-accent-gold/50 transition-all shadow-lg backdrop-blur-sm"
-            aria-label="הבא"
-          >
-            <ChevronLeft size={20} strokeWidth={2} />
-          </button>
-        )}
-        {canScrollLeft && (
-          <button
-            onClick={() => scroll('left')}
-            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-background-dark/90 border border-white/10 flex items-center justify-center text-foreground-light hover:text-accent-gold hover:border-accent-gold/50 transition-all shadow-lg backdrop-blur-sm"
-            aria-label="הקודם"
-          >
-            <ChevronRight size={20} strokeWidth={2} />
-          </button>
-        )}
+        {/* Gradient masks for edge fade effect */}
+        <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-background-dark to-transparent z-[1] pointer-events-none" />
+        <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-background-dark to-transparent z-[1] pointer-events-none" />
 
-        {/* Gradient masks */}
-        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background-dark to-transparent z-[1] pointer-events-none" />
-        <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background-dark to-transparent z-[1] pointer-events-none" />
-
-        {/* Carousel container */}
+        {/* Carousel container - smooth touch scrolling */}
         <div 
           ref={scrollRef}
-          className="flex gap-4 overflow-x-auto scrollbar-hide px-4 py-2"
+          className="flex gap-4 overflow-x-auto scrollbar-hide px-4 py-2 snap-x snap-mandatory"
           style={{ 
             scrollPaddingInline: '16px',
             WebkitOverflowScrolling: 'touch',
+            scrollBehavior: 'auto',
           }}
         >
           {displayBarbers.map((barber, index) => (
             <div 
               key={`${barber.id}-${index}`}
-              className="flex-shrink-0 w-[280px]"
+              className="flex-shrink-0 w-[280px] snap-center"
             >
               <BarberCard barber={barber} index={index % barberCount} />
             </div>

@@ -34,7 +34,7 @@ export function BarberCard({ barber, index = 0 }: BarberCardProps) {
   // Check if barber is available today
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
   const isAvailableToday = barber.work_days?.some(
-    (day) => day.day_of_week === today && day.is_active
+    (day) => day.day_of_week === today && day.is_working
   )
 
   const handleNavigation = () => {

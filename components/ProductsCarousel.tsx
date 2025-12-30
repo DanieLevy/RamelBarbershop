@@ -1,10 +1,10 @@
 'use client'
 
-import { useRef, useState, useEffect, useCallback } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { SectionContainer, SectionHeader, SectionContent } from './home/SectionContainer'
-import { ChevronLeft, ChevronRight, ShoppingBag } from 'lucide-react'
+import { ChevronLeft, ShoppingBag } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Product } from '@/types/database'
 
@@ -13,10 +13,10 @@ interface ProductsCarouselProps {
 }
 
 /**
- * Products Carousel with auto-scroll and swipe gestures
+ * Products Carousel with RTL-aware auto-scroll and swipe gestures
  * 
  * Features:
- * - Auto-scroll animation (pauses on hover/touch)
+ * - RTL-aware auto-scroll animation (pauses on hover/touch)
  * - Native touch swipe
  * - Infinite loop effect
  * - Hover zoom on product images
@@ -24,72 +24,66 @@ interface ProductsCarouselProps {
 export function ProductsCarousel({ products }: ProductsCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [isPaused, setIsPaused] = useState(false)
-  const [canScrollLeft, setCanScrollLeft] = useState(false)
-  const [canScrollRight, setCanScrollRight] = useState(false)
+  const scrollPositionRef = useRef(0)
   
   const productCount = products?.length || 0
 
-  // Check scroll position for arrows
-  const checkScroll = useCallback(() => {
-    if (!scrollRef.current) return
-    
-    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current
-    setCanScrollLeft(scrollLeft > 10)
-    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10)
-  }, [])
-
-  // Auto-scroll effect
+  // RTL-aware auto-scroll effect
   useEffect(() => {
     const container = scrollRef.current
     if (!container || isPaused || productCount < 3) return
 
-    const scrollSpeed = 0.5 // pixels per frame
+    const scrollSpeed = 0.7 // pixels per frame - faster than barbers
     let animationId: number
-
+    const isRTL = document.documentElement.dir === 'rtl' || document.documentElement.lang === 'he'
+    
     const autoScroll = () => {
       if (!container) return
       
-      const { scrollLeft, scrollWidth, clientWidth } = container
-      const maxScroll = scrollWidth - clientWidth
+      // Increment our tracked position
+      scrollPositionRef.current += scrollSpeed
       
-      // Reset to start when reaching end
-      if (scrollLeft >= maxScroll - 1) {
-        container.scrollLeft = 0
+      // Reset when we've scrolled the width of original items (half of duplicated)
+      const cardWidth = 216 + 16 // card width + gap
+      const resetPoint = productCount * cardWidth
+      
+      if (scrollPositionRef.current >= resetPoint) {
+        scrollPositionRef.current = 0
+        container.scrollLeft = isRTL ? 0 : 0
       } else {
-        container.scrollLeft += scrollSpeed
+        // In RTL, scroll in the negative direction
+        if (isRTL) {
+          container.scrollLeft = -scrollPositionRef.current
+        } else {
+          container.scrollLeft = scrollPositionRef.current
+        }
       }
       
       animationId = requestAnimationFrame(autoScroll)
     }
 
+    // Initialize scroll position
+    scrollPositionRef.current = isRTL ? 0 : container.scrollLeft
+
     animationId = requestAnimationFrame(autoScroll)
     
     return () => cancelAnimationFrame(animationId)
   }, [isPaused, productCount])
-
-  useEffect(() => {
-    const container = scrollRef.current
-    if (!container) return
-
-    checkScroll()
-    container.addEventListener('scroll', checkScroll, { passive: true })
-    return () => container.removeEventListener('scroll', checkScroll)
-  }, [checkScroll])
   
   // Early return after all hooks
   if (!products || products.length === 0) {
     return null
   }
 
-  const scroll = (direction: 'left' | 'right') => {
-    if (!scrollRef.current) return
-    const cardWidth = 240 + 16
-    const scrollAmount = direction === 'left' ? -cardWidth : cardWidth
-    scrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' })
-  }
-
   const handleInteractionStart = () => setIsPaused(true)
-  const handleInteractionEnd = () => setIsPaused(false)
+  const handleInteractionEnd = () => {
+    // Sync our ref with actual scroll position when user finishes interacting
+    if (scrollRef.current) {
+      const isRTL = document.documentElement.dir === 'rtl' || document.documentElement.lang === 'he'
+      scrollPositionRef.current = isRTL ? -scrollRef.current.scrollLeft : scrollRef.current.scrollLeft
+    }
+    setIsPaused(false)
+  }
 
   // Duplicate products for seamless loop effect
   const displayProducts = productCount > 2 ? [...products, ...products] : products
@@ -111,47 +105,18 @@ export function ProductsCarousel({ products }: ProductsCarouselProps) {
         onTouchStart={handleInteractionStart}
         onTouchEnd={handleInteractionEnd}
       >
-        {/* Navigation arrows - desktop only */}
-        <button
-          onClick={() => scroll('right')}
-          disabled={!canScrollRight}
-          className={cn(
-            'hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 z-10',
-            'w-12 h-12 rounded-full bg-background-dark/90 border border-white/10',
-            'items-center justify-center text-foreground-light',
-            'hover:text-accent-gold hover:border-accent-gold/50 transition-all shadow-lg backdrop-blur-sm',
-            'disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-foreground-light disabled:hover:border-white/10'
-          )}
-          aria-label="הבא"
-        >
-          <ChevronLeft size={24} strokeWidth={2} />
-        </button>
-        <button
-          onClick={() => scroll('left')}
-          disabled={!canScrollLeft}
-          className={cn(
-            'hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 z-10',
-            'w-12 h-12 rounded-full bg-background-dark/90 border border-white/10',
-            'items-center justify-center text-foreground-light',
-            'hover:text-accent-gold hover:border-accent-gold/50 transition-all shadow-lg backdrop-blur-sm',
-            'disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-foreground-light disabled:hover:border-white/10'
-          )}
-          aria-label="הקודם"
-        >
-          <ChevronRight size={24} strokeWidth={2} />
-        </button>
+        {/* Gradient masks for edge fade effect */}
+        <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-20 bg-gradient-to-l from-background-darker to-transparent z-[1] pointer-events-none" />
+        <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-20 bg-gradient-to-r from-background-darker to-transparent z-[1] pointer-events-none" />
 
-        {/* Gradient masks */}
-        <div className="absolute right-0 top-0 bottom-0 w-8 sm:w-16 bg-gradient-to-l from-background-darker to-transparent z-[1] pointer-events-none" />
-        <div className="absolute left-0 top-0 bottom-0 w-8 sm:w-16 bg-gradient-to-r from-background-darker to-transparent z-[1] pointer-events-none" />
-
-        {/* Products scroll container */}
+        {/* Products scroll container - smooth touch scrolling */}
         <div 
           ref={scrollRef}
-          className="flex gap-4 overflow-x-auto scrollbar-hide px-4 sm:px-8 py-4"
+          className="flex gap-4 overflow-x-auto scrollbar-hide px-4 sm:px-8 py-4 snap-x snap-mandatory"
           style={{ 
             scrollPaddingInline: '16px',
             WebkitOverflowScrolling: 'touch',
+            scrollBehavior: 'auto',
           }}
         >
           {displayProducts.map((product, index) => (
@@ -190,7 +155,7 @@ interface ProductCardProps {
 function ProductCard({ product, index }: ProductCardProps) {
   return (
     <div 
-      className="flex-shrink-0 w-[200px] sm:w-[220px]"
+      className="flex-shrink-0 w-[200px] sm:w-[216px] snap-center"
       style={{ animationDelay: `${index * 50}ms` }}
     >
       <div className={cn(

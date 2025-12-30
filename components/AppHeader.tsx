@@ -135,12 +135,14 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
             onClick={() => setShowUserMenu(!showUserMenu)}
             className={cn(
               'flex items-center gap-2 rounded-full transition-all',
-              'bg-accent-gold/20 hover:bg-accent-gold/30 border border-accent-gold/40',
+              'bg-accent-gold/10 hover:bg-accent-gold/20',
+              'backdrop-blur-md border border-accent-gold/30',
+              'shadow-[0_2px_12px_rgba(255,170,61,0.1)]',
               compact ? 'px-2.5 py-1.5' : 'px-3 py-2'
             )}
           >
             <div className={cn(
-              'rounded-full bg-accent-gold/40 flex items-center justify-center',
+              'rounded-full bg-accent-gold/30 backdrop-blur-sm flex items-center justify-center',
               compact ? 'w-6 h-6' : 'w-7 h-7'
             )}>
               <Scissors size={compact ? 12 : 14} strokeWidth={1.5} className="text-accent-gold" />
@@ -231,12 +233,14 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
             onClick={() => setShowUserMenu(!showUserMenu)}
             className={cn(
               'flex items-center gap-2 rounded-full transition-all',
-              'bg-white/10 hover:bg-white/15 border border-white/20',
+              'bg-white/5 hover:bg-white/10',
+              'backdrop-blur-md border border-white/15',
+              'shadow-[0_2px_12px_rgba(0,0,0,0.15)]',
               compact ? 'px-2.5 py-1.5' : 'px-3 py-2'
             )}
           >
             <div className={cn(
-              'rounded-full bg-accent-gold/30 flex items-center justify-center',
+              'rounded-full bg-accent-gold/25 backdrop-blur-sm flex items-center justify-center',
               compact ? 'w-6 h-6' : 'w-7 h-7'
             )}>
               <User size={compact ? 12 : 14} strokeWidth={1.5} className="text-accent-gold" />
@@ -325,13 +329,13 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
           top: 'var(--header-top-offset, 0px)',
         }}
       >
-        {/* Scroll Progress Bar */}
+        {/* Scroll Progress Bar - ultra thin with white gradient */}
         <div 
-          className="absolute top-0 left-0 right-0 h-0.5 bg-white/10"
+          className="absolute top-0 left-0 right-0 h-px"
           style={{ opacity: scrollProgress > 0.3 ? 1 : 0, transition: 'opacity 0.3s' }}
         >
           <div 
-            className="h-full bg-gradient-to-r from-accent-gold via-accent-gold-light to-accent-gold transition-all duration-100"
+            className="h-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-all duration-100"
             style={{ width: `${pageScrollProgress}%` }}
           />
         </div>

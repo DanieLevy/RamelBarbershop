@@ -147,21 +147,31 @@ export const HeroSection = ({
             {subtitle}
           </p>
 
-          {/* Decorative divider - elegant scissors icon */}
+          {/* Decorative divider - elegant diamond ornament */}
           <div 
             className={cn(
-              'flex items-center justify-center gap-3 mb-6 sm:mb-8 transition-all duration-1000 ease-reveal',
+              'flex items-center justify-center mb-6 sm:mb-8 transition-all duration-1000 ease-reveal',
               isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
             )}
             style={{ transitionDelay: '400ms' }}
           >
-            <div className="h-px w-16 sm:w-24 bg-gradient-to-r from-transparent via-white/20 to-white/40" />
-            <div className="flex items-center gap-1">
-              <div className="w-1 h-1 rounded-full bg-white/40" />
-              <div className="w-1.5 h-1.5 rounded-full bg-accent-gold/60" />
-              <div className="w-1 h-1 rounded-full bg-white/40" />
+            <div className="relative flex items-center">
+              {/* Left line */}
+              <div className="w-16 sm:w-28 h-px bg-gradient-to-r from-transparent via-white/15 to-white/30" />
+              
+              {/* Center ornament - elegant diamond pattern */}
+              <div className="mx-3 sm:mx-4 flex items-center gap-2">
+                <div className="w-1 h-1 rotate-45 bg-white/25 transition-colors" />
+                <div className="relative">
+                  <div className="w-2.5 h-2.5 rotate-45 bg-gradient-to-br from-accent-gold/70 to-accent-gold/40 shadow-[0_0_12px_rgba(255,170,61,0.4)]" />
+                  <div className="absolute inset-0 w-2.5 h-2.5 rotate-45 bg-accent-gold/30 animate-pulse" style={{ animationDuration: '2s' }} />
+                </div>
+                <div className="w-1 h-1 rotate-45 bg-white/25 transition-colors" />
+              </div>
+              
+              {/* Right line */}
+              <div className="w-16 sm:w-28 h-px bg-gradient-to-l from-transparent via-white/15 to-white/30" />
             </div>
-            <div className="h-px w-16 sm:w-24 bg-gradient-to-l from-transparent via-white/20 to-white/40" />
           </div>
 
           {/* Description */}

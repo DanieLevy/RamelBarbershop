@@ -1,9 +1,9 @@
 // Service Worker for Ramel Barbershop PWA
 // Version is updated automatically during build
-const APP_VERSION = '2.0.0-2025.12.30.0234';
+const APP_VERSION = '2.0.0-2025.12.30.0259';
 const CACHE_NAME = `ramel-pwa-${APP_VERSION}`;
 
-// Assets to cache (minimal - only critical for app shell)
+// Assets to cache - critical for app shell and fast loading
 const STATIC_ASSETS = [
   '/manifest.json',
   '/fonts/ploni-regular-aaa.otf',
@@ -11,8 +11,13 @@ const STATIC_ASSETS = [
   '/fonts/ploni-ultralight-aaa.otf',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
-  '/apple-touch-icon.png'
+  '/icons/icon-72x72.png',
+  '/apple-touch-icon.png',
+  '/icon.png'
 ];
+
+// Next.js static assets pattern - cached with stale-while-revalidate
+const NEXT_STATIC_PATTERN = /^\/_next\/static\//;
 
 // Install event - cache static assets
 // IMPORTANT: Do NOT call skipWaiting() here - we want the SW to enter "waiting" state
@@ -81,24 +86,49 @@ self.addEventListener('fetch', (event) => {
   // Skip Supabase and external requests
   if (!url.origin.includes(self.location.origin)) return;
 
-  // For navigation requests - always network first
+  // For navigation requests - network first with offline fallback
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .catch(() => {
-          // Could return offline page here if needed
-          return new Response('Offline', { status: 503 });
+          // Return branded offline page
+          return new Response(getOfflinePage(), {
+            status: 503,
+            headers: { 'Content-Type': 'text/html; charset=utf-8' }
+          });
         })
     );
     return;
   }
 
-  // For static assets (fonts, icons) - cache first, network fallback
+  // For Next.js static assets - stale-while-revalidate strategy
+  if (NEXT_STATIC_PATTERN.test(url.pathname)) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then(async (cache) => {
+        const cachedResponse = await cache.match(request);
+        
+        // Fetch in background to update cache
+        const fetchPromise = fetch(request).then((networkResponse) => {
+          if (networkResponse.ok) {
+            cache.put(request, networkResponse.clone());
+          }
+          return networkResponse;
+        }).catch(() => cachedResponse);
+
+        // Return cached immediately, or wait for network
+        return cachedResponse || fetchPromise;
+      })
+    );
+    return;
+  }
+
+  // For static assets (fonts, icons, images) - cache first, network fallback
   const isStaticAsset = 
     url.pathname.startsWith('/fonts/') ||
     url.pathname.startsWith('/icons/') ||
     url.pathname === '/manifest.json' ||
-    url.pathname === '/apple-touch-icon.png';
+    url.pathname === '/apple-touch-icon.png' ||
+    url.pathname === '/icon.png';
 
   if (isStaticAsset) {
     event.respondWith(
@@ -124,6 +154,90 @@ self.addEventListener('fetch', (event) => {
   // All other requests - network only (real-time data)
   // Don't cache dynamic content
 });
+
+/**
+ * Generate branded offline page HTML
+ */
+function getOfflinePage() {
+  return `<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#080b0d">
+  <title>אין חיבור לאינטרנט - רמאל ברברשופ</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #080b0d;
+      color: #e5e5e5;
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 24px;
+      padding-top: env(safe-area-inset-top, 24px);
+      padding-bottom: env(safe-area-inset-bottom, 24px);
+    }
+    .container {
+      text-align: center;
+      max-width: 320px;
+    }
+    .logo {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      margin-bottom: 24px;
+      border: 2px solid rgba(255, 170, 61, 0.3);
+      opacity: 0.8;
+    }
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .gold { color: #ffaa3d; }
+    p {
+      color: #9ca3af;
+      font-size: 0.9rem;
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+    .icon {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+    button {
+      background: #ffaa3d;
+      color: #080b0d;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5">
+      <path d="M1 1l22 22M9 9v-3a3 3 0 0 1 5.12-2.12M15 15.53c-.28.17-.58.31-.88.43-1.46.6-3.24.6-4.7 0A7 7 0 0 1 5 9m14 0a7 7 0 0 1-.33 2.12M5 19a10.94 10.94 0 0 0 7 2.54c2.24 0 4.3-.63 6-1.7" stroke-linecap="round"/>
+    </svg>
+    <img src="/icon.png" alt="" class="logo">
+    <h1>רמאל <span class="gold">ברברשופ</span></h1>
+    <p>אין חיבור לאינטרנט.<br>אנא בדוק את החיבור ונסה שוב.</p>
+    <button onclick="location.reload()">נסה שוב</button>
+  </div>
+</body>
+</html>`;
+}
 
 // Message handler for skip waiting
 self.addEventListener('message', (event) => {
