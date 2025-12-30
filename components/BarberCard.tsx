@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef, useCallback } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { BarberWithWorkDays } from '@/types/database'
@@ -9,12 +9,34 @@ import { cn } from '@/lib/utils'
 
 interface BarberCardProps {
   barber: BarberWithWorkDays
+  /** Index for staggered animation */
+  index?: number
 }
 
-export function BarberCard({ barber }: BarberCardProps) {
+/**
+ * Enhanced Barber Card with 3D tilt, status indicator, and micro-interactions
+ * 
+ * Features:
+ * - 3D tilt effect on hover (desktop)
+ * - Image parallax on hover
+ * - Availability status indicator
+ * - Loading state with skeleton
+ * - Accessible keyboard navigation
+ */
+export function BarberCard({ barber, index = 0 }: BarberCardProps) {
   const [isPending, startTransition] = useTransition()
   const [isNavigating, setIsNavigating] = useState(false)
+  const [tilt, setTilt] = useState({ x: 0, y: 0 })
+  const cardRef = useRef<HTMLAnchorElement>(null)
   
+  const showLoader = isPending || isNavigating
+
+  // Check if barber is available today
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
+  const isAvailableToday = barber.work_days?.some(
+    (day) => day.day_of_week === today && day.is_active
+  )
+
   const handleNavigation = () => {
     setIsNavigating(true)
     startTransition(() => {
@@ -22,14 +44,40 @@ export function BarberCard({ barber }: BarberCardProps) {
     })
   }
 
-  const showLoader = isPending || isNavigating
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!cardRef.current) return
+    
+    const rect = cardRef.current.getBoundingClientRect()
+    const x = (e.clientX - rect.left) / rect.width - 0.5
+    const y = (e.clientY - rect.top) / rect.height - 0.5
+    
+    // Tilt max 8 degrees
+    setTilt({
+      x: y * -8,
+      y: x * 8,
+    })
+  }, [])
+
+  const handleMouseLeave = useCallback(() => {
+    setTilt({ x: 0, y: 0 })
+  }, [])
 
   return (
     <Link
+      ref={cardRef}
       href={`/barber/${barber.id}`}
       prefetch={true}
       onClick={handleNavigation}
-      className="group relative w-full block"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      className={cn(
+        'group relative w-full block animate-reveal-up',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-gold focus-visible:ring-offset-2 focus-visible:ring-offset-background-dark rounded-2xl'
+      )}
+      style={{ 
+        animationDelay: `${index * 100}ms`,
+        animationFillMode: 'both',
+      }}
       aria-label={`קבע תור אצל ${barber.fullname}`}
     >
       {/* Loading overlay */}
@@ -42,37 +90,80 @@ export function BarberCard({ barber }: BarberCardProps) {
         </div>
       )}
       
-      {/* Card container - Modern glass design */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-white/[0.08] to-white/[0.02] border border-white/10 transition-all duration-500 hover:border-accent-gold/40 hover:shadow-[0_0_40px_-10px] hover:shadow-accent-gold/30 group-hover:scale-[1.02]">
-        
-        {/* Hero Image Section - Large featured image */}
-        <div className="relative h-56 sm:h-64 overflow-hidden">
-          {/* Background Image */}
-          <Image
-            src={barber.img_url || '/icon.png'}
-            alt={barber.fullname}
-            fill
-            className="object-cover object-top transition-transform duration-700 group-hover:scale-110"
-            sizes="(max-width: 640px) 100vw, 400px"
+      {/* Card container with 3D tilt */}
+      <div 
+        className={cn(
+          'relative overflow-hidden rounded-2xl',
+          'bg-gradient-to-b from-white/[0.08] to-white/[0.02]',
+          'border border-white/10 transition-all duration-500 ease-out',
+          'hover:border-accent-gold/40 hover:shadow-gold-lg',
+          'active:scale-[0.98]'
+        )}
+        style={{
+          transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale(${tilt.x !== 0 || tilt.y !== 0 ? 1.02 : 1})`,
+          transformStyle: 'preserve-3d',
+          transition: 'transform 0.15s ease-out, border-color 0.5s, box-shadow 0.5s',
+        }}
+      >
+        {/* Status indicator */}
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full bg-background-dark/80 backdrop-blur-sm border border-white/10">
+          <span 
+            className={cn(
+              'w-2 h-2 rounded-full',
+              isAvailableToday 
+                ? 'bg-status-available shadow-[0_0_8px_rgba(34,197,94,0.5)]' 
+                : 'bg-status-busy shadow-[0_0_8px_rgba(234,179,8,0.5)]'
+            )}
           />
+          <span className="text-xs text-foreground-light">
+            {isAvailableToday ? 'זמין היום' : 'לא זמין היום'}
+          </span>
+        </div>
+        
+        {/* Hero Image Section */}
+        <div className="relative h-52 sm:h-60 overflow-hidden">
+          {/* Background Image with parallax */}
+          <div 
+            className="absolute inset-0 transition-transform duration-700 ease-out"
+            style={{
+              transform: `translate(${tilt.y * 2}px, ${tilt.x * -2}px) scale(1.1)`,
+            }}
+          >
+            <Image
+              src={barber.img_url || '/icon.png'}
+              alt={barber.fullname}
+              fill
+              className="object-cover object-top"
+              sizes="(max-width: 640px) 100vw, 400px"
+            />
+          </div>
           
           {/* Gradient Overlays */}
-          <div className="absolute inset-0 bg-gradient-to-t from-background-dark via-background-dark/40 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-b from-background-dark/30 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background-dark via-background-dark/30 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-background-dark/20 via-transparent to-transparent" />
           
           {/* Top Decorative Line */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-accent-gold to-transparent opacity-60 group-hover:opacity-100 transition-opacity" />
+          <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-accent-gold to-transparent opacity-50 group-hover:opacity-100 transition-opacity duration-300" />
           
-          {/* Barber Name Overlay - Positioned at bottom of image */}
-          <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5">
+          {/* Barber Name Overlay */}
+          <div className="absolute bottom-0 left-0 right-0 p-4">
             <h3 className="text-xl sm:text-2xl font-bold text-foreground-light drop-shadow-lg group-hover:text-accent-gold transition-colors duration-300">
               {barber.fullname}
             </h3>
           </div>
+
+          {/* Shine effect on hover */}
+          <div 
+            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+            style={{
+              background: `linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.03) 45%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.03) 55%, transparent 60%)`,
+              transform: `translateX(${tilt.y * 30}px)`,
+            }}
+          />
         </div>
         
-        {/* Action Section - Clean CTA */}
-        <div className="p-4 sm:p-5 bg-background-dark/50 backdrop-blur-sm">
+        {/* Action Section */}
+        <div className="p-4 bg-background-dark/50 backdrop-blur-sm">
           <div className={cn(
             'flex items-center justify-between py-3 px-4 rounded-xl transition-all duration-300',
             'bg-accent-gold/10 border border-accent-gold/30',
@@ -91,14 +182,16 @@ export function BarberCard({ barber }: BarberCardProps) {
             <ChevronLeft 
               size={18} 
               strokeWidth={2} 
-              className="text-accent-gold/50 group-hover:text-background-dark group-hover:translate-x-[-4px] transition-all duration-300" 
+              className="text-accent-gold/50 group-hover:text-background-dark group-hover:-translate-x-1 transition-all duration-300" 
             />
           </div>
         </div>
         
-        {/* Decorative corner accents - visible on hover */}
-        <div className="absolute top-2 left-2 w-4 h-4 border-t border-l border-accent-gold/0 rounded-tl-lg group-hover:border-accent-gold/50 transition-colors duration-300" />
-        <div className="absolute top-2 right-2 w-4 h-4 border-t border-r border-accent-gold/0 rounded-tr-lg group-hover:border-accent-gold/50 transition-colors duration-300" />
+        {/* Decorative corner accents */}
+        <div className="absolute top-2 left-2 w-4 h-4 border-t border-l border-transparent rounded-tl-lg group-hover:border-accent-gold/50 transition-colors duration-300" />
+        <div className="absolute top-2 right-2 w-4 h-4 border-t border-r border-transparent rounded-tr-lg group-hover:border-accent-gold/50 transition-colors duration-300" />
+        <div className="absolute bottom-2 left-2 w-4 h-4 border-b border-l border-transparent rounded-bl-lg group-hover:border-accent-gold/50 transition-colors duration-300" />
+        <div className="absolute bottom-2 right-2 w-4 h-4 border-b border-r border-transparent rounded-br-lg group-hover:border-accent-gold/50 transition-colors duration-300" />
       </div>
     </Link>
   )

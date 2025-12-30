@@ -2,11 +2,11 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { MapPin, Phone, Clock } from 'lucide-react'
-import { formatOpeningHours } from '@/lib/utils'
+import { MapPin, Phone } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import type { BarbershopSettings } from '@/types/database'
 
-// Custom SVG icons for social media (Lucide doesn't have brand icons)
+// Social icons
 const WhatsAppIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
@@ -29,10 +29,18 @@ interface FooterProps {
   settings?: BarbershopSettings | null
 }
 
+/**
+ * Compact Footer with safe area handling
+ * 
+ * Features:
+ * - Compact single-column on mobile
+ * - Logo + tagline
+ * - Essential links only
+ * - Social icons row
+ * - Safe area padding for bottom nav
+ */
 export function Footer({ settings }: FooterProps) {
   const currentYear = new Date().getFullYear()
-
-  // Get values from settings with defaults
   const shopName = settings?.name || 'רמאל ברברשופ'
   const phone = settings?.contact_phone || settings?.phone || '052-384-0981'
   const addressText = settings?.address_text || 'בית הכרם 30, ירושלים'
@@ -40,48 +48,34 @@ export function Footer({ settings }: FooterProps) {
   const instagramUrl = settings?.social_instagram || 'https://www.instagram.com/ram__el_barber_shop/'
   const facebookUrl = settings?.social_facebook || 'https://www.facebook.com/ramel.leusani'
   
-  // Visibility toggles
   const showWhatsapp = settings?.show_whatsapp !== false
   const showInstagram = settings?.show_instagram !== false
   const showFacebook = settings?.show_facebook !== false
-  
-  // Working hours
-  const workStart = settings?.work_hours_start?.slice(0, 5) || '09:00'
-  const workEnd = settings?.work_hours_end?.slice(0, 5) || '20:00'
-  const openDays = settings?.open_days || ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday']
-  
-  // Get formatted opening hours for display
-  const openingHoursDisplay = formatOpeningHours(openDays, workStart, workEnd, '14:00')
-  // For footer, we just show a compact version - main days and friday if open
-  const mainHours = openingHoursDisplay.filter(h => !h.isClosed).slice(0, 2)
 
-  // Build social links array based on visibility
+  // Build social links
   const socialLinks = []
-  
   if (showWhatsapp) {
     socialLinks.push({
       name: 'WhatsApp',
       icon: WhatsAppIcon,
       url: `https://wa.me/${whatsappNumber}`,
-      color: 'hover:text-green-400',
+      hoverColor: 'hover:text-green-400 hover:border-green-400/50',
     })
   }
-  
   if (showInstagram && instagramUrl) {
     socialLinks.push({
       name: 'Instagram',
       icon: InstagramIcon,
       url: instagramUrl,
-      color: 'hover:text-pink-400',
+      hoverColor: 'hover:text-pink-400 hover:border-pink-400/50',
     })
   }
-  
   if (showFacebook && facebookUrl) {
     socialLinks.push({
       name: 'Facebook',
       icon: FacebookIcon,
       url: facebookUrl,
-      color: 'hover:text-blue-400',
+      hoverColor: 'hover:text-blue-400 hover:border-blue-400/50',
     })
   }
 
@@ -90,107 +84,64 @@ export function Footer({ settings }: FooterProps) {
   const telLink = formattedPhone.startsWith('+') ? formattedPhone : '+972' + formattedPhone.replace(/^0/, '')
 
   return (
-    <footer className="bg-[#080b0d] border-t border-white/10">
-      {/* Main footer content */}
-      <div className="container-mobile py-10 md:py-12">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
-          {/* Logo and description */}
-          <div className="sm:col-span-2 lg:col-span-1">
-            <Link href="/" className="inline-block mb-4">
-              <div className="w-16 h-16 rounded-full overflow-hidden border border-accent-gold/30 shadow-gold-sm">
+    <footer className="bg-background-darker border-t border-white/5">
+      <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-8 sm:py-10">
+        {/* Main footer content - Compact layout */}
+        <div className="flex flex-col items-center text-center sm:flex-row sm:text-right sm:items-start sm:justify-between gap-6">
+          {/* Logo + Info */}
+          <div className="flex flex-col items-center sm:items-start gap-4">
+            <Link href="/" className="inline-block">
+              <div className="w-12 h-12 rounded-full overflow-hidden border border-accent-gold/30 shadow-gold-sm">
                 <Image
                   src="/icon.png"
                   alt={shopName}
-                  width={64}
-                  height={64}
+                  width={48}
+                  height={48}
                   className="w-full h-full object-cover"
                 />
               </div>
             </Link>
-            <p className="text-foreground-muted text-sm leading-relaxed">
-              {shopName} - מספרה מקצועית בירושלים.
-              <br />
-              חוויית טיפוח ייחודית לגבר המודרני.
-            </p>
-          </div>
-
-          {/* Quick links */}
-          <div>
-            <h4 className="text-foreground-light font-medium mb-4">קישורים מהירים</h4>
-            <ul className="space-y-2">
-              <li>
-                <Link
-                  href="/"
-                  className="text-foreground-muted hover:text-accent-gold transition-colors text-sm"
-                >
-                  דף הבית
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/#index-body"
-                  className="text-foreground-muted hover:text-accent-gold transition-colors text-sm"
-                >
-                  קבע תור
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/my-appointments"
-                  className="text-foreground-muted hover:text-accent-gold transition-colors text-sm"
-                >
-                  התורים שלי
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Contact info */}
-          <div>
-            <h4 className="text-foreground-light font-medium mb-4">יצירת קשר</h4>
-            <ul className="space-y-3">
-              <li className="flex items-center gap-3 text-sm">
-                <MapPin size={16} strokeWidth={1.5} className="text-accent-gold flex-shrink-0" />
-                <span className="text-foreground-muted">{addressText}</span>
-              </li>
-              <li>
-                <a
-                  href={`tel:${telLink}`}
-                  className="flex items-center gap-3 text-sm text-foreground-muted hover:text-accent-gold transition-colors"
-                >
-                  <Phone size={16} strokeWidth={1.5} className="text-accent-gold flex-shrink-0" />
-                  <span dir="ltr">{phone}</span>
-                </a>
-              </li>
-              <li className="flex items-start gap-3 text-sm">
-                <Clock size={16} strokeWidth={1.5} className="text-accent-gold flex-shrink-0 mt-0.5" />
-                <div className="text-foreground-muted">
-                  {mainHours.map((item, index) => (
-                    <p key={index}>{item.days}: {item.hours}</p>
-                  ))}
-                </div>
-              </li>
-            </ul>
-          </div>
-
-          {/* Social links */}
-          {socialLinks.length > 0 && (
             <div>
-              <h4 className="text-foreground-light font-medium mb-4">עקבו אחרינו</h4>
-              <div className="flex items-center gap-4">
-                {socialLinks.map((social) => (
-                  <a
-                    key={social.name}
-                    href={social.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-foreground-muted transition-all hover:scale-110 ${social.color}`}
-                    aria-label={social.name}
-                  >
-                    <social.icon />
-                  </a>
-                ))}
-              </div>
+              <p className="text-foreground-light font-medium mb-1">{shopName}</p>
+              <p className="text-foreground-muted text-sm">מספרה מקצועית בירושלים</p>
+            </div>
+          </div>
+
+          {/* Quick Info */}
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 text-sm">
+            <div className="flex items-center gap-2 justify-center sm:justify-start">
+              <MapPin size={14} className="text-accent-gold" />
+              <span className="text-foreground-muted">{addressText}</span>
+            </div>
+            <a 
+              href={`tel:${telLink}`}
+              className="flex items-center gap-2 justify-center sm:justify-start text-foreground-muted hover:text-accent-gold transition-colors"
+            >
+              <Phone size={14} className="text-accent-gold" />
+              <span dir="ltr">{phone}</span>
+            </a>
+          </div>
+
+          {/* Social Links */}
+          {socialLinks.length > 0 && (
+            <div className="flex items-center gap-3">
+              {socialLinks.map((social) => (
+                <a
+                  key={social.name}
+                  href={social.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    'w-10 h-10 rounded-full bg-white/5 border border-white/10',
+                    'flex items-center justify-center text-foreground-muted',
+                    'transition-all hover:scale-110',
+                    social.hoverColor
+                  )}
+                  aria-label={social.name}
+                >
+                  <social.icon />
+                </a>
+              ))}
             </div>
           )}
         </div>
@@ -198,20 +149,23 @@ export function Footer({ settings }: FooterProps) {
 
       {/* Bottom bar */}
       <div className="border-t border-white/5">
-        <div className="container-mobile py-4 flex items-center justify-between text-xs text-foreground-muted">
+        <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-foreground-muted">
           <p>© {currentYear} {shopName}. כל הזכויות שמורות.</p>
-          {/* Debug link - remove before production */}
-          <Link 
-            href="/debug" 
-            className="text-foreground-muted/50 hover:text-accent-gold transition-colors"
-          >
-            Debug
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/my-appointments" className="hover:text-accent-gold transition-colors">
+              התורים שלי
+            </Link>
+            <Link href="/profile" className="hover:text-accent-gold transition-colors">
+              הפרופיל שלי
+            </Link>
+          </div>
         </div>
       </div>
 
-      {/* Add spacing for mobile bottom nav */}
-      <div className="h-16 md:hidden" />
+      {/* Safe area padding for mobile bottom nav */}
+      <div className="h-20 md:h-0 pb-safe" />
     </footer>
   )
 }
+
+export default Footer
