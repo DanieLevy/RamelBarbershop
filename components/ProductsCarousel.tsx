@@ -13,36 +13,59 @@ interface ProductsCarouselProps {
 }
 
 /**
- * Products Carousel with native swipe gestures and peek effect
+ * Products Carousel with auto-scroll and swipe gestures
  * 
  * Features:
+ * - Auto-scroll animation (pauses on hover/touch)
  * - Native touch swipe
- * - Peek effect (shows partial next/prev cards)
- * - Scroll snap for precise card positioning
+ * - Infinite loop effect
  * - Hover zoom on product images
- * - Optional auto-scroll (pauses on interaction)
  */
 export function ProductsCarousel({ products }: ProductsCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [isPaused, setIsPaused] = useState(false)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
-  const [activeIndex, setActiveIndex] = useState(0)
   
   const productCount = products?.length || 0
 
-  // Check scroll position
+  // Check scroll position for arrows
   const checkScroll = useCallback(() => {
     if (!scrollRef.current) return
     
     const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current
     setCanScrollLeft(scrollLeft > 10)
     setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10)
+  }, [])
+
+  // Auto-scroll effect
+  useEffect(() => {
+    const container = scrollRef.current
+    if (!container || isPaused || productCount < 3) return
+
+    const scrollSpeed = 0.5 // pixels per frame
+    let animationId: number
+
+    const autoScroll = () => {
+      if (!container) return
+      
+      const { scrollLeft, scrollWidth, clientWidth } = container
+      const maxScroll = scrollWidth - clientWidth
+      
+      // Reset to start when reaching end
+      if (scrollLeft >= maxScroll - 1) {
+        container.scrollLeft = 0
+      } else {
+        container.scrollLeft += scrollSpeed
+      }
+      
+      animationId = requestAnimationFrame(autoScroll)
+    }
+
+    animationId = requestAnimationFrame(autoScroll)
     
-    // Calculate active index
-    const cardWidth = 240 + 16 // card width + gap
-    const newIndex = Math.round(scrollLeft / cardWidth)
-    setActiveIndex(Math.min(newIndex, productCount - 1))
-  }, [productCount])
+    return () => cancelAnimationFrame(animationId)
+  }, [isPaused, productCount])
 
   useEffect(() => {
     const container = scrollRef.current
@@ -65,17 +88,29 @@ export function ProductsCarousel({ products }: ProductsCarouselProps) {
     scrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' })
   }
 
+  const handleInteractionStart = () => setIsPaused(true)
+  const handleInteractionEnd = () => setIsPaused(false)
+
+  // Duplicate products for seamless loop effect
+  const displayProducts = productCount > 2 ? [...products, ...products] : products
+
   return (
     <SectionContainer variant="darker" animate={true}>
       <SectionContent>
         <SectionHeader 
           title="המוצרים שלנו" 
-          subtitle="מוצרי טיפוח מקצועיים לשימוש ביתי"
+          subtitle="מוצרי טיפוח איכותיים"
         />
       </SectionContent>
 
       {/* Carousel Container */}
-      <div className="relative">
+      <div 
+        className="relative"
+        onMouseEnter={handleInteractionStart}
+        onMouseLeave={handleInteractionEnd}
+        onTouchStart={handleInteractionStart}
+        onTouchEnd={handleInteractionEnd}
+      >
         {/* Navigation arrows - desktop only */}
         <button
           onClick={() => scroll('right')}
@@ -113,43 +148,24 @@ export function ProductsCarousel({ products }: ProductsCarouselProps) {
         {/* Products scroll container */}
         <div 
           ref={scrollRef}
-          className="flex gap-4 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4 sm:px-8 py-4"
-          style={{ scrollPaddingInline: '16px' }}
+          className="flex gap-4 overflow-x-auto scrollbar-hide px-4 sm:px-8 py-4"
+          style={{ 
+            scrollPaddingInline: '16px',
+            WebkitOverflowScrolling: 'touch',
+          }}
         >
-          {products.map((product, index) => (
+          {displayProducts.map((product, index) => (
             <ProductCard 
-              key={product.id} 
+              key={`${product.id}-${index}`} 
               product={product}
               index={index}
-              isActive={index === activeIndex}
-            />
-          ))}
-        </div>
-
-        {/* Scroll indicator dots - mobile only */}
-        <div className="flex sm:hidden justify-center gap-1.5 mt-4 px-4">
-          {products.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => {
-                if (!scrollRef.current) return
-                const cardWidth = 240 + 16
-                scrollRef.current.scrollTo({ left: cardWidth * index, behavior: 'smooth' })
-              }}
-              className={cn(
-                'w-2 h-2 rounded-full transition-all duration-300',
-                index === activeIndex 
-                  ? 'bg-accent-gold w-6' 
-                  : 'bg-white/20 hover:bg-white/40'
-              )}
-              aria-label={`מוצר ${index + 1}`}
             />
           ))}
         </div>
       </div>
 
       {/* View All CTA */}
-      <SectionContent className="mt-8 text-center">
+      <SectionContent className="mt-6 text-center">
         <Link
           href="/products"
           className="inline-flex items-center gap-3 px-6 py-3 rounded-xl border border-accent-gold/30 text-accent-gold hover:bg-accent-gold/10 hover:border-accent-gold/50 transition-all group"
@@ -166,23 +182,16 @@ export function ProductsCarousel({ products }: ProductsCarouselProps) {
 interface ProductCardProps {
   product: Product
   index: number
-  isActive: boolean
 }
 
 /**
  * Enhanced Product Card with hover effects
  */
-function ProductCard({ product, index, isActive }: ProductCardProps) {
+function ProductCard({ product, index }: ProductCardProps) {
   return (
     <div 
-      className={cn(
-        'flex-shrink-0 w-[220px] sm:w-[240px] snap-center',
-        'transition-all duration-300',
-        isActive ? 'scale-100' : 'sm:scale-100'
-      )}
-      style={{ 
-        animationDelay: `${index * 50}ms`,
-      }}
+      className="flex-shrink-0 w-[200px] sm:w-[220px]"
+      style={{ animationDelay: `${index * 50}ms` }}
     >
       <div className={cn(
         'relative overflow-hidden rounded-2xl',
@@ -197,25 +206,25 @@ function ProductCard({ product, index, isActive }: ProductCardProps) {
             alt={product.name}
             fill
             className="object-cover transition-transform duration-500 group-hover:scale-110"
-            sizes="240px"
+            sizes="220px"
           />
           
           {/* Gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-background-dark/80 via-transparent to-transparent" />
           
           {/* Price tag */}
-          <div className="absolute top-3 left-3 px-3 py-1.5 rounded-full bg-accent-gold text-background-dark text-sm font-medium shadow-gold">
+          <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-accent-gold text-background-dark text-sm font-medium">
             ₪{product.price}
           </div>
         </div>
 
         {/* Product Info */}
-        <div className="p-4">
-          <h3 className="text-foreground-light font-medium text-sm sm:text-base line-clamp-1 group-hover:text-accent-gold transition-colors">
+        <div className="p-3">
+          <h3 className="text-foreground-light font-medium text-sm line-clamp-1 group-hover:text-accent-gold transition-colors">
             {product.name}
           </h3>
           {product.description && (
-            <p className="mt-1 text-foreground-muted text-xs sm:text-sm line-clamp-2">
+            <p className="mt-1 text-foreground-muted text-xs line-clamp-2">
               {product.description}
             </p>
           )}

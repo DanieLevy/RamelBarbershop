@@ -94,7 +94,7 @@ interface SectionHeaderProps {
 }
 
 /**
- * Section header with animated underline and optional subtitle
+ * Section header with full-width divider and optional subtitle
  */
 export const SectionHeader = ({
   title,
@@ -108,12 +108,15 @@ export const SectionHeader = ({
       align === 'center' && 'text-center',
       className
     )}>
-      <h2 className="relative inline-block text-2xl sm:text-3xl lg:text-4xl font-light text-foreground-light">
+      {/* Full-width divider line - lighter color */}
+      <div className="w-full h-px bg-gradient-to-r from-transparent via-white/15 to-transparent mb-6 sm:mb-8" />
+      
+      <h2 className="text-2xl sm:text-3xl lg:text-4xl font-light text-foreground-light">
         {title}
-        <span className="absolute -bottom-2 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-accent-gold to-transparent" />
       </h2>
+      
       {subtitle && (
-        <p className="mt-4 text-foreground-muted text-sm sm:text-base max-w-2xl mx-auto">
+        <p className="mt-3 text-foreground-muted text-sm sm:text-base max-w-2xl mx-auto">
           {subtitle}
         </p>
       )}

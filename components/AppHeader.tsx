@@ -20,6 +20,7 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
   const { type: userType, customer, barber, isLoggedIn, isLoading, isAdmin, displayName, logout } = useCurrentUser()
   
   const [scrollProgress, setScrollProgress] = useState(0)
+  const [pageScrollProgress, setPageScrollProgress] = useState(0)
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
@@ -29,8 +30,14 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
   const isBarberPage = pathname.includes('/barber') && !pathname.includes('/dashboard')
 
   const handleScroll = useCallback(() => {
-    const progress = Math.min(window.scrollY / 100, 1)
-    setScrollProgress(progress)
+    // Calculate scroll progress for header opacity (0-100px)
+    const headerOpacity = Math.min(window.scrollY / 100, 1)
+    setScrollProgress(headerOpacity)
+    
+    // Calculate page scroll progress (0-100%)
+    const scrollHeight = document.documentElement.scrollHeight - window.innerHeight
+    const pageProgress = scrollHeight > 0 ? (window.scrollY / scrollHeight) * 100 : 0
+    setPageScrollProgress(pageProgress)
   }, [])
 
   useEffect(() => {
@@ -318,10 +325,16 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
           top: 'var(--header-top-offset, 0px)',
         }}
       >
+        {/* Scroll Progress Bar */}
         <div 
-          className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-accent-gold to-transparent transition-opacity duration-500"
-          style={{ opacity: scrollProgress }}
-        />
+          className="absolute top-0 left-0 right-0 h-0.5 bg-white/10"
+          style={{ opacity: scrollProgress > 0.3 ? 1 : 0, transition: 'opacity 0.3s' }}
+        >
+          <div 
+            className="h-full bg-gradient-to-r from-accent-gold via-accent-gold-light to-accent-gold transition-all duration-100"
+            style={{ width: `${pageScrollProgress}%` }}
+          />
+        </div>
         
         <div className={cn(
           'mx-auto transition-all duration-500 px-4 sm:px-6',

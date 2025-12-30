@@ -99,7 +99,7 @@ export const HeroSection = ({
       {/* Main content container */}
       <div className="relative z-10 flex flex-1 items-center justify-center px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-4xl mx-auto">
-          {/* Logo with glow effect */}
+          {/* Logo with subtle glow */}
           <div 
             className={cn(
               'mb-6 sm:mb-8 transition-all duration-1000 ease-reveal',
@@ -107,16 +107,16 @@ export const HeroSection = ({
             )}
           >
             <div className="relative inline-block">
-              {/* Glow backdrop */}
-              <div className="absolute inset-0 rounded-full bg-accent-gold/20 blur-3xl scale-150 animate-glow-pulse" />
+              {/* Subtle glow backdrop - reduced opacity and size */}
+              <div className="absolute inset-0 rounded-full bg-accent-gold/10 blur-2xl scale-125" />
               
-              {/* Logo container */}
-              <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 mx-auto rounded-full overflow-hidden border-2 border-accent-gold/40 shadow-gold-lg">
+              {/* Logo container - slightly larger */}
+              <div className="relative w-32 h-32 sm:w-40 sm:h-40 lg:w-48 lg:h-48 mx-auto rounded-full overflow-hidden border-2 border-accent-gold/30 shadow-lg">
                 <Image
                   src="/icon.png"
                   alt="Ramel Barbershop Logo"
-                  width={176}
-                  height={176}
+                  width={192}
+                  height={192}
                   className="w-full h-full object-cover"
                   priority
                 />
@@ -147,17 +147,21 @@ export const HeroSection = ({
             {subtitle}
           </p>
 
-          {/* Decorative divider */}
+          {/* Decorative divider - elegant scissors icon */}
           <div 
             className={cn(
-              'flex items-center justify-center gap-4 mb-6 sm:mb-8 transition-all duration-1000 ease-reveal',
+              'flex items-center justify-center gap-3 mb-6 sm:mb-8 transition-all duration-1000 ease-reveal',
               isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
             )}
             style={{ transitionDelay: '400ms' }}
           >
-            <div className="h-px w-12 sm:w-16 bg-gradient-to-r from-transparent to-accent-gold/50" />
-            <div className="w-2 h-2 rounded-full bg-accent-gold animate-pulse" />
-            <div className="h-px w-12 sm:w-16 bg-gradient-to-l from-transparent to-accent-gold/50" />
+            <div className="h-px w-16 sm:w-24 bg-gradient-to-r from-transparent via-white/20 to-white/40" />
+            <div className="flex items-center gap-1">
+              <div className="w-1 h-1 rounded-full bg-white/40" />
+              <div className="w-1.5 h-1.5 rounded-full bg-accent-gold/60" />
+              <div className="w-1 h-1 rounded-full bg-white/40" />
+            </div>
+            <div className="h-px w-16 sm:w-24 bg-gradient-to-l from-transparent via-white/20 to-white/40" />
           </div>
 
           {/* Description */}
@@ -190,10 +194,10 @@ export const HeroSection = ({
         </div>
       </div>
 
-      {/* Scroll indicator */}
+      {/* Scroll indicator - moved up, inside content area */}
       <div 
         className={cn(
-          'absolute bottom-8 left-1/2 -translate-x-1/2 z-10 transition-all duration-1000 ease-reveal cursor-pointer',
+          'relative z-10 mt-8 sm:mt-12 pb-16 transition-all duration-1000 ease-reveal cursor-pointer flex justify-center',
           isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
         )}
         style={{ transitionDelay: '800ms' }}
@@ -203,10 +207,10 @@ export const HeroSection = ({
         onKeyDown={(e) => e.key === 'Enter' && handleScrollToTeam()}
         aria-label="גלול למטה"
       >
-        <div className="flex flex-col items-center gap-2 text-foreground-muted hover:text-accent-gold transition-colors">
-          <span className="text-sm">גלול למטה</span>
+        <div className="flex flex-col items-center gap-1.5 text-foreground-muted hover:text-accent-gold transition-colors">
+          <span className="text-xs">גלול למטה</span>
           <ChevronDown 
-            size={24} 
+            size={20} 
             strokeWidth={1.5} 
             className="animate-scroll-hint text-accent-gold" 
           />

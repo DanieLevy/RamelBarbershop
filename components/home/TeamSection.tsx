@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import { BarberCard } from '@/components/BarberCard'
 import { SectionContainer, SectionHeader, SectionContent } from './SectionContainer'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -15,17 +15,19 @@ interface TeamSectionProps {
  * Team Section with horizontal scroll on mobile and grid on desktop
  * 
  * Features:
+ * - Auto-scroll animation on mobile (pauses on interaction)
  * - Horizontal scroll carousel on mobile
  * - Grid layout on desktop (responsive)
  * - Scroll arrows for navigation
- * - Snap scrolling for better UX
- * - Staggered animation on reveal
  */
 export const TeamSection = ({ barbers }: TeamSectionProps) => {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [isPaused, setIsPaused] = useState(false)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+
+  const barberCount = barbers?.length || 0
 
   // Check if mobile on mount and resize
   useEffect(() => {
@@ -38,27 +40,62 @@ export const TeamSection = ({ barbers }: TeamSectionProps) => {
   }, [])
 
   // Check scroll position for arrow visibility
+  const checkScroll = useCallback(() => {
+    const container = scrollRef.current
+    if (!container) return
+    
+    const { scrollLeft, scrollWidth, clientWidth } = container
+    setCanScrollLeft(scrollLeft > 10)
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10)
+  }, [])
+
+  // Auto-scroll effect for mobile
+  useEffect(() => {
+    const container = scrollRef.current
+    if (!container || !isMobile || isPaused || barberCount < 2) return
+
+    const scrollSpeed = 0.3 // Slow auto-scroll
+    let animationId: number
+
+    const autoScroll = () => {
+      if (!container) return
+      
+      const { scrollLeft, scrollWidth, clientWidth } = container
+      const maxScroll = scrollWidth - clientWidth
+      
+      // Reset to start when reaching end
+      if (scrollLeft >= maxScroll - 1) {
+        container.scrollLeft = 0
+      } else {
+        container.scrollLeft += scrollSpeed
+      }
+      
+      animationId = requestAnimationFrame(autoScroll)
+    }
+
+    animationId = requestAnimationFrame(autoScroll)
+    
+    return () => cancelAnimationFrame(animationId)
+  }, [isMobile, isPaused, barberCount])
+
   useEffect(() => {
     const container = scrollRef.current
     if (!container || !isMobile) return
 
-    const checkScroll = () => {
-      const { scrollLeft, scrollWidth, clientWidth } = container
-      setCanScrollLeft(scrollLeft > 10)
-      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10)
-    }
-
     checkScroll()
     container.addEventListener('scroll', checkScroll, { passive: true })
     return () => container.removeEventListener('scroll', checkScroll)
-  }, [isMobile, barbers])
+  }, [isMobile, barbers, checkScroll])
 
   const scroll = (direction: 'left' | 'right') => {
     if (!scrollRef.current) return
-    const cardWidth = 300 // Approximate card width + gap
+    const cardWidth = 300
     const scrollAmount = direction === 'left' ? -cardWidth : cardWidth
     scrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' })
   }
+
+  const handleInteractionStart = () => setIsPaused(true)
+  const handleInteractionEnd = () => setIsPaused(false)
 
   if (!barbers || barbers.length === 0) {
     return (
@@ -73,17 +110,26 @@ export const TeamSection = ({ barbers }: TeamSectionProps) => {
     )
   }
 
+  // Duplicate barbers for seamless loop effect on mobile
+  const displayBarbers = isMobile && barberCount > 1 ? [...barbers, ...barbers] : barbers
+
   return (
     <SectionContainer id="team" variant="dark" animate={true}>
       <SectionContent>
         <SectionHeader 
           title="הצוות שלנו" 
-          subtitle="בחר ספר ותאם תור בקלות"
+          subtitle="בחר ספר לקביעת תור"
         />
       </SectionContent>
 
       {/* Mobile: Horizontal scroll carousel */}
-      <div className="md:hidden relative">
+      <div 
+        className="md:hidden relative"
+        onMouseEnter={handleInteractionStart}
+        onMouseLeave={handleInteractionEnd}
+        onTouchStart={handleInteractionStart}
+        onTouchEnd={handleInteractionEnd}
+      >
         {/* Scroll arrows */}
         {canScrollRight && (
           <button
@@ -111,29 +157,19 @@ export const TeamSection = ({ barbers }: TeamSectionProps) => {
         {/* Carousel container */}
         <div 
           ref={scrollRef}
-          className="flex gap-4 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4 py-2"
-          style={{ scrollPaddingInline: '16px' }}
+          className="flex gap-4 overflow-x-auto scrollbar-hide px-4 py-2"
+          style={{ 
+            scrollPaddingInline: '16px',
+            WebkitOverflowScrolling: 'touch',
+          }}
         >
-          {barbers.map((barber, index) => (
+          {displayBarbers.map((barber, index) => (
             <div 
-              key={barber.id}
-              className="flex-shrink-0 w-[280px] snap-center"
+              key={`${barber.id}-${index}`}
+              className="flex-shrink-0 w-[280px]"
             >
-              <BarberCard barber={barber} index={index} />
+              <BarberCard barber={barber} index={index % barberCount} />
             </div>
-          ))}
-        </div>
-
-        {/* Scroll indicator dots */}
-        <div className="flex justify-center gap-2 mt-4">
-          {barbers.map((_, index) => (
-            <div
-              key={index}
-              className={cn(
-                'w-2 h-2 rounded-full transition-all duration-300',
-                'bg-white/20'
-              )}
-            />
           ))}
         </div>
       </div>
@@ -161,4 +197,3 @@ export const TeamSection = ({ barbers }: TeamSectionProps) => {
 }
 
 export default TeamSection
-

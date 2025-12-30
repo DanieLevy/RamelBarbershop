@@ -331,7 +331,7 @@
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
     border: 1px solid var(--glass-border-gold);
     border-radius: var(--glass-radius-xl);
-    box-shadow: var(--glass-shadow-gold);
+    box-shadow: 0 4px 12px rgba(255, 170, 61, 0.08);
   }
 
   .glass-card-hover {
@@ -797,6 +797,8 @@
 /* iOS Scroll Optimizations */
 html {
   scroll-behavior: smooth;
+  /* Improve scroll performance */
+  -webkit-font-smoothing: antialiased;
 }
 
 @supports (-webkit-touch-callout: none) {
@@ -809,7 +811,8 @@ html {
   .overflow-auto,
   .overflow-y-auto,
   .overflow-x-auto,
-  .overflow-scroll {
+  .overflow-scroll,
+  .scrollbar-hide {
     -webkit-overflow-scrolling: touch;
     transform: translateZ(0);
     -webkit-transform: translateZ(0);
@@ -824,6 +827,20 @@ html {
   .smooth-scroll {
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
+  }
+  
+  /* iOS momentum scrolling for carousels */
+  .scroll-x,
+  [class*="overflow-x-auto"] {
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+  }
+  
+  /* Prevent iOS double-tap zoom on interactive elements */
+  .btn-press,
+  .glass-interactive,
+  .touch-btn {
+    touch-action: manipulation;
   }
 }
 

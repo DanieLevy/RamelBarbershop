@@ -105,20 +105,13 @@ export function BarberCard({ barber, index = 0 }: BarberCardProps) {
           transition: 'transform 0.15s ease-out, border-color 0.5s, box-shadow 0.5s',
         }}
       >
-        {/* Status indicator */}
-        <div className="absolute top-4 right-4 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full bg-background-dark/80 backdrop-blur-sm border border-white/10">
-          <span 
-            className={cn(
-              'w-2 h-2 rounded-full',
-              isAvailableToday 
-                ? 'bg-status-available shadow-[0_0_8px_rgba(34,197,94,0.5)]' 
-                : 'bg-status-busy shadow-[0_0_8px_rgba(234,179,8,0.5)]'
-            )}
-          />
-          <span className="text-xs text-foreground-light">
-            {isAvailableToday ? 'זמין היום' : 'לא זמין היום'}
-          </span>
-        </div>
+        {/* Status indicator - Only show when unavailable */}
+        {!isAvailableToday && (
+          <div className="absolute top-4 right-4 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full bg-background-dark/80 backdrop-blur-sm border border-white/10">
+            <span className="w-2 h-2 rounded-full bg-status-busy shadow-[0_0_8px_rgba(234,179,8,0.5)]" />
+            <span className="text-xs text-foreground-light">לא זמין היום</span>
+          </div>
+        )}
         
         {/* Hero Image Section */}
         <div className="relative h-52 sm:h-60 overflow-hidden">
