@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useEffect } from 'react'
+import { useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { SectionContainer, SectionHeader, SectionContent } from './home/SectionContainer'
@@ -13,80 +13,21 @@ interface ProductsCarouselProps {
 }
 
 /**
- * Products Carousel with RTL-aware auto-scroll and swipe gestures
+ * Products Carousel with smooth native swipe gestures
  * 
  * Features:
- * - RTL-aware auto-scroll animation (pauses on hover/touch)
- * - Native touch swipe
- * - Infinite loop effect
+ * - Smooth native touch swipe
+ * - Snap scrolling for precise card positioning
  * - Hover zoom on product images
+ * - No auto-scroll (cleaner UX)
  */
 export function ProductsCarousel({ products }: ProductsCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
-  const [isPaused, setIsPaused] = useState(false)
-  const scrollPositionRef = useRef(0)
   
-  const productCount = products?.length || 0
-
-  // RTL-aware auto-scroll effect
-  useEffect(() => {
-    const container = scrollRef.current
-    if (!container || isPaused || productCount < 3) return
-
-    const scrollSpeed = 0.7 // pixels per frame - faster than barbers
-    let animationId: number
-    const isRTL = document.documentElement.dir === 'rtl' || document.documentElement.lang === 'he'
-    
-    const autoScroll = () => {
-      if (!container) return
-      
-      // Increment our tracked position
-      scrollPositionRef.current += scrollSpeed
-      
-      // Reset when we've scrolled the width of original items (half of duplicated)
-      const cardWidth = 216 + 16 // card width + gap
-      const resetPoint = productCount * cardWidth
-      
-      if (scrollPositionRef.current >= resetPoint) {
-        scrollPositionRef.current = 0
-        container.scrollLeft = isRTL ? 0 : 0
-      } else {
-        // In RTL, scroll in the negative direction
-        if (isRTL) {
-          container.scrollLeft = -scrollPositionRef.current
-        } else {
-          container.scrollLeft = scrollPositionRef.current
-        }
-      }
-      
-      animationId = requestAnimationFrame(autoScroll)
-    }
-
-    // Initialize scroll position
-    scrollPositionRef.current = isRTL ? 0 : container.scrollLeft
-
-    animationId = requestAnimationFrame(autoScroll)
-    
-    return () => cancelAnimationFrame(animationId)
-  }, [isPaused, productCount])
-  
-  // Early return after all hooks
+  // Early return if no products
   if (!products || products.length === 0) {
     return null
   }
-
-  const handleInteractionStart = () => setIsPaused(true)
-  const handleInteractionEnd = () => {
-    // Sync our ref with actual scroll position when user finishes interacting
-    if (scrollRef.current) {
-      const isRTL = document.documentElement.dir === 'rtl' || document.documentElement.lang === 'he'
-      scrollPositionRef.current = isRTL ? -scrollRef.current.scrollLeft : scrollRef.current.scrollLeft
-    }
-    setIsPaused(false)
-  }
-
-  // Duplicate products for seamless loop effect
-  const displayProducts = productCount > 2 ? [...products, ...products] : products
 
   return (
     <SectionContainer variant="darker" animate={true}>
@@ -98,30 +39,23 @@ export function ProductsCarousel({ products }: ProductsCarouselProps) {
       </SectionContent>
 
       {/* Carousel Container */}
-      <div 
-        className="relative"
-        onMouseEnter={handleInteractionStart}
-        onMouseLeave={handleInteractionEnd}
-        onTouchStart={handleInteractionStart}
-        onTouchEnd={handleInteractionEnd}
-      >
+      <div className="relative">
         {/* Gradient masks for edge fade effect */}
-        <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-20 bg-gradient-to-l from-background-darker to-transparent z-[1] pointer-events-none" />
-        <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-20 bg-gradient-to-r from-background-darker to-transparent z-[1] pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-8 sm:w-16 bg-gradient-to-l from-background-darker to-transparent z-[1] pointer-events-none" />
+        <div className="absolute left-0 top-0 bottom-0 w-8 sm:w-16 bg-gradient-to-r from-background-darker to-transparent z-[1] pointer-events-none" />
 
-        {/* Products scroll container - smooth touch scrolling */}
+        {/* Products scroll container - smooth native touch scrolling */}
         <div 
           ref={scrollRef}
-          className="flex gap-4 overflow-x-auto scrollbar-hide px-4 sm:px-8 py-4 snap-x snap-mandatory"
+          className="flex gap-4 overflow-x-auto scrollbar-hide px-4 sm:px-8 py-4 snap-x snap-mandatory overscroll-x-contain"
           style={{ 
             scrollPaddingInline: '16px',
             WebkitOverflowScrolling: 'touch',
-            scrollBehavior: 'auto',
           }}
         >
-          {displayProducts.map((product, index) => (
+          {products.map((product, index) => (
             <ProductCard 
-              key={`${product.id}-${index}`} 
+              key={product.id} 
               product={product}
               index={index}
             />
@@ -155,7 +89,7 @@ interface ProductCardProps {
 function ProductCard({ product, index }: ProductCardProps) {
   return (
     <div 
-      className="flex-shrink-0 w-[200px] sm:w-[216px] snap-center"
+      className="flex-shrink-0 w-[180px] sm:w-[200px] snap-center"
       style={{ animationDelay: `${index * 50}ms` }}
     >
       <div className={cn(
@@ -171,7 +105,7 @@ function ProductCard({ product, index }: ProductCardProps) {
             alt={product.name}
             fill
             className="object-cover transition-transform duration-500 group-hover:scale-110"
-            sizes="220px"
+            sizes="200px"
           />
           
           {/* Gradient overlay */}

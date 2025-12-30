@@ -32,6 +32,13 @@ export default function GlobalSchedulePage() {
   const [startTime, setStartTime] = useState('09:00')
   const [endTime, setEndTime] = useState('19:00')
 
+  // Helper to normalize time format for consistent comparison
+  // Handles both "HH:MM" and "HH:MM:SS" formats, returns "HH:MM"
+  const normalizeTime = (time: string): string => {
+    const parts = time.split(':')
+    return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`
+  }
+
   const fetchSettings = useCallback(async () => {
     const supabase = createClient()
     
@@ -50,8 +57,9 @@ export default function GlobalSchedulePage() {
     const s = data as BarbershopSettings
     setSettings(s)
     setOpenDays(s.open_days || [])
-    setStartTime(s.work_hours_start || '09:00')
-    setEndTime(s.work_hours_end || '19:00')
+    // Normalize time format when loading from database
+    setStartTime(normalizeTime(s.work_hours_start || '09:00'))
+    setEndTime(normalizeTime(s.work_hours_end || '19:00'))
     setLoading(false)
   }, [report])
 
@@ -137,24 +145,24 @@ export default function GlobalSchedulePage() {
           </div>
         </div>
 
-        {/* Work Hours */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col gap-2">
+        {/* Work Hours - Mobile stacked, tablet+ side by side */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1 flex flex-col gap-2">
             <label className="text-foreground-light text-sm">שעת פתיחה</label>
             <input
               type="time"
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
-              className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold"
+              className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-base"
             />
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex-1 flex flex-col gap-2">
             <label className="text-foreground-light text-sm">שעת סגירה</label>
             <input
               type="time"
               value={endTime}
               onChange={(e) => setEndTime(e.target.value)}
-              className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold"
+              className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-base"
             />
           </div>
         </div>

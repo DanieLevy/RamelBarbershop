@@ -41,6 +41,13 @@ export default function MySchedulePage() {
   const [closureEndDate, setClosureEndDate] = useState('')
   const [closureReason, setClosureReason] = useState('')
 
+  // Helper to normalize time format for consistent comparison
+  // Handles both "HH:MM" and "HH:MM:SS" formats, returns "HH:MM"
+  const normalizeTime = (time: string): string => {
+    const parts = time.split(':')
+    return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`
+  }
+
   useEffect(() => {
     if (barber?.id) {
       fetchData()
@@ -74,15 +81,17 @@ export default function MySchedulePage() {
       const s = scheduleData as BarberSchedule
       setSchedule(s)
       setWorkDays(s.work_days || [])
-      setStartTime(s.work_hours_start || '09:00')
-      setEndTime(s.work_hours_end || '19:00')
+      // Normalize time format when loading from database
+      setStartTime(normalizeTime(s.work_hours_start || '09:00'))
+      setEndTime(normalizeTime(s.work_hours_end || '19:00'))
     } else {
       // Use shop defaults
       if (shopData) {
         const shop = shopData as BarbershopSettings
         setWorkDays(shop.open_days || [])
-        setStartTime(shop.work_hours_start || '09:00')
-        setEndTime(shop.work_hours_end || '19:00')
+        // Normalize time format when loading from database
+        setStartTime(normalizeTime(shop.work_hours_start || '09:00'))
+        setEndTime(normalizeTime(shop.work_hours_end || '19:00'))
       }
     }
     
@@ -116,12 +125,17 @@ export default function MySchedulePage() {
     
     // Validate times are within shop hours
     if (shopSettings) {
-      if (startTime < shopSettings.work_hours_start) {
-        toast.error(`שעת ההתחלה לא יכולה להיות לפני ${shopSettings.work_hours_start}`)
+      const shopStart = normalizeTime(shopSettings.work_hours_start)
+      const shopEnd = normalizeTime(shopSettings.work_hours_end)
+      const barberStart = normalizeTime(startTime)
+      const barberEnd = normalizeTime(endTime)
+      
+      if (barberStart < shopStart) {
+        toast.error(`שעת ההתחלה לא יכולה להיות לפני ${shopStart}`)
         return
       }
-      if (endTime > shopSettings.work_hours_end) {
-        toast.error(`שעת הסיום לא יכולה להיות אחרי ${shopSettings.work_hours_end}`)
+      if (barberEnd > shopEnd) {
+        toast.error(`שעת הסיום לא יכולה להיות אחרי ${shopEnd}`)
         return
       }
     }
@@ -266,7 +280,7 @@ export default function MySchedulePage() {
         {shopSettings && (
           <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
             <p className="text-blue-400 text-sm">
-              שעות פתיחה של המספרה: {shopSettings.work_hours_start} - {shopSettings.work_hours_end}
+              שעות פתיחה של המספרה: {normalizeTime(shopSettings.work_hours_start)} - {normalizeTime(shopSettings.work_hours_end)}
             </p>
           </div>
         )}
@@ -299,28 +313,28 @@ export default function MySchedulePage() {
           </div>
         </div>
 
-        {/* Work Hours */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="flex flex-col gap-2">
+        {/* Work Hours - Mobile stacked, tablet+ side by side */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex-1 flex flex-col gap-2">
             <label className="text-foreground-light text-sm">שעת התחלה</label>
             <input
               type="time"
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
-              min={shopSettings?.work_hours_start}
-              max={shopSettings?.work_hours_end}
-              className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold"
+              min={shopSettings ? normalizeTime(shopSettings.work_hours_start) : undefined}
+              max={shopSettings ? normalizeTime(shopSettings.work_hours_end) : undefined}
+              className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-base"
             />
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex-1 flex flex-col gap-2">
             <label className="text-foreground-light text-sm">שעת סיום</label>
             <input
               type="time"
               value={endTime}
               onChange={(e) => setEndTime(e.target.value)}
-              min={shopSettings?.work_hours_start}
-              max={shopSettings?.work_hours_end}
-              className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold"
+              min={shopSettings ? normalizeTime(shopSettings.work_hours_start) : undefined}
+              max={shopSettings ? normalizeTime(shopSettings.work_hours_end) : undefined}
+              className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-base"
             />
           </div>
         </div>
