@@ -71,6 +71,71 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
     }
   }, [showMobileMenu])
 
+  // Swipe gesture detection for mobile menu
+  useEffect(() => {
+    let touchStartX = 0
+    let touchStartY = 0
+    let touchEndX = 0
+    const edgeThreshold = 40 // pixels from edge to trigger
+    const swipeThreshold = 80 // minimum swipe distance
+    
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartX = e.touches[0].clientX
+      touchStartY = e.touches[0].clientY
+    }
+    
+    const handleTouchEnd = (e: TouchEvent) => {
+      touchEndX = e.changedTouches[0].clientX
+      const touchEndY = e.changedTouches[0].clientY
+      
+      const deltaX = touchEndX - touchStartX
+      const deltaY = Math.abs(touchEndY - touchStartY)
+      
+      // Only trigger if horizontal swipe is dominant
+      if (deltaY > Math.abs(deltaX)) return
+      
+      const screenWidth = window.innerWidth
+      const isRTL = document.documentElement.dir === 'rtl' || document.documentElement.lang === 'he'
+      
+      if (!showMobileMenu) {
+        // Open menu: In RTL, swipe from right edge towards left (negative deltaX, start near right edge)
+        // In LTR, swipe from left edge towards right (positive deltaX, start near left edge)
+        if (isRTL) {
+          // Touch started near right edge and swiped left
+          if (touchStartX > screenWidth - edgeThreshold && deltaX < -swipeThreshold) {
+            setShowMobileMenu(true)
+          }
+        } else {
+          // Touch started near left edge and swiped right
+          if (touchStartX < edgeThreshold && deltaX > swipeThreshold) {
+            setShowMobileMenu(true)
+          }
+        }
+      } else {
+        // Close menu: swipe in opposite direction
+        if (isRTL) {
+          // Swipe right to close
+          if (deltaX > swipeThreshold) {
+            setShowMobileMenu(false)
+          }
+        } else {
+          // Swipe left to close
+          if (deltaX < -swipeThreshold) {
+            setShowMobileMenu(false)
+          }
+        }
+      }
+    }
+    
+    document.addEventListener('touchstart', handleTouchStart, { passive: true })
+    document.addEventListener('touchend', handleTouchEnd, { passive: true })
+    
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart)
+      document.removeEventListener('touchend', handleTouchEnd)
+    }
+  }, [showMobileMenu])
+
   const scrollToSection = (className: string) => {
     setShowMobileMenu(false)
     
