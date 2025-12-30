@@ -87,7 +87,7 @@ export function ContactSection({ settings }: ContactSectionProps) {
   }
 
   return (
-    <SectionContainer variant="accent" animate={true}>
+    <SectionContainer variant="accent" animate={true} className="index-contact">
       <SectionContent maxWidth="4xl">
         <SectionHeader 
           title="צור קשר" 

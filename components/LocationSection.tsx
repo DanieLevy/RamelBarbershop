@@ -56,7 +56,7 @@ export function LocationSection({ settings }: LocationSectionProps) {
   const addressLine2 = addressParts.slice(1).join(', ') || ''
 
   return (
-    <SectionContainer variant="dark" animate={true}>
+    <SectionContainer variant="dark" animate={true} className="index-location">
       <SectionContent>
         <SectionHeader 
           title="המיקום שלנו" 

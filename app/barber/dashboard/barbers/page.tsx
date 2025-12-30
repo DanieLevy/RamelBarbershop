@@ -7,7 +7,7 @@ import { getAllBarbers, createBarber, updateBarber, setBarberPassword } from '@/
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { Plus, Pencil, User, Phone, Crown, GripVertical } from 'lucide-react'
+import { Plus, Pencil, User, Phone, Crown, GripVertical, Trash2, AlertTriangle, X, Loader2 } from 'lucide-react'
 import type { User as UserType } from '@/types/database'
 import Image from 'next/image'
 import { useBugReporter } from '@/hooks/useBugReporter'
@@ -34,6 +34,15 @@ export default function BarbersPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [phone, setPhone] = useState('')
+  
+  // Delete confirmation state
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean
+    step: 1 | 2
+    barber: UserType | null
+    confirmName: string
+  }>({ isOpen: false, step: 1, barber: null, confirmName: '' })
+  const [deleting, setDeleting] = useState(false)
 
   const fetchBarbers = useCallback(async () => {
     try {
@@ -81,6 +90,74 @@ export default function BarbersPage() {
       toast.error('שגיאה בשמירת הסדר')
     }
   }, [report])
+
+  // Handle delete barber
+  const handleDeleteBarber = useCallback(async () => {
+    if (!deleteModal.barber) return
+    
+    const barberId = deleteModal.barber.id
+    setDeleting(true)
+    
+    try {
+      const supabase = createClient()
+      
+      // Delete in correct order to respect foreign key constraints
+      // 1. Cancel/delete reservations
+      const { error: resError } = await supabase
+        .from('reservations')
+        .update({ 
+          status: 'cancelled', 
+          cancelled_by: 'barber',
+          cancellation_reason: 'הספר הוסר מהמערכת'
+        })
+        .eq('barber_id', barberId)
+      
+      if (resError) {
+        console.error('Error cancelling reservations:', resError)
+      }
+      
+      // 2. Delete barber_notification_settings
+      await supabase.from('barber_notification_settings').delete().eq('barber_id', barberId)
+      
+      // 3. Delete barber_schedules
+      await supabase.from('barber_schedules').delete().eq('barber_id', barberId)
+      
+      // 4. Delete barber_closures
+      await supabase.from('barber_closures').delete().eq('barber_id', barberId)
+      
+      // 5. Delete barber_messages
+      await supabase.from('barber_messages').delete().eq('barber_id', barberId)
+      
+      // 6. Delete work_days
+      await supabase.from('work_days').delete().eq('user_id', barberId)
+      
+      // 7. Delete push_subscriptions
+      await supabase.from('push_subscriptions').delete().eq('barber_id', barberId)
+      
+      // 8. Delete services
+      await supabase.from('services').delete().eq('barber_id', barberId)
+      
+      // 9. Finally delete the user
+      const { error: userError } = await supabase.from('users').delete().eq('id', barberId)
+      
+      if (userError) {
+        console.error('Error deleting barber:', userError)
+        await report(new Error(userError.message), 'Deleting barber from users table')
+        toast.error('שגיאה במחיקת הספר')
+        return
+      }
+      
+      toast.success('הספר הוסר בהצלחה')
+      setBarbers(prev => prev.filter(b => b.id !== barberId))
+      setDeleteModal({ isOpen: false, step: 1, barber: null, confirmName: '' })
+    } catch (error) {
+      console.error('Error deleting barber:', error)
+      await report(error, 'Deleting barber (exception)')
+      toast.error('שגיאה במחיקת הספר')
+    } finally {
+      setDeleting(false)
+    }
+  }, [deleteModal.barber, report])
 
   // Handle drag start
   const handleDragStart = useCallback((index: number, e: React.MouseEvent | React.TouchEvent) => {
@@ -450,17 +527,26 @@ export default function BarbersPage() {
                       <Pencil size={14} strokeWidth={1.5} />
                     </button>
                     {barber.id !== currentBarber?.id && (
-                      <button
-                        onClick={() => handleToggleActive(barber)}
-                        className={cn(
-                          'px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-medium transition-colors',
-                          barber.is_active
-                            ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
-                            : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
-                        )}
-                      >
-                        {barber.is_active ? 'השבת' : 'הפעל'}
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleToggleActive(barber)}
+                          className={cn(
+                            'px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-medium transition-colors',
+                            barber.is_active
+                              ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
+                              : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
+                          )}
+                        >
+                          {barber.is_active ? 'השבת' : 'הפעל'}
+                        </button>
+                        <button
+                          onClick={() => setDeleteModal({ isOpen: true, step: 1, barber, confirmName: '' })}
+                          className="icon-btn p-2 text-foreground-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                          title="מחק ספר"
+                        >
+                          <Trash2 size={14} strokeWidth={1.5} />
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -476,6 +562,128 @@ export default function BarbersPage() {
           </p>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal.isOpen && deleteModal.barber && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-md bg-background-darker border border-white/10 rounded-2xl p-6 shadow-2xl animate-slide-in-up">
+            {/* Close button */}
+            <button
+              onClick={() => setDeleteModal({ isOpen: false, step: 1, barber: null, confirmName: '' })}
+              className="absolute top-4 left-4 p-2 rounded-full hover:bg-white/5 transition-colors"
+            >
+              <X size={18} className="text-foreground-muted" />
+            </button>
+
+            {/* Step 1: Initial Confirmation */}
+            {deleteModal.step === 1 && (
+              <div className="flex flex-col gap-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="w-6 h-6 text-red-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-foreground-light">
+                      מחיקת ספר
+                    </h3>
+                    <p className="text-foreground-muted text-sm">
+                      {deleteModal.barber.fullname}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+                  <p className="text-foreground-light text-sm">
+                    האם אתה בטוח שברצונך למחוק את הספר?
+                  </p>
+                  <ul className="mt-3 space-y-1.5 text-foreground-muted text-xs">
+                    <li>• כל התורים של הספר יבוטלו</li>
+                    <li>• כל השירותים של הספר יימחקו</li>
+                    <li>• פעולה זו אינה ניתנת לביטול</li>
+                  </ul>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setDeleteModal(prev => ({ ...prev, step: 2 }))}
+                    className="flex-1 py-3 rounded-xl font-medium bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors text-center"
+                  >
+                    המשך למחיקה
+                  </button>
+                  <button
+                    onClick={() => setDeleteModal({ isOpen: false, step: 1, barber: null, confirmName: '' })}
+                    className="flex-1 py-3 rounded-xl font-medium border border-white/20 text-foreground-light hover:bg-white/5 transition-colors text-center"
+                  >
+                    ביטול
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Type name to confirm */}
+            {deleteModal.step === 2 && (
+              <div className="flex flex-col gap-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                    <Trash2 className="w-6 h-6 text-red-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-foreground-light">
+                      אישור מחיקה סופי
+                    </h3>
+                    <p className="text-foreground-muted text-sm">
+                      הקלד את שם הספר לאישור
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-foreground-muted text-xs">
+                    הקלד: <span className="text-accent-gold font-medium">{deleteModal.barber.fullname}</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={deleteModal.confirmName}
+                    onChange={(e) => setDeleteModal(prev => ({ ...prev, confirmName: e.target.value }))}
+                    placeholder={deleteModal.barber.fullname}
+                    className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-red-400/50"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleDeleteBarber}
+                    disabled={deleteModal.confirmName !== deleteModal.barber.fullname || deleting}
+                    className={cn(
+                      'flex-1 py-3 rounded-xl font-medium transition-colors text-center',
+                      deleteModal.confirmName === deleteModal.barber.fullname && !deleting
+                        ? 'bg-red-500 text-white hover:bg-red-600'
+                        : 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
+                    )}
+                  >
+                    {deleting ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        מוחק...
+                      </span>
+                    ) : (
+                      'מחק לצמיתות'
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setDeleteModal(prev => ({ ...prev, step: 1, confirmName: '' }))}
+                    disabled={deleting}
+                    className="px-6 py-3 rounded-xl font-medium border border-white/20 text-foreground-light hover:bg-white/5 transition-colors text-center"
+                  >
+                    חזור
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

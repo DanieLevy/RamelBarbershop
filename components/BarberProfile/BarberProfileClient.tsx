@@ -1,8 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { Phone, Clock, ChevronLeft, Bell } from 'lucide-react'
+import { Phone, Clock, ChevronLeft, Bell, Loader2 } from 'lucide-react'
 import { cn, formatPrice } from '@/lib/utils'
 import type { BarberWithWorkDays, Service, BarbershopSettings, BarberMessage } from '@/types/database'
 
@@ -31,8 +32,10 @@ export function BarberProfileClient({
   barberMessages = []
 }: BarberProfileClientProps) {
   const router = useRouter()
+  const [loadingServiceId, setLoadingServiceId] = useState<string | null>(null)
 
   const handleServiceSelect = (serviceId: string) => {
+    setLoadingServiceId(serviceId)
     router.push(`/barber/${barber.id}/book?service=${serviceId}`)
   }
 
@@ -179,15 +182,23 @@ export function BarberProfileClient({
                     {/* Book Button */}
                     <button
                       onClick={() => handleServiceSelect(service.id)}
+                      disabled={loadingServiceId !== null}
                       className={cn(
-                        'px-4 py-2.5 rounded-xl text-sm font-medium',
+                        'px-4 py-2.5 rounded-xl text-sm font-medium min-w-[72px]',
                         'bg-accent-gold text-background-dark',
                         'hover:bg-accent-gold/90 active:scale-95 transition-all',
-                        'flex items-center gap-1 flex-shrink-0'
+                        'flex items-center justify-center gap-1 flex-shrink-0',
+                        loadingServiceId === service.id && 'opacity-80 cursor-wait'
                       )}
                     >
-                      הזמן
-                      <ChevronLeft size={14} strokeWidth={2} />
+                      {loadingServiceId === service.id ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <>
+                          הזמן
+                          <ChevronLeft size={14} strokeWidth={2} />
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>

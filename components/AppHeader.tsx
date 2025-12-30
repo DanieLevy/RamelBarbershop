@@ -139,22 +139,41 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
   const scrollToSection = (className: string) => {
     setShowMobileMenu(false)
     
+    const doScroll = () => {
+      if (className === 'index-header') {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+        return
+      }
+      
+      const el = document.querySelector(`.${className}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' })
+      }
+    }
+    
     if (pathname !== '/') {
       router.push('/')
-      setTimeout(() => {
+      // Poll for element with increasing delays, up to 3 seconds total
+      let attempts = 0
+      const maxAttempts = 15
+      const pollInterval = 200
+      
+      const pollForElement = () => {
+        attempts++
         const el = document.querySelector(`.${className}`)
-        el?.scrollIntoView({ behavior: 'smooth' })
-      }, 500)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' })
+        } else if (attempts < maxAttempts) {
+          setTimeout(pollForElement, pollInterval)
+        }
+      }
+      
+      // Start polling after initial delay for navigation
+      setTimeout(pollForElement, 300)
       return
     }
 
-    if (className === 'index-header') {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-      return
-    }
-
-    const el = document.querySelector(`.${className}`)
-    el?.scrollIntoView({ behavior: 'smooth' })
+    doScroll()
   }
 
   const handleLogout = () => {
@@ -650,7 +669,7 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
             
             <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10 bg-background-darker">
               <p className="text-center text-foreground-muted text-xs">
-                © 2024 רמאל ברברשופ
+                © 2025 רמאל ברברשופ
               </p>
             </div>
           </div>

@@ -295,7 +295,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               onClick={handlePhoneSubmit}
               disabled={loading}
               className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all',
+                'w-full py-3 rounded-xl font-medium transition-all text-center',
                 loading
                   ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                   : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
@@ -352,7 +352,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               onClick={handleNameSubmit}
               disabled={loading}
               className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all',
+                'w-full py-3 rounded-xl font-medium transition-all text-center',
                 loading
                   ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                   : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
@@ -363,7 +363,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             
             <button
               onClick={() => setStep('phone')}
-              className="text-foreground-muted hover:text-foreground-light text-sm transition-colors"
+              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors text-center"
             >
               ← חזור
             </button>
@@ -390,7 +390,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               onClick={() => handleDebugChoice(true)}
               disabled={loading}
               className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all',
+                'w-full py-3 rounded-xl font-medium transition-all text-center',
                 loading
                   ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                   : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
@@ -403,7 +403,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               onClick={() => handleDebugChoice(false)}
               disabled={loading}
               className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all border',
+                'w-full py-3 rounded-xl font-medium transition-all text-center border',
                 loading
                   ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed border-foreground-muted/30'
                   : 'bg-transparent text-foreground-light border-white/20 hover:border-accent-gold/50'
@@ -414,7 +414,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             
             <button
               onClick={() => setStep('phone')}
-              className="text-foreground-muted hover:text-foreground-light text-sm transition-colors"
+              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors text-center"
             >
               ← חזור
             </button>
@@ -465,7 +465,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               onClick={handleVerifyOtp}
               disabled={loading || otp.join('').length !== 6}
               className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all',
+                'w-full py-3 rounded-xl font-medium transition-all text-center',
                 loading || otp.join('').length !== 6
                   ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                   : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
@@ -492,7 +492,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             
             <button
               onClick={() => setStep('phone')}
-              className="text-foreground-muted hover:text-foreground-light text-sm transition-colors"
+              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors text-center"
             >
               ← חזור
             </button>
@@ -527,14 +527,14 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 barberLogout()
                 setStep('phone')
               }}
-              className="w-full py-3 rounded-xl font-medium transition-all bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
+              className="w-full py-3 rounded-xl font-medium transition-all text-center bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
             >
               התנתק מחשבון הספר
             </button>
             
             <button
               onClick={onClose}
-              className="w-full py-3 rounded-xl font-medium transition-all border border-white/20 text-foreground-light hover:bg-white/5"
+              className="w-full py-3 rounded-xl font-medium transition-all text-center border border-white/20 text-foreground-light hover:bg-white/5"
             >
               סגור
             </button>

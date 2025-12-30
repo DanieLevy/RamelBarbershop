@@ -4,51 +4,218 @@ import { useState } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { cn } from '@/lib/utils'
 import { TEST_USER } from '@/lib/firebase/config'
+import { findCustomerByPhone } from '@/lib/services/customer.service'
+import { Loader2, User, CheckCircle } from 'lucide-react'
+
+type Step = 'phone' | 'name'
 
 export function CustomerDetails() {
   const { customer, setCustomer, nextStep, prevStep } = useBookingStore()
-  const [errors, setErrors] = useState<{ fullname?: string; phone?: string }>({})
+  const [step, setStep] = useState<Step>('phone')
+  const [phone, setPhone] = useState(customer.phone || '')
+  const [fullname, setFullname] = useState(customer.fullname || '')
+  const [existingCustomerName, setExistingCustomerName] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   
-  // Helper to fill test user data
-  const fillTestUser = () => {
-    setCustomer({ 
-      fullname: TEST_USER.name, 
-      phone: TEST_USER.phoneRaw 
-    })
-    setErrors({})
+  // Helper to fill test user phone
+  const fillTestPhone = () => {
+    setPhone(TEST_USER.phoneRaw)
+    setError(null)
   }
 
-  const validateAndSubmit = () => {
-    const newErrors: typeof errors = {}
-    
-    if (!customer.fullname.trim()) {
-      newErrors.fullname = 'נא להזין שם מלא'
-    }
-    
-    // Validate Israeli phone number (10 digits starting with 05)
-    const phoneClean = customer.phone.replace(/\D/g, '')
+  // Validate Israeli phone number
+  const validatePhone = (phoneStr: string): string | null => {
+    const phoneClean = phoneStr.replace(/\D/g, '')
     if (!phoneClean || phoneClean.length !== 10 || !phoneClean.startsWith('05')) {
-      newErrors.phone = 'נא להזין מספר טלפון ישראלי תקין (05XXXXXXXX)'
+      return 'נא להזין מספר טלפון ישראלי תקין (05XXXXXXXX)'
     }
+    return null
+  }
+
+  // Handle phone submission - check if user exists
+  const handlePhoneSubmit = async () => {
+    const phoneClean = phone.replace(/\D/g, '')
+    const phoneError = validatePhone(phoneClean)
     
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors)
+    if (phoneError) {
+      setError(phoneError)
       return
     }
     
-    // Update phone to clean format
-    setCustomer({ phone: phoneClean })
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const existingCustomer = await findCustomerByPhone(phoneClean)
+      
+      if (existingCustomer) {
+        // User exists - show welcome and proceed
+        setExistingCustomerName(existingCustomer.fullname)
+        setCustomer({ 
+          phone: phoneClean, 
+          fullname: existingCustomer.fullname 
+        })
+        // Short delay to show welcome message before proceeding
+        setTimeout(() => {
+          nextStep()
+        }, 1500)
+      } else {
+        // User doesn't exist - ask for name
+        setCustomer({ phone: phoneClean, fullname: '' })
+        setStep('name')
+      }
+    } catch (err) {
+      console.error('Error checking phone:', err)
+      setError('שגיאה בבדיקת המספר, נסה שנית')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Handle name submission for new users
+  const handleNameSubmit = () => {
+    if (!fullname.trim()) {
+      setError('נא להזין שם מלא')
+      return
+    }
+    
+    setCustomer({ 
+      phone: phone.replace(/\D/g, ''), 
+      fullname: fullname.trim() 
+    })
     nextStep()
   }
 
+  // If showing welcome back message
+  if (existingCustomerName) {
+    return (
+      <div className="flex flex-col gap-6 items-center justify-center py-8">
+        <div className="w-16 h-16 rounded-full bg-accent-gold/20 flex items-center justify-center">
+          <CheckCircle className="w-8 h-8 text-accent-gold" />
+        </div>
+        <div className="text-center">
+          <h2 className="text-xl text-foreground-light font-medium mb-2">
+            שלום, {existingCustomerName}! 👋
+          </h2>
+          <p className="text-foreground-muted text-sm">
+            ממשיך לאימות...
+          </p>
+        </div>
+        <Loader2 className="w-6 h-6 text-accent-gold animate-spin" />
+      </div>
+    )
+  }
+
+  // Phone input step
+  if (step === 'phone') {
+    return (
+      <div className="flex flex-col gap-6">
+        <h2 className="text-xl text-center text-foreground-light font-medium">
+          הזן מספר טלפון
+        </h2>
+        
+        <p className="text-foreground-muted text-sm text-center">
+          נבדוק אם יש לך חשבון קיים
+        </p>
+        
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <label htmlFor="phone" className="text-foreground-light text-sm">
+              מספר טלפון
+            </label>
+            <input
+              id="phone"
+              type="tel"
+              dir="ltr"
+              value={phone}
+              onChange={(e) => {
+                setPhone(e.target.value)
+                setError(null)
+              }}
+              placeholder="05XXXXXXXX"
+              disabled={loading}
+              className={cn(
+                'w-full p-3.5 rounded-xl bg-background-card border text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold transition-all text-left text-base',
+                error ? 'border-red-400' : 'border-white/10',
+                loading && 'opacity-60'
+              )}
+              onKeyDown={(e) => e.key === 'Enter' && handlePhoneSubmit()}
+            />
+            {error && (
+              <span className="text-red-400 text-xs">{error}</span>
+            )}
+            <span className="text-foreground-muted text-xs">
+              קוד אימות יישלח למספר זה
+            </span>
+          </div>
+        </div>
+        
+        <button
+          onClick={handlePhoneSubmit}
+          disabled={loading}
+          className={cn(
+            'w-full py-3 px-4 rounded-xl font-medium transition-all text-center',
+            loading
+              ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
+              : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
+          )}
+        >
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              בודק...
+            </span>
+          ) : (
+            'המשך'
+          )}
+        </button>
+        
+        <button
+          onClick={prevStep}
+          disabled={loading}
+          className="w-full text-foreground-muted hover:text-foreground-light transition-colors text-sm text-center"
+        >
+          ← חזור לבחירת שעה
+        </button>
+        
+        {/* Dev helper - fill test user phone */}
+        {process.env.NODE_ENV === 'development' && (
+          <button
+            onClick={fillTestPhone}
+            className="mt-2 text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center justify-center gap-1"
+          >
+            🧪 מלא טלפון בדיקה
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  // Name input step (for new users)
   return (
     <div className="flex flex-col gap-6">
       <h2 className="text-xl text-center text-foreground-light font-medium">
-        פרטים אישיים
+        הרשמה
       </h2>
       
+      <div className="flex items-center gap-3 p-3 rounded-xl bg-background-card/50 border border-white/10">
+        <div className="w-10 h-10 rounded-full bg-accent-gold/20 flex items-center justify-center">
+          <User className="w-5 h-5 text-accent-gold" />
+        </div>
+        <div>
+          <p className="text-foreground-muted text-xs">מספר טלפון</p>
+          <p className="text-foreground-light text-sm font-medium" dir="ltr">{phone}</p>
+        </div>
+      </div>
+      
+      <p className="text-foreground-muted text-sm text-center">
+        לא מצאנו את המספר במערכת.
+        <br />
+        נא להזין את שמך להרשמה.
+      </p>
+      
       <div className="flex flex-col gap-4">
-        {/* Full Name */}
         <div className="flex flex-col gap-2">
           <label htmlFor="fullname" className="text-foreground-light text-sm">
             שם מלא
@@ -56,75 +223,41 @@ export function CustomerDetails() {
           <input
             id="fullname"
             type="text"
-            value={customer.fullname}
+            value={fullname}
             onChange={(e) => {
-              setCustomer({ fullname: e.target.value })
-              setErrors((prev) => ({ ...prev, fullname: undefined }))
+              setFullname(e.target.value)
+              setError(null)
             }}
             placeholder="הזן את שמך המלא"
             className={cn(
-              'w-full p-3 rounded-xl bg-background-card border text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold transition-all',
-              errors.fullname ? 'border-red-400' : 'border-white/10'
+              'w-full p-3.5 rounded-xl bg-background-card border text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold transition-all text-base',
+              error ? 'border-red-400' : 'border-white/10'
             )}
+            onKeyDown={(e) => e.key === 'Enter' && handleNameSubmit()}
+            autoFocus
           />
-          {errors.fullname && (
-            <span className="text-red-400 text-xs">{errors.fullname}</span>
+          {error && (
+            <span className="text-red-400 text-xs">{error}</span>
           )}
-        </div>
-        
-        {/* Phone */}
-        <div className="flex flex-col gap-2">
-          <label htmlFor="phone" className="text-foreground-light text-sm">
-            מספר טלפון
-          </label>
-          <input
-            id="phone"
-            type="tel"
-            dir="ltr"
-            value={customer.phone}
-            onChange={(e) => {
-              setCustomer({ phone: e.target.value })
-              setErrors((prev) => ({ ...prev, phone: undefined }))
-            }}
-            placeholder="05XXXXXXXX"
-            className={cn(
-              'w-full p-3 rounded-xl bg-background-card border text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold transition-all text-left',
-              errors.phone ? 'border-red-400' : 'border-white/10'
-            )}
-          />
-          {errors.phone && (
-            <span className="text-red-400 text-xs">{errors.phone}</span>
-          )}
-          <span className="text-foreground-muted text-xs">
-            קוד אימות יישלח למספר זה
-          </span>
         </div>
       </div>
       
       <button
-        onClick={validateAndSubmit}
-        className="w-full py-3 px-4 rounded-xl bg-accent-gold text-background-dark font-medium hover:bg-accent-gold/90 transition-all"
+        onClick={handleNameSubmit}
+        className="w-full py-3 px-4 rounded-xl bg-accent-gold text-background-dark font-medium hover:bg-accent-gold/90 transition-all text-center"
       >
         המשך לאימות
       </button>
       
       <button
-        onClick={prevStep}
-        className="text-foreground-muted hover:text-foreground-light transition-colors text-sm"
+        onClick={() => {
+          setStep('phone')
+          setError(null)
+        }}
+        className="w-full text-foreground-muted hover:text-foreground-light transition-colors text-sm text-center"
       >
-        ← חזור לבחירת שעה
+        ← חזור
       </button>
-      
-      {/* Dev helper - fill test user */}
-      {process.env.NODE_ENV === 'development' && (
-        <button
-          onClick={fillTestUser}
-          className="mt-2 text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center justify-center gap-1"
-        >
-          🧪 מלא משתמש בדיקה
-        </button>
-      )}
     </div>
   )
 }
-

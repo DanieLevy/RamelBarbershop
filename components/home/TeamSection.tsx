@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 import { BarberCard } from '@/components/BarberCard'
 import { SectionContainer, SectionHeader, SectionContent } from './SectionContainer'
 import { cn } from '@/lib/utils'
@@ -22,6 +22,14 @@ interface TeamSectionProps {
 export const TeamSection = ({ barbers }: TeamSectionProps) => {
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  // Scroll to start (right side in RTL) on mount to show first barber
+  useEffect(() => {
+    if (scrollRef.current && barbers && barbers.length > 0) {
+      // In RTL, scroll to the end (which is the start visually)
+      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth
+    }
+  }, [barbers])
+
   if (!barbers || barbers.length === 0) {
     return (
       <SectionContainer id="team" variant="dark">
@@ -36,7 +44,7 @@ export const TeamSection = ({ barbers }: TeamSectionProps) => {
   }
 
   return (
-    <SectionContainer id="team" variant="dark" animate={true}>
+    <SectionContainer id="team" variant="dark" animate={true} className="index-body">
       <SectionContent>
         <SectionHeader 
           title="הצוות שלנו" 
@@ -51,8 +59,10 @@ export const TeamSection = ({ barbers }: TeamSectionProps) => {
         <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background-dark to-transparent z-[1] pointer-events-none" />
 
         {/* Carousel container - smooth native touch scrolling */}
+        {/* Using dir="rtl" ensures first item (lowest display_order) appears on the right */}
         <div 
           ref={scrollRef}
+          dir="rtl"
           className="flex gap-4 overflow-x-auto scrollbar-hide px-4 py-2 snap-x snap-mandatory overscroll-x-contain"
           style={{ 
             scrollPaddingInline: '16px',
@@ -62,6 +72,7 @@ export const TeamSection = ({ barbers }: TeamSectionProps) => {
           {barbers.map((barber, index) => (
             <div 
               key={barber.id}
+              dir="rtl"
               className="flex-shrink-0 w-[280px] snap-center"
             >
               <BarberCard barber={barber} index={index} />
