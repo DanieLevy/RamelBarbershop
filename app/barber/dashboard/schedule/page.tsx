@@ -123,10 +123,10 @@ export default function GlobalSchedulePage() {
       </div>
 
       <div className="bg-background-card border border-white/10 rounded-2xl p-4 sm:p-6 space-y-6">
-        {/* Open Days - Grid for mobile */}
+        {/* Open Days - Flexible wrap layout for mobile */}
         <div>
           <label className="text-foreground-light text-sm block mb-3">ימי פתיחה</label>
-          <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+          <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
             {DAYS.map((day) => {
               const isActive = openDays.includes(day.key)
               return (
@@ -134,7 +134,7 @@ export default function GlobalSchedulePage() {
                   key={day.key}
                   onClick={() => toggleDay(day.key)}
                   className={cn(
-                    'py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all text-center',
+                    'min-w-[60px] px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all flex items-center justify-center',
                     isActive
                       ? 'bg-accent-gold text-background-dark shadow-sm shadow-accent-gold/30'
                       : 'bg-white/[0.03] border border-white/[0.06] text-foreground-muted hover:bg-white/[0.06]'

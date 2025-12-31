@@ -11,6 +11,7 @@ import { X, Scissors, AlertTriangle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { ConfirmationResult } from 'firebase/auth'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { useHaptics } from '@/hooks/useHaptics'
 
 interface LoginModalProps {
   isOpen: boolean
@@ -26,6 +27,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const { login } = useAuthStore()
   const { isLoggedIn: isBarberLoggedIn, barber, logout: barberLogout } = useBarberAuthStore()
   const { report } = useBugReporter('LoginModal')
+  const haptics = useHaptics()
   
   const [step, setStep] = useState<Step>('phone')
   const [phone, setPhone] = useState('')
@@ -152,6 +154,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         setConfirmation(result.confirmation)
         setStep('otp')
         setCountdown(60)
+        haptics.light() // Haptic feedback for OTP sent
         if (result.isDebugUser) {
           toast.success('מצב בדיקה - קוד: ' + TEST_USER.otpCode)
         } else {
@@ -214,6 +217,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         const customer = await login(phone.replace(/\D/g, ''), fullname, result.firebaseUid)
         
         if (customer) {
+          haptics.success() // Haptic feedback for successful login
           toast.success(`שלום ${customer.fullname}!`)
           onClose()
         } else {
@@ -248,7 +252,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-4 left-4 text-foreground-muted hover:text-foreground-light transition-colors"
+          className="absolute top-4 left-4 w-10 h-10 flex items-center justify-center text-foreground-muted hover:text-foreground-light transition-colors"
           aria-label="סגור"
         >
           <X size={20} strokeWidth={1.5} />
@@ -295,7 +299,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               onClick={handlePhoneSubmit}
               disabled={loading}
               className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all text-center',
+                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center',
                 loading
                   ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                   : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
@@ -352,7 +356,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               onClick={handleNameSubmit}
               disabled={loading}
               className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all text-center',
+                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center',
                 loading
                   ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                   : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
@@ -363,7 +367,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             
             <button
               onClick={() => setStep('phone')}
-              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors text-center"
+              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors flex items-center justify-center"
             >
               ← חזור
             </button>
@@ -390,7 +394,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               onClick={() => handleDebugChoice(true)}
               disabled={loading}
               className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all text-center',
+                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center',
                 loading
                   ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                   : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
@@ -403,7 +407,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               onClick={() => handleDebugChoice(false)}
               disabled={loading}
               className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all text-center border',
+                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center border',
                 loading
                   ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed border-foreground-muted/30'
                   : 'bg-transparent text-foreground-light border-white/20 hover:border-accent-gold/50'
@@ -414,7 +418,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             
             <button
               onClick={() => setStep('phone')}
-              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors text-center"
+              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors flex items-center justify-center"
             >
               ← חזור
             </button>
@@ -465,7 +469,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               onClick={handleVerifyOtp}
               disabled={loading || otp.join('').length !== 6}
               className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all text-center',
+                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center',
                 loading || otp.join('').length !== 6
                   ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                   : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
@@ -492,7 +496,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             
             <button
               onClick={() => setStep('phone')}
-              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors text-center"
+              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors flex items-center justify-center"
             >
               ← חזור
             </button>
@@ -527,14 +531,14 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 barberLogout()
                 setStep('phone')
               }}
-              className="w-full py-3 rounded-xl font-medium transition-all text-center bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
+              className="w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
             >
               התנתק מחשבון הספר
             </button>
             
             <button
               onClick={onClose}
-              className="w-full py-3 rounded-xl font-medium transition-all text-center border border-white/20 text-foreground-light hover:bg-white/5"
+              className="w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center border border-white/20 text-foreground-light hover:bg-white/5"
             >
               סגור
             </button>

@@ -119,14 +119,14 @@ export default function BarberLoginPage() {
                 onClick={() => {
                   customerLogout()
                 }}
-                className="w-full py-3.5 rounded-xl font-medium transition-all bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
+                className="w-full py-3.5 rounded-xl font-medium transition-all flex items-center justify-center bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
               >
                 התנתק מחשבון הלקוח
               </button>
               
               <Link
                 href="/"
-                className="w-full py-3.5 rounded-xl font-medium transition-all border border-white/20 text-foreground-light hover:bg-white/5 text-center"
+                className="w-full py-3.5 rounded-xl font-medium transition-all flex items-center justify-center border border-white/20 text-foreground-light hover:bg-white/5"
               >
                 חזרה לאתר
               </Link>
@@ -228,7 +228,7 @@ export default function BarberLoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground-light transition-colors p-1"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-foreground-muted hover:text-foreground-light transition-colors"
                   aria-label={showPassword ? 'הסתר סיסמה' : 'הצג סיסמה'}
                 >
                   {showPassword ? <EyeOff size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
@@ -246,17 +246,17 @@ export default function BarberLoginPage() {
               type="submit"
               disabled={loading || isLoading}
               className={cn(
-                'w-full py-3.5 rounded-xl font-medium transition-all text-base sm:text-lg mt-2 text-center',
+                'w-full py-3.5 rounded-xl font-medium transition-all text-base sm:text-lg mt-2 flex items-center justify-center',
                 loading || isLoading
                   ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                   : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90 hover:scale-[1.02] active:scale-[0.98]'
               )}
             >
               {loading || isLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="w-5 h-5 border-2 border-background-dark border-t-transparent rounded-full animate-spin" />
+                <>
+                  <span className="w-5 h-5 border-2 border-background-dark border-t-transparent rounded-full animate-spin mr-2" />
                   מתחבר...
-                </span>
+                </>
               ) : (
                 'התחבר'
               )}

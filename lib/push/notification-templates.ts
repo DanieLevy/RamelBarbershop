@@ -29,6 +29,31 @@ function formatShortDate(timestamp: number): string {
 }
 
 /**
+ * Format time duration in proper Hebrew grammar
+ * Handles special cases for 1, 2, and 3+ units
+ */
+function formatHebrewDuration(minutes: number): string {
+  if (minutes < 60) {
+    // Minutes
+    if (minutes === 1) return 'דקה אחת'
+    if (minutes === 2) return 'שתי דקות'
+    if (minutes <= 10) return `${minutes} דקות`
+    if (minutes <= 20) return `${minutes} דקות`
+    return `${minutes} דקות`
+  }
+  
+  const hours = Math.round(minutes / 60)
+  
+  // Hours - proper Hebrew grammar
+  if (hours === 1) return 'שעה'
+  if (hours === 2) return 'שעתיים'
+  if (hours <= 10) return `${hours} שעות`
+  if (hours === 11) return 'אחת עשרה שעות'
+  if (hours === 12) return 'שתים עשרה שעות'
+  return `${hours} שעות`
+}
+
+/**
  * Get notification template by type
  */
 export function getNotificationTemplate(
@@ -56,7 +81,7 @@ export function getNotificationTemplate(
 /**
  * Appointment reminder template
  * Includes deep link with highlight param to focus on the specific appointment
- * Dynamically shows time remaining until appointment
+ * Dynamically shows time remaining until appointment with proper Hebrew grammar
  */
 function getReminderTemplate(context: ReminderContext): NotificationPayload {
   const time = formatTime(context.appointmentTime)
@@ -67,16 +92,13 @@ function getReminderTemplate(context: ReminderContext): NotificationPayload {
   const now = Date.now()
   const msUntil = context.appointmentTime - now
   const minutesUntil = Math.round(msUntil / 60000)
-  const hoursUntil = Math.round(msUntil / 3600000)
   
-  // Build dynamic time text
+  // Build dynamic time text with proper Hebrew grammar
   let timeUntilText: string
   if (minutesUntil < 60) {
-    timeUntilText = `בעוד ${minutesUntil} דקות`
-  } else if (hoursUntil === 1) {
-    timeUntilText = 'בעוד שעה'
-  } else if (hoursUntil <= 5) {
-    timeUntilText = `בעוד ${hoursUntil} שעות`
+    timeUntilText = `בעוד ${formatHebrewDuration(minutesUntil)}`
+  } else if (minutesUntil < 360) { // Less than 6 hours
+    timeUntilText = `בעוד ${formatHebrewDuration(minutesUntil)}`
   } else {
     timeUntilText = `היום בשעה ${time}`
   }
@@ -85,8 +107,8 @@ function getReminderTemplate(context: ReminderContext): NotificationPayload {
   const deepLinkUrl = `/my-appointments?highlight=${context.reservationId}`
   
   return {
-    title: `⏰ תזכורת: תור ${timeUntilText}`,
-    body: `יש לך תור ל${context.serviceName} אצל ${context.barberName} ב${fullDate} בשעה ${time}`,
+    title: `⏰ תזכורת: התור שלך ${timeUntilText}`,
+    body: `היי ${context.customerName}! יש לך תור ל${context.serviceName} אצל ${context.barberName} ב${fullDate} בשעה ${time}`,
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-72x72.png',
     tag: `reminder-${context.reservationId}`,

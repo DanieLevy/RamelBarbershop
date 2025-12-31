@@ -183,7 +183,7 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule }: TimeSe
                     key={slot.time_timestamp}
                     onClick={() => handleSelect(slot.time_timestamp)}
                     className={cn(
-                      'py-3 px-2 rounded-xl text-sm font-medium transition-all cursor-pointer',
+                      'py-3 px-2 rounded-xl text-sm font-medium transition-all cursor-pointer text-center',
                       'active:scale-95 hover:scale-[1.02]',
                       timeTimestamp === slot.time_timestamp
                         ? 'bg-accent-gold text-background-dark shadow-gold'

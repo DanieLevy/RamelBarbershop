@@ -214,6 +214,31 @@ function formatTime(timestamp: number): string {
 }
 
 /**
+ * Format time duration in proper Hebrew grammar
+ * Handles special cases for 1, 2, and 3+ units
+ */
+function formatHebrewDuration(minutes: number): string {
+  if (minutes < 60) {
+    // Minutes
+    if (minutes === 1) return 'דקה אחת'
+    if (minutes === 2) return 'שתי דקות'
+    if (minutes <= 10) return `${minutes} דקות`
+    if (minutes <= 20) return `${minutes} דקות`
+    return `${minutes} דקות`
+  }
+  
+  const hours = Math.round(minutes / 60)
+  
+  // Hours - proper Hebrew grammar
+  if (hours === 1) return 'שעה'
+  if (hours === 2) return 'שעתיים'
+  if (hours <= 10) return `${hours} שעות`
+  if (hours === 11) return 'אחת עשרה שעות'
+  if (hours === 12) return 'שתים עשרה שעות'
+  return `${hours} שעות`
+}
+
+/**
  * Send reminder to customer
  */
 async function sendReminder(apt: AppointmentForReminder): Promise<{ sent: number; failed: number; errors: string[] }> {
@@ -226,17 +251,14 @@ async function sendReminder(apt: AppointmentForReminder): Promise<{ sent: number
 
   const formattedTime = formatTime(apt.time_timestamp)
   
-  // Build dynamic title based on time until appointment
-  const hoursText = apt.reminder_hours_before === 1 ? 'שעה' : `${apt.reminder_hours_before} שעות`
+  // Build dynamic title with proper Hebrew grammar
   const minutesUntil = Math.round((apt.time_timestamp - Date.now()) / 60000)
-  const timeText = minutesUntil < 60 
-    ? `${minutesUntil} דקות` 
-    : hoursText
+  const timeText = formatHebrewDuration(minutesUntil)
 
   const payload = JSON.stringify({
     notification: {
-      title: `⏰ תזכורת: תור בעוד ${timeText}`,
-      body: `היי ${apt.customer_name}, יש לך תור ל${apt.service_name} עם ${apt.barber_name} ב${formattedTime}`,
+      title: `⏰ תזכורת: התור שלך בעוד ${timeText}`,
+      body: `היי ${apt.customer_name}! יש לך תור ל${apt.service_name} עם ${apt.barber_name} ב${formattedTime}`,
       icon: '/icons/icon-192x192.png',
       badge: '/icons/icon-72x72.png',
       tag: `reminder-${apt.id}`,

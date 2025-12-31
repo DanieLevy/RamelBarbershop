@@ -27,7 +27,7 @@ export function LogoutModal({ isOpen, onClose, onConfirm, isLoading }: LogoutMod
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="p-1 text-foreground-muted hover:text-foreground-light transition-colors"
+            className="w-10 h-10 flex items-center justify-center text-foreground-muted hover:text-foreground-light transition-colors"
           >
             <X size={20} />
           </button>
@@ -66,7 +66,7 @@ export function LogoutModal({ isOpen, onClose, onConfirm, isLoading }: LogoutMod
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="flex-1 py-3 rounded-xl bg-white/10 text-foreground-light font-medium hover:bg-white/15 transition-colors disabled:opacity-50 text-center"
+            className="flex-1 py-3 rounded-xl bg-white/10 text-foreground-light font-medium hover:bg-white/15 transition-colors disabled:opacity-50 flex items-center justify-center"
           >
             ביטול
           </button>

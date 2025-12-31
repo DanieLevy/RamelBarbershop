@@ -434,7 +434,7 @@ export default function ProfilePage() {
             onClick={handleChangePassword}
             disabled={savingPassword}
             className={cn(
-              'w-full py-3 rounded-xl font-medium transition-all text-center',
+              'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center',
               savingPassword
                 ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                 : 'bg-blue-500 text-white hover:bg-blue-600'

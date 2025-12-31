@@ -433,7 +433,7 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
               <div className="flex items-center gap-4">
                 <button
                   onClick={() => setShowMobileMenu(true)}
-                  className="md:hidden p-2 -ml-2 rounded-full hover:bg-white/10 transition-colors"
+                  className="md:hidden w-10 h-10 -ml-2 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors"
                   aria-label="פתח תפריט"
                 >
                   <Menu size={22} strokeWidth={1.5} className="text-foreground-light" />

@@ -226,7 +226,7 @@ export default function DashboardPage() {
                   {/* Time Display - Before indicator */}
                   <div className="flex flex-col items-center shrink-0 w-12">
                     <span className={cn(
-                      'text-lg font-bold tabular-nums',
+                      'text-lg font-medium tabular-nums',
                       smartDate.isToday ? 'text-accent-gold' : 'text-foreground-muted'
                     )}>
                       {smartDate.time}

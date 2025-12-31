@@ -5,9 +5,10 @@ import { useBookingStore } from '@/store/useBookingStore'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import type { BarberWithWorkDays } from '@/types/database'
-import { cn, formatTime } from '@/lib/utils'
+import { cn, formatTime, formatDateHebrew } from '@/lib/utils'
 import { Check, Calendar, Clock, Scissors, User, Phone } from 'lucide-react'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { useHaptics } from '@/hooks/useHaptics'
 import { BlockedUserModal } from './BlockedUserModal'
 import { validateLoggedInReservation } from '@/lib/validation/reservation'
 
@@ -25,6 +26,7 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
     reset,
   } = useBookingStore()
   const { report } = useBugReporter('LoggedInConfirmation')
+  const haptics = useHaptics()
   
   const [isCreating, setIsCreating] = useState(false)
   const [isCreated, setIsCreated] = useState(false)
@@ -119,6 +121,7 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
       }
       
       setIsCreated(true)
+      haptics.success() // Haptic feedback for successful booking
       toast.success('התור נקבע בהצלחה!')
     } catch (err) {
       console.error('Unexpected error creating reservation:', err)
@@ -215,7 +218,7 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
             <Calendar size={16} strokeWidth={1.5} className="text-accent-gold" />
             <span className="text-foreground-muted">תאריך:</span>
             <span className="text-foreground-light font-medium">
-              {date?.dayName} {date?.dayNum}
+              {date?.dateTimestamp ? formatDateHebrew(date.dateTimestamp) : `${date?.dayName} ${date?.dayNum}`}
             </span>
           </div>
           
@@ -263,7 +266,7 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
             reset()
             window.scrollTo({ top: 0, behavior: 'smooth' })
           }}
-          className="w-full py-3 px-4 rounded-xl font-medium bg-accent-gold text-background-dark hover:bg-accent-gold/90 transition-colors"
+          className="w-full py-3 px-4 rounded-xl font-medium bg-accent-gold text-background-dark hover:bg-accent-gold/90 transition-colors flex items-center justify-center"
         >
           הזמן תור נוסף
         </button>

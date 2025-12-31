@@ -9,6 +9,7 @@ import { getOrCreateCustomer } from '@/lib/services/customer.service'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { useHaptics } from '@/hooks/useHaptics'
 import { validateLoggedInReservation } from '@/lib/validation/reservation'
 
 const RECAPTCHA_CONTAINER_ID = 'recaptcha-container'
@@ -32,6 +33,7 @@ export function OTPVerification() {
   
   const { login } = useAuthStore()
   const { report } = useBugReporter('OTPVerification')
+  const haptics = useHaptics()
 
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [sending, setSending] = useState(false)
@@ -113,6 +115,7 @@ export function OTPVerification() {
         setSent(true)
         setCountdown(RESEND_COOLDOWN_SECONDS)
         setRetryCount(0)
+        haptics.light() // Haptic feedback for OTP sent
         toast.success('קוד אימות נשלח בהצלחה!')
         setTimeout(() => inputRefs.current[0]?.focus(), 100)
       } else {
@@ -132,7 +135,7 @@ export function OTPVerification() {
     if (isMountedRef.current) {
       setSending(false)
     }
-  }, [countdown, sending, customer.phone, setOtpConfirmation, formatPhoneNumber, retryCount, report])
+  }, [countdown, sending, customer.phone, setOtpConfirmation, formatPhoneNumber, retryCount, report, haptics])
 
   const handleOtpChange = (index: number, value: string) => {
     if (!/^\d*$/.test(value)) return
@@ -223,6 +226,7 @@ export function OTPVerification() {
         if (!isMountedRef.current) return
         
         if (reservationCreated) {
+          haptics.success() // Haptic feedback for successful booking
           toast.success('התור נקבע בהצלחה!')
           nextStep()
         } else {

@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { cn, formatTime as formatTimeUtil, nowInIsrael, generateTimeSlots, parseTimeString } from '@/lib/utils'
 import { startOfDay, endOfDay, addDays, format, isSameDay, startOfWeek, endOfWeek } from 'date-fns'
 import { he } from 'date-fns/locale'
-import { Calendar, Phone, X, Ban, Plus } from 'lucide-react'
+import { Calendar, Phone, X, Plus } from 'lucide-react'
 import type { Reservation, Service, BarbershopSettings } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { CancelReservationModal } from '@/components/barber/CancelReservationModal'
@@ -388,18 +388,6 @@ export default function ReservationsPage() {
     return null
   }
 
-  // Bulk cancellable reservations
-  const bulkCancellableReservations = useMemo(() => {
-    const { start, end } = getDateRange()
-    if (!start || !end) return []
-    
-    return reservations.filter(res => {
-      const resTime = normalizeTs(res.time_timestamp)
-      return resTime >= start.getTime() && resTime <= end.getTime() && res.status === 'confirmed'
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reservations, quickDate, customDate])
-
   // Tab counts
   const getTabCounts = () => {
     const { start, end } = getDateRange()
@@ -555,20 +543,6 @@ export default function ReservationsPage() {
         ))}
       </div>
 
-      {/* Bulk Cancel Button */}
-      {quickDate !== 'all' && bulkCancellableReservations.length > 1 && (
-        <button
-          onClick={() => setBulkCancelModal({
-            isOpen: true,
-            reservations: bulkCancellableReservations
-          })}
-          className="w-full mb-4 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors text-sm font-medium"
-        >
-          <Ban size={16} strokeWidth={1.5} />
-          בטל את כל התורים ({bulkCancellableReservations.length})
-        </button>
-      )}
-
       {/* Toggle Empty Slots - Only for single day views */}
       {(quickDate === 'today' || quickDate === 'tomorrow' || quickDate === 'custom') && activeTab === 'upcoming' && (
         <div className="flex items-center justify-end mb-3">
@@ -660,7 +634,7 @@ export default function ReservationsPage() {
                   {/* Time Display - Before indicator */}
                   <div className="flex flex-col items-center shrink-0 w-12">
                     <span className={cn(
-                      'text-lg font-bold tabular-nums',
+                      'text-lg font-medium tabular-nums',
                       isUpcoming ? 'text-accent-gold' : 'text-foreground-muted'
                     )}>
                       {smartDate.time}

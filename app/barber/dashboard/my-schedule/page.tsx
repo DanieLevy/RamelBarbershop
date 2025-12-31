@@ -287,7 +287,7 @@ export default function MySchedulePage() {
         {/* Work Days - Grid layout for mobile */}
         <div className="mb-6">
           <label className="text-foreground-light text-sm block mb-3">ימי עבודה</label>
-          <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+          <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
             {DAYS.map((day) => {
               const isShopOpen = shopSettings?.open_days.includes(day.key)
               const isActive = workDays.includes(day.key)
@@ -297,7 +297,7 @@ export default function MySchedulePage() {
                   onClick={() => toggleDay(day.key)}
                   disabled={!isShopOpen}
                   className={cn(
-                    'py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all text-center',
+                    'min-w-[60px] px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all flex items-center justify-center',
                     !isShopOpen
                       ? 'bg-background-dark/50 text-foreground-muted/30 cursor-not-allowed'
                       : isActive

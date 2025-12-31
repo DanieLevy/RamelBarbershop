@@ -21,6 +21,7 @@ import {
   ChevronRight
 } from 'lucide-react'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { useHaptics } from '@/hooks/useHaptics'
 import { NotificationSettings } from '@/components/profile/NotificationSettings'
 import { LogoutModal } from '@/components/profile/LogoutModal'
 
@@ -28,6 +29,7 @@ export default function ProfilePage() {
   const router = useRouter()
   const { customer, isLoggedIn, isLoading, isInitialized, logout } = useAuthStore()
   const { report } = useBugReporter('ProfilePage')
+  const haptics = useHaptics()
   
   const [editingName, setEditingName] = useState(false)
   const [newName, setNewName] = useState('')
@@ -113,6 +115,7 @@ export default function ProfilePage() {
         customer: { ...customer, fullname: newName.trim() }
       })
       
+      haptics.success() // Haptic feedback for settings saved
       toast.success('השם עודכן בהצלחה')
       setEditingName(false)
     } catch (err) {
@@ -127,6 +130,7 @@ export default function ProfilePage() {
   const handleLogout = () => {
     setShowLogoutModal(false)
     logout()
+    haptics.light() // Haptic feedback for logout
     router.replace('/')
     toast.success('התנתקת בהצלחה')
   }

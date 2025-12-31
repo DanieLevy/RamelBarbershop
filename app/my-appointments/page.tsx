@@ -10,11 +10,12 @@ import { GlassCard } from '@/components/ui/GlassCard'
 import { AppointmentDetailModal } from '@/components/barber/AppointmentDetailModal'
 import { toast } from 'sonner'
 import { cn, formatTime as formatTimeUtil } from '@/lib/utils'
-import { Calendar, Clock, Scissors, User, X, History, ChevronRight, LogIn, Info, AlertCircle } from 'lucide-react'
+import { Calendar, Scissors, User, X, History, ChevronRight, LogIn, Info, AlertCircle } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { ReservationWithDetails } from '@/types/database'
 import { LoginModal } from '@/components/LoginModal'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { useHaptics } from '@/hooks/useHaptics'
 import { isSameDay, addDays } from 'date-fns'
 import ErrorBoundary from '@/components/ErrorBoundary'
 
@@ -52,6 +53,7 @@ function MyAppointmentsContent() {
   const searchParams = useSearchParams()
   const { customer, isLoggedIn, isLoading, isInitialized } = useAuthStore()
   const { report } = useBugReporter('MyAppointmentsPage')
+  const haptics = useHaptics()
   
   // Get highlight param from URL (from push notification deep link)
   const highlightId = searchParams.get('highlight')
@@ -199,6 +201,7 @@ function MyAppointmentsContent() {
         }).catch(err => console.log('Push notification error:', err))
       }
       
+      haptics.medium() // Haptic feedback for cancellation
       toast.success('התור בוטל בהצלחה')
       await fetchReservations()
     } catch (err) {
@@ -308,7 +311,7 @@ function MyAppointmentsContent() {
                   <span>התחבר עכשיו</span>
                 </button>
                 
-                <div className="mt-6 pt-6 border-t border-white/10">
+                <div className="mt-6 pt-6 border-t border-white/10 flex flex-col items-center">
                   <p className="text-foreground-muted text-sm mb-3">עדיין לא קבעת תור?</p>
                   <button
                     onClick={() => router.push('/')}
@@ -380,8 +383,8 @@ function MyAppointmentsContent() {
                 <ScissorsLoader size="md" text="טוען תורים..." />
               </div>
             ) : filteredReservations.length === 0 ? (
-              <GlassCard className="text-center py-12">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-white/5 flex items-center justify-center">
+              <GlassCard className="flex flex-col items-center text-center py-12">
+                <div className="w-16 h-16 mb-4 rounded-full bg-white/5 flex items-center justify-center">
                   <Calendar size={32} strokeWidth={1} className="text-foreground-muted" />
                 </div>
                 <p className="text-foreground-muted mb-4">
@@ -417,6 +420,22 @@ function MyAppointmentsContent() {
                           isHighlighted && 'bg-accent-gold/10 ring-2 ring-accent-gold/50 ring-inset animate-pulse'
                         )}
                       >
+                        {/* Time Display - Before indicator */}
+                        <div className="flex flex-col items-center shrink-0 w-14">
+                          <span className={cn(
+                            'text-lg font-medium tabular-nums',
+                            cancelled ? 'text-red-400/60' : upcoming ? 'text-accent-gold' : 'text-foreground-muted'
+                          )}>
+                            {smartDate.time}
+                          </span>
+                          <span className={cn(
+                            'text-xs',
+                            smartDate.isToday ? 'text-accent-gold' : 'text-foreground-muted'
+                          )}>
+                            {smartDate.date}
+                          </span>
+                        </div>
+                        
                         {/* Status Line */}
                         <div className={cn(
                           'w-1 h-12 rounded-full shrink-0',
@@ -433,16 +452,10 @@ function MyAppointmentsContent() {
                             </span>
                           </div>
                           
-                          {/* Service & Time */}
+                          {/* Service */}
                           <p className="text-foreground-muted text-xs flex items-center gap-1.5">
                             <Scissors size={11} />
-                            <span className="truncate max-w-[80px]">{reservation.services?.name_he || 'שירות'}</span>
-                            <span className="text-foreground-muted/50">•</span>
-                            <Clock size={11} />
-                            <span>{smartDate.time}</span>
-                            <span className={cn(smartDate.isToday && 'text-accent-gold')}>
-                              {smartDate.date}
-                            </span>
+                            <span className="truncate">{reservation.services?.name_he || 'שירות'}</span>
                           </p>
                           
                           {/* Cancelled info */}
@@ -464,7 +477,7 @@ function MyAppointmentsContent() {
                               e.stopPropagation()
                               setDetailModal({ isOpen: true, reservation })
                             }}
-                            className="p-2 rounded-lg hover:bg-white/[0.08] transition-colors"
+                            className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/[0.08] transition-colors"
                             aria-label="פרטים"
                           >
                             <Info size={16} strokeWidth={1.5} className="text-foreground-muted" />
@@ -479,7 +492,7 @@ function MyAppointmentsContent() {
                               }}
                               disabled={cancellingId === reservation.id}
                               className={cn(
-                                'p-2 rounded-lg transition-colors',
+                                'w-10 h-10 flex items-center justify-center rounded-lg transition-colors',
                                 cancellingId === reservation.id
                                   ? 'opacity-50 cursor-not-allowed'
                                   : 'hover:bg-red-500/10 text-red-400'
