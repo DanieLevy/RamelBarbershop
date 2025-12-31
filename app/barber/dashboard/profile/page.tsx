@@ -23,6 +23,7 @@ export default function ProfilePage() {
   
   // Profile form
   const [fullname, setFullname] = useState('')
+  const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [imgUrl, setImgUrl] = useState('')
   
@@ -43,6 +44,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (barber) {
       setFullname(barber.fullname)
+      setEmail(barber.email || '')
       setPhone(barber.phone || '')
       setImgUrl(barber.img_url || '')
       fetchMessages()
@@ -110,17 +112,24 @@ export default function ProfilePage() {
       return
     }
     
+    // Validate email format
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error('נא להזין כתובת אימייל תקינה')
+      return
+    }
+    
     setSavingProfile(true)
     
     const result = await updateBarber(barber.id, {
       fullname,
+      email: email || undefined,
       phone: phone || undefined,
       img_url: imgUrl || undefined,
     })
     
     if (result.success) {
       toast.success('הפרופיל עודכן בהצלחה!')
-      setBarber({ ...barber, fullname, phone, img_url: imgUrl })
+      setBarber({ ...barber, fullname, email, phone, img_url: imgUrl })
     } else {
       toast.error(result.error || 'שגיאה בעדכון')
     }
@@ -356,6 +365,18 @@ export default function ProfilePage() {
           </div>
 
           <div className="flex flex-col gap-2">
+            <label className="text-foreground-light text-sm">אימייל (להתחברות)</label>
+            <input
+              type="email"
+              dir="ltr"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="your@email.com"
+              className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-left"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
             <label className="text-foreground-light text-sm">טלפון</label>
             <input
               type="tel"
@@ -371,7 +392,7 @@ export default function ProfilePage() {
             onClick={handleSaveProfile}
             disabled={savingProfile}
             className={cn(
-              'w-full py-3 rounded-xl font-medium transition-all',
+              'w-full py-3 rounded-xl font-medium transition-all text-center',
               savingProfile
                 ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                 : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
@@ -413,7 +434,7 @@ export default function ProfilePage() {
             onClick={handleChangePassword}
             disabled={savingPassword}
             className={cn(
-              'w-full py-3 rounded-xl font-medium transition-all',
+              'w-full py-3 rounded-xl font-medium transition-all text-center',
               savingPassword
                 ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                 : 'bg-blue-500 text-white hover:bg-blue-600'
@@ -504,13 +525,13 @@ export default function ProfilePage() {
                   </button>
                   <button
                     onClick={() => handleEditMessage(msg)}
-                    className="p-1.5 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded transition-colors"
+                    className="p-1.5 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded transition-colors flex items-center justify-center"
                   >
                     <Pencil size={12} strokeWidth={1.5} />
                   </button>
                   <button
                     onClick={() => handleDeleteMessage(msg.id)}
-                    className="p-1.5 text-foreground-muted hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                    className="p-1.5 text-foreground-muted hover:text-red-400 hover:bg-red-500/10 rounded transition-colors flex items-center justify-center"
                   >
                     <Trash size={12} strokeWidth={1.5} />
                   </button>

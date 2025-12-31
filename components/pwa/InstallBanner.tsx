@@ -184,7 +184,7 @@ export function InstallBanner({
         <div className="flex gap-3">
           <button
             onClick={handleClose}
-            className="flex-1 py-3 px-4 rounded-xl bg-white/10 text-foreground-light font-medium hover:bg-white/20 transition-colors"
+            className="flex-1 py-3 px-4 rounded-xl bg-white/10 text-foreground-light font-medium hover:bg-white/20 transition-colors text-center"
           >
             אולי אח&quot;כ
           </button>

@@ -187,17 +187,17 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
               onClick={isNotificationsEnabled ? handleDisableNotifications : handleEnableNotifications}
               disabled={isEnabling || push.isLoading}
               className={cn(
-                'relative w-14 h-8 rounded-full transition-colors duration-200',
+                'relative w-11 h-6 rounded-full transition-colors duration-200',
                 isNotificationsEnabled ? 'bg-green-500' : 'bg-white/20',
                 (isEnabling || push.isLoading) && 'opacity-50 cursor-not-allowed'
               )}
             >
               <div className={cn(
-                'absolute top-1 w-6 h-6 bg-white rounded-full shadow transition-transform duration-200',
-                isNotificationsEnabled ? 'right-1' : 'left-1'
+                'absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200',
+                isNotificationsEnabled ? 'right-0.5' : 'left-0.5'
               )}>
                 {(isEnabling || push.isLoading) && (
-                  <Loader2 size={14} className="animate-spin absolute top-1 left-1 text-background-dark" />
+                  <Loader2 size={12} className="animate-spin absolute top-0.5 left-0.5 text-background-dark" />
                 )}
               </div>
             </button>

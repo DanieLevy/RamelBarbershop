@@ -4,15 +4,16 @@ import { useEffect, useState, useMemo } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { cn, formatTime as formatTimeUtil, nowInIsrael } from '@/lib/utils'
+import { cn, formatTime as formatTimeUtil, nowInIsrael, generateTimeSlots, parseTimeString } from '@/lib/utils'
 import { startOfDay, endOfDay, addDays, format, isSameDay, startOfWeek, endOfWeek } from 'date-fns'
 import { he } from 'date-fns/locale'
-import { Calendar, Phone, X, Clock, Ban, Info } from 'lucide-react'
-import type { Reservation, Service } from '@/types/database'
+import { Calendar, Phone, X, Ban, Plus } from 'lucide-react'
+import type { Reservation, Service, BarbershopSettings } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { CancelReservationModal } from '@/components/barber/CancelReservationModal'
 import { BulkCancelModal } from '@/components/barber/BulkCancelModal'
 import { AppointmentDetailModal } from '@/components/barber/AppointmentDetailModal'
+import { ManualBookingModal } from '@/components/barber/ManualBookingModal'
 
 interface ReservationWithService extends Reservation {
   services?: Service
@@ -49,13 +50,40 @@ export default function ReservationsPage() {
     isOpen: boolean
     reservation: ReservationWithService | null
   }>({ isOpen: false, reservation: null })
+  
+  // Shop settings for work hours
+  const [shopSettings, setShopSettings] = useState<BarbershopSettings | null>(null)
+  
+  // Toggle for showing empty slots
+  const [showEmptySlots, setShowEmptySlots] = useState(true)
+  
+  // Manual booking modal state
+  const [manualBookingModal, setManualBookingModal] = useState<{
+    isOpen: boolean
+    preselectedDate?: Date | null
+    preselectedTime?: number | null
+  }>({ isOpen: false, preselectedDate: null, preselectedTime: null })
 
   useEffect(() => {
     if (barber?.id) {
       fetchReservations()
+      fetchShopSettings()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [barber?.id])
+  
+  const fetchShopSettings = async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('barbershop_settings')
+      .select('*')
+      .eq('id', 'default')
+      .single()
+    
+    if (data) {
+      setShopSettings(data as BarbershopSettings)
+    }
+  }
 
   const fetchReservations = async () => {
     if (!barber?.id) return
@@ -287,6 +315,78 @@ export default function ReservationsPage() {
     return filtered
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reservations, quickDate, customDate, activeTab, now])
+  
+  // Generate timeline with empty slots for single-day views
+  type TimelineItem = 
+    | { type: 'reservation'; data: ReservationWithService }
+    | { type: 'empty'; timestamp: number; time: string }
+  
+  const timelineItems = useMemo((): TimelineItem[] => {
+    // Only show empty slots for single-day views and upcoming tab
+    if (!showEmptySlots || quickDate === 'week' || quickDate === 'all' || activeTab !== 'upcoming') {
+      return filteredReservations.map(res => ({ type: 'reservation' as const, data: res }))
+    }
+    
+    // Get the selected date
+    let selectedDate: Date
+    if (quickDate === 'today') {
+      selectedDate = israelNow
+    } else if (quickDate === 'tomorrow') {
+      selectedDate = addDays(israelNow, 1)
+    } else if (quickDate === 'custom' && customDate) {
+      selectedDate = customDate
+    } else {
+      return filteredReservations.map(res => ({ type: 'reservation' as const, data: res }))
+    }
+    
+    // Get work hours from shop settings
+    const workStart = shopSettings?.work_hours_start || '09:00'
+    const workEnd = shopSettings?.work_hours_end || '19:00'
+    const { hour: startHour, minute: startMinute } = parseTimeString(workStart)
+    const { hour: endHour, minute: endMinute } = parseTimeString(workEnd)
+    
+    // Generate all time slots for the day
+    const allSlots = generateTimeSlots(
+      selectedDate.getTime(),
+      startHour,
+      startMinute,
+      endHour,
+      endMinute,
+      30
+    )
+    
+    // Build timeline
+    const timeline: TimelineItem[] = []
+    
+    for (const slot of allSlots) {
+      // Skip past slots for today
+      if (isSameDay(selectedDate, israelNow) && slot.timestamp < now) {
+        continue
+      }
+      
+      // Check if this slot is reserved
+      const reservation = filteredReservations.find(res => 
+        Math.abs(normalizeTs(res.time_timestamp) - slot.timestamp) < 60000 // within 1 minute
+      )
+      
+      if (reservation) {
+        timeline.push({ type: 'reservation', data: reservation })
+      } else {
+        timeline.push({ type: 'empty', timestamp: slot.timestamp, time: slot.time })
+      }
+    }
+    
+    return timeline
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredReservations, quickDate, customDate, activeTab, shopSettings, showEmptySlots, now])
+  
+  // Get selected date for manual booking
+  const getSelectedDate = (): Date | null => {
+    if (quickDate === 'today') return israelNow
+    if (quickDate === 'tomorrow') return addDays(israelNow, 1)
+    if (quickDate === 'custom' && customDate) return customDate
+    return null
+  }
 
   // Bulk cancellable reservations
   const bulkCancellableReservations = useMemo(() => {
@@ -352,7 +452,7 @@ export default function ReservationsPage() {
       </div>
 
       {/* Date Filter Chips - Horizontal Scroll */}
-      <div className="mb-4 -mx-4 px-4">
+      <div className="mb-2 -mx-4 px-4">
         <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
           {quickDateChips.map((chip) => (
             <button
@@ -371,25 +471,60 @@ export default function ReservationsPage() {
               {chip.label}
             </button>
           ))}
-          
-          {/* Custom Date Picker Chip */}
-          <div className="relative shrink-0">
-            <input
-              type="date"
-              value={customDate ? format(customDate, 'yyyy-MM-dd') : ''}
-              onChange={(e) => {
-                const date = e.target.value ? new Date(e.target.value) : null
-                setCustomDate(date)
-                if (date) setQuickDate('custom')
-              }}
-              className={cn(
-                'w-32 px-4 py-2 rounded-full text-sm font-medium transition-all cursor-pointer',
-                'bg-white/[0.05] border border-white/[0.08] text-foreground-light',
-                'focus:outline-none focus:ring-2 focus:ring-accent-gold/50',
-                quickDate === 'custom' && 'bg-accent-gold/20 border-accent-gold/30 text-accent-gold'
-              )}
-            />
-          </div>
+        </div>
+      </div>
+      
+      {/* Date Display with Date Picker */}
+      <div className="mb-4 flex items-center gap-3">
+        <div className="flex items-center gap-2 text-foreground-light">
+          <Calendar size={16} className="text-accent-gold" />
+          <span className="text-sm font-medium">
+            {quickDate === 'today' && format(israelNow, 'EEEE, d בMMMM', { locale: he })}
+            {quickDate === 'tomorrow' && format(addDays(israelNow, 1), 'EEEE, d בMMMM', { locale: he })}
+            {quickDate === 'week' && `${format(startOfWeek(israelNow, { weekStartsOn: 0 }), 'd/M', { locale: he })} - ${format(endOfWeek(israelNow, { weekStartsOn: 0 }), 'd/M', { locale: he })}`}
+            {quickDate === 'all' && 'כל התורים'}
+            {quickDate === 'custom' && customDate && format(customDate, 'EEEE, d בMMMM', { locale: he })}
+          </span>
+        </div>
+        
+        {/* Date picker for custom selection */}
+        <div className="relative">
+          <input
+            type="date"
+            value={(() => {
+              if (quickDate === 'today') return format(israelNow, 'yyyy-MM-dd')
+              if (quickDate === 'tomorrow') return format(addDays(israelNow, 1), 'yyyy-MM-dd')
+              if (quickDate === 'custom' && customDate) return format(customDate, 'yyyy-MM-dd')
+              return ''
+            })()}
+            onChange={(e) => {
+              const date = e.target.value ? new Date(e.target.value) : null
+              if (date) {
+                // Check if selected date matches today or tomorrow
+                if (isSameDay(date, israelNow)) {
+                  setQuickDate('today')
+                  setCustomDate(null)
+                } else if (isSameDay(date, addDays(israelNow, 1))) {
+                  setQuickDate('tomorrow')
+                  setCustomDate(null)
+                } else {
+                  setCustomDate(date)
+                  setQuickDate('custom')
+                }
+              }
+            }}
+            className={cn(
+              'w-10 h-10 px-0 py-0 rounded-lg text-sm cursor-pointer opacity-0',
+              'absolute inset-0'
+            )}
+            title="בחר תאריך"
+          />
+          <button
+            className="w-10 h-10 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-foreground-muted hover:text-accent-gold hover:border-accent-gold/30 transition-colors"
+            title="בחר תאריך"
+          >
+            <Calendar size={18} />
+          </button>
         </div>
       </div>
 
@@ -433,16 +568,79 @@ export default function ReservationsPage() {
         </button>
       )}
 
+      {/* Toggle Empty Slots - Only for single day views */}
+      {(quickDate === 'today' || quickDate === 'tomorrow' || quickDate === 'custom') && activeTab === 'upcoming' && (
+        <div className="flex items-center justify-end mb-3">
+          <label className="flex items-center gap-2 text-sm text-foreground-muted cursor-pointer">
+            <span>הצג משבצות פנויות</span>
+            <button
+              onClick={() => setShowEmptySlots(!showEmptySlots)}
+              className={cn(
+                'relative w-9 h-5 rounded-full transition-colors duration-200',
+                showEmptySlots ? 'bg-accent-gold' : 'bg-white/20'
+              )}
+            >
+              <div className={cn(
+                'absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200',
+                showEmptySlots ? 'right-0.5' : 'left-0.5'
+              )} />
+            </button>
+          </label>
+        </div>
+      )}
+
       {/* Reservations List */}
       <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden">
-        {filteredReservations.length === 0 ? (
+        {timelineItems.length === 0 ? (
           <div className="text-center py-12">
             <Calendar size={40} strokeWidth={1} className="text-foreground-muted/30 mx-auto mb-3" />
             <p className="text-foreground-muted text-sm">אין תורים להציג</p>
           </div>
         ) : (
           <div className="divide-y divide-white/[0.04]">
-            {filteredReservations.map((res) => {
+            {timelineItems.map((item) => {
+              if (item.type === 'empty') {
+                // Empty slot row
+                return (
+                  <div
+                    key={`empty-${item.timestamp}`}
+                    className="flex items-center gap-3 px-3 sm:px-4 py-2 transition-all hover:bg-white/[0.02] group"
+                  >
+                    {/* Time Display */}
+                    <div className="flex flex-col items-center shrink-0 w-12">
+                      <span className="text-lg font-bold tabular-nums text-foreground-muted/50">
+                        {item.time}
+                      </span>
+                    </div>
+                    
+                    {/* Empty indicator */}
+                    <div className="w-1 h-6 rounded-full shrink-0 bg-white/[0.08]" />
+                    
+                    {/* Empty content */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-foreground-muted/40 text-xs">פנוי</p>
+                    </div>
+                    
+                    {/* Add button */}
+                    <button
+                      onClick={() => {
+                        setManualBookingModal({
+                          isOpen: true,
+                          preselectedDate: getSelectedDate(),
+                          preselectedTime: item.timestamp
+                        })
+                      }}
+                      className="p-1.5 rounded-lg bg-white/[0.05] text-foreground-muted/50 hover:bg-accent-gold/20 hover:text-accent-gold transition-colors opacity-0 group-hover:opacity-100"
+                      title="הוסף תור"
+                    >
+                      <Plus size={14} strokeWidth={2} />
+                    </button>
+                  </div>
+                )
+              }
+              
+              // Reservation row
+              const res = item.data
               const smartDate = getSmartDateTime(res.time_timestamp)
               const isUpcoming = normalizeTs(res.time_timestamp) > now && res.status === 'confirmed'
               const isCancelled = res.status === 'cancelled'
@@ -456,6 +654,19 @@ export default function ReservationsPage() {
                     isCancelled && 'opacity-60'
                   )}
                 >
+                  {/* Time Display - Before indicator */}
+                  <div className="flex flex-col items-center shrink-0 w-12">
+                    <span className={cn(
+                      'text-lg font-bold tabular-nums',
+                      isUpcoming ? 'text-accent-gold' : 'text-foreground-muted'
+                    )}>
+                      {smartDate.time}
+                    </span>
+                    <span className="text-[10px] text-foreground-muted/70">
+                      {smartDate.isToday ? 'היום' : smartDate.date}
+                    </span>
+                  </div>
+                  
                   {/* Status Line */}
                   <div className={cn(
                     'w-1 h-10 rounded-full shrink-0',
@@ -470,31 +681,13 @@ export default function ReservationsPage() {
                     )}>
                       {res.customer_name}
                     </p>
-                    <p className="text-foreground-muted text-xs truncate flex items-center gap-1.5">
-                      <span>{res.services?.name_he || 'שירות'}</span>
-                      <span className="text-foreground-muted/50">•</span>
-                      <Clock size={11} className="inline" />
-                      <span>{smartDate.time}</span>
-                      <span className={cn(smartDate.isToday && 'text-accent-gold')}>
-                        {smartDate.date}
-                      </span>
+                    <p className="text-foreground-muted text-xs truncate">
+                      {res.services?.name_he || 'שירות'}
                     </p>
                   </div>
                   
                   {/* Actions */}
                   <div className="flex items-center gap-1 shrink-0">
-                    {/* Info icon */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setDetailModal({ isOpen: true, reservation: res })
-                      }}
-                      className="icon-btn p-2 rounded-lg hover:bg-white/[0.08] transition-colors"
-                      aria-label="פרטים"
-                    >
-                      <Info size={16} strokeWidth={1.5} className="text-foreground-muted" />
-                    </button>
-                    
                     {/* Phone */}
                     <a
                       href={`tel:${res.customer_phone}`}
@@ -567,6 +760,31 @@ export default function ReservationsPage() {
         reservation={detailModal.reservation}
         variant="barber"
       />
+
+      <ManualBookingModal
+        isOpen={manualBookingModal.isOpen}
+        onClose={() => setManualBookingModal({ isOpen: false, preselectedDate: null, preselectedTime: null })}
+        onSuccess={fetchReservations}
+        barberId={barber?.id || ''}
+        barberName={barber?.fullname || ''}
+        shopSettings={shopSettings}
+        preselectedDate={manualBookingModal.preselectedDate}
+        preselectedTime={manualBookingModal.preselectedTime}
+      />
+
+      {/* Floating Add Button */}
+      <button
+        onClick={() => {
+          const selectedDate = quickDate === 'today' ? israelNow : 
+                              quickDate === 'tomorrow' ? addDays(israelNow, 1) : 
+                              quickDate === 'custom' && customDate ? customDate : null
+          setManualBookingModal({ isOpen: true, preselectedDate: selectedDate, preselectedTime: null })
+        }}
+        className="fixed bottom-24 left-4 w-14 h-14 rounded-full bg-accent-gold text-background-dark shadow-lg shadow-accent-gold/30 hover:bg-accent-gold/90 hover:scale-105 transition-all flex items-center justify-center z-40"
+        title="הוסף תור ידני"
+      >
+        <Plus size={24} strokeWidth={2} />
+      </button>
     </div>
   )
 }

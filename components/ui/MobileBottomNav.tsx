@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Home, Search, Calendar, User, LayoutDashboard, LogIn, Scissors } from 'lucide-react'
@@ -10,6 +10,8 @@ import { usePushNotifications } from '@/hooks/usePushNotifications'
 import { usePushStore } from '@/store/usePushStore'
 import { usePWA } from '@/hooks/usePWA'
 import { LoginModal } from '@/components/LoginModal'
+import { createClient } from '@/lib/supabase/client'
+import { useAuthStore } from '@/store/useAuthStore'
 
 interface NavItem {
   id: string
@@ -50,11 +52,50 @@ export function MobileBottomNav() {
   const [isVisible, setIsVisible] = useState(true)
   const [showLoginDropup, setShowLoginDropup] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
+  const [upcomingCount, setUpcomingCount] = useState(0)
+  
+  // Get customer from auth store for fetching appointments
+  const { customer } = useAuthStore()
   
   // Scroll tracking
   const lastScrollY = useRef(0)
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null)
   const dropupRef = useRef<HTMLDivElement>(null)
+  
+  // Fetch upcoming appointments count for customers
+  const fetchUpcomingCount = useCallback(async () => {
+    if (userRole !== 'customer' || !customer?.id) {
+      setUpcomingCount(0)
+      return
+    }
+    
+    try {
+      const supabase = createClient()
+      const now = Date.now()
+      
+      const { count, error } = await supabase
+        .from('reservations')
+        .select('*', { count: 'exact', head: true })
+        .eq('customer_id', customer.id)
+        .eq('status', 'active')
+        .gt('time_timestamp', now)
+      
+      if (!error && count !== null) {
+        setUpcomingCount(count)
+      }
+    } catch (err) {
+      console.error('Error fetching upcoming appointments count:', err)
+    }
+  }, [userRole, customer?.id])
+  
+  // Fetch count on mount and when customer changes
+  useEffect(() => {
+    fetchUpcomingCount()
+    
+    // Refetch every 30 seconds
+    const interval = setInterval(fetchUpcomingCount, 30000)
+    return () => clearInterval(interval)
+  }, [fetchUpcomingCount])
 
   // Don't show on dashboard pages or barber booking wizard
   const shouldHide = pathname.startsWith('/barber/dashboard') || 
@@ -324,6 +365,20 @@ export function MobileBottomNav() {
                       <span className="relative flex h-3 w-3">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
                         <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border border-background-dark" />
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Upcoming appointments count badge for calendar tab */}
+                  {item.id === 'calendar' && upcomingCount > 0 && (
+                    <div className="absolute -top-1.5 -right-2 flex items-center justify-center">
+                      <span className={cn(
+                        'inline-flex items-center justify-center min-w-[18px] h-[18px] px-1',
+                        'text-[10px] font-bold rounded-full',
+                        'bg-accent-gold text-background-dark',
+                        'border border-background-dark'
+                      )}>
+                        {upcomingCount > 9 ? '9+' : upcomingCount}
                       </span>
                     </div>
                   )}

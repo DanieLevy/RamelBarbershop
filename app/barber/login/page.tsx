@@ -246,7 +246,7 @@ export default function BarberLoginPage() {
               type="submit"
               disabled={loading || isLoading}
               className={cn(
-                'w-full py-3.5 rounded-xl font-medium transition-all text-base sm:text-lg mt-2',
+                'w-full py-3.5 rounded-xl font-medium transition-all text-base sm:text-lg mt-2 text-center',
                 loading || isLoading
                   ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                   : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90 hover:scale-[1.02] active:scale-[0.98]'

@@ -66,7 +66,7 @@ export function LogoutModal({ isOpen, onClose, onConfirm, isLoading }: LogoutMod
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="flex-1 py-3 rounded-xl bg-white/10 text-foreground-light font-medium hover:bg-white/15 transition-colors disabled:opacity-50"
+            className="flex-1 py-3 rounded-xl bg-white/10 text-foreground-light font-medium hover:bg-white/15 transition-colors disabled:opacity-50 text-center"
           >
             ביטול
           </button>

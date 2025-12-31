@@ -167,7 +167,7 @@ export default function ServicesPage() {
 
   return (
     <div className="max-w-2xl">
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-medium text-foreground-light">השירותים שלי</h1>
           <p className="text-foreground-muted mt-1">נהל את השירותים שאתה מציע</p>
@@ -179,6 +179,13 @@ export default function ServicesPage() {
           <Plus size={16} strokeWidth={1.5} />
           הוסף שירות
         </button>
+      </div>
+      
+      {/* 30-minute slot info */}
+      <div className="mb-6 px-4 py-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+        <p className="text-blue-400 text-sm">
+          <span className="font-medium">💡 מידע חשוב:</span> כל תור תופס משבצת קבועה של <span className="font-bold">30 דק׳</span> ללא קשר למשך השירות המוגדר. זמן השירות מוצג ללקוחות לאינפורמציה בלבד.
+        </p>
       </div>
 
       {/* Add/Edit Form */}
@@ -300,14 +307,14 @@ export default function ServicesPage() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleEdit(service)}
-                    className="p-2 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition-colors"
+                    className="p-2 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition-colors flex items-center justify-center"
                     title="ערוך"
                   >
                     <Pencil size={16} strokeWidth={1.5} />
                   </button>
                   <button
                     onClick={() => handleDelete(service.id)}
-                    className="p-2 text-foreground-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                    className="p-2 text-foreground-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors flex items-center justify-center"
                     title="מחק"
                   >
                     <Trash2 size={16} strokeWidth={1.5} />
