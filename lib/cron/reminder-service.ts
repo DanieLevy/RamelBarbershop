@@ -10,6 +10,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { pushService } from '@/lib/push/push-service'
 import type { ReminderContext } from '@/lib/push/types'
+import { nowInIsraelMs } from '@/lib/utils'
 
 // Type for reservation with joined data from the reminder query
 interface ReservationWithJoins {
@@ -75,7 +76,8 @@ export async function getAppointmentsForReminders(
   supabase?: SupabaseClient
 ): Promise<AppointmentForReminder[]> {
   const client = supabase || getSupabaseClient()
-  const now = Date.now()
+  // Use Israel timezone-aware timestamp for accurate reminder window calculation
+  const now = nowInIsraelMs()
   const maxWindowEnd = now + (MAX_REMINDER_HOURS * HOUR_MS)
 
   const { data, error } = await client

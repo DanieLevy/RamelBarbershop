@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBookingStore } from '@/store/useBookingStore'
 import type { WorkDay, BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure } from '@/types/database'
-import { cn } from '@/lib/utils'
+import { cn, nowInIsrael, getIsraelDayStart, getDayIndexInIsrael } from '@/lib/utils'
 import { ChevronRight, ChevronLeft, X } from 'lucide-react'
 
 /**
@@ -87,22 +87,23 @@ export function DateSelection({
     endDate.setDate(endDate.getDate() + (6 - lastDay.getDay()))
     
     const days: CalendarDay[] = []
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    // Use Israel timezone for "today" calculation
+    const todayStartMs = getIsraelDayStart(nowInIsrael())
     
     const current = new Date(startDate)
     while (current <= endDate) {
       const dayOfWeek = current.getDay()
+      const currentStartMs = getIsraelDayStart(current)
       
       days.push({
         date: new Date(current),
         dayNum: current.getDate(),
         dayKey: DAY_KEYS[dayOfWeek],
         dateString: current.toISOString().split('T')[0],
-        dateTimestamp: current.getTime(),
+        dateTimestamp: currentStartMs, // Use Israel day start
         isCurrentMonth: current.getMonth() === month,
-        isToday: current.getTime() === today.getTime(),
-        isPast: current < today,
+        isToday: currentStartMs === todayStartMs,
+        isPast: currentStartMs < todayStartMs,
       })
       
       current.setDate(current.getDate() + 1)
@@ -163,7 +164,7 @@ export function DateSelection({
     }
     
     setDate({ 
-      dayName: WEEKDAY_LABELS[new Date(day.dateTimestamp).getDay()], 
+      dayName: WEEKDAY_LABELS[getDayIndexInIsrael(day.dateTimestamp)], 
       dayNum: day.dayNum.toString(), 
       dateTimestamp: day.dateTimestamp 
     })

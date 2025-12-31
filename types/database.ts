@@ -555,6 +555,7 @@ export type Database = {
           service_id: string
           status: string | null
           time_timestamp: number
+          version: number
         }
         Insert: {
           barber_id: string
@@ -570,6 +571,7 @@ export type Database = {
           id?: string
           service_id: string
           status?: string | null
+          version?: number
           time_timestamp: number
         }
         Update: {
@@ -587,6 +589,7 @@ export type Database = {
           service_id?: string
           status?: string | null
           time_timestamp?: number
+          version?: number
         }
         Relationships: [
           {
@@ -744,6 +747,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_reservation_atomic: {
+        Args: {
+          p_barber_id: string
+          p_service_id: string
+          p_customer_id: string
+          p_customer_name: string
+          p_customer_phone: string
+          p_date_timestamp: number
+          p_time_timestamp: number
+          p_day_name: string
+          p_day_num: string
+        }
+        Returns: string
+      }
       get_available_time_slots:
         | {
             Args: {

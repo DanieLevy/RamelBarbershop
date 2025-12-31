@@ -6,16 +6,19 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { pushService } from '@/lib/push/push-service'
+import { validateRequestBody, NotifyBookingSchema } from '@/lib/validation/api-schemas'
 import type { ReminderContext } from '@/lib/push/types'
 
 export const dynamic = 'force-dynamic'
 
-// UUID validation regex
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    // Validate request body using Zod schema
+    const validation = await validateRequestBody(request, NotifyBookingSchema)
+    
+    if (!validation.success) {
+      return validation.response
+    }
     
     const { 
       reservationId, 
@@ -25,46 +28,7 @@ export async function POST(request: NextRequest) {
       barberName, 
       serviceName, 
       appointmentTime 
-    } = body
-    
-    // Validate required fields - ALL bookings require login, so customerId is required
-    const missingFields: string[] = []
-    if (!reservationId) missingFields.push('reservationId')
-    if (!customerId) missingFields.push('customerId')  // Required - no guest bookings
-    if (!barberId) missingFields.push('barberId')
-    if (!customerName) missingFields.push('customerName')
-    if (!serviceName) missingFields.push('serviceName')
-    if (!appointmentTime) missingFields.push('appointmentTime')
-    
-    if (missingFields.length > 0) {
-      console.log('[API notify-booking] Missing required fields:', missingFields)
-      return NextResponse.json(
-        { success: false, error: `Missing required fields: ${missingFields.join(', ')}` },
-        { status: 400 }
-      )
-    }
-    
-    // Validate UUIDs
-    if (!UUID_REGEX.test(reservationId)) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid reservationId format' },
-        { status: 400 }
-      )
-    }
-    
-    if (!UUID_REGEX.test(customerId)) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid customerId format' },
-        { status: 400 }
-      )
-    }
-    
-    if (!UUID_REGEX.test(barberId)) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid barberId format' },
-        { status: 400 }
-      )
-    }
+    } = validation.data
     
     console.log('[API notify-booking] Sending notification:', {
       reservationId,
@@ -100,4 +64,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

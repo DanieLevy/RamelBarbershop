@@ -4,8 +4,8 @@ import { useEffect, useState, useMemo } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { cn, formatTime as formatTimeUtil, nowInIsrael, generateTimeSlots, parseTimeString } from '@/lib/utils'
-import { startOfDay, endOfDay, addDays, format, isSameDay, startOfWeek, endOfWeek } from 'date-fns'
+import { cn, formatTime as formatTimeUtil, nowInIsrael, generateTimeSlots, parseTimeString, getIsraelDayStart, getIsraelDayEnd, timestampToIsraelDate, isSameDayInIsrael } from '@/lib/utils'
+import { addDays, format, startOfWeek, endOfWeek, isSameDay } from 'date-fns'
 import { he } from 'date-fns/locale'
 import { Calendar, Phone, X, Plus } from 'lucide-react'
 import type { Reservation, Service, BarbershopSettings } from '@/types/database'
@@ -72,6 +72,127 @@ export default function ReservationsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [barber?.id])
   
+  // Connection status for realtime
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(true)
+  
+  // Real-time subscription for live updates with reconnection logic
+  // This ensures the barber sees changes made by customers immediately
+  useEffect(() => {
+    if (!barber?.id) return
+    
+    const supabase = createClient()
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    let reconnectAttempts = 0
+    const MAX_RECONNECT_ATTEMPTS = 5
+    const RECONNECT_DELAY_BASE = 1000 // 1 second
+    let reconnectTimeout: NodeJS.Timeout | null = null
+    let isUnmounting = false
+    
+    const setupChannel = () => {
+      if (isUnmounting) return
+      
+      // Clean up existing channel if any
+      if (channel) {
+        supabase.removeChannel(channel)
+      }
+      
+      // Subscribe to reservation changes for this barber
+      channel = supabase
+        .channel(`reservations-barber-${barber.id}-${Date.now()}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*', // Listen to INSERT, UPDATE, DELETE
+            schema: 'public',
+            table: 'reservations',
+            filter: `barber_id=eq.${barber.id}`
+          },
+          (payload) => {
+            console.log('[Realtime] Reservation change detected:', payload.eventType)
+            
+            // Refresh data when any change occurs
+            // This is simpler and more reliable than trying to merge changes
+            fetchReservations()
+            
+            // Show toast for new bookings
+            if (payload.eventType === 'INSERT') {
+              const newRes = payload.new as ReservationWithService
+              if (newRes.status === 'confirmed') {
+                toast.info('תור חדש התקבל!')
+              }
+            }
+            
+            // Show toast for cancellations by customer
+            if (payload.eventType === 'UPDATE') {
+              const updated = payload.new as ReservationWithService
+              const old = payload.old as { status?: string }
+              if (updated.status === 'cancelled' && old.status === 'confirmed' && updated.cancelled_by === 'customer') {
+                toast.warning('לקוח ביטל תור')
+              }
+            }
+          }
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('[Realtime] Connected to reservation updates')
+            setIsRealtimeConnected(true)
+            reconnectAttempts = 0 // Reset on successful connection
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.error('[Realtime] Connection error, status:', status)
+            setIsRealtimeConnected(false)
+            
+            // Attempt reconnection with exponential backoff
+            if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS && !isUnmounting) {
+              const delay = RECONNECT_DELAY_BASE * Math.pow(2, reconnectAttempts)
+              console.log(`[Realtime] Attempting reconnect in ${delay}ms (attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`)
+              
+              reconnectTimeout = setTimeout(() => {
+                reconnectAttempts++
+                setupChannel()
+              }, delay)
+            } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+              console.error('[Realtime] Max reconnection attempts reached')
+              toast.error('התנתק מעדכונים בזמן אמת. רענן את הדף.')
+            }
+          } else if (status === 'CLOSED') {
+            console.log('[Realtime] Channel closed')
+            setIsRealtimeConnected(false)
+          }
+        })
+    }
+    
+    // Initial setup
+    setupChannel()
+    
+    // Heartbeat check - verify connection every 30 seconds
+    const heartbeatInterval = setInterval(() => {
+      if (!isUnmounting && channel) {
+        // Force refresh if we haven't received updates in a while
+        // This helps catch cases where the connection died silently
+        const state = (channel as unknown as { state?: string }).state
+        if (state !== 'joined' && state !== 'joining') {
+          console.log('[Realtime] Heartbeat detected disconnection, reconnecting...')
+          setIsRealtimeConnected(false)
+          setupChannel()
+        }
+      }
+    }, 30000)
+    
+    // Cleanup subscription on unmount
+    return () => {
+      isUnmounting = true
+      console.log('[Realtime] Unsubscribing from reservation updates')
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout)
+      }
+      clearInterval(heartbeatInterval)
+      if (channel) {
+        supabase.removeChannel(channel)
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [barber?.id])
+  
   const fetchShopSettings = async () => {
     const supabase = createClient()
     // barbershop_settings is a singleton table - fetch the first (only) row
@@ -93,9 +214,15 @@ export default function ReservationsPage() {
     try {
       const supabase = createClient()
       
+      // Only select columns needed for the dashboard
       const { data, error } = await supabase
         .from('reservations')
-        .select('*, services(*)')
+        .select(`
+          id, barber_id, service_id, customer_id, customer_name, customer_phone,
+          date_timestamp, time_timestamp, day_name, day_num, status, 
+          cancelled_by, cancellation_reason, version, created_at,
+          services (id, name_he, duration, price)
+        `)
         .eq('barber_id', barber.id)
         .order('time_timestamp', { ascending: true })
       
@@ -121,22 +248,42 @@ export default function ReservationsPage() {
     
     // Get reservation details before cancelling for notification
     const reservation = reservations.find(r => r.id === id)
+    if (!reservation) {
+      toast.error('התור לא נמצא')
+      setUpdatingId(null)
+      return
+    }
     
     try {
       const supabase = createClient()
       
-      const { error } = await supabase.from('reservations')
+      // Use optimistic locking with version check
+      const currentVersion = (reservation as ReservationWithService & { version?: number }).version || 1
+      
+      const { data, error } = await supabase.from('reservations')
         .update({ 
           status: 'cancelled',
           cancelled_by: 'barber',
           cancellation_reason: reason || null
         })
         .eq('id', id)
+        .eq('status', 'confirmed') // Only cancel if still confirmed
+        .eq('version', currentVersion) // Optimistic locking
+        .select('id, version')
       
       if (error) {
         console.error('Error cancelling reservation:', error)
         await report(error instanceof Error ? error : new Error(String(error)), 'Cancelling reservation', 'high')
         toast.error('שגיאה בביטול התור')
+        return
+      }
+      
+      if (!data || data.length === 0) {
+        // Version mismatch or status changed - concurrent modification detected
+        toast.error('התור עודכן על ידי אחר. מרענן...')
+        await fetchReservations()
+        setCancelModal({ isOpen: false, reservation: null })
+        setUpdatingId(null)
         return
       }
       
@@ -243,32 +390,35 @@ export default function ReservationsPage() {
   const now = Date.now()
   const israelNow = nowInIsrael()
 
-  // Get date range based on quickDate
-  const getDateRange = (): { start: Date | null; end: Date | null } => {
+  // Get date range based on quickDate - USING ISRAEL TIMEZONE
+  const getDateRange = (): { startMs: number | null; endMs: number | null } => {
     switch (quickDate) {
       case 'today':
-        return { start: startOfDay(israelNow), end: endOfDay(israelNow) }
+        return { startMs: getIsraelDayStart(israelNow), endMs: getIsraelDayEnd(israelNow) }
       case 'tomorrow':
         const tomorrow = addDays(israelNow, 1)
-        return { start: startOfDay(tomorrow), end: endOfDay(tomorrow) }
+        return { startMs: getIsraelDayStart(tomorrow), endMs: getIsraelDayEnd(tomorrow) }
       case 'week':
-        return { start: startOfWeek(israelNow, { weekStartsOn: 0 }), end: endOfWeek(israelNow, { weekStartsOn: 0 }) }
+        const weekStart = startOfWeek(israelNow, { weekStartsOn: 0 })
+        const weekEnd = endOfWeek(israelNow, { weekStartsOn: 0 })
+        return { startMs: getIsraelDayStart(weekStart), endMs: getIsraelDayEnd(weekEnd) }
       case 'custom':
         if (customDate) {
-          return { start: startOfDay(customDate), end: endOfDay(customDate) }
+          return { startMs: getIsraelDayStart(customDate), endMs: getIsraelDayEnd(customDate) }
         }
-        return { start: null, end: null }
+        return { startMs: null, endMs: null }
       default:
-        return { start: null, end: null }
+        return { startMs: null, endMs: null }
     }
   }
 
-  // Smart date display
+  // Smart date display - USING ISRAEL TIMEZONE
   const getSmartDateTime = (timestamp: number): { date: string; time: string; isToday: boolean } => {
     const normalizedTs = normalizeTs(timestamp)
-    const resDate = new Date(normalizedTs)
-    const isToday = isSameDay(resDate, israelNow)
-    const isTomorrow = isSameDay(resDate, addDays(israelNow, 1))
+    const resDate = timestampToIsraelDate(normalizedTs)
+    const isToday = isSameDayInIsrael(normalizedTs, Date.now())
+    const tomorrowMs = Date.now() + (24 * 60 * 60 * 1000)
+    const isTomorrow = isSameDayInIsrael(normalizedTs, tomorrowMs)
     
     let dateStr = ''
     if (isToday) {
@@ -285,13 +435,13 @@ export default function ReservationsPage() {
   // Filter reservations
   const filteredReservations = useMemo(() => {
     let filtered = [...reservations]
-    const { start, end } = getDateRange()
+    const { startMs, endMs } = getDateRange()
     
     // Date filter
-    if (start && end) {
+    if (startMs && endMs) {
       filtered = filtered.filter(res => {
         const resTime = normalizeTs(res.time_timestamp)
-        return resTime >= start.getTime() && resTime <= end.getTime()
+        return resTime >= startMs && resTime <= endMs
       })
     }
     
@@ -390,13 +540,13 @@ export default function ReservationsPage() {
 
   // Tab counts
   const getTabCounts = () => {
-    const { start, end } = getDateRange()
+    const { startMs, endMs } = getDateRange()
     let base = [...reservations]
     
-    if (start && end) {
+    if (startMs && endMs) {
       base = base.filter(res => {
         const resTime = normalizeTs(res.time_timestamp)
-        return resTime >= start.getTime() && resTime <= end.getTime()
+        return resTime >= startMs && resTime <= endMs
       })
     }
     
@@ -433,11 +583,36 @@ export default function ReservationsPage() {
 
   return (
     <div className="max-w-3xl">
+      {/* Connection Status Indicator */}
+      {!isRealtimeConnected && (
+        <div className="mb-3 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+          <span className="text-amber-400 text-sm">מתחבר מחדש לעדכונים בזמן אמת...</span>
+          <button
+            onClick={() => {
+              fetchReservations()
+              toast.info('מרענן נתונים...')
+            }}
+            className="mr-auto text-amber-400 hover:text-amber-300 text-sm underline"
+          >
+            רענן ידנית
+          </button>
+        </div>
+      )}
+      
       {/* Header with Add Button */}
       <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-medium text-foreground-light">תורים של לקוחות</h1>
-          <p className="text-foreground-muted text-sm mt-0.5">ניהול תורים שנקבעו על ידי לקוחות</p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-medium text-foreground-light">תורים של לקוחות</h1>
+            <p className="text-foreground-muted text-sm mt-0.5">ניהול תורים שנקבעו על ידי לקוחות</p>
+          </div>
+          {isRealtimeConnected && (
+            <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-green-500/10 rounded-full" title="מחובר לעדכונים בזמן אמת">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+              <span className="text-green-400 text-xs">חי</span>
+            </div>
+          )}
         </div>
         <button
           onClick={() => {

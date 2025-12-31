@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Phone, Clock, ChevronLeft, Bell, Loader2 } from 'lucide-react'
 import { cn, formatPrice } from '@/lib/utils'

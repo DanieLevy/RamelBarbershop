@@ -2,11 +2,23 @@ import { format, addDays, startOfDay, setHours, setMinutes } from 'date-fns'
 import { toZonedTime, fromZonedTime } from 'date-fns-tz'
 import { he } from 'date-fns/locale'
 
-// Israel timezone constant
+// ============================================================
+// ISRAEL TIMEZONE CONSTANTS
+// ============================================================
+
+/**
+ * Israel timezone identifier - USE THIS CONSTANT EVERYWHERE
+ * Never hardcode 'Asia/Jerusalem' elsewhere
+ */
 export const ISRAEL_TIMEZONE = 'Asia/Jerusalem'
+
+// ============================================================
+// CORE TIMEZONE CONVERSION FUNCTIONS
+// ============================================================
 
 /**
  * Get current time in Israel timezone
+ * This is the PRIMARY function for getting "now" in Israel
  */
 export function nowInIsrael(): Date {
   return toZonedTime(new Date(), ISRAEL_TIMEZONE)
@@ -21,6 +33,7 @@ export function toIsraelTime(date: Date): Date {
 
 /**
  * Convert a timestamp (milliseconds) to Israel timezone Date
+ * IMPORTANT: This converts UTC timestamp to Israel local representation
  */
 export function timestampToIsraelDate(timestamp: number): Date {
   return toZonedTime(new Date(timestamp), ISRAEL_TIMEZONE)
@@ -28,6 +41,8 @@ export function timestampToIsraelDate(timestamp: number): Date {
 
 /**
  * Create a Date in Israel timezone and get its UTC timestamp
+ * Use when you have year/month/day/hour/minute in Israel local time
+ * and need the UTC timestamp for storage
  */
 export function israelDateToTimestamp(
   year: number,
@@ -44,12 +59,85 @@ export function israelDateToTimestamp(
 }
 
 /**
- * Get current timestamp in milliseconds (Israel-aware)
- * Use this instead of Date.now() when comparing with Israel dates
+ * Get current timestamp in milliseconds
+ * Note: Date.now() is timezone-agnostic (always UTC)
+ * Use this for comparisons with stored timestamps
  */
 export function nowInIsraelMs(): number {
   return Date.now()
 }
+
+// ============================================================
+// ISRAEL DAY BOUNDARY FUNCTIONS
+// Critical for queries that filter by date
+// ============================================================
+
+/**
+ * Get start of day (00:00:00.000) in Israel timezone as UTC timestamp
+ * USE THIS for database queries filtering by day start
+ */
+export function getIsraelDayStart(date: Date | number): number {
+  const israelDate = typeof date === 'number' 
+    ? timestampToIsraelDate(date) 
+    : toIsraelTime(date)
+  
+  const year = israelDate.getFullYear()
+  const month = israelDate.getMonth() + 1 // getMonth is 0-indexed
+  const day = israelDate.getDate()
+  
+  return israelDateToTimestamp(year, month, day, 0, 0)
+}
+
+/**
+ * Get end of day (23:59:59.999) in Israel timezone as UTC timestamp
+ * USE THIS for database queries filtering by day end
+ */
+export function getIsraelDayEnd(date: Date | number): number {
+  const dayStart = getIsraelDayStart(date)
+  // Add 24 hours minus 1 millisecond
+  return dayStart + (24 * 60 * 60 * 1000) - 1
+}
+
+/**
+ * Get start of day as Date object in Israel timezone
+ */
+export function startOfDayInIsrael(date: Date | number): Date {
+  const timestamp = getIsraelDayStart(date)
+  return timestampToIsraelDate(timestamp)
+}
+
+/**
+ * Get end of day as Date object in Israel timezone
+ */
+export function endOfDayInIsrael(date: Date | number): Date {
+  const timestamp = getIsraelDayEnd(date)
+  return timestampToIsraelDate(timestamp)
+}
+
+// ============================================================
+// DAY OF WEEK FUNCTIONS (ISRAEL TIMEZONE)
+// ============================================================
+
+/**
+ * Get day of week (0-6, Sunday=0) for a timestamp in Israel timezone
+ * ALWAYS use this instead of new Date(timestamp).getDay()
+ */
+export function getDayIndexInIsrael(timestamp: number): number {
+  const israelDate = timestampToIsraelDate(timestamp)
+  return israelDate.getDay()
+}
+
+/**
+ * Get day key (lowercase string) for a timestamp in Israel timezone
+ */
+export function getDayKeyInIsrael(timestamp: number): string {
+  const dayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+  return dayKeys[getDayIndexInIsrael(timestamp)]
+}
+
+// ============================================================
+// DATE COMPARISON FUNCTIONS
+// ============================================================
 
 /**
  * Check if a timestamp is today in Israel timezone
@@ -61,7 +149,8 @@ export function isTodayInIsrael(timestamp: number): boolean {
 }
 
 /**
- * Check if a timestamp is in the past (Israel timezone aware)
+ * Check if a timestamp is in the past
+ * Note: This is timezone-agnostic as it compares UTC timestamps
  */
 export function isPastInIsrael(timestamp: number): boolean {
   return timestamp < Date.now()

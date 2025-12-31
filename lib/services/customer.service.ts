@@ -2,6 +2,9 @@ import { createClient } from '@/lib/supabase/client'
 import type { Customer } from '@/types/database'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
 
+// Define commonly needed customer columns for optimized queries
+const CUSTOMER_COLUMNS = 'id, phone, fullname, firebase_uid, is_blocked, blocked_reason, last_login_at, created_at, updated_at'
+
 /**
  * Find a customer by phone number
  */
@@ -14,7 +17,7 @@ export async function findCustomerByPhone(phone: string): Promise<Customer | nul
   // Use maybeSingle() to avoid 406 error when customer doesn't exist
   const { data, error } = await supabase
     .from('customers')
-    .select('*')
+    .select(CUSTOMER_COLUMNS)
     .eq('phone', normalizedPhone)
     .maybeSingle()
   
@@ -138,7 +141,7 @@ export async function getCustomerById(customerId: string): Promise<Customer | nu
   // Use maybeSingle() to avoid 406 error when customer doesn't exist
   const { data, error } = await supabase
     .from('customers')
-    .select('*')
+    .select(CUSTOMER_COLUMNS)
     .eq('id', customerId)
     .maybeSingle()
   
@@ -252,7 +255,7 @@ export async function getAllCustomers(): Promise<Customer[]> {
   
   const { data, error } = await supabase
     .from('customers')
-    .select('*')
+    .select(CUSTOMER_COLUMNS)
     .order('created_at', { ascending: false })
   
   if (error) {

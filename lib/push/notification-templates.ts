@@ -1,10 +1,13 @@
 /**
  * Push Notification Templates
  * Centralized Hebrew message templates for all notification types
+ * 
+ * IMPORTANT: All date/time formatting uses Israel timezone
  */
 
 import { format } from 'date-fns'
 import { he } from 'date-fns/locale'
+import { timestampToIsraelDate } from '@/lib/utils'
 import type { 
   NotificationPayload, 
   NotificationType,
@@ -13,19 +16,22 @@ import type {
   BroadcastContext 
 } from './types'
 
-// Format time from timestamp
+// Format time from timestamp - ALWAYS ISRAEL TIMEZONE
 function formatTime(timestamp: number): string {
-  return format(new Date(timestamp), 'HH:mm', { locale: he })
+  const israelDate = timestampToIsraelDate(timestamp)
+  return format(israelDate, 'HH:mm', { locale: he })
 }
 
-// Format date from timestamp
+// Format date from timestamp - ALWAYS ISRAEL TIMEZONE
 function formatDate(timestamp: number): string {
-  return format(new Date(timestamp), 'EEEE, d בMMMM', { locale: he })
+  const israelDate = timestampToIsraelDate(timestamp)
+  return format(israelDate, 'EEEE, d בMMMM', { locale: he })
 }
 
-// Format short date
+// Format short date - ALWAYS ISRAEL TIMEZONE
 function formatShortDate(timestamp: number): string {
-  return format(new Date(timestamp), 'd/M', { locale: he })
+  const israelDate = timestampToIsraelDate(timestamp)
+  return format(israelDate, 'd/M', { locale: he })
 }
 
 /**

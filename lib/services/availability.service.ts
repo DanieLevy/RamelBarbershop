@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/client'
 import type { BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure, BarberMessage } from '@/types/database'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
-import { getTodayDateString, getIsraelDateString } from '@/lib/utils'
+import { getTodayDateString, getIsraelDateString, getDayKeyInIsrael } from '@/lib/utils'
 
 /**
  * Get barbershop settings
@@ -117,8 +117,8 @@ export function isDateAvailable(
 ): { available: boolean; reason?: string } {
   // Use Israel timezone for date calculations
   const dateStr = getIsraelDateString(dateTimestamp)
-  const date = new Date(dateTimestamp)
-  const dayName = getDayName(date.getDay())
+  // Use Israel timezone for day of week
+  const dayName = getDayKeyInIsrael(dateTimestamp)
   
   // Check if shop is open on this day
   if (shopSettings && !shopSettings.open_days.includes(dayName)) {
@@ -179,10 +179,5 @@ export function getWorkHours(
   
   // Default hours
   return { start: '09:00', end: '19:00' }
-}
-
-function getDayName(dayIndex: number): string {
-  const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-  return days[dayIndex]
 }
 

@@ -18,6 +18,7 @@ import { useBugReporter } from '@/hooks/useBugReporter'
 import { useHaptics } from '@/hooks/useHaptics'
 import { isSameDay, addDays } from 'date-fns'
 import ErrorBoundary from '@/components/ErrorBoundary'
+import { cancelReservation } from '@/lib/services/booking.service'
 
 type TabType = 'upcoming' | 'past' | 'cancelled'
 
@@ -125,6 +126,7 @@ function MyAppointmentsContent() {
       const supabase = createClient()
       
       // Only select necessary fields for performance
+      // Include version for optimistic locking
       let query = supabase
         .from('reservations')
         .select(`
@@ -135,6 +137,7 @@ function MyAppointmentsContent() {
           cancelled_by, 
           barber_id, 
           service_id,
+          version,
           services (id, name_he), 
           users (id, fullname)
         `)
@@ -171,26 +174,36 @@ function MyAppointmentsContent() {
     
     // Get reservation details before cancelling for notification
     const reservation = reservations.find(r => r.id === reservationId)
+    if (!reservation) {
+      toast.error('התור לא נמצא')
+      return
+    }
     
     setCancellingId(reservationId)
     
     try {
-      const supabase = createClient()
+      // Get current version for optimistic locking
+      const currentVersion = (reservation as ReservationWithDetails & { version?: number }).version || 1
       
-      const { data, error } = await supabase.from('reservations')
-        .update({ status: 'cancelled', cancelled_by: 'customer' })
-        .eq('id', reservationId)
-        .select('id, status')
+      // Use the centralized booking service for cancellation
+      const result = await cancelReservation(
+        reservationId,
+        'customer',
+        undefined, // No reason from customer UI
+        currentVersion
+      )
       
-      if (error) {
-        console.error('Error cancelling reservation:', error)
-        await report(new Error((error as Error)?.message || 'Unknown cancellation error'), 'Cancelling customer reservation')
-        toast.error(`שגיאה בביטול התור`)
-        return
-      }
-      
-      if (!data || data.length === 0) {
-        toast.error('שגיאה בביטול התור - לא נמצא התור')
+      if (!result.success) {
+        console.error('Error cancelling reservation:', result.error)
+        
+        if (result.concurrencyConflict) {
+          toast.error('התור עודכן על ידי אחר. מרענן...')
+          await fetchReservations() // Refresh to get latest data
+          return
+        }
+        
+        await report(new Error(result.error || 'Unknown cancellation error'), 'Cancelling customer reservation')
+        toast.error(result.error || 'שגיאה בביטול התור')
         return
       }
       

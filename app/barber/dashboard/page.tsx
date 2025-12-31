@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { cn, formatTime as formatTimeUtil, nowInIsrael } from '@/lib/utils'
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, isSameDay, addDays, startOfMonth, endOfMonth } from 'date-fns'
+import { cn, formatTime as formatTimeUtil, nowInIsrael, getIsraelDayStart, getIsraelDayEnd, isSameDayInIsrael, timestampToIsraelDate } from '@/lib/utils'
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import { 
   Calendar, Clock, TrendingDown, Users, 
   CalendarOff, Store,
@@ -54,12 +54,17 @@ export default function DashboardPage() {
     const supabase = createClient()
     
     const now = Date.now()
-    const todayStart = startOfDay(israelNow)
-    const todayEnd = endOfDay(israelNow)
+    // Use Israel timezone for day boundaries
+    const todayStartMs = getIsraelDayStart(israelNow)
+    const todayEndMs = getIsraelDayEnd(israelNow)
     const weekStart = startOfWeek(israelNow, { weekStartsOn: 0 })
     const weekEnd = endOfWeek(israelNow, { weekStartsOn: 0 })
+    const weekStartMs = getIsraelDayStart(weekStart)
+    const weekEndMs = getIsraelDayEnd(weekEnd)
     const monthStart = startOfMonth(israelNow)
     const monthEnd = endOfMonth(israelNow)
+    const monthStartMs = getIsraelDayStart(monthStart)
+    const monthEndMs = getIsraelDayEnd(monthEnd)
     
     try {
       // Fetch reservations for stats
@@ -67,29 +72,29 @@ export default function DashboardPage() {
         .from('reservations')
         .select('*, services(*)')
         .eq('barber_id', barber.id)
-        .gte('time_timestamp', monthStart.getTime())
+        .gte('time_timestamp', monthStartMs)
         .order('time_timestamp', { ascending: true })
       
       const allRes = (reservations || []) as UpcomingReservation[]
       
       // Today's confirmed appointments
       const todayRes = allRes.filter(
-        r => r.time_timestamp >= todayStart.getTime() && 
-             r.time_timestamp <= todayEnd.getTime() &&
+        r => r.time_timestamp >= todayStartMs && 
+             r.time_timestamp <= todayEndMs &&
              r.status === 'confirmed'
       )
       
       // Week's confirmed appointments
       const weekRes = allRes.filter(
-        r => r.time_timestamp >= weekStart.getTime() && 
-             r.time_timestamp <= weekEnd.getTime() &&
+        r => r.time_timestamp >= weekStartMs && 
+             r.time_timestamp <= weekEndMs &&
              r.status === 'confirmed'
       )
       
       // Month stats for cancellation rate
       const monthRes = allRes.filter(
-        r => r.time_timestamp >= monthStart.getTime() && 
-             r.time_timestamp <= monthEnd.getTime()
+        r => r.time_timestamp >= monthStartMs && 
+             r.time_timestamp <= monthEndMs
       )
       const cancelledMonth = monthRes.filter(r => r.status === 'cancelled')
       const cancellationRate = monthRes.length > 0 
@@ -120,11 +125,12 @@ export default function DashboardPage() {
     }
   }
 
-  // Smart date/time display
+  // Smart date/time display - USING ISRAEL TIMEZONE
   const getSmartDateTime = (timestamp: number): { date: string; time: string; isToday: boolean } => {
-    const resDate = new Date(timestamp)
-    const isToday = isSameDay(resDate, israelNow)
-    const isTomorrow = isSameDay(resDate, addDays(israelNow, 1))
+    const resDate = timestampToIsraelDate(timestamp)
+    const isToday = isSameDayInIsrael(timestamp, Date.now())
+    const tomorrowMs = Date.now() + (24 * 60 * 60 * 1000)
+    const isTomorrow = isSameDayInIsrael(timestamp, tomorrowMs)
     
     let dateStr = ''
     if (isToday) dateStr = 'היום'

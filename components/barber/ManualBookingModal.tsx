@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { X, Loader2, Search, User, Calendar, Clock, UserPlus } from 'lucide-react'
-import { cn, generateTimeSlots, parseTimeString, nowInIsrael } from '@/lib/utils'
+import { cn, generateTimeSlots, parseTimeString, nowInIsrael, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { format, addDays, isSameDay, startOfDay, endOfDay } from 'date-fns'
+import { format, addDays, isSameDay } from 'date-fns'
 import { toast } from 'sonner'
 import type { Customer, BarbershopSettings, Service } from '@/types/database'
 
@@ -96,16 +96,17 @@ export function ManualBookingModal({
     setLoadingSlots(true)
     const supabase = createClient()
     
-    const dayStart = startOfDay(selectedDate)
-    const dayEnd = endOfDay(selectedDate)
+    // Use Israel timezone for day boundaries
+    const dayStartMs = getIsraelDayStart(selectedDate)
+    const dayEndMs = getIsraelDayEnd(selectedDate)
     
     const { data } = await supabase
       .from('reservations')
       .select('time_timestamp')
       .eq('barber_id', barberId)
       .eq('status', 'confirmed')
-      .gte('time_timestamp', dayStart.getTime())
-      .lte('time_timestamp', dayEnd.getTime())
+      .gte('time_timestamp', dayStartMs)
+      .lte('time_timestamp', dayEndMs)
     
     if (data) {
       setReservedSlots(data.map(r => r.time_timestamp))
@@ -242,12 +243,9 @@ export function ManualBookingModal({
         customerPhone = ''
       }
       
-      // Calculate date-related fields
-      const appointmentDate = new Date(selectedTime)
-      const dayOfWeek = appointmentDate.getDay()
-      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-      const dayName = dayNames[dayOfWeek]
-      const dateTimestamp = new Date(appointmentDate).setHours(0, 0, 0, 0)
+      // Calculate date-related fields - USING ISRAEL TIMEZONE
+      const dayName = getDayKeyInIsrael(selectedTime)
+      const dateTimestamp = getIsraelDayStart(selectedTime)
       
       const reservationData = {
         barber_id: barberId,
@@ -258,7 +256,7 @@ export function ManualBookingModal({
         time_timestamp: selectedTime,
         date_timestamp: dateTimestamp,
         day_name: dayName,
-        day_num: String(dayOfWeek),
+        day_num: format(selectedDate, 'dd/MM'),
         status: 'confirmed' as const,
       }
       

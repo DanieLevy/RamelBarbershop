@@ -42,6 +42,11 @@ if (vapidPublicKey && vapidPrivateKey) {
 // HTTP error codes that indicate the subscription is permanently invalid
 const PERMANENT_ERROR_CODES = [410, 404, 401]
 
+// Configuration for subscription health management
+const MAX_CONSECUTIVE_FAILURES = 5 // Deactivate after this many consecutive failures
+const MAX_RETRY_ATTEMPTS = 2 // Number of retry attempts for transient failures
+const RETRY_DELAY_MS = 1000 // Base delay between retries (exponential backoff applied)
+
 /**
  * Push Notification Service Class
  */
@@ -330,9 +335,10 @@ class PushNotificationService {
     customerIds: string[],
     payload: NotificationPayload
   ): Promise<SendNotificationResult> {
+    // Only select columns needed for sending notifications
     const { data: subscriptions } = await supabase
       .from('push_subscriptions')
-      .select('*')
+      .select('id, endpoint, p256dh, auth, customer_id, barber_id, device_type, is_active, consecutive_failures')
       .in('customer_id', customerIds)
       .eq('is_active', true)
 
@@ -356,9 +362,10 @@ class PushNotificationService {
     barberIds: string[],
     payload: NotificationPayload
   ): Promise<SendNotificationResult> {
+    // Only select columns needed for sending notifications
     const { data: subscriptions } = await supabase
       .from('push_subscriptions')
-      .select('*')
+      .select('id, endpoint, p256dh, auth, customer_id, barber_id, device_type, is_active, consecutive_failures')
       .in('barber_id', barberIds)
       .eq('is_active', true)
 
@@ -379,9 +386,10 @@ class PushNotificationService {
    * Send a notification to all active subscriptions (broadcast)
    */
   async sendToAll(payload: NotificationPayload): Promise<SendNotificationResult> {
+    // Only select columns needed for sending notifications
     const { data: subscriptions } = await supabase
       .from('push_subscriptions')
-      .select('*')
+      .select('id, endpoint, p256dh, auth, customer_id, barber_id, device_type, is_active, consecutive_failures')
       .eq('is_active', true)
 
     return this.sendToSubscriptions(subscriptions as PushSubscriptionRecord[] || [], payload)
@@ -389,6 +397,7 @@ class PushNotificationService {
 
   /**
    * Core function to send notifications to a list of subscriptions
+   * Includes retry logic with exponential backoff and automatic deactivation
    */
   private async sendToSubscriptions(
     subscriptions: PushSubscriptionRecord[],
@@ -400,6 +409,25 @@ class PushNotificationService {
 
     if (!subscriptions.length) {
       return { success: false, sent: 0, failed: 0, errors: ['No active subscriptions found'] }
+    }
+
+    // Filter out subscriptions with too many consecutive failures
+    const healthySubscriptions = subscriptions.filter(sub => {
+      if ((sub.consecutive_failures || 0) >= MAX_CONSECUTIVE_FAILURES) {
+        console.log(`[PushService] Skipping subscription ${sub.id} - too many consecutive failures (${sub.consecutive_failures})`)
+        // Mark as inactive asynchronously (don't await to avoid blocking)
+        supabase
+          .from('push_subscriptions')
+          .update({ is_active: false, last_delivery_status: 'failed' })
+          .eq('id', sub.id)
+          .then(() => console.log(`[PushService] Auto-deactivated subscription ${sub.id}`))
+        return false
+      }
+      return true
+    })
+
+    if (!healthySubscriptions.length) {
+      return { success: false, sent: 0, failed: 0, errors: ['All subscriptions exceeded failure threshold'] }
     }
 
     // Build notification payload for web-push
@@ -425,51 +453,82 @@ class PushNotificationService {
       badgeCount: payload.badgeCount ?? 1
     })
 
-    // Send to each subscription
-    const sendPromises = subscriptions.map(async (sub) => {
-      try {
-        await webpush.sendNotification(
-          {
-            endpoint: sub.endpoint,
-            keys: { p256dh: sub.p256dh, auth: sub.auth }
-          },
-          notificationPayload
-        )
+    // Send to each subscription with retry logic
+    const sendPromises = healthySubscriptions.map(async (sub) => {
+      let lastError: { message?: string; statusCode?: number } | null = null
+      
+      // Retry loop with exponential backoff
+      for (let attempt = 0; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
+        try {
+          await webpush.sendNotification(
+            {
+              endpoint: sub.endpoint,
+              keys: { p256dh: sub.p256dh, auth: sub.auth }
+            },
+            notificationPayload
+          )
 
-        // Update success status
+          // Update success status - reset failure count
+          await supabase
+            .from('push_subscriptions')
+            .update({
+              consecutive_failures: 0,
+              last_delivery_status: 'success',
+              last_used: new Date().toISOString()
+            })
+            .eq('id', sub.id)
+
+          sent++
+          return // Success - exit retry loop
+        } catch (error: unknown) {
+          lastError = error as { message?: string; statusCode?: number }
+          
+          // Don't retry permanent errors
+          if (lastError.statusCode && PERMANENT_ERROR_CODES.includes(lastError.statusCode)) {
+            console.log(`[PushService] Permanent error for ${sub.id}: ${lastError.statusCode}`)
+            break // Exit retry loop for permanent errors
+          }
+          
+          // Wait before retrying (exponential backoff)
+          if (attempt < MAX_RETRY_ATTEMPTS) {
+            const delay = RETRY_DELAY_MS * Math.pow(2, attempt)
+            console.log(`[PushService] Retry ${attempt + 1}/${MAX_RETRY_ATTEMPTS} for ${sub.id} in ${delay}ms`)
+            await new Promise(resolve => setTimeout(resolve, delay))
+          }
+        }
+      }
+      
+      // All retries failed
+      failed++
+      errors.push(`Subscription ${sub.id}: ${lastError?.message || 'Unknown error'}`)
+
+      // Handle permanent vs transient errors
+      if (lastError?.statusCode && PERMANENT_ERROR_CODES.includes(lastError.statusCode)) {
+        // Deactivate immediately for permanent errors
         await supabase
           .from('push_subscriptions')
           .update({
-            consecutive_failures: 0,
-            last_delivery_status: 'success',
-            last_used: new Date().toISOString()
+            is_active: false,
+            last_delivery_status: 'failed'
           })
           .eq('id', sub.id)
-
-        sent++
-      } catch (error: unknown) {
-        failed++
-        const err = error as { message?: string; statusCode?: number }
-        errors.push(`Subscription ${sub.id}: ${err.message || 'Unknown error'}`)
-
-        // Deactivate subscription if permanent error
-        if (err.statusCode && PERMANENT_ERROR_CODES.includes(err.statusCode)) {
-          await supabase
-            .from('push_subscriptions')
-            .update({
-              is_active: false,
-              last_delivery_status: 'failed'
-            })
-            .eq('id', sub.id)
-        } else {
-          // Increment failure count for transient errors
-          await supabase
-            .from('push_subscriptions')
-            .update({
-              consecutive_failures: (sub.consecutive_failures || 0) + 1,
-              last_delivery_status: 'failed'
-            })
-            .eq('id', sub.id)
+        console.log(`[PushService] Deactivated subscription ${sub.id} due to permanent error`)
+      } else {
+        // Increment failure count for transient errors
+        const newFailureCount = (sub.consecutive_failures || 0) + 1
+        const shouldDeactivate = newFailureCount >= MAX_CONSECUTIVE_FAILURES
+        
+        await supabase
+          .from('push_subscriptions')
+          .update({
+            consecutive_failures: newFailureCount,
+            last_delivery_status: 'failed',
+            is_active: !shouldDeactivate
+          })
+          .eq('id', sub.id)
+        
+        if (shouldDeactivate) {
+          console.log(`[PushService] Auto-deactivated subscription ${sub.id} after ${newFailureCount} consecutive failures`)
         }
       }
     })
@@ -592,7 +651,7 @@ class PushNotificationService {
   async getBarberNotificationSettings(barberId: string): Promise<BarberNotificationSettings | null> {
     const { data } = await supabase
       .from('barber_notification_settings')
-      .select('*')
+      .select('barber_id, reminder_hours_before, notify_on_customer_cancel, notify_on_new_booking, broadcast_enabled')
       .eq('barber_id', barberId)
       .single()
 
@@ -605,7 +664,7 @@ class PushNotificationService {
   async getCustomerNotificationSettings(customerId: string): Promise<CustomerNotificationSettings | null> {
     const { data } = await supabase
       .from('customer_notification_settings')
-      .select('*')
+      .select('customer_id, pwa_installed, notifications_enabled, reminder_enabled, cancellation_alerts_enabled')
       .eq('customer_id', customerId)
       .single()
 
@@ -863,6 +922,154 @@ class PushNotificationService {
       .eq('is_active', true)
 
     return count || 0
+  }
+
+  // ============================================================
+  // Maintenance & Cleanup
+  // ============================================================
+
+  /**
+   * Clean up stale subscriptions and old notification logs
+   * Should be called periodically (e.g., via cron job)
+   * 
+   * @returns Summary of cleanup operations
+   */
+  async cleanupStaleData(): Promise<{
+    deactivatedSubscriptions: number
+    deletedLogs: number
+    errors: string[]
+  }> {
+    const results = {
+      deactivatedSubscriptions: 0,
+      deletedLogs: 0,
+      errors: [] as string[]
+    }
+
+    try {
+      // 1. Deactivate subscriptions with high consecutive failures
+      const { data: failedSubs, error: failedError } = await supabase
+        .from('push_subscriptions')
+        .update({ is_active: false })
+        .eq('is_active', true)
+        .gte('consecutive_failures', MAX_CONSECUTIVE_FAILURES)
+        .select('id')
+
+      if (failedError) {
+        results.errors.push(`Failed to deactivate high-failure subscriptions: ${failedError.message}`)
+      } else {
+        results.deactivatedSubscriptions = failedSubs?.length || 0
+        if (results.deactivatedSubscriptions > 0) {
+          console.log(`[PushService Cleanup] Deactivated ${results.deactivatedSubscriptions} high-failure subscriptions`)
+        }
+      }
+
+      // 2. Deactivate subscriptions not used in 90 days
+      const ninetyDaysAgo = new Date()
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+      
+      const { data: staleSubs, error: staleError } = await supabase
+        .from('push_subscriptions')
+        .update({ is_active: false })
+        .eq('is_active', true)
+        .lt('last_used', ninetyDaysAgo.toISOString())
+        .select('id')
+
+      if (staleError) {
+        results.errors.push(`Failed to deactivate stale subscriptions: ${staleError.message}`)
+      } else {
+        const staleCount = staleSubs?.length || 0
+        results.deactivatedSubscriptions += staleCount
+        if (staleCount > 0) {
+          console.log(`[PushService Cleanup] Deactivated ${staleCount} stale subscriptions (90+ days unused)`)
+        }
+      }
+
+      // 3. Delete old notification logs (older than 30 days)
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+      
+      // First count how many we're going to delete
+      const { count: toDeleteCount } = await supabase
+        .from('notification_logs')
+        .select('id', { count: 'exact', head: true })
+        .lt('created_at', thirtyDaysAgo.toISOString())
+      
+      // Then delete them
+      const { error: deleteError } = await supabase
+        .from('notification_logs')
+        .delete()
+        .lt('created_at', thirtyDaysAgo.toISOString())
+
+      if (deleteError) {
+        results.errors.push(`Failed to delete old notification logs: ${deleteError.message}`)
+      } else {
+        results.deletedLogs = toDeleteCount || 0
+        if (results.deletedLogs > 0) {
+          console.log(`[PushService Cleanup] Deleted ${results.deletedLogs} old notification logs (30+ days)`)
+        }
+      }
+
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      results.errors.push(`Cleanup failed: ${message}`)
+      console.error('[PushService Cleanup] Error:', error)
+    }
+
+    return results
+  }
+
+  /**
+   * Get subscription health statistics
+   * Useful for monitoring and debugging
+   */
+  async getSubscriptionStats(): Promise<{
+    total: number
+    active: number
+    inactive: number
+    highFailure: number
+    byDeviceType: Record<string, number>
+  }> {
+    const stats = {
+      total: 0,
+      active: 0,
+      inactive: 0,
+      highFailure: 0,
+      byDeviceType: {} as Record<string, number>
+    }
+
+    try {
+      // Get all subscriptions for analysis
+      const { data, error } = await supabase
+        .from('push_subscriptions')
+        .select('is_active, consecutive_failures, device_type')
+
+      if (error || !data) {
+        console.error('[PushService] Error fetching subscription stats:', error)
+        return stats
+      }
+
+      stats.total = data.length
+
+      for (const sub of data) {
+        if (sub.is_active) {
+          stats.active++
+        } else {
+          stats.inactive++
+        }
+
+        if ((sub.consecutive_failures || 0) >= MAX_CONSECUTIVE_FAILURES) {
+          stats.highFailure++
+        }
+
+        const deviceType = sub.device_type || 'unknown'
+        stats.byDeviceType[deviceType] = (stats.byDeviceType[deviceType] || 0) + 1
+      }
+
+    } catch (error) {
+      console.error('[PushService] Error calculating stats:', error)
+    }
+
+    return stats
   }
 }
 

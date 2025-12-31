@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { createClient } from '@/lib/supabase/client'
-import { formatTime, cn, parseTimeString, generateTimeSlots } from '@/lib/utils'
+import { formatTime, cn, parseTimeString, generateTimeSlots, getIsraelDayStart, getIsraelDayEnd } from '@/lib/utils'
 import type { TimeSlot, BarbershopSettings, BarberSchedule } from '@/types/database'
 import { ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
@@ -20,7 +20,7 @@ interface EnrichedTimeSlot extends TimeSlot {
 }
 
 export function TimeSelection({ barberId, shopSettings, barberSchedule }: TimeSelectionProps) {
-  const { date, timeTimestamp, setTime, nextStep, prevStep, service } = useBookingStore()
+  const { date, timeTimestamp, setTime, nextStep, prevStep } = useBookingStore()
   const [availableSlots, setAvailableSlots] = useState<EnrichedTimeSlot[]>([])
   const [reservedSlots, setReservedSlots] = useState<EnrichedTimeSlot[]>([])
   const [loading, setLoading] = useState(true)
@@ -69,11 +69,9 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule }: TimeSe
           30 // Fixed 30 minute intervals - each booking takes exactly one slot
         )
         
-        // Get date range for query
-        const dayStart = new Date(date.dateTimestamp)
-        dayStart.setHours(0, 0, 0, 0)
-        const dayEnd = new Date(date.dateTimestamp)
-        dayEnd.setHours(23, 59, 59, 999)
+        // Get date range for query - USING ISRAEL TIMEZONE
+        const dayStartMs = getIsraelDayStart(date.dateTimestamp)
+        const dayEndMs = getIsraelDayEnd(date.dateTimestamp)
         
         // Fetch existing reservations - simple query, no duration needed
         // Each reservation blocks exactly one 30-minute slot
@@ -81,8 +79,8 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule }: TimeSe
           .from('reservations')
           .select('time_timestamp, customer_name, status')
           .eq('barber_id', barberId)
-          .gte('time_timestamp', dayStart.getTime())
-          .lte('time_timestamp', dayEnd.getTime())
+          .gte('time_timestamp', dayStartMs)
+          .lte('time_timestamp', dayEndMs)
           .neq('status', 'cancelled') as { 
             data: { 
               time_timestamp: number

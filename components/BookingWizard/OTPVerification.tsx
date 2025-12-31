@@ -4,13 +4,12 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { useAuthStore } from '@/store/useAuthStore'
 import { sendPhoneOtp, verifyOtp, clearRecaptchaVerifier, isTestUser, TEST_USER } from '@/lib/firebase/config'
-import { createClient } from '@/lib/supabase/client'
 import { getOrCreateCustomer } from '@/lib/services/customer.service'
+import { createReservation as createReservationService } from '@/lib/services/booking.service'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { useHaptics } from '@/hooks/useHaptics'
-import { validateLoggedInReservation } from '@/lib/validation/reservation'
 
 const RECAPTCHA_CONTAINER_ID = 'recaptcha-container'
 const RESEND_COOLDOWN_SECONDS = 60
@@ -220,18 +219,18 @@ export function OTPVerification() {
         // Log the user in (saves to localStorage)
         await login(customer.phone.replace(/\D/g, ''), customer.fullname, result.firebaseUid)
         
-        // Create reservation with customer_id
-        const reservationCreated = await createReservation(customerRecord.id)
+        // Create reservation using the centralized booking service
+        const reservationResult = await handleCreateReservation(customerRecord.id)
         
         if (!isMountedRef.current) return
         
-        if (reservationCreated) {
+        if (reservationResult.success) {
           haptics.success() // Haptic feedback for successful booking
           toast.success('התור נקבע בהצלחה!')
           nextStep()
         } else {
-          setError('שגיאה ביצירת התור - נסה שוב')
-          toast.error('שגיאה ביצירת התור')
+          setError(reservationResult.message || 'שגיאה ביצירת התור - נסה שוב')
+          toast.error(reservationResult.message || 'שגיאה ביצירת התור')
         }
       } else {
         setError(result.error || 'קוד שגוי, נסה שוב')
@@ -251,90 +250,51 @@ export function OTPVerification() {
     }
   }
 
-  const createReservation = async (customerId: string): Promise<boolean> => {
+  const handleCreateReservation = async (customerId: string): Promise<{ success: boolean; reservationId?: string; message?: string }> => {
     if (!barberId || !service || !date || !timeTimestamp) {
       console.error('[OTP Booking] Missing required data:', { barberId, service, date, timeTimestamp })
-      return false
+      return { success: false, message: 'חסרים נתונים ליצירת התור' }
     }
     
-    // Validate all required fields before proceeding
-    const reservationData = {
-      barber_id: barberId,
-      service_id: service.id,
-      customer_id: customerId,
-      customer_name: customer.fullname,
-      customer_phone: customer.phone,
-      date_timestamp: date.dateTimestamp,
-      time_timestamp: timeTimestamp,
-      day_name: date.dayName,
-      day_num: date.dayNum,
-      status: 'confirmed' as const,
+    // Use the centralized booking service with atomic database function
+    const result = await createReservationService({
+      barberId: barberId,
+      serviceId: service.id,
+      customerId: customerId,
+      customerName: customer.fullname,
+      customerPhone: customer.phone,
+      dateTimestamp: date.dateTimestamp,
+      timeTimestamp: timeTimestamp,
+      dayName: date.dayName,
+      dayNum: date.dayNum,
+    })
+    
+    if (!result.success) {
+      console.error('[OTP Booking] Creation failed:', result.error)
+      return { success: false, message: result.message }
     }
     
-    const validation = validateLoggedInReservation(reservationData)
-    if (!validation.valid) {
-      console.error('[OTP Booking] Validation failed:', validation.errors)
-      return false
-    }
-    
-    try {
-      const supabase = createClient()
-      
-      // Pre-check: Verify slot is still available (race condition prevention)
-      const { data: existingSlot } = await supabase.from('reservations')
-        .select('id')
-        .eq('barber_id', barberId)
-        .eq('time_timestamp', timeTimestamp)
-        .eq('status', 'confirmed')
-        .maybeSingle()
-      
-      if (existingSlot) {
-        console.error('[OTP Booking] Slot already taken:', existingSlot)
-        setError('השעה כבר נתפסה. אנא חזור ובחר שעה אחרת.')
-        toast.error('השעה כבר נתפסה')
-        return false
-      }
-      
-      const { data: insertedData, error: insertError } = await supabase.from('reservations')
-        .insert(reservationData)
-        .select('id')
-        .single()
-      
-      if (insertError) {
-        console.error('Error creating reservation:', insertError)
-        // Handle unique constraint violation specifically
-        if (insertError.code === '23505') {
-          setError('השעה כבר נתפסה. אנא חזור ובחר שעה אחרת.')
-          toast.error('השעה כבר נתפסה')
-        }
-        return false
-      }
-      
-      // Send push notification to barber (fire and forget)
-      if (insertedData?.id) {
-        console.log('[OTP Booking] Sending push notification to barber:', barberId)
-        fetch('/api/push/notify-booking', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            reservationId: insertedData.id,
-            customerId,
-            barberId,
-            customerName: customer.fullname,
-            serviceName: service.name_he,
-            appointmentTime: timeTimestamp
-          })
+    // Send push notification to barber (fire and forget)
+    if (result.reservationId) {
+      console.log('[OTP Booking] Sending push notification to barber:', barberId)
+      fetch('/api/push/notify-booking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reservationId: result.reservationId,
+          customerId,
+          barberId,
+          customerName: customer.fullname,
+          serviceName: service.name_he,
+          appointmentTime: timeTimestamp
         })
-          .then(res => res.json())
-          .then(data => console.log('[OTP Booking] Push notification result:', data))
-          .catch(err => console.error('[OTP Booking] Push notification error:', err))
-      }
-      
-      return true
-    } catch (err) {
-      console.error('Error creating reservation:', err)
-      return false
+      })
+        .then(res => res.json())
+        .then(data => console.log('[OTP Booking] Push notification result:', data))
+        .catch(err => console.error('[OTP Booking] Push notification error:', err))
     }
+    
+    return { success: true, reservationId: result.reservationId }
   }
 
   const otpCode = otp.join('')

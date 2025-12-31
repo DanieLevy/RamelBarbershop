@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
-import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import type { BarberWithWorkDays } from '@/types/database'
 import { cn, formatTime, formatDateHebrew } from '@/lib/utils'
@@ -10,7 +9,7 @@ import { Check, Calendar, Clock, Scissors, User, Phone } from 'lucide-react'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { useHaptics } from '@/hooks/useHaptics'
 import { BlockedUserModal } from './BlockedUserModal'
-import { validateLoggedInReservation } from '@/lib/validation/reservation'
+import { createReservation as createReservationService, checkCustomerEligibility } from '@/lib/services/booking.service'
 
 interface LoggedInConfirmationProps {
   barber: BarberWithWorkDays
@@ -39,34 +38,13 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
   useEffect(() => {
     if (!hasCreatedRef.current && !isCreated && !isCreating) {
       hasCreatedRef.current = true
-      createReservation()
+      handleCreateReservation()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const createReservation = async () => {
+  const handleCreateReservation = async () => {
     if (!service || !date || !timeTimestamp || !loggedInCustomer) {
-      setError('חסרים נתונים ליצירת התור')
-      return
-    }
-    
-    // Validate all required fields before proceeding
-    const reservationData = {
-      barber_id: barber.id,
-      service_id: service.id,
-      customer_id: loggedInCustomer.id,
-      customer_name: loggedInCustomer.fullname,
-      customer_phone: loggedInCustomer.phone,
-      date_timestamp: date.dateTimestamp,
-      time_timestamp: timeTimestamp,
-      day_name: date.dayName,
-      day_num: date.dayNum,
-      status: 'confirmed' as const,
-    }
-    
-    const validation = validateLoggedInReservation(reservationData)
-    if (!validation.valid) {
-      console.error('[Booking] Validation failed:', validation.errors)
       setError('חסרים נתונים ליצירת התור')
       return
     }
@@ -75,65 +53,52 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
     setError(null)
     
     try {
-      const supabase = createClient()
+      // First check customer eligibility (blocked status, booking limits)
+      const eligibility = await checkCustomerEligibility(loggedInCustomer.id)
       
-      // Check if customer is blocked AND verify slot is still available (race condition prevention)
-      const [customerResult, slotResult] = await Promise.all([
-        supabase.from('customers')
-          .select('is_blocked')
-          .eq('id', loggedInCustomer.id)
-          .single(),
-        supabase.from('reservations')
-          .select('id')
-          .eq('barber_id', barber.id)
-          .eq('time_timestamp', timeTimestamp)
-          .eq('status', 'confirmed')
-          .maybeSingle()
-      ])
-      
-      if (customerResult.data?.is_blocked) {
+      if (eligibility.isBlocked) {
         setIsBlocked(true)
         setIsCreating(false)
         return
       }
       
-      // Check if slot was taken by another customer (race condition)
-      if (slotResult.data) {
-        console.error('[Booking] Slot already taken:', slotResult.data)
-        setError('השעה כבר נתפסה. אנא בחר שעה אחרת.')
-        toast.error('השעה כבר נתפסה')
+      if (!eligibility.eligible) {
+        setError(eligibility.limits.message || 'לא ניתן לקבוע תור כרגע')
+        toast.error(eligibility.limits.message || 'הגעת למקסימום התורים המותרים')
         hasCreatedRef.current = false
         setIsCreating(false)
         return
       }
       
-      const { data: insertedData, error: insertError } = await supabase.from('reservations')
-        .insert(reservationData)
-        .select('id')
-        .single()
+      // Use the centralized booking service with atomic database function
+      const result = await createReservationService({
+        barberId: barber.id,
+        serviceId: service.id,
+        customerId: loggedInCustomer.id,
+        customerName: loggedInCustomer.fullname,
+        customerPhone: loggedInCustomer.phone,
+        dateTimestamp: date.dateTimestamp,
+        timeTimestamp: timeTimestamp,
+        dayName: date.dayName,
+        dayNum: date.dayNum,
+      })
       
-      if (insertError) {
-        console.error('Error creating reservation:', insertError)
-        // Handle unique constraint violation specifically
-        if (insertError.code === '23505') {
-          setError('השעה כבר נתפסה. אנא בחר שעה אחרת.')
-          toast.error('השעה כבר נתפסה')
-        } else {
-          await report(new Error(insertError.message), 'Creating reservation for logged-in customer')
-          setError('שגיאה ביצירת התור. נסה שוב.')
-          toast.error('שגיאה ביצירת התור')
-        }
+      if (!result.success) {
+        console.error('[Booking] Creation failed:', result.error)
+        setError(result.message || 'שגיאה ביצירת התור')
+        toast.error(result.message || 'שגיאה ביצירת התור')
         hasCreatedRef.current = false
+        setIsCreating(false)
         return
       }
       
       // Send push notification to barber (fire and forget)
-      if (insertedData?.id) {
+      if (result.reservationId) {
         fetch('/api/push/notify-booking', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            reservationId: insertedData.id,
+            reservationId: result.reservationId,
             customerId: loggedInCustomer.id,
             barberId: barber.id,
             customerName: loggedInCustomer.fullname,
@@ -182,7 +147,7 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
         <button
           onClick={() => {
             hasCreatedRef.current = false
-            createReservation()
+            handleCreateReservation()
           }}
           className="w-full py-3 bg-accent-gold text-background-dark rounded-xl font-medium hover:bg-accent-gold/90 transition-colors"
         >
