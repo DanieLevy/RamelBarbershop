@@ -77,14 +77,32 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
     try {
       const supabase = createClient()
       
-      // Check if customer is blocked
-      const { data: customerData } = await supabase.from('customers')
-        .select('is_blocked')
-        .eq('id', loggedInCustomer.id)
-        .single()
+      // Check if customer is blocked AND verify slot is still available (race condition prevention)
+      const [customerResult, slotResult] = await Promise.all([
+        supabase.from('customers')
+          .select('is_blocked')
+          .eq('id', loggedInCustomer.id)
+          .single(),
+        supabase.from('reservations')
+          .select('id')
+          .eq('barber_id', barber.id)
+          .eq('time_timestamp', timeTimestamp)
+          .eq('status', 'confirmed')
+          .maybeSingle()
+      ])
       
-      if (customerData?.is_blocked) {
+      if (customerResult.data?.is_blocked) {
         setIsBlocked(true)
+        setIsCreating(false)
+        return
+      }
+      
+      // Check if slot was taken by another customer (race condition)
+      if (slotResult.data) {
+        console.error('[Booking] Slot already taken:', slotResult.data)
+        setError('השעה כבר נתפסה. אנא בחר שעה אחרת.')
+        toast.error('השעה כבר נתפסה')
+        hasCreatedRef.current = false
         setIsCreating(false)
         return
       }
@@ -96,9 +114,15 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
       
       if (insertError) {
         console.error('Error creating reservation:', insertError)
-        await report(new Error(insertError.message), 'Creating reservation for logged-in customer')
-        setError('שגיאה ביצירת התור. נסה שוב.')
-        toast.error('שגיאה ביצירת התור')
+        // Handle unique constraint violation specifically
+        if (insertError.code === '23505') {
+          setError('השעה כבר נתפסה. אנא בחר שעה אחרת.')
+          toast.error('השעה כבר נתפסה')
+        } else {
+          await report(new Error(insertError.message), 'Creating reservation for logged-in customer')
+          setError('שגיאה ביצירת התור. נסה שוב.')
+          toast.error('שגיאה ביצירת התור')
+        }
         hasCreatedRef.current = false
         return
       }

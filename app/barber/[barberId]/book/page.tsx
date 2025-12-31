@@ -13,58 +13,72 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
   const { barberId } = await params
   const { service: preSelectedServiceId } = await searchParams
   const supabase = await createClient()
+  const todayStr = new Date().toISOString().split('T')[0]
   
-  // Fetch barber data
-  const { data: barber, error: barberError } = await supabase
-    .from('users')
-    .select('*, work_days(*)')
-    .eq('id', barberId)
-    .eq('is_barber', true)
-    .single() as { data: BarberWithWorkDays | null; error: unknown }
+  // Fetch all data in parallel for optimal performance
+  const [
+    barberResult,
+    servicesResult,
+    shopSettingsResult,
+    shopClosuresResult,
+    barberScheduleResult,
+    barberClosuresResult,
+    barberMessagesResult
+  ] = await Promise.all([
+    // Barber data with work days
+    supabase
+      .from('users')
+      .select('*, work_days(*)')
+      .eq('id', barberId)
+      .eq('is_barber', true)
+      .single(),
+    // Barber-specific services
+    supabase
+      .from('services')
+      .select('*')
+      .eq('barber_id', barberId)
+      .eq('is_active', true),
+    // Barbershop settings
+    supabase
+      .from('barbershop_settings')
+      .select('*')
+      .single(),
+    // Barbershop closures
+    supabase
+      .from('barbershop_closures')
+      .select('*')
+      .gte('end_date', todayStr),
+    // Barber schedule
+    supabase
+      .from('barber_schedules')
+      .select('*')
+      .eq('barber_id', barberId)
+      .single(),
+    // Barber closures
+    supabase
+      .from('barber_closures')
+      .select('*')
+      .eq('barber_id', barberId)
+      .gte('end_date', todayStr),
+    // Barber messages
+    supabase
+      .from('barber_messages')
+      .select('*')
+      .eq('barber_id', barberId)
+      .eq('is_active', true)
+  ])
   
-  if (barberError || !barber) {
+  const barber = barberResult.data as BarberWithWorkDays | null
+  if (barberResult.error || !barber) {
     notFound()
   }
   
-  // Fetch barber-specific services
-  const { data: services } = await supabase
-    .from('services')
-    .select('*')
-    .eq('barber_id', barberId)
-    .eq('is_active', true) as { data: Service[] | null }
-  
-  // Fetch barbershop settings
-  const { data: shopSettings } = await supabase
-    .from('barbershop_settings')
-    .select('*')
-    .single() as { data: BarbershopSettings | null }
-  
-  // Fetch barbershop closures
-  const { data: shopClosures } = await supabase
-    .from('barbershop_closures')
-    .select('*')
-    .gte('end_date', new Date().toISOString().split('T')[0]) as { data: BarbershopClosure[] | null }
-  
-  // Fetch barber schedule
-  const { data: barberSchedule } = await supabase
-    .from('barber_schedules')
-    .select('*')
-    .eq('barber_id', barberId)
-    .single() as { data: BarberSchedule | null }
-  
-  // Fetch barber closures
-  const { data: barberClosures } = await supabase
-    .from('barber_closures')
-    .select('*')
-    .eq('barber_id', barberId)
-    .gte('end_date', new Date().toISOString().split('T')[0]) as { data: BarberClosure[] | null }
-  
-  // Fetch barber messages
-  const { data: barberMessages } = await supabase
-    .from('barber_messages')
-    .select('*')
-    .eq('barber_id', barberId)
-    .eq('is_active', true) as { data: BarberMessage[] | null }
+  const services = servicesResult.data as Service[] | null
+  const shopSettings = shopSettingsResult.data as BarbershopSettings | null
+  const shopClosures = shopClosuresResult.data as BarbershopClosure[] | null
+  const barberSchedule = barberScheduleResult.data as BarberSchedule | null
+  const barberClosures = barberClosuresResult.data as BarberClosure[] | null
+  const barberMessages = barberMessagesResult.data as BarberMessage[] | null
   
   return (
     <>

@@ -74,10 +74,10 @@ export default function ReservationsPage() {
   
   const fetchShopSettings = async () => {
     const supabase = createClient()
+    // barbershop_settings is a singleton table - fetch the first (only) row
     const { data } = await supabase
       .from('barbershop_settings')
       .select('*')
-      .eq('id', 'default')
       .single()
     
     if (data) {

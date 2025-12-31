@@ -193,6 +193,24 @@ export function ManualBookingModal({
     try {
       const supabase = createClient()
       
+      // Pre-check: Verify slot is still available (race condition prevention)
+      const { data: existingSlot } = await supabase
+        .from('reservations')
+        .select('id')
+        .eq('barber_id', barberId)
+        .eq('time_timestamp', selectedTime)
+        .eq('status', 'confirmed')
+        .maybeSingle()
+      
+      if (existingSlot) {
+        toast.error('השעה כבר נתפסה. אנא בחר שעה אחרת.')
+        // Refresh available slots
+        await fetchReservedSlots()
+        setSelectedTime(null)
+        setSaving(false)
+        return
+      }
+      
       let customerId: string
       let customerName: string
       let customerPhone: string
@@ -202,13 +220,12 @@ export function ManualBookingModal({
         customerName = selectedCustomer!.fullname
         customerPhone = selectedCustomer!.phone
       } else {
-        // Create a walkin customer record
+        // Create a walkin customer record (no role field - customers table doesn't have it)
         const { data: newCustomer, error: customerError } = await supabase
           .from('customers')
           .insert({
             fullname: walkinName.trim(),
             phone: 'walkin-' + Date.now(), // Unique placeholder phone
-            role: 'customer' as const,
           })
           .select()
           .single()
@@ -243,7 +260,6 @@ export function ManualBookingModal({
         day_name: dayName,
         day_num: String(dayOfWeek),
         status: 'confirmed' as const,
-        created_by: 'barber',
       }
       
       const { error } = await supabase
@@ -252,7 +268,14 @@ export function ManualBookingModal({
       
       if (error) {
         console.error('Error creating reservation:', error)
-        toast.error('שגיאה ביצירת התור')
+        // Handle unique constraint violation specifically
+        if (error.code === '23505') {
+          toast.error('השעה כבר נתפסה. אנא בחר שעה אחרת.')
+          await fetchReservedSlots()
+          setSelectedTime(null)
+        } else {
+          toast.error('שגיאה ביצירת התור')
+        }
         return
       }
       

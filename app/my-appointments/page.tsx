@@ -124,9 +124,20 @@ function MyAppointmentsContent() {
     try {
       const supabase = createClient()
       
+      // Only select necessary fields for performance
       let query = supabase
         .from('reservations')
-        .select(`*, services (*), users (*)`)
+        .select(`
+          id, 
+          time_timestamp, 
+          status, 
+          customer_name, 
+          cancelled_by, 
+          barber_id, 
+          service_id,
+          services (id, name_he), 
+          users (id, fullname)
+        `)
         .order('time_timestamp', { ascending: false })
       
       if (customer.id) {

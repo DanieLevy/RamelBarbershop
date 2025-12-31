@@ -12,38 +12,43 @@ export default async function BarberPage({ params }: BarberPageProps) {
   const { barberId } = await params
   const supabase = await createClient()
   
-  // Fetch barber data with work days
-  const { data: barber, error: barberError } = await supabase
-    .from('users')
-    .select('*, work_days(*)')
-    .eq('id', barberId)
-    .eq('is_barber', true)
-    .single() as { data: BarberWithWorkDays | null; error: unknown }
+  // Fetch all data in parallel for optimal performance
+  const [barberResult, servicesResult, shopSettingsResult, barberMessagesResult] = await Promise.all([
+    // Barber data with work days
+    supabase
+      .from('users')
+      .select('*, work_days(*)')
+      .eq('id', barberId)
+      .eq('is_barber', true)
+      .single(),
+    // Barber-specific services
+    supabase
+      .from('services')
+      .select('*')
+      .eq('barber_id', barberId)
+      .eq('is_active', true)
+      .order('price', { ascending: true }),
+    // Barbershop settings
+    supabase
+      .from('barbershop_settings')
+      .select('*')
+      .single(),
+    // Barber messages
+    supabase
+      .from('barber_messages')
+      .select('*')
+      .eq('barber_id', barberId)
+      .eq('is_active', true)
+  ])
   
-  if (barberError || !barber) {
+  const barber = barberResult.data as BarberWithWorkDays | null
+  if (barberResult.error || !barber) {
     notFound()
   }
   
-  // Fetch barber-specific services
-  const { data: services } = await supabase
-    .from('services')
-    .select('*')
-    .eq('barber_id', barberId)
-    .eq('is_active', true)
-    .order('price', { ascending: true }) as { data: Service[] | null }
-  
-  // Fetch barbershop settings
-  const { data: shopSettings } = await supabase
-    .from('barbershop_settings')
-    .select('*')
-    .single() as { data: BarbershopSettings | null }
-  
-  // Fetch barber messages
-  const { data: barberMessages } = await supabase
-    .from('barber_messages')
-    .select('*')
-    .eq('barber_id', barberId)
-    .eq('is_active', true) as { data: BarberMessage[] | null }
+  const services = servicesResult.data as Service[] | null
+  const shopSettings = shopSettingsResult.data as BarbershopSettings | null
+  const barberMessages = barberMessagesResult.data as BarberMessage[] | null
   
   return (
     <>

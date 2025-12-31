@@ -57,24 +57,49 @@ export async function createCustomer(
 }
 
 /**
- * Get or create a customer - upsert logic
+ * Get or create a customer - optimized upsert logic using single query where possible
  */
 export async function getOrCreateCustomer(
   phone: string,
   fullname: string,
   firebaseUid?: string
 ): Promise<Customer | null> {
-  // First try to find existing customer
-  const existing = await findCustomerByPhone(phone)
+  const supabase = createClient()
+  const normalizedPhone = phone.replace(/\D/g, '')
   
-  if (existing) {
-    // Update last login and firebase_uid if provided
-    await updateLastLogin(existing.id, firebaseUid)
-    return { ...existing, firebase_uid: firebaseUid || existing.firebase_uid }
+  // Try to upsert in a single operation for better performance
+  // This inserts if not exists, updates if exists (based on unique phone constraint)
+  const { data, error } = await supabase.from('customers')
+    .upsert(
+      {
+        phone: normalizedPhone,
+        fullname,
+        firebase_uid: firebaseUid || null,
+        last_login_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      { 
+        onConflict: 'phone',
+        ignoreDuplicates: false 
+      }
+    )
+    .select()
+    .single()
+  
+  if (error) {
+    // If upsert fails (e.g., on old Supabase versions), fall back to original logic
+    console.warn('Upsert failed, falling back to find+create:', error)
+    
+    const existing = await findCustomerByPhone(phone)
+    if (existing) {
+      await updateLastLogin(existing.id, firebaseUid)
+      return { ...existing, firebase_uid: firebaseUid || existing.firebase_uid }
+    }
+    
+    return createCustomer(phone, fullname, firebaseUid)
   }
   
-  // Create new customer
-  return createCustomer(phone, fullname, firebaseUid)
+  return data as Customer
 }
 
 /**

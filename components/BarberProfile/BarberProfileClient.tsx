@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Phone, Clock, ChevronLeft, Bell, Loader2 } from 'lucide-react'
 import { cn, formatPrice } from '@/lib/utils'
@@ -33,6 +34,16 @@ export function BarberProfileClient({
 }: BarberProfileClientProps) {
   const router = useRouter()
   const [loadingServiceId, setLoadingServiceId] = useState<string | null>(null)
+
+  // Prefetch the booking page on mount for instant navigation
+  useEffect(() => {
+    // Prefetch the booking page with each service option
+    services.forEach(service => {
+      router.prefetch(`/barber/${barber.id}/book?service=${service.id}`)
+    })
+    // Also prefetch without a service (fallback)
+    router.prefetch(`/barber/${barber.id}/book`)
+  }, [barber.id, services, router])
 
   const handleServiceSelect = (serviceId: string) => {
     setLoadingServiceId(serviceId)

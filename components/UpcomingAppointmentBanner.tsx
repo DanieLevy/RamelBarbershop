@@ -54,9 +54,10 @@ export function UpcomingAppointmentBanner() {
       const supabase = createClient()
       const now = Date.now()
       
+      // Only select necessary fields for performance
       let query = supabase
         .from('reservations')
-        .select('*, services(*), users(*)')
+        .select('id, time_timestamp, customer_id, barber_id, service_id, services(name_he), users(fullname)')
         .eq('status', 'confirmed')
         .gt('time_timestamp', now)
         .order('time_timestamp', { ascending: true })

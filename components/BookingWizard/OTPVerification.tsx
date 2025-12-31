@@ -280,6 +280,21 @@ export function OTPVerification() {
     try {
       const supabase = createClient()
       
+      // Pre-check: Verify slot is still available (race condition prevention)
+      const { data: existingSlot } = await supabase.from('reservations')
+        .select('id')
+        .eq('barber_id', barberId)
+        .eq('time_timestamp', timeTimestamp)
+        .eq('status', 'confirmed')
+        .maybeSingle()
+      
+      if (existingSlot) {
+        console.error('[OTP Booking] Slot already taken:', existingSlot)
+        setError('השעה כבר נתפסה. אנא חזור ובחר שעה אחרת.')
+        toast.error('השעה כבר נתפסה')
+        return false
+      }
+      
       const { data: insertedData, error: insertError } = await supabase.from('reservations')
         .insert(reservationData)
         .select('id')
@@ -287,6 +302,11 @@ export function OTPVerification() {
       
       if (insertError) {
         console.error('Error creating reservation:', insertError)
+        // Handle unique constraint violation specifically
+        if (insertError.code === '23505') {
+          setError('השעה כבר נתפסה. אנא חזור ובחר שעה אחרת.')
+          toast.error('השעה כבר נתפסה')
+        }
         return false
       }
       
