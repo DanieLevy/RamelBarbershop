@@ -122,75 +122,74 @@ export default function GlobalSchedulePage() {
         <p className="text-foreground-muted mt-1">הגדר את ימי ושעות הפעילות של המספרה</p>
       </div>
 
-      <div className="bg-background-card border border-white/10 rounded-2xl p-6 space-y-6">
-        {/* Open Days */}
+      <div className="bg-background-card border border-white/10 rounded-2xl p-4 sm:p-6 space-y-6">
+        {/* Open Days - Grid for mobile */}
         <div>
           <label className="text-foreground-light text-sm block mb-3">ימי פתיחה</label>
-          <div className="flex flex-wrap gap-2">
-            {DAYS.map((day) => (
-              <button
-                key={day.key}
-                onClick={() => toggleDay(day.key)}
-                className={cn(
-                  'px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                  openDays.includes(day.key)
-                    ? 'bg-accent-gold text-background-dark'
-                    : 'bg-background-dark border border-white/10 text-foreground-muted hover:text-foreground-light'
-                )}
-              >
-                {day.label}
-              </button>
-            ))}
+          <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+            {DAYS.map((day) => {
+              const isActive = openDays.includes(day.key)
+              return (
+                <button
+                  key={day.key}
+                  onClick={() => toggleDay(day.key)}
+                  className={cn(
+                    'py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all text-center',
+                    isActive
+                      ? 'bg-accent-gold text-background-dark shadow-sm shadow-accent-gold/30'
+                      : 'bg-white/[0.03] border border-white/[0.06] text-foreground-muted hover:bg-white/[0.06]'
+                  )}
+                >
+                  {day.label}
+                </button>
+              )
+            })}
           </div>
         </div>
 
-        {/* Work Hours - Mobile stacked, tablet+ side by side */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 flex flex-col gap-2">
-            <label className="text-foreground-light text-sm">שעת פתיחה</label>
+        {/* Work Hours - Side by side on mobile too */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-2">
+            <label className="text-foreground-light text-xs sm:text-sm">שעת פתיחה</label>
             <input
               type="time"
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
-              className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-base"
+              className="w-full p-2.5 sm:p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-sm sm:text-base"
             />
           </div>
-          <div className="flex-1 flex flex-col gap-2">
-            <label className="text-foreground-light text-sm">שעת סגירה</label>
+          <div className="flex flex-col gap-2">
+            <label className="text-foreground-light text-xs sm:text-sm">שעת סגירה</label>
             <input
               type="time"
               value={endTime}
               onChange={(e) => setEndTime(e.target.value)}
-              className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-base"
+              className="w-full p-2.5 sm:p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-sm sm:text-base"
             />
           </div>
         </div>
 
-        {/* Preview */}
-        <div className="p-4 bg-background-dark rounded-xl border border-white/5">
-          <p className="text-foreground-muted text-sm mb-2">תצוגה מקדימה:</p>
-          <p className="text-foreground-light">
+        {/* Preview - Compact */}
+        <div className="p-3 sm:p-4 bg-white/[0.02] rounded-xl border border-white/[0.06]">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <span className="text-foreground-muted">סיכום:</span>
             {openDays.length > 0 ? (
-              <>
-                פתוח בימים:{' '}
-                <span className="text-accent-gold">
-                  {openDays.map(d => DAYS.find(day => day.key === d)?.label).join(', ')}
-                </span>
-              </>
+              <span className="text-accent-gold text-xs sm:text-sm">
+                {openDays.map(d => DAYS.find(day => day.key === d)?.label).join(', ')}
+              </span>
             ) : (
-              <span className="text-red-400">לא נבחרו ימי פתיחה</span>
+              <span className="text-red-400 text-xs sm:text-sm">לא נבחרו ימי פתיחה</span>
             )}
-          </p>
-          <p className="text-foreground-light mt-1">
-            שעות: <span className="text-accent-gold" dir="ltr">{startTime} - {endTime}</span>
-          </p>
+            <span className="text-foreground-muted">|</span>
+            <span className="text-foreground-light" dir="ltr">{startTime} - {endTime}</span>
+          </div>
         </div>
 
         <button
           onClick={handleSave}
           disabled={saving}
           className={cn(
-            'w-full py-3 rounded-xl font-medium transition-all',
+            'w-full py-3 rounded-xl font-medium transition-all text-center flex items-center justify-center',
             saving
               ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
               : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'

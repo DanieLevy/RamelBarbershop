@@ -8,7 +8,7 @@ import { cn, formatTime as formatTimeUtil, nowInIsrael } from '@/lib/utils'
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, isSameDay, addDays, startOfMonth, endOfMonth } from 'date-fns'
 import { 
   Calendar, Clock, TrendingDown, Users, 
-  Scissors, CalendarOff, Store,
+  CalendarOff, Store,
   ChevronLeft, Phone, Package
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -218,10 +218,24 @@ export default function DashboardPage() {
               const smartDate = getSmartDateTime(res.time_timestamp)
               
               return (
-                <div
+                <Link
                   key={res.id}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors"
+                  href="/barber/dashboard/reservations"
+                  className="flex items-center gap-3 px-3 sm:px-4 py-3 hover:bg-white/[0.03] transition-colors cursor-pointer"
                 >
+                  {/* Time Display - Before indicator */}
+                  <div className="flex flex-col items-center shrink-0 w-12">
+                    <span className={cn(
+                      'text-lg font-bold tabular-nums',
+                      smartDate.isToday ? 'text-accent-gold' : 'text-foreground-muted'
+                    )}>
+                      {smartDate.time}
+                    </span>
+                    <span className="text-[10px] text-foreground-muted/70">
+                      {smartDate.isToday ? 'היום' : smartDate.date}
+                    </span>
+                  </div>
+                  
                   {/* Status line */}
                   <div className={cn(
                     'w-1 h-10 rounded-full shrink-0',
@@ -233,27 +247,21 @@ export default function DashboardPage() {
                     <p className="text-foreground-light font-medium text-sm truncate">
                       {res.customer_name}
                     </p>
-                    <p className="text-foreground-muted text-xs truncate flex items-center gap-1.5">
-                      <Scissors size={10} />
-                      <span>{res.services?.name_he || 'שירות'}</span>
-                      <span className="text-foreground-muted/50">•</span>
-                      <Clock size={10} />
-                      <span>{smartDate.time}</span>
-                      <span className={cn(smartDate.isToday && 'text-accent-gold')}>
-                        {smartDate.date}
-                      </span>
+                    <p className="text-foreground-muted text-xs truncate">
+                      {res.services?.name_he || 'שירות'}
                     </p>
                   </div>
                   
                   {/* Phone */}
                   <a
                     href={`tel:${res.customer_phone}`}
+                    onClick={(e) => e.stopPropagation()}
                     className="icon-btn p-2 rounded-lg hover:bg-accent-gold/10 transition-colors shrink-0"
                     aria-label="התקשר"
                   >
                     <Phone size={16} strokeWidth={1.5} className="text-accent-gold" />
                   </a>
-                </div>
+                </Link>
               )
             })}
           </div>

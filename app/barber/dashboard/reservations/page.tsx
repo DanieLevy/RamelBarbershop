@@ -445,49 +445,47 @@ export default function ReservationsPage() {
 
   return (
     <div className="max-w-3xl">
-      {/* Header */}
-      <div className="mb-4">
-        <h1 className="text-xl sm:text-2xl font-medium text-foreground-light">תורים של לקוחות</h1>
-        <p className="text-foreground-muted text-sm mt-0.5">ניהול תורים שנקבעו על ידי לקוחות</p>
+      {/* Header with Add Button */}
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-medium text-foreground-light">תורים של לקוחות</h1>
+          <p className="text-foreground-muted text-sm mt-0.5">ניהול תורים שנקבעו על ידי לקוחות</p>
+        </div>
+        <button
+          onClick={() => {
+            const selectedDate = quickDate === 'today' ? israelNow : 
+                                quickDate === 'tomorrow' ? addDays(israelNow, 1) : 
+                                quickDate === 'custom' && customDate ? customDate : null
+            setManualBookingModal({ isOpen: true, preselectedDate: selectedDate, preselectedTime: null })
+          }}
+          className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-background-dark rounded-xl font-medium hover:bg-accent-gold/90 transition-all text-sm"
+        >
+          <Plus size={16} strokeWidth={2} />
+          הוסף תור
+        </button>
       </div>
 
-      {/* Date Filter Chips - Horizontal Scroll */}
-      <div className="mb-2 -mx-4 px-4">
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-          {quickDateChips.map((chip) => (
-            <button
-              key={chip.key}
-              onClick={() => {
-                setQuickDate(chip.key)
-                setCustomDate(null)
-              }}
-              className={cn(
-                'px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all shrink-0',
-                quickDate === chip.key
-                  ? 'bg-accent-gold text-background-dark shadow-lg shadow-accent-gold/20'
-                  : 'bg-white/[0.05] text-foreground-muted hover:bg-white/[0.1] border border-white/[0.08]'
-              )}
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      
-      {/* Date Display with Date Picker */}
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex items-center gap-2 text-foreground-light">
-          <Calendar size={16} className="text-accent-gold" />
-          <span className="text-sm font-medium">
-            {quickDate === 'today' && format(israelNow, 'EEEE, d בMMMM', { locale: he })}
-            {quickDate === 'tomorrow' && format(addDays(israelNow, 1), 'EEEE, d בMMMM', { locale: he })}
-            {quickDate === 'week' && `${format(startOfWeek(israelNow, { weekStartsOn: 0 }), 'd/M', { locale: he })} - ${format(endOfWeek(israelNow, { weekStartsOn: 0 }), 'd/M', { locale: he })}`}
-            {quickDate === 'all' && 'כל התורים'}
-            {quickDate === 'custom' && customDate && format(customDate, 'EEEE, d בMMMM', { locale: he })}
-          </span>
-        </div>
+      {/* Date Filter Chips - Compact Design */}
+      <div className="mb-3 flex items-center gap-2 flex-wrap">
+        {quickDateChips.map((chip) => (
+          <button
+            key={chip.key}
+            onClick={() => {
+              setQuickDate(chip.key)
+              setCustomDate(null)
+            }}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all',
+              quickDate === chip.key
+                ? 'bg-accent-gold text-background-dark'
+                : 'bg-white/[0.05] text-foreground-muted hover:bg-white/[0.08]'
+            )}
+          >
+            {chip.label}
+          </button>
+        ))}
         
-        {/* Date picker for custom selection */}
+        {/* Clickable Date Display with hidden picker */}
         <div className="relative">
           <input
             type="date"
@@ -500,7 +498,6 @@ export default function ReservationsPage() {
             onChange={(e) => {
               const date = e.target.value ? new Date(e.target.value) : null
               if (date) {
-                // Check if selected date matches today or tomorrow
                 if (isSameDay(date, israelNow)) {
                   setQuickDate('today')
                   setCustomDate(null)
@@ -513,18 +510,22 @@ export default function ReservationsPage() {
                 }
               }
             }}
-            className={cn(
-              'w-10 h-10 px-0 py-0 rounded-lg text-sm cursor-pointer opacity-0',
-              'absolute inset-0'
-            )}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             title="בחר תאריך"
           />
-          <button
-            className="w-10 h-10 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-foreground-muted hover:text-accent-gold hover:border-accent-gold/30 transition-colors"
-            title="בחר תאריך"
-          >
-            <Calendar size={18} />
-          </button>
+          <div className={cn(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all',
+            'bg-white/[0.05] text-foreground-light hover:bg-white/[0.08] border border-white/[0.06]'
+          )}>
+            <Calendar size={12} className="text-accent-gold" />
+            <span>
+              {quickDate === 'today' && format(israelNow, 'd/M', { locale: he })}
+              {quickDate === 'tomorrow' && format(addDays(israelNow, 1), 'd/M', { locale: he })}
+              {quickDate === 'week' && `${format(startOfWeek(israelNow, { weekStartsOn: 0 }), 'd/M')} - ${format(endOfWeek(israelNow, { weekStartsOn: 0 }), 'd/M')}`}
+              {quickDate === 'all' && 'הכל'}
+              {quickDate === 'custom' && customDate && format(customDate, 'd/M', { locale: he })}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -576,13 +577,15 @@ export default function ReservationsPage() {
             <button
               onClick={() => setShowEmptySlots(!showEmptySlots)}
               className={cn(
-                'relative w-9 h-5 rounded-full transition-colors duration-200',
-                showEmptySlots ? 'bg-accent-gold' : 'bg-white/20'
+                'w-12 h-7 rounded-full transition-colors relative flex-shrink-0',
+                showEmptySlots ? 'bg-accent-gold' : 'bg-white/10'
               )}
+              aria-checked={showEmptySlots}
+              role="switch"
             >
               <div className={cn(
-                'absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200',
-                showEmptySlots ? 'right-0.5' : 'left-0.5'
+                'absolute top-1 w-5 h-5 rounded-full bg-white transition-all',
+                showEmptySlots ? 'right-1' : 'left-1'
               )} />
             </button>
           </label>
@@ -772,19 +775,6 @@ export default function ReservationsPage() {
         preselectedTime={manualBookingModal.preselectedTime}
       />
 
-      {/* Floating Add Button */}
-      <button
-        onClick={() => {
-          const selectedDate = quickDate === 'today' ? israelNow : 
-                              quickDate === 'tomorrow' ? addDays(israelNow, 1) : 
-                              quickDate === 'custom' && customDate ? customDate : null
-          setManualBookingModal({ isOpen: true, preselectedDate: selectedDate, preselectedTime: null })
-        }}
-        className="fixed bottom-24 left-4 w-14 h-14 rounded-full bg-accent-gold text-background-dark shadow-lg shadow-accent-gold/30 hover:bg-accent-gold/90 hover:scale-105 transition-all flex items-center justify-center z-40"
-        title="הוסף תור ידני"
-      >
-        <Plus size={24} strokeWidth={2} />
-      </button>
     </div>
   )
 }

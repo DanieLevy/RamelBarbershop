@@ -77,7 +77,7 @@ export function MobileBottomNav() {
         .from('reservations')
         .select('*', { count: 'exact', head: true })
         .eq('customer_id', customer.id)
-        .eq('status', 'active')
+        .eq('status', 'confirmed')
         .gt('time_timestamp', now)
       
       if (!error && count !== null) {

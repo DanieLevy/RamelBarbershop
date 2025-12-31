@@ -284,24 +284,25 @@ export default function MySchedulePage() {
           </div>
         )}
 
-        {/* Work Days */}
+        {/* Work Days - Grid layout for mobile */}
         <div className="mb-6">
           <label className="text-foreground-light text-sm block mb-3">ימי עבודה</label>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
             {DAYS.map((day) => {
               const isShopOpen = shopSettings?.open_days.includes(day.key)
+              const isActive = workDays.includes(day.key)
               return (
                 <button
                   key={day.key}
                   onClick={() => toggleDay(day.key)}
                   disabled={!isShopOpen}
                   className={cn(
-                    'px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                    'py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all text-center',
                     !isShopOpen
-                      ? 'bg-background-dark border border-white/5 text-foreground-muted/50 cursor-not-allowed'
-                      : workDays.includes(day.key)
-                        ? 'bg-accent-gold text-background-dark'
-                        : 'bg-background-dark border border-white/10 text-foreground-muted hover:text-foreground-light'
+                      ? 'bg-background-dark/50 text-foreground-muted/30 cursor-not-allowed'
+                      : isActive
+                        ? 'bg-accent-gold text-background-dark shadow-sm shadow-accent-gold/30'
+                        : 'bg-white/[0.03] border border-white/[0.06] text-foreground-muted hover:bg-white/[0.06]'
                   )}
                   title={!isShopOpen ? 'המספרה סגורה ביום זה' : ''}
                 >
@@ -342,7 +343,7 @@ export default function MySchedulePage() {
           onClick={handleSaveSchedule}
           disabled={savingSchedule}
           className={cn(
-            'w-full py-3 rounded-xl font-medium transition-all',
+            'w-full py-3 rounded-xl font-medium transition-all text-center flex items-center justify-center',
             savingSchedule
               ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
               : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'

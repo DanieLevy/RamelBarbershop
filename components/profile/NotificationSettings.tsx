@@ -187,14 +187,16 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
               onClick={isNotificationsEnabled ? handleDisableNotifications : handleEnableNotifications}
               disabled={isEnabling || push.isLoading}
               className={cn(
-                'relative w-11 h-6 rounded-full transition-colors duration-200',
-                isNotificationsEnabled ? 'bg-green-500' : 'bg-white/20',
+                'w-12 h-7 rounded-full transition-colors relative flex-shrink-0',
+                isNotificationsEnabled ? 'bg-accent-gold' : 'bg-white/10',
                 (isEnabling || push.isLoading) && 'opacity-50 cursor-not-allowed'
               )}
+              aria-checked={isNotificationsEnabled}
+              role="switch"
             >
               <div className={cn(
-                'absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200',
-                isNotificationsEnabled ? 'right-0.5' : 'left-0.5'
+                'absolute top-1 w-5 h-5 rounded-full bg-white transition-all',
+                isNotificationsEnabled ? 'right-1' : 'left-1'
               )}>
                 {(isEnabling || push.isLoading) && (
                   <Loader2 size={12} className="animate-spin absolute top-0.5 left-0.5 text-background-dark" />
