@@ -58,26 +58,28 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule }: TimeSe
         const { hour: startHour, minute: startMinute } = parseTimeString(workHours.start)
         const { hour: endHour, minute: endMinute } = parseTimeString(workHours.end)
         
-        // Generate all possible time slots
+        // Generate all possible time slots - fixed 30-minute intervals
+        // Service duration is informational only, all bookings use one 30-min slot
         const allSlots = generateTimeSlots(
           date.dateTimestamp,
           startHour,
           startMinute,
           endHour,
           endMinute,
-          30 // 30 minute intervals
+          30 // Fixed 30 minute intervals - each booking takes exactly one slot
         )
         
-        // Get date string for query
+        // Get date range for query
         const dayStart = new Date(date.dateTimestamp)
         dayStart.setHours(0, 0, 0, 0)
         const dayEnd = new Date(date.dateTimestamp)
         dayEnd.setHours(23, 59, 59, 999)
         
-        // Fetch existing reservations with service duration for overlap calculation
+        // Fetch existing reservations - simple query, no duration needed
+        // Each reservation blocks exactly one 30-minute slot
         const { data: reservations, error: resError } = await supabase
           .from('reservations')
-          .select('time_timestamp, customer_name, status, services(duration)')
+          .select('time_timestamp, customer_name, status')
           .eq('barber_id', barberId)
           .gte('time_timestamp', dayStart.getTime())
           .lte('time_timestamp', dayEnd.getTime())
@@ -86,7 +88,6 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule }: TimeSe
               time_timestamp: number
               customer_name: string
               status: string
-              services: { duration: number } | null 
             }[] | null
             error: unknown 
           }
@@ -96,43 +97,28 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule }: TimeSe
           await report(new Error((resError as Error)?.message || 'Unknown reservation fetch error'), 'Fetching reservations for time slots')
         }
         
-        // Build a function to check if a slot overlaps with any existing reservation
-        // This properly handles service duration (e.g., 45min service blocks the next slot too)
-        const isSlotBlocked = (slotTimestamp: number): { blocked: boolean; reservedBy?: string } => {
-          if (!reservations) return { blocked: false }
-          
-          const selectedServiceDuration = service?.duration || 30 // Default 30 min
-          const slotEndTime = slotTimestamp + (selectedServiceDuration * 60 * 1000)
-          
+        // Create a set of reserved timestamps - simple exact match
+        // Each booking occupies exactly one 30-minute slot
+        const reservedTimestamps = new Set<number>()
+        const reservedMap = new Map<number, string>()
+        
+        if (reservations) {
           for (const res of reservations) {
-            const resDuration = res.services?.duration || 30
-            const resEndTime = res.time_timestamp + (resDuration * 60 * 1000)
-            
-            // Check for overlap: 
-            // A slot is blocked if it starts before an existing reservation ends
-            // AND ends after the existing reservation starts
-            const overlaps = slotTimestamp < resEndTime && slotEndTime > res.time_timestamp
-            
-            if (overlaps) {
-              return { blocked: true, reservedBy: res.customer_name }
-            }
+            reservedTimestamps.add(res.time_timestamp)
+            reservedMap.set(res.time_timestamp, res.customer_name)
           }
-          
-          return { blocked: false }
         }
         
-        // Split slots into available and reserved
+        // Split slots into available and reserved - simple timestamp check
         const available: EnrichedTimeSlot[] = []
         const reserved: EnrichedTimeSlot[] = []
         
         for (const slot of allSlots) {
-          const blockInfo = isSlotBlocked(slot.timestamp)
-          
-          if (blockInfo.blocked) {
+          if (reservedTimestamps.has(slot.timestamp)) {
             reserved.push({
               time_timestamp: slot.timestamp,
               is_available: false,
-              reservedBy: blockInfo.reservedBy,
+              reservedBy: reservedMap.get(slot.timestamp),
             })
           } else {
             available.push({
@@ -155,7 +141,7 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule }: TimeSe
 
     fetchTimeSlots()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [barberId, date, service])
+  }, [barberId, date])
 
   const handleSelect = (timestamp: number) => {
     setTime(timestamp)
