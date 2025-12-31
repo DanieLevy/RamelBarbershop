@@ -99,6 +99,13 @@ export const usePWA = (): UsePWAReturn => {
 
     const registerSW = async () => {
       try {
+        // Check for existing registration first
+        const existingReg = await navigator.serviceWorker.getRegistration('/')
+        if (existingReg?.waiting) {
+          console.log('[PWA] Existing waiting service worker found immediately')
+          setState((prev) => ({ ...prev, isUpdateAvailable: true, isServiceWorkerReady: true }))
+        }
+        
         const registration = await navigator.serviceWorker.register('/sw.js', {
           scope: '/',
           updateViaCache: 'none',

@@ -1,7 +1,6 @@
 'use client'
 
-import { useCallback } from 'react'
-import { useHaptic } from 'react-haptic'
+import { useCallback, useRef, useEffect } from 'react'
 
 type VibratePattern = number | number[]
 
@@ -41,56 +40,65 @@ interface UseHapticsReturn {
 }
 
 /**
- * Enhanced haptics hook using react-haptic for iOS support
- * Falls back to native vibrate API where available, uses hidden switch
- * trick for iOS Taptic-like feedback
+ * Simple haptics hook using native Vibration API only
+ * 
+ * NOTE: Removed react-haptic dependency as it caused PWA layout issues on iOS
+ * due to DOM manipulation during SSR hydration. The hidden checkbox trick
+ * for iOS haptics was causing "Connection closed" errors and layout breaks.
+ * 
+ * This hook now uses only the native Vibration API (Android/Chrome support).
+ * iOS Safari doesn't support haptics via JavaScript, so we fail silently there.
  */
 export const useHaptics = (): UseHapticsReturn => {
-  // react-haptic handles iOS vs Android internally
-  const { vibrate: hapticVibrate } = useHaptic({ hapticDuration: 100 })
+  // Check for native vibrate API support (Android, Chrome desktop)
+  const isSupportedRef = useRef(false)
+  const isMountedRef = useRef(false)
   
-  // Check basic support
-  const isSupported = typeof window !== 'undefined'
+  useEffect(() => {
+    isMountedRef.current = true
+    isSupportedRef.current = typeof navigator !== 'undefined' && 'vibrate' in navigator
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
-  const vibrate = useCallback(
-    (pattern: VibratePattern): void => {
-      if (!isSupported) return
-      
-      try {
-        // For single durations, use react-haptic (which handles iOS)
-        if (typeof pattern === 'number') {
-          hapticVibrate()
-          return
-        }
-        
-        // For patterns, try native vibrate first, fallback to single haptic
-        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-          navigator.vibrate(pattern)
-        } else {
-          // Multiple haptic taps for patterns on iOS
-          pattern.forEach((duration, i) => {
-            if (duration > 0 && i % 2 === 0) {
-              setTimeout(() => hapticVibrate(), i * 50)
-            }
-          })
-        }
-      } catch {
-        // Silently fail - haptic feedback is not critical
+  const vibrate = useCallback((pattern: VibratePattern): void => {
+    // Only run on client after mount
+    if (!isMountedRef.current) return
+    
+    try {
+      // Use native Vibration API if available (Android/Chrome)
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate(pattern)
       }
-    },
-    [isSupported, hapticVibrate]
-  )
+      // iOS doesn't support navigator.vibrate - silently fail
+      // The user experience is still good without haptics
+    } catch {
+      // Silently fail - haptic feedback is not critical
+    }
+  }, [])
+
+  // Memoized callbacks for each pattern
+  const light = useCallback(() => vibrate(PATTERNS.light), [vibrate])
+  const medium = useCallback(() => vibrate(PATTERNS.medium), [vibrate])
+  const heavy = useCallback(() => vibrate(PATTERNS.heavy), [vibrate])
+  const success = useCallback(() => vibrate(PATTERNS.success), [vibrate])
+  const error = useCallback(() => vibrate(PATTERNS.error), [vibrate])
+  const warning = useCallback(() => vibrate(PATTERNS.warning), [vibrate])
+  const selection = useCallback(() => vibrate(PATTERNS.selection), [vibrate])
+  const impact = useCallback(() => vibrate(PATTERNS.impact), [vibrate])
+  const custom = useCallback((pattern: VibratePattern) => vibrate(pattern), [vibrate])
 
   return {
-    isSupported,
-    light: useCallback(() => vibrate(PATTERNS.light), [vibrate]),
-    medium: useCallback(() => vibrate(PATTERNS.medium), [vibrate]),
-    heavy: useCallback(() => vibrate(PATTERNS.heavy), [vibrate]),
-    success: useCallback(() => vibrate(PATTERNS.success), [vibrate]),
-    error: useCallback(() => vibrate(PATTERNS.error), [vibrate]),
-    warning: useCallback(() => vibrate(PATTERNS.warning), [vibrate]),
-    selection: useCallback(() => vibrate(PATTERNS.selection), [vibrate]),
-    impact: useCallback(() => vibrate(PATTERNS.impact), [vibrate]),
-    custom: (pattern: VibratePattern) => vibrate(pattern),
+    isSupported: isSupportedRef.current,
+    light,
+    medium,
+    heavy,
+    success,
+    error,
+    warning,
+    selection,
+    impact,
+    custom,
   }
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import { usePWA, wasInstallDismissed, getVisitCount } from '@/hooks/usePWA'
 import { InstallBanner } from './InstallBanner'
 import { UpdateModal } from './UpdateModal'
@@ -34,6 +34,13 @@ interface PWAProviderProps {
 
 export function PWAProvider({ children }: PWAProviderProps) {
   const pwa = usePWA()
+  const [isMounted, setIsMounted] = useState(false)
+  
+  // Ensure PWA components only render on client after mount
+  // This prevents hydration issues and SSR errors
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
   
   // Determine if we should show install banner
   const shouldShowInstallBanner = 
@@ -60,25 +67,30 @@ export function PWAProvider({ children }: PWAProviderProps) {
     <PWAContext.Provider value={contextValue}>
       {children}
       
-      {/* Force Update Modal - Non-dismissible */}
-      {pwa.isUpdateAvailable && (
-        <UpdateModal onUpdate={pwa.updateApp} version={pwa.currentVersion} />
+      {/* Only render PWA-related modals after client mount to prevent SSR issues */}
+      {isMounted && (
+        <>
+          {/* Force Update Modal - Non-dismissible */}
+          {pwa.isUpdateAvailable && (
+            <UpdateModal onUpdate={pwa.updateApp} version={pwa.currentVersion} />
+          )}
+          
+          {/* Install Banner - Smart behavior based on visit count */}
+          {shouldShowInstallBanner && (
+            <InstallBanner
+              isModal={showAsModal}
+              deviceOS={pwa.deviceOS}
+              isInstallable={pwa.isInstallable}
+              onInstall={pwa.installApp}
+              onDismiss={pwa.dismissInstallPrompt}
+              instructions={pwa.getInstallInstructions()}
+            />
+          )}
+          
+          {/* Notification Permission Modal - Shows in PWA for logged-in users */}
+          <NotificationPermissionModal />
+        </>
       )}
-      
-      {/* Install Banner - Smart behavior based on visit count */}
-      {shouldShowInstallBanner && (
-        <InstallBanner
-          isModal={showAsModal}
-          deviceOS={pwa.deviceOS}
-          isInstallable={pwa.isInstallable}
-          onInstall={pwa.installApp}
-          onDismiss={pwa.dismissInstallPrompt}
-          instructions={pwa.getInstallInstructions()}
-        />
-      )}
-      
-      {/* Notification Permission Modal - Shows in PWA for logged-in users */}
-      <NotificationPermissionModal />
     </PWAContext.Provider>
   )
 }
