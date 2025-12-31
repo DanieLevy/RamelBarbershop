@@ -204,6 +204,7 @@ export type Database = {
           hero_subtitle: string | null
           hero_title: string | null
           id: string
+          max_booking_days_ahead: number
           name: string
           open_days: string[]
           phone: string | null
@@ -237,6 +238,7 @@ export type Database = {
           hero_subtitle?: string | null
           hero_title?: string | null
           id?: string
+          max_booking_days_ahead?: number
           name?: string
           open_days?: string[]
           phone?: string | null
@@ -270,6 +272,7 @@ export type Database = {
           hero_subtitle?: string | null
           hero_title?: string | null
           id?: string
+          max_booking_days_ahead?: number
           name?: string
           open_days?: string[]
           phone?: string | null

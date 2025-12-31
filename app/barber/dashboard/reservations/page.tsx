@@ -796,6 +796,7 @@ export default function ReservationsPage() {
               const smartDate = getSmartDateTime(res.time_timestamp)
               const isUpcoming = normalizeTs(res.time_timestamp) > now && res.status === 'confirmed'
               const isCancelled = res.status === 'cancelled'
+              const isPast = normalizeTs(res.time_timestamp) <= now && res.status !== 'cancelled'
               
               return (
                 <div
@@ -803,7 +804,7 @@ export default function ReservationsPage() {
                   onClick={() => setDetailModal({ isOpen: true, reservation: res })}
                   className={cn(
                     'flex items-center gap-3 px-3 sm:px-4 py-3 transition-all cursor-pointer hover:bg-white/[0.03]',
-                    isCancelled && 'opacity-60'
+                    (isCancelled || isPast) && 'opacity-60'
                   )}
                 >
                   {/* Time Display - Before indicator */}
@@ -829,13 +830,20 @@ export default function ReservationsPage() {
                   <div className="flex-1 min-w-0">
                     <p className={cn(
                       'text-foreground-light font-medium text-sm truncate',
-                      isCancelled && 'line-through'
+                      (isCancelled || isPast) && 'line-through decoration-foreground-muted/50'
                     )}>
                       {res.customer_name}
                     </p>
-                    <p className="text-foreground-muted text-xs truncate">
+                    <p className={cn(
+                      'text-foreground-muted text-xs truncate',
+                      (isCancelled || isPast) && 'line-through decoration-foreground-muted/30'
+                    )}>
                       {res.services?.name_he || 'שירות'}
                     </p>
+                    {/* Past appointment indicator */}
+                    {isPast && !isCancelled && (
+                      <span className="text-[10px] text-foreground-muted/60">הסתיים</span>
+                    )}
                   </div>
                   
                   {/* Actions */}
@@ -850,8 +858,8 @@ export default function ReservationsPage() {
                       <Phone size={16} strokeWidth={1.5} className="text-accent-gold" />
                     </a>
                     
-                    {/* Cancel */}
-                    {res.status === 'confirmed' && (
+                    {/* Cancel - Only for upcoming appointments */}
+                    {res.status === 'confirmed' && isUpcoming && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation()

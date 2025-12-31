@@ -44,6 +44,7 @@ export type BookingErrorCode =
   | 'CUSTOMER_BLOCKED'
   | 'CUSTOMER_DOUBLE_BOOKING'
   | 'MAX_BOOKINGS_REACHED'
+  | 'DATE_OUT_OF_RANGE'
   | 'VALIDATION_ERROR'
   | 'DATABASE_ERROR'
   | 'UNKNOWN_ERROR'
@@ -65,6 +66,7 @@ const ERROR_MESSAGES: Record<BookingErrorCode, string> = {
   CUSTOMER_BLOCKED: 'לא ניתן לקבוע תור. אנא פנה לצוות המספרה.',
   CUSTOMER_DOUBLE_BOOKING: 'כבר יש לך תור בשעה זו.',
   MAX_BOOKINGS_REACHED: 'הגעת למקסימום התורים המותרים. בטל תור קיים כדי לקבוע חדש.',
+  DATE_OUT_OF_RANGE: 'התאריך שנבחר חורג מטווח ההזמנות המותר.',
   VALIDATION_ERROR: 'חסרים נתונים ליצירת התור.',
   DATABASE_ERROR: 'שגיאה ביצירת התור. נסה שוב.',
   UNKNOWN_ERROR: 'שגיאה בלתי צפויה. נסה שוב.',
@@ -479,6 +481,9 @@ function parseBookingError(errorMessage: string): BookingErrorCode {
   }
   if (errorMessage.includes('MAX_BOOKINGS_REACHED')) {
     return 'MAX_BOOKINGS_REACHED'
+  }
+  if (errorMessage.includes('DATE_OUT_OF_RANGE')) {
+    return 'DATE_OUT_OF_RANGE'
   }
   return 'DATABASE_ERROR'
 }

@@ -271,9 +271,26 @@ export function getNextWeekDates(daysCount = 14): DateOption[] {
 }
 
 /**
+ * Validate if a timestamp is valid for formatting
+ */
+function isValidTimestamp(timestamp: unknown): timestamp is number {
+  if (typeof timestamp !== 'number') return false
+  if (isNaN(timestamp)) return false
+  if (!isFinite(timestamp)) return false
+  // Check if timestamp creates a valid date (reasonable range: 1970-2100)
+  if (timestamp < 0 || timestamp > 4102444800000) return false
+  const date = new Date(timestamp)
+  return !isNaN(date.getTime())
+}
+
+/**
  * Format timestamp (milliseconds) to time string (HH:mm) in Israel timezone
  */
 export function formatTime(timestamp: number): string {
+  if (!isValidTimestamp(timestamp)) {
+    console.warn('[formatTime] Invalid timestamp:', timestamp)
+    return '--:--'
+  }
   const date = timestampToIsraelDate(timestamp)
   return format(date, 'HH:mm')
 }
@@ -282,6 +299,10 @@ export function formatTime(timestamp: number): string {
  * Format timestamp (milliseconds) to full date in Hebrew
  */
 export function formatDateHebrew(timestamp: number): string {
+  if (!isValidTimestamp(timestamp)) {
+    console.warn('[formatDateHebrew] Invalid timestamp:', timestamp)
+    return 'תאריך לא זמין'
+  }
   const date = timestampToIsraelDate(timestamp)
   return format(date, "EEEE, d בMMMM yyyy", { locale: he })
 }
@@ -290,6 +311,10 @@ export function formatDateHebrew(timestamp: number): string {
  * Format timestamp (milliseconds) to short date
  */
 export function formatDateShort(timestamp: number): string {
+  if (!isValidTimestamp(timestamp)) {
+    console.warn('[formatDateShort] Invalid timestamp:', timestamp)
+    return '--/--/----'
+  }
   const date = timestampToIsraelDate(timestamp)
   return format(date, 'dd/MM/yyyy')
 }

@@ -221,17 +221,17 @@ export default function BarberLoginPage() {
                   }}
                   placeholder="••••••••"
                   className={cn(
-                    'w-full p-3.5 pr-10 pl-10 rounded-xl bg-background-dark border text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold transition-all text-left text-sm sm:text-base',
+                    'w-full p-3.5 pr-10 pl-12 rounded-xl bg-background-dark border text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold transition-all text-left text-sm sm:text-base',
                     error ? 'border-red-400' : 'border-white/10'
                   )}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-foreground-muted hover:text-foreground-light transition-colors"
+                  className="absolute left-1 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-foreground-muted hover:text-foreground-light transition-colors"
                   aria-label={showPassword ? 'הסתר סיסמה' : 'הצג סיסמה'}
                 >
-                  {showPassword ? <EyeOff size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
+                  {showPassword ? <EyeOff size={18} strokeWidth={1.5} /> : <Eye size={18} strokeWidth={1.5} />}
                 </button>
               </div>
             </div>

@@ -392,7 +392,7 @@ export default function ProfilePage() {
             onClick={handleSaveProfile}
             disabled={savingProfile}
             className={cn(
-              'w-full py-3 rounded-xl font-medium transition-all text-center',
+              'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center',
               savingProfile
                 ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                 : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'

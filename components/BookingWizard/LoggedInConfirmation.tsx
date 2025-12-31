@@ -180,7 +180,7 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
       <div className="text-center">
         <h2 className="text-2xl text-foreground-light font-medium">התור נקבע בהצלחה!</h2>
         <p className="text-foreground-muted mt-2">
-          {loggedInCustomer?.fullname}, להתראות!
+          תודה {loggedInCustomer?.fullname}! נשמח לראותך 💈
         </p>
       </div>
       

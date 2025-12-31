@@ -55,6 +55,16 @@ interface UnavailableInfo {
   reason: string
 }
 
+// Availability result types for enhanced UX
+type UnavailabilityType = 'past' | 'out_of_range' | 'shop_closed' | 'shop_closure' | 'barber_not_working' | 'barber_closure'
+
+interface AvailabilityResult {
+  available: boolean
+  reason?: string
+  type?: UnavailabilityType
+  closureReason?: string // Custom reason from barber/shop closure
+}
+
 export function DateSelection({ 
   workDays, 
   shopSettings, 
@@ -112,43 +122,94 @@ export function DateSelection({
     return days
   }, [currentMonth])
 
-  // Check if a date is available
-  const checkAvailability = useCallback((day: CalendarDay): { available: boolean; reason?: string } => {
+  // Calculate max booking date based on settings
+  const maxBookingDate = useMemo(() => {
+    const maxDays = shopSettings?.max_booking_days_ahead || 21
+    const today = nowInIsrael()
+    const maxDate = new Date(today)
+    maxDate.setDate(maxDate.getDate() + maxDays)
+    return getIsraelDayStart(maxDate)
+  }, [shopSettings?.max_booking_days_ahead])
+
+  // Check if a date is available with structured response
+  const checkAvailability = useCallback((day: CalendarDay): AvailabilityResult => {
+    // 1. Check if past
     if (day.isPast) {
-      return { available: false, reason: 'תאריך עבר' }
+      return { available: false, reason: 'תאריך עבר', type: 'past' }
     }
     
+    // 2. Check if today is past working hours
+    if (day.isToday) {
+      const now = nowInIsrael()
+      const currentHour = now.getHours()
+      const currentMinute = now.getMinutes()
+      
+      let endTimeStr = barberSchedule?.work_hours_end || shopSettings?.work_hours_end || '19:00'
+      if (endTimeStr.includes(':')) {
+        endTimeStr = endTimeStr.split(':').slice(0, 2).join(':')
+      }
+      const [endHour, endMinute] = endTimeStr.split(':').map(Number)
+      
+      if (currentHour > endHour || (currentHour === endHour && currentMinute >= endMinute)) {
+        return { available: false, reason: 'שעות העבודה הסתיימו להיום', type: 'past' }
+      }
+    }
+    
+    // 3. Check if out of booking range
+    if (day.dateTimestamp > maxBookingDate) {
+      const maxDays = shopSettings?.max_booking_days_ahead || 21
+      return { 
+        available: false, 
+        reason: `ניתן לקבוע תור עד ${maxDays} ימים מראש`, 
+        type: 'out_of_range' 
+      }
+    }
+    
+    // 4. Check if shop is closed on this day
     if (shopSettings?.open_days && !shopSettings.open_days.includes(day.dayKey)) {
-      return { available: false, reason: 'המספרה סגורה' }
+      return { available: false, reason: 'המספרה סגורה', type: 'shop_closed' }
     }
     
+    // 5. Check shop closure with optional reason
     const shopClosure = shopClosures.find(c => 
       day.dateString >= c.start_date && day.dateString <= c.end_date
     )
     if (shopClosure) {
-      return { available: false, reason: shopClosure.reason || 'המספרה סגורה' }
+      return { 
+        available: false, 
+        reason: shopClosure.reason || 'המספרה סגורה', 
+        type: 'shop_closure',
+        closureReason: shopClosure.reason || undefined
+      }
     }
     
+    // 6. Check if barber works on this day
     if (barberSchedule?.work_days && barberSchedule.work_days.length > 0) {
       if (!barberSchedule.work_days.includes(day.dayKey)) {
-        return { available: false, reason: 'הספר לא עובד' }
+        return { available: false, reason: 'הספר לא עובד', type: 'barber_not_working' }
       }
     } else {
       const legacyWorkDay = workDays.find((wd) => wd.day_of_week.toLowerCase() === day.dayKey)
       if (!legacyWorkDay?.is_working) {
-        return { available: false, reason: 'הספר לא עובד' }
+        return { available: false, reason: 'הספר לא עובד', type: 'barber_not_working' }
       }
     }
     
+    // 7. Check barber closure with optional reason
     const barberClosure = barberClosures.find(c => 
       day.dateString >= c.start_date && day.dateString <= c.end_date
     )
     if (barberClosure) {
-      return { available: false, reason: barberClosure.reason || 'הספר לא זמין' }
+      return { 
+        available: false, 
+        reason: barberClosure.reason || 'הספר לא זמין', 
+        type: 'barber_closure',
+        closureReason: barberClosure.reason || undefined
+      }
     }
     
     return { available: true }
-  }, [shopSettings, shopClosures, barberSchedule, barberClosures, workDays])
+  }, [shopSettings, shopClosures, barberSchedule, barberClosures, workDays, maxBookingDate])
 
   // Handle date selection - allows clicking outside-month days if they're available
   const handleSelect = useCallback((day: CalendarDay, index: number) => {
@@ -245,6 +306,61 @@ export function DateSelection({
     return result
   }, [calendarDays])
 
+  // Get closures visible in the current month that have custom reasons
+  const visibleClosures = useMemo(() => {
+    const closures: { type: 'shop' | 'barber'; reason: string; startDate: string; endDate: string }[] = []
+    
+    // Get date range of visible calendar
+    const firstDay = calendarDays[0]?.dateString
+    const lastDay = calendarDays[calendarDays.length - 1]?.dateString
+    
+    if (!firstDay || !lastDay) return closures
+    
+    // Shop closures with reasons
+    shopClosures.forEach(c => {
+      if (c.reason && c.start_date <= lastDay && c.end_date >= firstDay) {
+        closures.push({
+          type: 'shop',
+          reason: c.reason,
+          startDate: c.start_date,
+          endDate: c.end_date
+        })
+      }
+    })
+    
+    // Barber closures with reasons
+    barberClosures.forEach(c => {
+      if (c.reason && c.start_date <= lastDay && c.end_date >= firstDay) {
+        closures.push({
+          type: 'barber',
+          reason: c.reason,
+          startDate: c.start_date,
+          endDate: c.end_date
+        })
+      }
+    })
+    
+    return closures
+  }, [calendarDays, shopClosures, barberClosures])
+
+  // Format date range for legend display
+  const formatDateRange = (startDate: string, endDate: string): string => {
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const startDay = start.getDate()
+    const endDay = end.getDate()
+    const startMonth = HEBREW_MONTHS[start.getMonth()]
+    const endMonth = HEBREW_MONTHS[end.getMonth()]
+    
+    if (startDate === endDate) {
+      return `${startDay} ${startMonth}`
+    }
+    if (start.getMonth() === end.getMonth()) {
+      return `${startDay}-${endDay} ${startMonth}`
+    }
+    return `${startDay} ${startMonth} - ${endDay} ${endMonth}`
+  }
+
   return (
     <div className="flex flex-col gap-5">
       {/* Header */}
@@ -324,8 +440,12 @@ export function DateSelection({
                 const isSelected = selectedDate?.dateTimestamp === day.dateTimestamp
                 const isUnavailable = !availability.available
                 const isOutsideMonth = !day.isCurrentMonth
-                // Clickable if available and not in the past (outside month days CAN be clicked)
                 const isClickable = availability.available && !day.isPast
+                
+                // Determine visual style based on unavailability type
+                const isOutOfRange = availability.type === 'out_of_range'
+                const isClosure = availability.type === 'shop_closure' || availability.type === 'barber_closure'
+                const hasClosure = isClosure && availability.closureReason
                 
                 return (
                   <button
@@ -334,7 +454,7 @@ export function DateSelection({
                     role="gridcell"
                     aria-selected={isSelected}
                     aria-disabled={!isClickable}
-                    aria-label={`${day.dayNum} ${HEBREW_MONTHS[day.date.getMonth()]}`}
+                    aria-label={`${day.dayNum} ${HEBREW_MONTHS[day.date.getMonth()]}${isUnavailable ? ` - ${availability.reason}` : ''}`}
                     tabIndex={isClickable ? 0 : -1}
                     onClick={() => handleSelect(day, globalIndex)}
                     onKeyDown={(e) => handleKeyDown(e, globalIndex)}
@@ -346,33 +466,51 @@ export function DateSelection({
                       'transition-all duration-200 relative',
                       'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-gold focus-visible:ring-offset-2 focus-visible:ring-offset-background-dark',
                       
-                      // Disabled/Unavailable state (past or not available)
-                      isUnavailable && [
+                      // Out of range - dashed border, very muted
+                      isOutOfRange && [
+                        'bg-white/[0.01] cursor-not-allowed border border-dashed border-white/10',
+                        isOutsideMonth ? 'text-foreground-muted/10' : 'text-foreground-muted/25'
+                      ].filter(Boolean).join(' '),
+                      
+                      // Closures with custom reason - colored indicator
+                      isClosure && !isOutOfRange && [
                         'bg-white/[0.03] cursor-not-allowed',
                         isOutsideMonth ? 'text-foreground-muted/15' : 'text-foreground-muted/40',
                         'before:absolute before:inset-1 before:rounded-lg',
                         'before:bg-[repeating-linear-gradient(135deg,transparent,transparent_3px,rgba(255,255,255,0.05)_3px,rgba(255,255,255,0.05)_6px)]'
                       ].filter(Boolean).join(' '),
                       
-                      // Available state (clickable) - slightly muted if outside month
+                      // Other unavailable states (past, shop closed, barber not working)
+                      isUnavailable && !isOutOfRange && !isClosure && [
+                        'bg-white/[0.03] cursor-not-allowed',
+                        isOutsideMonth ? 'text-foreground-muted/15' : 'text-foreground-muted/40',
+                        'before:absolute before:inset-1 before:rounded-lg',
+                        'before:bg-[repeating-linear-gradient(135deg,transparent,transparent_3px,rgba(255,255,255,0.05)_3px,rgba(255,255,255,0.05)_6px)]'
+                      ].filter(Boolean).join(' '),
+                      
+                      // Available state (clickable)
                       !isUnavailable && !isSelected && [
                         isOutsideMonth ? 'bg-white/[0.03] text-foreground-muted/60' : 'bg-white/5 text-foreground-light',
                         'hover:bg-white/10 hover:scale-[1.05]',
                         'active:scale-95 cursor-pointer'
                       ].filter(Boolean).join(' '),
                       
-                      // Selected state - highest emphasis
+                      // Selected state
                       isSelected && [
                         'bg-accent-gold text-background-dark font-bold',
                         'scale-[1.05] shadow-lg shadow-accent-gold/30',
                         'ring-2 ring-accent-gold ring-offset-2 ring-offset-background-dark'
                       ].filter(Boolean).join(' '),
                       
-                      // Today indicator (subtle outline when not selected)
+                      // Today indicator
                       day.isToday && !isSelected && !isUnavailable && 'ring-1 ring-accent-gold/50'
                     )}
                   >
                     {day.dayNum}
+                    {/* Closure indicator dot */}
+                    {hasClosure && !isOutOfRange && (
+                      <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-orange-400" />
+                    )}
                   </button>
                 )
               })}
@@ -394,21 +532,38 @@ export function DateSelection({
       </div>
 
       {/* Legend */}
-      <div className="flex items-center justify-center gap-4 sm:gap-6 text-xs text-foreground-muted">
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-md bg-white/5 border border-white/10" />
-          <span>פנוי</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-md bg-accent-gold shadow-sm" />
-          <span>נבחר</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-md bg-white/[0.03] border border-white/5 relative overflow-hidden">
-            <div className="absolute inset-0 bg-[repeating-linear-gradient(135deg,transparent,transparent_2px,rgba(255,255,255,0.1)_2px,rgba(255,255,255,0.1)_4px)]" />
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-center gap-4 sm:gap-6 text-xs text-foreground-muted">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded-md bg-white/5 border border-white/10" />
+            <span>פנוי</span>
           </div>
-          <span>לא זמין</span>
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded-md bg-accent-gold shadow-sm" />
+            <span>נבחר</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded-md bg-white/[0.03] border border-dashed border-white/10" />
+            <span>מחוץ לטווח</span>
+          </div>
         </div>
+        
+        {/* Closure reasons legend - only show if there are closures with reasons */}
+        {visibleClosures.length > 0 && (
+          <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 space-y-2">
+            {visibleClosures.map((closure, index) => (
+              <div key={index} className="flex items-center gap-2 text-xs">
+                <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0" />
+                <span className="text-foreground-muted">
+                  {closure.type === 'shop' ? 'המספרה' : 'הספר'} - {closure.reason}
+                </span>
+                <span className="text-foreground-muted/60 mr-auto">
+                  ({formatDateRange(closure.startDate, closure.endDate)})
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Action Buttons */}
@@ -419,7 +574,10 @@ export function DateSelection({
             <p className="text-foreground-muted text-sm">
               תאריך נבחר:{' '}
               <span className="text-accent-gold font-medium">
-                {selectedDate.dayName} {selectedDate.dayNum}
+                יום {selectedDate.dayName},{' '}
+                {selectedDate.dayNum} {selectedDate.dateTimestamp ? 
+                  HEBREW_MONTHS[new Date(selectedDate.dateTimestamp).getMonth()] : ''}{' '}
+                {selectedDate.dateTimestamp ? new Date(selectedDate.dateTimestamp).getFullYear() : ''}
               </span>
             </p>
           </div>

@@ -20,7 +20,7 @@ import {
 } from 'lucide-react'
 import type { BarbershopSettings } from '@/types/database'
 
-type SectionKey = 'basic' | 'hero' | 'location' | 'contact'
+type SectionKey = 'basic' | 'hero' | 'location' | 'contact' | 'booking'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -65,6 +65,9 @@ export default function SettingsPage() {
   const [showInstagram, setShowInstagram] = useState(true)
   const [showFacebook, setShowFacebook] = useState(true)
   const [showTiktok, setShowTiktok] = useState(false)
+  
+  // Booking settings
+  const [maxBookingDaysAhead, setMaxBookingDaysAhead] = useState(21)
 
   const fetchSettings = useCallback(async () => {
     const supabase = createClient()
@@ -117,6 +120,9 @@ export default function SettingsPage() {
     setShowInstagram(s.show_instagram !== false)
     setShowFacebook(s.show_facebook !== false)
     setShowTiktok(s.show_tiktok === true)
+    
+    // Booking settings
+    setMaxBookingDaysAhead(s.max_booking_days_ahead || 21)
     
     setLoading(false)
   }, [report])
@@ -179,6 +185,9 @@ export default function SettingsPage() {
         show_facebook: showFacebook,
         show_tiktok: showTiktok,
         
+        // Booking settings
+        max_booking_days_ahead: maxBookingDaysAhead,
+        
         updated_at: new Date().toISOString(),
       })
       .eq('id', settings.id)
@@ -222,6 +231,7 @@ export default function SettingsPage() {
     { key: 'hero', title: 'תוכן ראשי', icon: MessageSquare, description: 'כותרות ותיאור בדף הבית' },
     { key: 'location', title: 'מיקום', icon: MapPin, description: 'כתובת, מפה וניווט' },
     { key: 'contact', title: 'יצירת קשר', icon: Globe, description: 'רשתות חברתיות ופרטי קשר' },
+    { key: 'booking', title: 'הגדרות הזמנות', icon: Store, description: 'מגבלות וכללים להזמנת תורים' },
   ]
 
   return (
@@ -416,6 +426,37 @@ export default function SettingsPage() {
                       dir="ltr"
                       placeholder="https://tiktok.com/@..."
                     />
+                  </div>
+                )}
+                
+                {section.key === 'booking' && (
+                  <div className="space-y-4 pt-5">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-foreground-light text-sm">
+                        טווח הזמנה מקסימלי (ימים)
+                      </label>
+                      <p className="text-foreground-muted text-xs">
+                        כמה ימים מראש לקוחות יכולים לקבוע תורים. לדוגמה: 21 ימים = 3 שבועות קדימה
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="number"
+                          min={1}
+                          max={90}
+                          value={maxBookingDaysAhead}
+                          onChange={(e) => setMaxBookingDaysAhead(Math.max(1, Math.min(90, parseInt(e.target.value) || 21)))}
+                          className="w-24 p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-center"
+                        />
+                        <span className="text-foreground-muted">ימים</span>
+                      </div>
+                      <div className="mt-2 p-3 bg-white/5 rounded-xl">
+                        <p className="text-foreground-muted text-xs">
+                          כרגע: לקוחות יכולים לקבוע תורים עד{' '}
+                          <span className="text-accent-gold font-medium">{maxBookingDaysAhead} ימים</span>{' '}
+                          מהיום
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

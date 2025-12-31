@@ -14,7 +14,8 @@ interface BarberProfileClientProps {
   barberMessages?: BarberMessage[]
 }
 
-// Hebrew day names for working days display
+// Hebrew day names for working days display - ordered Sunday to Saturday
+const DAY_ORDER = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 const DAY_NAMES_SHORT: Record<string, string> = {
   sunday: 'א׳',
   monday: 'ב׳',
@@ -55,7 +56,15 @@ export function BarberProfileClient({
   const workingDays = barber.work_days?.filter(d => 
     d.is_working && shopOpenDays.includes(d.day_of_week.toLowerCase())
   ) || []
-  const workingDayNames = workingDays.map(d => DAY_NAMES_SHORT[d.day_of_week.toLowerCase()] || d.day_of_week)
+  
+  // Sort working days by proper day order (Sunday to Saturday)
+  const sortedWorkingDays = [...workingDays].sort((a, b) => {
+    const aIndex = DAY_ORDER.indexOf(a.day_of_week.toLowerCase())
+    const bIndex = DAY_ORDER.indexOf(b.day_of_week.toLowerCase())
+    return aIndex - bIndex
+  })
+  
+  const workingDayNames = sortedWorkingDays.map(d => DAY_NAMES_SHORT[d.day_of_week.toLowerCase()] || d.day_of_week)
 
   // Format working hours
   const workHours = shopSettings?.work_hours_start && shopSettings?.work_hours_end

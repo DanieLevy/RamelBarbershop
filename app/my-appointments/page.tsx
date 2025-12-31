@@ -361,14 +361,26 @@ function MyAppointmentsContent() {
       <main className="relative top-20 sm:top-24 min-h-screen bg-background-dark">
         <div className="container-mobile py-6 sm:py-8 pb-24">
           <div className="max-w-2xl mx-auto">
-            {/* Header */}
-            <div className="mb-6">
-              <h1 className="text-xl sm:text-2xl text-foreground-light font-medium">
-                התורים שלי
-              </h1>
-              <p className="text-foreground-muted text-sm mt-0.5">
-                שלום {customer?.fullname}
-              </p>
+            {/* Header with New Appointment Button */}
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div>
+                <h1 className="text-xl sm:text-2xl text-foreground-light font-medium">
+                  התורים שלי
+                </h1>
+                <p className="text-foreground-muted text-sm mt-0.5">
+                  שלום {customer?.fullname}
+                </p>
+              </div>
+              
+              {/* Quick New Appointment Button */}
+              <button
+                onClick={() => router.push('/')}
+                className="flex items-center gap-1.5 px-3 py-2 bg-accent-gold text-background-dark rounded-xl text-sm font-medium hover:bg-accent-gold/90 transition-all hover:scale-[1.02] shrink-0"
+              >
+                <Calendar size={14} strokeWidth={2} />
+                <span className="hidden sm:inline">תור חדש</span>
+                <span className="sm:hidden">+</span>
+              </button>
             </div>
             
             {/* Tabs - Compact Pills */}
