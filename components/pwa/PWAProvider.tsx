@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import { usePWA, wasInstallDismissed, getVisitCount } from '@/hooks/usePWA'
+import { useBadgeManager } from '@/hooks/useBadgeManager'
 import { InstallBanner } from './InstallBanner'
 import { UpdateModal } from './UpdateModal'
 import { NotificationPermissionModal } from './NotificationPermissionModal'
@@ -35,6 +36,9 @@ interface PWAProviderProps {
 export function PWAProvider({ children }: PWAProviderProps) {
   const pwa = usePWA()
   const [isMounted, setIsMounted] = useState(false)
+  
+  // Badge manager handles clearing badges when app is opened
+  useBadgeManager()
   
   // Ensure PWA components only render on client after mount
   // This prevents hydration issues and SSR errors

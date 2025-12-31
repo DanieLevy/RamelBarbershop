@@ -1,6 +1,6 @@
 // Service Worker for Ramel Barbershop PWA
 // Version is updated automatically during build
-const APP_VERSION = '2.0.0-2025.12.31.2218';
+const APP_VERSION = '2.0.0-2025.12.31.2236';
 const CACHE_NAME = `ramel-pwa-${APP_VERSION}`;
 
 // Assets to cache - critical for app shell and fast loading
@@ -346,8 +346,13 @@ self.addEventListener('notificationclick', (event) => {
 
   // Handle different actions
   if (event.action === 'dismiss') {
-    // User dismissed, just clear badge
-    event.waitUntil(updateBadge(0));
+    // User dismissed, just clear badge and notify clients
+    event.waitUntil(
+      Promise.all([
+        updateBadge(0),
+        notifyClientsNotificationClicked(notificationData)
+      ])
+    );
     return;
   }
 
@@ -356,7 +361,8 @@ self.addEventListener('notificationclick', (event) => {
     event.waitUntil(
       Promise.all([
         updateBadge(0),
-        openOrFocusWindow('/')
+        openOrFocusWindow('/'),
+        notifyClientsNotificationClicked(notificationData)
       ])
     );
     return;
@@ -373,11 +379,12 @@ self.addEventListener('notificationclick', (event) => {
   }
 
   if (event.action === 'view' || !event.action) {
-    // Navigate to the target URL
+    // Navigate to the target URL and notify clients
     event.waitUntil(
       Promise.all([
         updateBadge(0),
-        openOrFocusWindow(targetUrl)
+        openOrFocusWindow(targetUrl),
+        notifyClientsNotificationClicked(notificationData)
       ])
     );
   }
@@ -388,8 +395,35 @@ self.addEventListener('notificationclick', (event) => {
  */
 self.addEventListener('notificationclose', (event) => {
   console.log('[SW] Notification closed');
-  // Optionally track closed notifications
+  // Clear badge when notification is dismissed by swipe
+  event.waitUntil(
+    Promise.all([
+      updateBadge(0),
+      notifyClientsNotificationClicked(event.notification.data || {})
+    ])
+  );
 });
+
+/**
+ * Notify all clients that a notification was clicked/dismissed
+ * This allows the client to mark notifications as read and update UI
+ */
+async function notifyClientsNotificationClicked(notificationData) {
+  const windowClients = await clients.matchAll({
+    type: 'window',
+    includeUncontrolled: true
+  });
+
+  // Post message to all clients
+  for (const client of windowClients) {
+    client.postMessage({
+      type: 'NOTIFICATION_CLICKED',
+      data: notificationData
+    });
+  }
+  
+  console.log('[SW] Notified clients of notification click');
+}
 
 /**
  * Update app badge count (iOS 16.4+, Android)

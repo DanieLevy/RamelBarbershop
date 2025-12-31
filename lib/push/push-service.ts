@@ -240,6 +240,10 @@ class PushNotificationService {
 
   /**
    * Send a typed notification with logging
+   * 
+   * Badge count logic:
+   * - If payload.shouldBadge is true, calculates accurate unread count
+   * - If payload.shouldBadge is false, sends badgeCount: 0 (no badge change)
    */
   private async sendTypedNotification(params: {
     type: NotificationType
@@ -263,7 +267,7 @@ class PushNotificationService {
       }
     }
 
-    // Create log entry
+    // Create log entry (this notification will be unread)
     const logId = await this.createNotificationLog({
       notification_type: type,
       recipient_type: recipientType,
@@ -274,6 +278,21 @@ class PushNotificationService {
       body: payload.body,
       payload: { ...payload.data, ...metadata }
     })
+
+    // Calculate badge count based on shouldBadge flag
+    let badgeCount = 0
+    if (payload.shouldBadge !== false) {
+      // Get current unread count + 1 for this new notification
+      const currentUnread = await this.getUnreadCount(recipientType, recipientId)
+      badgeCount = currentUnread // Already includes this notification since we just created the log entry
+      console.log(`[PushService] Badge count for ${recipientType} ${recipientId}: ${badgeCount}`)
+    }
+
+    // Prepare payload with accurate badge count
+    const payloadWithBadge: NotificationPayload = {
+      ...payload,
+      badgeCount: payload.shouldBadge !== false ? badgeCount : 0
+    }
 
     // Get subscriptions for recipient
     const subscriptions = recipientType === 'customer'
@@ -288,8 +307,8 @@ class PushNotificationService {
       return { success: false, sent: 0, failed: 0, errors: ['No active subscriptions'], logId }
     }
 
-    // Send notifications
-    const result = await this.sendToSubscriptions(subscriptions, payload)
+    // Send notifications with badge count
+    const result = await this.sendToSubscriptions(subscriptions, payloadWithBadge)
 
     // Update log with results
     await this.updateNotificationLog(logId, {
@@ -461,6 +480,52 @@ class PushNotificationService {
   }
 
   // ============================================================
+  // Badge Count Management
+  // ============================================================
+
+  /**
+   * Get unread notification count for a recipient
+   * Only counts notifications where shouldBadge would be true
+   */
+  async getUnreadCount(recipientType: RecipientType, recipientId: string): Promise<number> {
+    const { count, error } = await supabase
+      .from('notification_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('recipient_type', recipientType)
+      .eq('recipient_id', recipientId)
+      .eq('is_read', false)
+      .eq('status', 'sent')
+      // Only count high-priority notification types that show badges
+      .in('notification_type', ['reminder', 'cancellation', 'booking_confirmed'])
+
+    if (error) {
+      console.error('[PushService] Failed to get unread count:', error)
+      return 1 // Default to 1 on error
+    }
+
+    return count || 0
+  }
+
+  /**
+   * Mark all notifications as read for a recipient
+   */
+  async markAllAsRead(recipientType: RecipientType, recipientId: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('notification_logs')
+      .update({ is_read: true })
+      .eq('recipient_type', recipientType)
+      .eq('recipient_id', recipientId)
+      .eq('is_read', false)
+
+    if (error) {
+      console.error('[PushService] Failed to mark notifications as read:', error)
+      return false
+    }
+
+    return true
+  }
+
+  // ============================================================
   // Notification Logging
   // ============================================================
 
@@ -481,7 +546,8 @@ class PushNotificationService {
       .from('notification_logs')
       .insert({
         ...data,
-        status: 'pending'
+        status: 'pending',
+        is_read: false // New notifications start as unread
       })
       .select('id')
       .single()

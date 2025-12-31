@@ -33,6 +33,12 @@ export interface NotificationPayload {
   actions?: Array<{ action: string; title: string; icon?: string }>
   data?: Record<string, unknown>
   badgeCount?: number
+  /**
+   * Whether this notification type should increment the app badge.
+   * High-priority notifications (reminders, cancellations, new bookings) should badge.
+   * Low-priority notifications (broadcasts) should not badge to reduce noise.
+   */
+  shouldBadge?: boolean
 }
 
 // Extended payload with metadata for logging
@@ -113,6 +119,8 @@ export interface NotificationLogRecord {
   error_message: string | null
   created_at: string
   sent_at: string | null
+  /** Whether the notification has been seen/read by the recipient */
+  is_read: boolean
 }
 
 // Send notification result

@@ -239,6 +239,27 @@ function formatHebrewDuration(minutes: number): string {
 }
 
 /**
+ * Get unread notification count for a customer
+ */
+async function getUnreadCount(customerId: string): Promise<number> {
+  const supabase = getSupabase()
+  const { count, error } = await supabase
+    .from('notification_logs')
+    .select('*', { count: 'exact', head: true })
+    .eq('recipient_type', 'customer')
+    .eq('recipient_id', customerId)
+    .eq('is_read', false)
+    .eq('status', 'sent')
+    .in('notification_type', ['reminder', 'cancellation', 'booking_confirmed'])
+
+  if (error) {
+    console.error('[Netlify] Error getting unread count:', error)
+    return 1
+  }
+  return count || 0
+}
+
+/**
  * Send reminder to customer
  */
 async function sendReminder(apt: AppointmentForReminder): Promise<{ sent: number; failed: number; errors: string[] }> {
@@ -255,6 +276,25 @@ async function sendReminder(apt: AppointmentForReminder): Promise<{ sent: number
   const minutesUntil = Math.round((apt.time_timestamp - Date.now()) / 60000)
   const timeText = formatHebrewDuration(minutesUntil)
 
+  // First, create the notification log (so it counts in the badge)
+  const { data: logData } = await supabase.from('notification_logs').insert({
+    notification_type: 'reminder',
+    recipient_type: 'customer',
+    recipient_id: apt.customer_id,
+    reservation_id: apt.id,
+    title: `תזכורת לתור`,
+    body: `תור ל${apt.service_name} עם ${apt.barber_name}`,
+    status: 'pending',
+    is_read: false, // New notifications are unread
+    devices_targeted: subscriptions.length,
+    devices_succeeded: 0,
+    devices_failed: 0
+  }).select('id').single()
+
+  // Get accurate unread count (includes this new notification)
+  const badgeCount = await getUnreadCount(apt.customer_id)
+  console.log(`[Netlify] Badge count for customer ${apt.customer_id}: ${badgeCount}`)
+
   const payload = JSON.stringify({
     notification: {
       title: `⏰ תזכורת: התור שלך בעוד ${timeText}`,
@@ -269,7 +309,7 @@ async function sendReminder(apt: AppointmentForReminder): Promise<{ sent: number
         reservationId: apt.id
       }
     },
-    badgeCount: 1
+    badgeCount: badgeCount || 1 // Fallback to 1 if count is 0
   })
 
   let sent = 0
@@ -302,21 +342,14 @@ async function sendReminder(apt: AppointmentForReminder): Promise<{ sent: number
     }
   }
 
-  // Log the notification
-  if (sent > 0) {
-    await supabase.from('notification_logs').insert({
-      notification_type: 'reminder',
-      recipient_type: 'customer',
-      recipient_id: apt.customer_id,
-      reservation_id: apt.id,
-      title: `תזכורת לתור`,
-      body: `תור ל${apt.service_name} עם ${apt.barber_name}`,
-      status: sent === subscriptions.length ? 'sent' : 'partial',
-      devices_targeted: subscriptions.length,
+  // Update the notification log with results
+  if (logData?.id) {
+    await supabase.from('notification_logs').update({
+      status: sent === subscriptions.length ? 'sent' : sent > 0 ? 'partial' : 'failed',
       devices_succeeded: sent,
       devices_failed: failed,
       sent_at: new Date().toISOString()
-    })
+    }).eq('id', logData.id)
   }
 
   return { sent, failed, errors }

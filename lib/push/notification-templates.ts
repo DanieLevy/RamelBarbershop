@@ -114,6 +114,7 @@ function getReminderTemplate(context: ReminderContext): NotificationPayload {
     tag: `reminder-${context.reservationId}`,
     url: deepLinkUrl,
     requireInteraction: true,
+    shouldBadge: true, // High priority - should show badge
     data: {
       type: 'reminder',
       reservationId: context.reservationId,
@@ -146,6 +147,7 @@ function getCancellationTemplate(context: CancellationContext): NotificationPayl
       tag: `cancel-${context.reservationId}`,
       url: '/barber/dashboard/reservations',
       requireInteraction: true,
+      shouldBadge: true, // High priority - should show badge
       data: {
         type: 'cancellation',
         reservationId: context.reservationId,
@@ -171,6 +173,7 @@ function getCancellationTemplate(context: CancellationContext): NotificationPayl
     tag: `cancel-${context.reservationId}`,
     url: deepLinkUrl,
     requireInteraction: true,
+    shouldBadge: true, // High priority - should show badge
     data: {
       type: 'cancellation',
       reservationId: context.reservationId,
@@ -200,6 +203,7 @@ function getBookingConfirmedTemplate(context: ReminderContext): NotificationPayl
     tag: `booking-${context.reservationId}`,
     url: '/barber/dashboard/reservations',
     requireInteraction: false,
+    shouldBadge: true, // Medium priority - should show badge for barbers
     data: {
       type: 'booking_confirmed',
       reservationId: context.reservationId
@@ -240,6 +244,7 @@ function getChatMessageTemplate(context: { senderName: string; message: string }
 
 /**
  * Barber broadcast template (barber to their customers)
+ * NOTE: Broadcasts do NOT increment badge to reduce noise
  */
 function getBarberBroadcastTemplate(context: BroadcastContext): NotificationPayload {
   return {
@@ -250,6 +255,7 @@ function getBarberBroadcastTemplate(context: BroadcastContext): NotificationPayl
     tag: 'barber-broadcast',
     url: '/',
     requireInteraction: false,
+    shouldBadge: false, // Low priority - informational only, no badge
     data: {
       type: 'barber_broadcast',
       senderId: context.senderId
@@ -263,6 +269,7 @@ function getBarberBroadcastTemplate(context: BroadcastContext): NotificationPayl
 
 /**
  * Admin broadcast template (admin to all users)
+ * NOTE: Broadcasts do NOT increment badge to reduce noise
  */
 function getAdminBroadcastTemplate(context: BroadcastContext): NotificationPayload {
   return {
@@ -273,6 +280,7 @@ function getAdminBroadcastTemplate(context: BroadcastContext): NotificationPaylo
     tag: 'admin-broadcast',
     url: '/',
     requireInteraction: false,
+    shouldBadge: false, // Low priority - informational only, no badge
     data: {
       type: 'admin_broadcast',
       senderId: context.senderId
