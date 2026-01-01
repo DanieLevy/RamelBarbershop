@@ -27,7 +27,7 @@ interface LocationSectionProps {
  * - Parking info
  */
 export function LocationSection({ settings }: LocationSectionProps) {
-  const addressText = settings?.address_text || 'בית הכרם 30, ירושלים'
+  const addressText = settings?.address_text || 'יעקב טהון 13, ירושלים, ישראל'
   const addressLat = settings?.address_lat || 31.7805713
   const addressLng = settings?.address_lng || 35.1886834
   const wazeLink = settings?.waze_link || `https://waze.com/ul?ll=${addressLat}%2C${addressLng}&navigate=yes&zoom=17`

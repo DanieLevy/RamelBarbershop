@@ -2,8 +2,9 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { MapPin, Phone } from 'lucide-react'
+import { MapPin, Phone, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import type { BarbershopSettings } from '@/types/database'
 
 // Social icons
@@ -40,10 +41,11 @@ interface FooterProps {
  * - Safe area padding for bottom nav
  */
 export function Footer({ settings }: FooterProps) {
+  const { isAdmin, isLoggedIn: isBarberLoggedIn } = useBarberAuthStore()
   const currentYear = new Date().getFullYear()
   const shopName = settings?.name || 'רמאל ברברשופ'
   const phone = settings?.contact_phone || settings?.phone || '052-384-0981'
-  const addressText = settings?.address_text || 'בית הכרם 30, ירושלים'
+  const addressText = settings?.address_text || 'יעקב טהון 13, ירושלים, ישראל'
   const whatsappNumber = settings?.contact_whatsapp || '972523840981'
   const instagramUrl = settings?.social_instagram || 'https://www.instagram.com/ram__el_barber_shop/'
   const facebookUrl = settings?.social_facebook || 'https://www.facebook.com/ramel.leusani'
@@ -51,6 +53,7 @@ export function Footer({ settings }: FooterProps) {
   const showWhatsapp = settings?.show_whatsapp !== false
   const showInstagram = settings?.show_instagram !== false
   const showFacebook = settings?.show_facebook !== false
+  const showDebugLink = isBarberLoggedIn && isAdmin
 
   // Build social links
   const socialLinks = []
@@ -154,6 +157,10 @@ export function Footer({ settings }: FooterProps) {
           
           {/* Legal Links - nowrap to prevent breaking */}
           <div className="order-1 sm:order-2 flex items-start justify-start whitespace-nowrap h-[22px]">
+            <Link href="/faq" className="hover:text-accent-gold transition-colors px-1.5">
+              שאלות נפוצות
+            </Link>
+            <span className="text-white/30 mx-1">|</span>
             <Link href="/terms" className="hover:text-accent-gold transition-colors px-1.5">
               תקנון
             </Link>
@@ -175,6 +182,16 @@ export function Footer({ settings }: FooterProps) {
             <Link href="/profile" className="hover:text-accent-gold transition-colors">
               הפרופיל שלי
             </Link>
+            {showDebugLink && (
+              <Link 
+                href="/debug" 
+                className="hover:text-accent-gold transition-colors flex items-center gap-1"
+                title="Debug Console"
+              >
+                <Settings size={12} />
+                <span>Debug</span>
+              </Link>
+            )}
           </div>
         </div>
       </div>

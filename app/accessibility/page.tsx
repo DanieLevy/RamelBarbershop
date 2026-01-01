@@ -139,7 +139,7 @@ export default function AccessibilityPage() {
             <div className="p-4 bg-white/5 rounded-xl">
               <p className="text-foreground-light font-medium">רכז נגישות</p>
               <p className="text-foreground-muted mt-2">רמאל ברברשופ</p>
-              <p className="text-foreground-muted">בית הכרם 30, ירושלים</p>
+              <p className="text-foreground-muted">יעקב טהון 13, ירושלים, ישראל</p>
               <p className="text-foreground-muted">טלפון: 052-384-0981</p>
             </div>
           </section>

@@ -47,9 +47,9 @@ export function LogoutModal({ isOpen, onClose, onConfirm, isLoading }: LogoutMod
           </div>
           
           <div className="flex items-start gap-3 text-sm">
-            <Calendar size={16} className="text-green-400 mt-0.5 flex-shrink-0" />
+            <Calendar size={16} className="text-amber-400 mt-0.5 flex-shrink-0" />
             <p className="text-foreground-muted">
-              <span className="text-green-400">עדיין תוכל להזמין תורים</span> כאורח
+              <span className="text-amber-400">לא תוכל לקבוע תורים</span> עד שתתחבר מחדש
             </p>
           </div>
           

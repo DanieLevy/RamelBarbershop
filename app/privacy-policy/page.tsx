@@ -191,7 +191,7 @@ export default function PrivacyPolicyPage() {
             </p>
             <div className="mt-3 p-4 bg-white/5 rounded-xl">
               <p className="text-foreground-light font-medium">רמאל ברברשופ</p>
-              <p className="text-foreground-muted mt-1">בית הכרם 30, ירושלים</p>
+              <p className="text-foreground-muted mt-1">יעקב טהון 13, ירושלים, ישראל</p>
               <p className="text-foreground-muted">טלפון: 052-384-0981</p>
             </div>
           </section>

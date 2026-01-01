@@ -310,7 +310,7 @@ export default function SettingsPage() {
                       label="כתובת מלאה" 
                       value={addressText} 
                       onChange={setAddressText}
-                      placeholder="רחוב הנביאים 15, ירושלים"
+                      placeholder="יעקב טהון 13, ירושלים, ישראל"
                     />
                     
                     <div className="grid grid-cols-2 gap-4">

@@ -53,7 +53,7 @@ export default function TermsPage() {
             <h2 className="text-lg font-medium text-accent-gold mb-3">2. הגדרות</h2>
             <ul className="text-foreground-muted list-disc list-inside mr-4 space-y-2">
               <li><strong className="text-foreground-light">&quot;האתר&quot;</strong> - אתר האינטרנט של רמאל ברברשופ</li>
-              <li><strong className="text-foreground-light">&quot;המספרה&quot; / &quot;אנחנו&quot;</strong> - רמאל ברברשופ, בית הכרם 30, ירושלים</li>
+              <li><strong className="text-foreground-light">&quot;המספרה&quot; / &quot;אנחנו&quot;</strong> - רמאל ברברשופ, יעקב טהון 13, ירושלים, ישראל</li>
               <li><strong className="text-foreground-light">&quot;משתמש&quot;</strong> - כל אדם הגולש או משתמש באתר</li>
               <li><strong className="text-foreground-light">&quot;שירותים&quot;</strong> - שירותי קביעת תורים, צפייה במידע ושירותים נלווים</li>
             </ul>
@@ -64,7 +64,7 @@ export default function TermsPage() {
             <h2 className="text-lg font-medium text-accent-gold mb-3">3. פרטי בעל האתר</h2>
             <div className="p-4 bg-white/5 rounded-xl text-foreground-muted">
               <p><strong className="text-foreground-light">שם העסק:</strong> רמאל ברברשופ</p>
-              <p><strong className="text-foreground-light">כתובת:</strong> בית הכרם 30, ירושלים</p>
+              <p><strong className="text-foreground-light">כתובת:</strong> יעקב טהון 13, ירושלים, ישראל</p>
               <p><strong className="text-foreground-light">טלפון:</strong> 052-384-0981</p>
               <p className="text-xs mt-2 text-foreground-muted/70">
                 [מספר ע.מ./ח.פ. יתעדכן בהמשך]
@@ -209,7 +209,7 @@ export default function TermsPage() {
             </p>
             <div className="mt-3 p-4 bg-white/5 rounded-xl">
               <p className="text-foreground-light font-medium">רמאל ברברשופ</p>
-              <p className="text-foreground-muted mt-1">בית הכרם 30, ירושלים</p>
+              <p className="text-foreground-muted mt-1">יעקב טהון 13, ירושלים, ישראל</p>
               <p className="text-foreground-muted">טלפון: 052-384-0981</p>
             </div>
           </section>
