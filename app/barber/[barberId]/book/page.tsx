@@ -13,7 +13,11 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
   const { barberId } = await params
   const { service: preSelectedServiceId } = await searchParams
   const supabase = await createClient()
-  const todayStr = new Date().toISOString().split('T')[0]
+  
+  // Format today's date in LOCAL timezone (not UTC!) for closure filtering
+  // toISOString() uses UTC which can cause off-by-one errors
+  const now = new Date()
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   
   // Fetch all data in parallel for optimal performance
   const [

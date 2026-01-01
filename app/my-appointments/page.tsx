@@ -9,14 +9,13 @@ import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { AppointmentDetailModal } from '@/components/barber/AppointmentDetailModal'
 import { toast } from 'sonner'
-import { cn, formatTime as formatTimeUtil } from '@/lib/utils'
+import { cn, formatTime as formatTimeUtil, timestampToIsraelDate, nowInIsrael, isSameDayInIsrael } from '@/lib/utils'
 import { Calendar, Scissors, User, X, History, ChevronRight, LogIn, Info, AlertCircle } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { ReservationWithDetails } from '@/types/database'
 import { LoginModal } from '@/components/LoginModal'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { useHaptics } from '@/hooks/useHaptics'
-import { isSameDay, addDays } from 'date-fns'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { cancelReservation } from '@/lib/services/booking.service'
 
@@ -259,14 +258,14 @@ function MyAppointmentsContent() {
     return reservation.status === 'cancelled'
   }
 
-  // Smart date/time display
+  // Smart date/time display - using Israel timezone
   const getSmartDateTime = (timestamp: number): { date: string; time: string; isToday: boolean } => {
     const normalizedTs = normalizeTimestamp(timestamp)
-    const resDate = new Date(normalizedTs)
-    const today = new Date()
-    const tomorrow = addDays(today, 1)
-    const isToday = isSameDay(resDate, today)
-    const isTomorrow = isSameDay(resDate, tomorrow)
+    const resDate = timestampToIsraelDate(normalizedTs)
+    const today = nowInIsrael()
+    const tomorrowMs = today.getTime() + 24 * 60 * 60 * 1000
+    const isToday = isSameDayInIsrael(normalizedTs, today.getTime())
+    const isTomorrow = isSameDayInIsrael(normalizedTs, tomorrowMs)
     
     let dateStr = ''
     if (isToday) dateStr = 'היום'

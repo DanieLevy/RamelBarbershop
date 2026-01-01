@@ -105,11 +105,15 @@ export function DateSelection({
       const dayOfWeek = current.getDay()
       const currentStartMs = getIsraelDayStart(current)
       
+      // Format date as YYYY-MM-DD in LOCAL timezone (not UTC!)
+      // toISOString() uses UTC which causes off-by-one errors in Israel timezone
+      const localDateString = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`
+      
       days.push({
         date: new Date(current),
         dayNum: current.getDate(),
         dayKey: DAY_KEYS[dayOfWeek],
-        dateString: current.toISOString().split('T')[0],
+        dateString: localDateString,
         dateTimestamp: currentStartMs, // Use Israel day start
         isCurrentMonth: current.getMonth() === month,
         isToday: currentStartMs === todayStartMs,
@@ -248,9 +252,9 @@ export function DateSelection({
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
   }
 
-  // Check if can go to previous month
+  // Check if can go to previous month - use Israel timezone for accurate month check
   const canGoPrev = useMemo(() => {
-    const now = new Date()
+    const now = nowInIsrael()
     return currentMonth.getMonth() > now.getMonth() || currentMonth.getFullYear() > now.getFullYear()
   }, [currentMonth])
 

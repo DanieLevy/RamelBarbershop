@@ -1,6 +1,6 @@
 'use client'
 
-import { cn, formatTime as formatTimeUtil } from '@/lib/utils'
+import { cn, formatTime as formatTimeUtil, timestampToIsraelDate, nowInIsrael, isSameDayInIsrael } from '@/lib/utils'
 import { Phone, X, Clock, Scissors, User, AlertCircle } from 'lucide-react'
 import type { Reservation, Service, User as UserType } from '@/types/database'
 
@@ -32,18 +32,17 @@ export function CompactAppointmentCard({
   const isPast = reservation.time_timestamp < now
   const isCancelled = reservation.status === 'cancelled'
 
-  // Format smart date/time
+  // Format smart date/time - using Israel timezone
   const formatSmartDateTime = (timestamp: number): string => {
-    const date = new Date(timestamp)
-    const today = new Date()
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
+    const date = timestampToIsraelDate(timestamp)
+    const today = nowInIsrael()
+    const tomorrowMs = today.getTime() + 24 * 60 * 60 * 1000
 
     const timeStr = formatTimeUtil(timestamp)
 
-    if (date.toDateString() === today.toDateString()) {
+    if (isSameDayInIsrael(timestamp, today.getTime())) {
       return `היום ${timeStr}`
-    } else if (date.toDateString() === tomorrow.toDateString()) {
+    } else if (isSameDayInIsrael(timestamp, tomorrowMs)) {
       return `מחר ${timeStr}`
     } else {
       const day = date.getDate().toString().padStart(2, '0')

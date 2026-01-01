@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useAuthStore } from '@/store/useAuthStore'
 import { createClient } from '@/lib/supabase/client'
-import { cn, formatTime } from '@/lib/utils'
-import { isSameDay, addDays } from 'date-fns'
+import { cn, formatTime, timestampToIsraelDate, nowInIsrael, isSameDayInIsrael } from '@/lib/utils'
 import { Calendar, Clock, ChevronLeft, Scissors } from 'lucide-react'
 import type { Reservation, Service, User } from '@/types/database'
 
@@ -86,15 +85,15 @@ export function UpcomingAppointmentBanner() {
     return null
   }
 
-  // Format smart date
+  // Format smart date - using Israel timezone
   const getSmartDate = (timestamp: number): string => {
-    const date = new Date(timestamp)
-    const today = new Date()
-    const tomorrow = addDays(today, 1)
+    const date = timestampToIsraelDate(timestamp)
+    const today = nowInIsrael()
+    const tomorrowMs = today.getTime() + 24 * 60 * 60 * 1000
     
-    if (isSameDay(date, today)) {
+    if (isSameDayInIsrael(timestamp, today.getTime())) {
       return 'היום'
-    } else if (isSameDay(date, tomorrow)) {
+    } else if (isSameDayInIsrael(timestamp, tomorrowMs)) {
       return 'מחר'
     } else {
       return date.toLocaleDateString('he-IL', { weekday: 'short', day: 'numeric', month: 'short' })
@@ -103,7 +102,7 @@ export function UpcomingAppointmentBanner() {
 
   const smartDate = getSmartDate(nextAppointment.time_timestamp)
   const timeStr = formatTime(nextAppointment.time_timestamp)
-  const isToday = isSameDay(new Date(nextAppointment.time_timestamp), new Date())
+  const isToday = isSameDayInIsrael(nextAppointment.time_timestamp, nowInIsrael().getTime())
 
   // Hide completely when scrolled
   if (scrollProgress >= 1) {
