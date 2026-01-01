@@ -54,7 +54,7 @@ export default async function BarberPage({ params }: BarberPageProps) {
     <>
       <AppHeader barberImgUrl={barber.img_url || undefined} />
       
-      <main className="min-h-screen bg-background-dark">
+      <main id="main-content" tabIndex={-1} className="min-h-screen bg-background-dark outline-none">
         <BarberProfileClient 
           barber={barber} 
           services={services || []} 

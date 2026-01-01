@@ -86,7 +86,9 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
       
       {/* Main content - safe area handled via CSS variable */}
       <main 
-        className="min-h-screen bg-background-dark pb-24"
+        id="main-content"
+        tabIndex={-1}
+        className="min-h-screen bg-background-dark pb-24 outline-none"
         style={{
           // Account for header + safe area
           paddingTop: 'calc(var(--header-top-offset, 0px) + 4rem)',

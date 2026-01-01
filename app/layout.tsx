@@ -7,6 +7,8 @@ import { MobileBottomNav } from '@/components/ui/MobileBottomNav'
 import { PWAProvider } from '@/components/pwa/PWAProvider'
 import { PWAHead } from '@/components/pwa/PWAHead'
 import ErrorBoundary from '@/components/ErrorBoundary'
+import { CookieNotice } from '@/components/legal/CookieNotice'
+import { SkipLink } from '@/components/a11y/SkipLink'
 
 export const metadata: Metadata = {
   title: 'רמאל ברברשופ - Ramel Barbershop',
@@ -52,6 +54,7 @@ export default function RootLayout({
         <PWAHead />
       </head>
       <body className="min-h-screen bg-background-dark" suppressHydrationWarning>
+        <SkipLink />
         <Providers>
           <AuthProvider>
             <PWAProvider>
@@ -59,6 +62,7 @@ export default function RootLayout({
                 {children}
               </ErrorBoundary>
               <MobileBottomNav />
+              <CookieNotice />
             </PWAProvider>
           </AuthProvider>
           <Toaster

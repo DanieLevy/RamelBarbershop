@@ -9,6 +9,16 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'gcdnb.pbrd.co' },
     ],
   },
+  // Turbopack configuration to resolve lockfile warning
+  turbopack: {
+    root: process.cwd(),
+  },
+  // Suppress known streaming errors in development
+  logging: {
+    fetches: {
+      fullUrl: false,
+    },
+  },
 }
 
 export default nextConfig

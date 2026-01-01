@@ -43,7 +43,9 @@ export default async function ProductPage({ params }: ProductPageProps) {
       <AppHeader />
       
       <main 
-        className="min-h-screen bg-background-dark"
+        id="main-content"
+        tabIndex={-1}
+        className="min-h-screen bg-background-dark outline-none"
         style={{
           paddingTop: 'calc(var(--header-top-offset, 0px) + 5rem)',
         }}

@@ -45,7 +45,7 @@ export default async function HomePage() {
         <UpcomingAppointmentBanner />
       </div>
       
-      <main className="relative">
+      <main id="main-content" tabIndex={-1} className="relative outline-none">
         {/* Hero Section - Full viewport with animated reveal */}
         <HeroSection 
           title={settings?.hero_title || 'רמאל ברברשופ'}

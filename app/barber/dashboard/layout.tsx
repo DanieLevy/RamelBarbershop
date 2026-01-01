@@ -127,7 +127,9 @@ export default function DashboardLayout({
         
         {/* Main content with smooth scrolling */}
         <main 
-          className="flex-1 overflow-auto min-h-screen"
+          id="main-content"
+          tabIndex={-1}
+          className="flex-1 overflow-auto min-h-screen outline-none"
           style={{
             WebkitOverflowScrolling: 'touch',
           }}

@@ -149,9 +149,26 @@ export function Footer({ settings }: FooterProps) {
 
       {/* Bottom bar */}
       <div className="border-t border-white/5">
-        <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-foreground-muted">
-          <p>© {currentYear} {shopName}. כל הזכויות שמורות.</p>
-          <div className="flex items-center gap-4">
+        <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-foreground-muted">
+          <p className="order-3 sm:order-1">© {currentYear} {shopName}. כל הזכויות שמורות.</p>
+          
+          {/* Legal Links - nowrap to prevent breaking */}
+          <div className="order-1 sm:order-2 flex items-start justify-start whitespace-nowrap h-[22px]">
+            <Link href="/terms" className="hover:text-accent-gold transition-colors px-1.5">
+              תקנון
+            </Link>
+            <span className="text-white/30 mx-1">|</span>
+            <Link href="/privacy-policy" className="hover:text-accent-gold transition-colors px-1.5">
+              פרטיות
+            </Link>
+            <span className="text-white/30 mx-1">|</span>
+            <Link href="/accessibility" className="hover:text-accent-gold transition-colors px-1.5">
+              נגישות
+            </Link>
+          </div>
+          
+          {/* User Links */}
+          <div className="order-2 sm:order-3 flex items-center gap-4">
             <Link href="/my-appointments" className="hover:text-accent-gold transition-colors">
               התורים שלי
             </Link>

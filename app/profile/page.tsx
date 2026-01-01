@@ -169,7 +169,7 @@ export default function ProfilePage() {
     <>
       <AppHeader />
       
-      <main className="relative top-20 sm:top-24 min-h-screen bg-background-dark">
+      <main id="main-content" tabIndex={-1} className="relative top-20 sm:top-24 min-h-screen bg-background-dark outline-none">
         <div className="container-mobile py-6 sm:py-8 pb-24">
           <div className="max-w-md mx-auto">
             {/* Profile Header */}

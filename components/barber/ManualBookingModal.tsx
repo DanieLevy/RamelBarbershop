@@ -294,22 +294,26 @@ export function ManualBookingModal({
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="relative w-full sm:max-w-lg sm:mx-4 bg-background-darker sm:bg-background-dark border-t sm:border border-white/10 sm:rounded-2xl rounded-t-2xl p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto animate-slide-in-up sm:animate-fade-in">
         {/* Header */}
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-lg font-medium text-foreground-light">הוספת תור ידני</h3>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-medium text-foreground-light">הוספת תור ידני</h3>
+            <p className="text-foreground-muted text-xs mt-0.5">רישום תור על-ידי הספר</p>
+          </div>
           <button
             onClick={onClose}
             className="p-2 rounded-full hover:bg-white/5 transition-colors"
+            aria-label="סגור"
           >
             <X size={20} className="text-foreground-muted" />
           </button>
         </div>
 
         {/* Mode Toggle */}
-        <div className="flex gap-2 mb-5 p-1 bg-white/[0.03] rounded-xl">
+        <div className="flex gap-2 mb-4 p-1 bg-white/[0.03] rounded-xl">
           <button
             onClick={() => setMode('existing')}
             className={cn(
-              'flex-1 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2',
+              'flex-1 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2',
               mode === 'existing'
                 ? 'bg-accent-gold text-background-dark'
                 : 'text-foreground-muted hover:text-foreground-light'
@@ -321,25 +325,40 @@ export function ManualBookingModal({
           <button
             onClick={() => setMode('walkin')}
             className={cn(
-              'flex-1 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2',
+              'flex-1 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2',
               mode === 'walkin'
                 ? 'bg-accent-gold text-background-dark'
                 : 'text-foreground-muted hover:text-foreground-light'
             )}
           >
             <UserPlus size={16} />
-            Walk-in
+            לקוח חדש
           </button>
+        </div>
+        
+        {/* Mode Info */}
+        <div className={cn(
+          'mb-4 p-3 rounded-xl text-xs',
+          mode === 'existing' 
+            ? 'bg-green-500/10 border border-green-500/20 text-green-400'
+            : 'bg-orange-500/10 border border-orange-500/20 text-orange-400'
+        )}>
+          {mode === 'existing' ? (
+            <p>לקוח קיים יקבל התראות ותזכורות לתור.</p>
+          ) : (
+            <p>לקוח חדש ללא רישום במערכת - לא יקבל התראות או תזכורות. מתאים ללקוחות שהגיעו ישירות למספרה.</p>
+          )}
         </div>
 
         <div className="space-y-4">
           {/* Customer Selection / Walk-in Name */}
           {mode === 'existing' ? (
             <div className="flex flex-col gap-2">
-              <label className="text-foreground-light text-sm">חיפוש לקוח</label>
+              <label htmlFor="customer-search" className="text-foreground-light text-sm">חיפוש לקוח</label>
               <div className="relative">
                 <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
                 <input
+                  id="customer-search"
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -397,8 +416,9 @@ export function ManualBookingModal({
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              <label className="text-foreground-light text-sm">שם הלקוח (Walk-in)</label>
+              <label htmlFor="walkin-name" className="text-foreground-light text-sm">שם הלקוח</label>
               <input
+                id="walkin-name"
                 type="text"
                 value={walkinName}
                 onChange={(e) => setWalkinName(e.target.value)}
@@ -460,6 +480,7 @@ export function ManualBookingModal({
               </button>
               <input
                 type="date"
+                aria-label="בחר תאריך"
                 value={format(selectedDate, 'yyyy-MM-dd')}
                 onChange={(e) => {
                   const date = e.target.value ? new Date(e.target.value) : israelNow

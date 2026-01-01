@@ -782,10 +782,11 @@ export default function ReservationsPage() {
                           preselectedTime: item.timestamp
                         })
                       }}
-                      className="p-1.5 rounded-lg bg-white/[0.05] text-foreground-muted/50 hover:bg-accent-gold/20 hover:text-accent-gold transition-colors opacity-0 group-hover:opacity-100"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/[0.05] text-foreground-muted/50 hover:bg-accent-gold/20 hover:text-accent-gold transition-colors opacity-0 group-hover:opacity-100"
                       title="הוסף תור"
+                      aria-label="הוסף תור"
                     >
-                      <Plus size={14} strokeWidth={2} />
+                      <Plus size={16} strokeWidth={2} />
                     </button>
                   </div>
                 )

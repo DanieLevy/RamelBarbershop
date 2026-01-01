@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
@@ -27,6 +28,7 @@ interface UpcomingReservation extends Reservation {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const { barber, isAdmin } = useBarberAuthStore()
   const { report } = useBugReporter('DashboardPage')
   const [stats, setStats] = useState<DashboardStats>({
@@ -224,10 +226,13 @@ export default function DashboardPage() {
               const smartDate = getSmartDateTime(res.time_timestamp)
               
               return (
-                <Link
+                <div
                   key={res.id}
-                  href="/barber/dashboard/reservations"
+                  onClick={() => router.push('/barber/dashboard/reservations')}
                   className="flex items-center gap-3 px-3 sm:px-4 py-3 hover:bg-white/[0.03] transition-colors cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && router.push('/barber/dashboard/reservations')}
                 >
                   {/* Time Display - Before indicator */}
                   <div className="flex flex-col items-center shrink-0 w-12">
@@ -267,7 +272,7 @@ export default function DashboardPage() {
                   >
                     <Phone size={16} strokeWidth={1.5} className="text-accent-gold" />
                   </a>
-                </Link>
+                </div>
               )
             })}
           </div>

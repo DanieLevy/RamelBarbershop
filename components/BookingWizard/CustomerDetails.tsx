@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useBookingStore } from '@/store/useBookingStore'
 import { cn } from '@/lib/utils'
 import { TEST_USER } from '@/lib/firebase/config'
 import { findCustomerByPhone } from '@/lib/services/customer.service'
-import { Loader2, User, CheckCircle } from 'lucide-react'
+import { Loader2, User, CheckCircle, Check } from 'lucide-react'
 
 type Step = 'phone' | 'name'
 
@@ -17,6 +18,7 @@ export function CustomerDetails() {
   const [existingCustomerName, setExistingCustomerName] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [privacyConsent, setPrivacyConsent] = useState(false)
   
   // Helper to fill test user phone
   const fillTestPhone = () => {
@@ -77,6 +79,10 @@ export function CustomerDetails() {
   const handleNameSubmit = () => {
     if (!fullname.trim()) {
       setError('נא להזין שם מלא')
+      return
+    }
+    if (!privacyConsent) {
+      setError('יש לאשר את מדיניות הפרטיות')
       return
     }
     
@@ -231,15 +237,51 @@ export function CustomerDetails() {
             placeholder="הזן את שמך המלא"
             className={cn(
               'w-full p-3.5 rounded-xl bg-background-card border text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold transition-all text-base',
-              error ? 'border-red-400' : 'border-white/10'
+              error && !fullname.trim() ? 'border-red-400' : 'border-white/10'
             )}
             onKeyDown={(e) => e.key === 'Enter' && handleNameSubmit()}
             autoFocus
           />
-          {error && (
-            <span className="text-red-400 text-xs">{error}</span>
-          )}
         </div>
+        
+        {/* Privacy Consent Checkbox */}
+        <label className="flex items-start gap-3 cursor-pointer group">
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={privacyConsent}
+            onClick={() => {
+              setPrivacyConsent(!privacyConsent)
+              setError(null)
+            }}
+            className={cn(
+              'w-5 h-5 rounded border flex items-center justify-center shrink-0 mt-0.5 transition-all',
+              privacyConsent
+                ? 'bg-accent-gold border-accent-gold'
+                : error && !privacyConsent
+                  ? 'border-red-400 bg-transparent'
+                  : 'border-white/30 bg-transparent group-hover:border-white/50'
+            )}
+          >
+            {privacyConsent && <Check size={14} className="text-background-dark" strokeWidth={3} />}
+          </button>
+          <span className="text-foreground-muted text-sm leading-relaxed">
+            אני מסכים/ה ל
+            <Link 
+              href="/privacy-policy" 
+              target="_blank"
+              className="text-accent-gold hover:underline mx-1"
+              onClick={(e) => e.stopPropagation()}
+            >
+              מדיניות הפרטיות
+            </Link>
+            ולקבלת הודעות תזכורת בנוגע לתורים
+          </span>
+        </label>
+        
+        {error && (
+          <span className="text-red-400 text-xs">{error}</span>
+        )}
       </div>
       
       <button
