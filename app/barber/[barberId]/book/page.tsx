@@ -69,7 +69,8 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
   ])
   
   const barber = barberResult.data as BarberWithWorkDays | null
-  if (barberResult.error || !barber) {
+  // Block access if barber not found or is paused/inactive
+  if (barberResult.error || !barber || !barber.is_active) {
     notFound()
   }
   

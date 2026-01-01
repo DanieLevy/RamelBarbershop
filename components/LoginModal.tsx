@@ -155,7 +155,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         setStep('otp')
         setCountdown(60)
         haptics.light() // Haptic feedback for OTP sent
-        if (result.isDebugUser) {
+        if (process.env.NODE_ENV === 'development' && result.isDebugUser) {
           toast.success('מצב בדיקה - קוד: ' + TEST_USER.otpCode)
         } else {
           toast.success('קוד אימות נשלח!')
@@ -374,8 +374,8 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           </div>
         )}
         
-        {/* Debug Choice Step */}
-        {step === 'debug-choice' && (
+        {/* Debug Choice Step - only in development */}
+        {process.env.NODE_ENV === 'development' && step === 'debug-choice' && (
           <div className="flex flex-col gap-4">
             <p className="text-foreground-muted text-sm text-center">
               זוהה משתמש בדיקה. איך תרצה להמשיך?
@@ -432,8 +432,8 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               קוד אימות נשלח ל-{phone}
             </p>
             
-            {/* Test user hint */}
-            {isTestUser(phone) && (
+            {/* Test user hint - only in development */}
+            {process.env.NODE_ENV === 'development' && isTestUser(phone) && (
               <div className="px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                 <p className="text-blue-400 text-xs text-center">
                   🧪 משתמש בדיקה - הקוד הוא: <span className="font-mono font-bold">{TEST_USER.otpCode}</span>

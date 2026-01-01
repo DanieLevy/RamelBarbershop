@@ -45,6 +45,7 @@ export type BookingErrorCode =
   | 'CUSTOMER_DOUBLE_BOOKING'
   | 'MAX_BOOKINGS_REACHED'
   | 'DATE_OUT_OF_RANGE'
+  | 'BARBER_PAUSED'
   | 'VALIDATION_ERROR'
   | 'DATABASE_ERROR'
   | 'UNKNOWN_ERROR'
@@ -67,6 +68,7 @@ const ERROR_MESSAGES: Record<BookingErrorCode, string> = {
   CUSTOMER_DOUBLE_BOOKING: 'כבר יש לך תור בשעה זו.',
   MAX_BOOKINGS_REACHED: 'הגעת למקסימום התורים המותרים. בטל תור קיים כדי לקבוע חדש.',
   DATE_OUT_OF_RANGE: 'התאריך שנבחר חורג מטווח ההזמנות המותר.',
+  BARBER_PAUSED: 'הספר אינו זמין כרגע לקביעת תורים.',
   VALIDATION_ERROR: 'חסרים נתונים ליצירת התור.',
   DATABASE_ERROR: 'שגיאה ביצירת התור. נסה שוב.',
   UNKNOWN_ERROR: 'שגיאה בלתי צפויה. נסה שוב.',
@@ -484,6 +486,9 @@ function parseBookingError(errorMessage: string): BookingErrorCode {
   }
   if (errorMessage.includes('DATE_OUT_OF_RANGE')) {
     return 'DATE_OUT_OF_RANGE'
+  }
+  if (errorMessage.includes('BARBER_PAUSED')) {
+    return 'BARBER_PAUSED'
   }
   return 'DATABASE_ERROR'
 }

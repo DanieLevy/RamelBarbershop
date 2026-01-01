@@ -104,7 +104,7 @@ export function CompactAppointmentCard({
           <div className="flex items-center gap-1 mt-1.5 text-xs text-red-400/80">
             <AlertCircle className="w-3 h-3" />
             <span>
-              בוטל ע&quot;י {reservation.cancelled_by === 'barber' ? 'הספר' : 'הלקוח'}
+              בוטל ע״י {reservation.cancelled_by === 'barber' ? 'הספר' : 'הלקוח'}
             </span>
           </div>
         )}

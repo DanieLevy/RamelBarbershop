@@ -43,6 +43,13 @@ export default function BarbersPage() {
     confirmName: string
   }>({ isOpen: false, step: 1, barber: null, confirmName: '' })
   const [deleting, setDeleting] = useState(false)
+  
+  // Self-pause confirmation state
+  const [selfPauseModal, setSelfPauseModal] = useState<{
+    isOpen: boolean
+    action: 'pause' | 'unpause'
+  }>({ isOpen: false, action: 'pause' })
+  const [selfPausing, setSelfPausing] = useState(false)
 
   const fetchBarbers = useCallback(async () => {
     try {
@@ -306,8 +313,12 @@ export default function BarbersPage() {
   }
 
   const handleToggleActive = async (barber: UserType) => {
+    // If toggling self (admin), show confirmation modal
     if (barber.id === currentBarber?.id) {
-      toast.error('לא ניתן להשבית את עצמך')
+      setSelfPauseModal({
+        isOpen: true,
+        action: barber.is_active ? 'pause' : 'unpause'
+      })
       return
     }
     
@@ -319,6 +330,26 @@ export default function BarbersPage() {
     } else {
       toast.error('שגיאה בעדכון')
     }
+  }
+  
+  // Handle self-pause confirmation
+  const handleSelfPauseConfirm = async () => {
+    if (!currentBarber) return
+    
+    setSelfPausing(true)
+    
+    const newActiveState = selfPauseModal.action === 'unpause'
+    const result = await updateBarber(currentBarber.id, { is_active: newActiveState })
+    
+    if (result.success) {
+      toast.success(newActiveState ? 'החשבון שלך הופעל מחדש' : 'החשבון שלך הושבת - לקוחות לא יוכלו לקבוע תורים אצלך')
+      fetchBarbers()
+      setSelfPauseModal({ isOpen: false, action: 'pause' })
+    } else {
+      toast.error('שגיאה בעדכון')
+    }
+    
+    setSelfPausing(false)
   }
 
   if (!isAdmin) return null
@@ -526,27 +557,27 @@ export default function BarbersPage() {
                     >
                       <Pencil size={14} strokeWidth={1.5} />
                     </button>
+                    {/* Pause/Unpause button - shown for all barbers including self */}
+                    <button
+                      onClick={() => handleToggleActive(barber)}
+                      className={cn(
+                        'px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-medium transition-colors',
+                        barber.is_active
+                          ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
+                          : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
+                      )}
+                    >
+                      {barber.is_active ? 'השבת' : 'הפעל'}
+                    </button>
+                    {/* Delete button - only for other barbers, not self */}
                     {barber.id !== currentBarber?.id && (
-                      <>
-                        <button
-                          onClick={() => handleToggleActive(barber)}
-                          className={cn(
-                            'px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-medium transition-colors',
-                            barber.is_active
-                              ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
-                              : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
-                          )}
-                        >
-                          {barber.is_active ? 'השבת' : 'הפעל'}
-                        </button>
-                        <button
-                          onClick={() => setDeleteModal({ isOpen: true, step: 1, barber, confirmName: '' })}
-                          className="icon-btn p-2 text-foreground-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                          title="מחק ספר"
-                        >
-                          <Trash2 size={14} strokeWidth={1.5} />
-                        </button>
-                      </>
+                      <button
+                        onClick={() => setDeleteModal({ isOpen: true, step: 1, barber, confirmName: '' })}
+                        className="icon-btn p-2 text-foreground-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                        title="מחק ספר"
+                      >
+                        <Trash2 size={14} strokeWidth={1.5} />
+                      </button>
                     )}
                   </div>
                 </div>
@@ -681,6 +712,105 @@ export default function BarbersPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Self-Pause Confirmation Modal */}
+      {selfPauseModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-md bg-background-darker border border-white/10 rounded-2xl p-6 shadow-2xl animate-slide-in-up">
+            {/* Close button */}
+            <button
+              onClick={() => setSelfPauseModal({ isOpen: false, action: 'pause' })}
+              className="absolute top-4 left-4 p-2 rounded-full hover:bg-white/5 transition-colors"
+            >
+              <X size={18} className="text-foreground-muted" />
+            </button>
+
+            <div className="flex flex-col gap-5">
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  'w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0',
+                  selfPauseModal.action === 'pause' ? 'bg-amber-500/20' : 'bg-green-500/20'
+                )}>
+                  <AlertTriangle className={cn(
+                    'w-6 h-6',
+                    selfPauseModal.action === 'pause' ? 'text-amber-400' : 'text-green-400'
+                  )} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium text-foreground-light">
+                    {selfPauseModal.action === 'pause' ? 'השבתת החשבון שלך' : 'הפעלת החשבון שלך'}
+                  </h3>
+                  <p className="text-foreground-muted text-sm">
+                    {currentBarber?.fullname}
+                  </p>
+                </div>
+              </div>
+
+              <div className={cn(
+                'p-4 rounded-xl border',
+                selfPauseModal.action === 'pause' 
+                  ? 'bg-amber-500/10 border-amber-500/20' 
+                  : 'bg-green-500/10 border-green-500/20'
+              )}>
+                {selfPauseModal.action === 'pause' ? (
+                  <>
+                    <p className="text-foreground-light text-sm">
+                      האם אתה בטוח שברצונך להשבית את החשבון שלך?
+                    </p>
+                    <ul className="mt-3 space-y-1.5 text-foreground-muted text-xs">
+                      <li>• לא תופיע בדף הבית ללקוחות</li>
+                      <li>• לקוחות לא יוכלו לקבוע תורים חדשים</li>
+                      <li>• התורים הקיימים שלך יישארו פעילים</li>
+                      <li>• תוכל להפעיל מחדש בכל עת</li>
+                    </ul>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-foreground-light text-sm">
+                      האם אתה בטוח שברצונך להפעיל מחדש את החשבון שלך?
+                    </p>
+                    <ul className="mt-3 space-y-1.5 text-foreground-muted text-xs">
+                      <li>• תופיע שוב בדף הבית ללקוחות</li>
+                      <li>• לקוחות יוכלו לקבוע תורים חדשים</li>
+                    </ul>
+                  </>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSelfPauseConfirm}
+                  disabled={selfPausing}
+                  className={cn(
+                    'flex-1 py-3 rounded-xl font-medium transition-colors text-center',
+                    selfPausing
+                      ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
+                      : selfPauseModal.action === 'pause'
+                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30'
+                        : 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30'
+                  )}
+                >
+                  {selfPausing ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      מעדכן...
+                    </span>
+                  ) : (
+                    selfPauseModal.action === 'pause' ? 'השבת את החשבון' : 'הפעל את החשבון'
+                  )}
+                </button>
+                <button
+                  onClick={() => setSelfPauseModal({ isOpen: false, action: 'pause' })}
+                  disabled={selfPausing}
+                  className="px-6 py-3 rounded-xl font-medium border border-white/20 text-foreground-light hover:bg-white/5 transition-colors text-center"
+                >
+                  ביטול
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

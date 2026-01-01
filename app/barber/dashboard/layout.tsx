@@ -6,6 +6,7 @@ import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { DashboardSidebar } from '@/components/barber/DashboardSidebar'
 import { DashboardMobileHeader } from '@/components/barber/DashboardMobileHeader'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
+import { AlertTriangle } from 'lucide-react'
 
 export default function DashboardLayout({
   children,
@@ -134,12 +135,27 @@ export default function DashboardLayout({
             WebkitOverflowScrolling: 'touch',
           }}
         >
+          {/* Paused barber warning banner */}
+          {barber && barber.is_active === false && (
+            <div 
+              className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-3 lg:py-2"
+              style={{
+                paddingTop: 'calc(var(--header-top-offset, 0px) + 4.5rem)',
+              }}
+            >
+              <div className="flex items-center justify-center gap-2 text-amber-400 text-sm">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>החשבון שלך מושהה - לא תוצג בעמוד הבית ולקוחות לא יוכלו לקבוע תורים חדשים</span>
+              </div>
+            </div>
+          )}
+          
           {/* Safe area padding for notch + header height on mobile */}
           <div 
             className="p-4 sm:p-6 lg:p-8 lg:pt-8"
             style={{
-              // Mobile: account for header + safe area
-              paddingTop: 'calc(var(--header-top-offset, 0px) + 5rem)',
+              // Mobile: account for header + safe area (only if not showing pause banner)
+              paddingTop: barber?.is_active === false ? undefined : 'calc(var(--header-top-offset, 0px) + 5rem)',
             }}
           >
             {children}

@@ -192,7 +192,7 @@ export function AppointmentDetailModal({
                   <div>
                     <p className="text-sm text-red-400/80">פרטי ביטול</p>
                     <p className="font-medium text-red-400">
-                      בוטל ע&quot;י {reservation.cancelled_by === 'barber' ? 'הספר' : 'הלקוח'}
+                      בוטל ע״י {reservation.cancelled_by === 'barber' ? 'הספר' : 'הלקוח'}
                     </p>
                     {reservation.cancellation_reason && (
                       <p className="text-sm text-red-400/80 mt-1">

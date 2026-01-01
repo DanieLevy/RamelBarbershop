@@ -33,12 +33,13 @@ export async function loginBarber(
   const normalizedEmail = email.toLowerCase().trim()
   
   // Find user by email - use maybeSingle to handle not found gracefully
+  // Note: We do NOT filter by is_active here - paused barbers should still be able to log in
+  // The is_active flag only controls visibility for public booking, not dashboard access
   const { data: user, error } = await supabase
     .from('users')
     .select('id, username, fullname, email, phone, role, is_barber, is_active, img_url, password_hash, created_at, updated_at')
     .eq('email', normalizedEmail)
     .eq('is_barber', true)
-    .eq('is_active', true)
     .maybeSingle()
   
   if (error) {
@@ -132,12 +133,13 @@ export async function validateBarberSession(): Promise<User | null> {
   
   const supabase = createClient()
   
+  // Note: We do NOT filter by is_active here - paused barbers should still be able to access their dashboard
+  // The is_active flag only controls visibility for public booking, not dashboard access
   const { data: user, error } = await supabase
     .from('users')
     .select('id, username, fullname, email, phone, role, is_barber, is_active, img_url, created_at, updated_at')
     .eq('id', session.barberId)
     .eq('is_barber', true)
-    .eq('is_active', true)
     .maybeSingle()
   
   if (error) {
@@ -356,9 +358,9 @@ export async function getAllBarbers(): Promise<User[]> {
   try {
     const { data, error } = await supabase
       .from('users')
-      .select('id, username, fullname, email, phone, role, is_barber, is_active, img_url, created_at, updated_at')
+      .select('id, username, fullname, email, phone, role, is_barber, is_active, img_url, display_order, created_at, updated_at')
       .eq('is_barber', true)
-      .order('created_at', { ascending: true })
+      .order('display_order', { ascending: true })
     
     if (error) {
       console.error('Error fetching barbers:', error)

@@ -20,6 +20,7 @@ export default async function HomePage() {
       .from('users')
       .select('*, work_days(*)')
       .eq('is_barber', true)
+      .eq('is_active', true)
       .order('display_order', { ascending: true }),
     supabase
       .from('barbershop_settings')

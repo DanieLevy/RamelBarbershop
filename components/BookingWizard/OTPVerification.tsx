@@ -317,8 +317,8 @@ export function OTPVerification() {
           אימות הטלפון הכרחי להשלמת ההזמנה
         </p>
         
-        {/* Test user hint */}
-        {isTestUser(customer.phone || '') && (
+        {/* Test user hint - only in development */}
+        {process.env.NODE_ENV === 'development' && isTestUser(customer.phone || '') && (
           <div className="mt-3 px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
             <p className="text-blue-400 text-xs">
               🧪 משתמש בדיקה - הקוד הוא: <span className="font-mono font-bold">{TEST_USER.otpCode}</span>
