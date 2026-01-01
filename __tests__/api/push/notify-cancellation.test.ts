@@ -75,8 +75,8 @@ describe('/api/push/notify-cancellation', () => {
       const data = await response.json()
       
       expect(response.status).toBe(400)
-      expect(data.success).toBe(false)
-      expect(data.error).toContain('reservationId')
+      expect(data.error).toBe('Invalid request')
+      expect(data.message).toContain('reservationId')
     })
 
     it('should reject request without barberId', async () => {
@@ -87,8 +87,8 @@ describe('/api/push/notify-cancellation', () => {
       const data = await response.json()
       
       expect(response.status).toBe(400)
-      expect(data.success).toBe(false)
-      expect(data.error).toContain('barberId')
+      expect(data.error).toBe('Invalid request')
+      expect(data.message).toContain('barberId')
     })
 
     it('should reject request without cancelledBy', async () => {
@@ -99,8 +99,8 @@ describe('/api/push/notify-cancellation', () => {
       const data = await response.json()
       
       expect(response.status).toBe(400)
-      expect(data.success).toBe(false)
-      expect(data.error).toContain('cancelledBy')
+      expect(data.error).toBe('Invalid request')
+      expect(data.message).toContain('cancelledBy')
     })
 
     it('should reject request without customerName', async () => {
@@ -111,8 +111,8 @@ describe('/api/push/notify-cancellation', () => {
       const data = await response.json()
       
       expect(response.status).toBe(400)
-      expect(data.success).toBe(false)
-      expect(data.error).toContain('customerName')
+      expect(data.error).toBe('Invalid request')
+      expect(data.message).toContain('customerName')
     })
 
     it('should reject request without serviceName', async () => {
@@ -123,8 +123,8 @@ describe('/api/push/notify-cancellation', () => {
       const data = await response.json()
       
       expect(response.status).toBe(400)
-      expect(data.success).toBe(false)
-      expect(data.error).toContain('serviceName')
+      expect(data.error).toBe('Invalid request')
+      expect(data.message).toContain('serviceName')
     })
 
     it('should reject request without appointmentTime', async () => {
@@ -135,8 +135,8 @@ describe('/api/push/notify-cancellation', () => {
       const data = await response.json()
       
       expect(response.status).toBe(400)
-      expect(data.success).toBe(false)
-      expect(data.error).toContain('appointmentTime')
+      expect(data.error).toBe('Invalid request')
+      expect(data.message).toContain('appointmentTime')
     })
 
     it('should reject invalid cancelledBy value', async () => {
@@ -147,7 +147,8 @@ describe('/api/push/notify-cancellation', () => {
       const data = await response.json()
       
       expect(response.status).toBe(400)
-      expect(data.error).toContain('Invalid cancelledBy')
+      expect(data.error).toBe('Invalid request')
+      expect(data.message).toContain('cancelledBy')
     })
 
     it('should reject invalid reservationId UUID format', async () => {
@@ -158,7 +159,9 @@ describe('/api/push/notify-cancellation', () => {
       const data = await response.json()
       
       expect(response.status).toBe(400)
-      expect(data.error).toContain('reservationId format')
+      expect(data.error).toBe('Invalid request')
+      expect(data.message).toContain('reservationId')
+      expect(data.message).toContain('UUID')
     })
 
     it('should reject invalid barberId UUID format', async () => {
@@ -169,7 +172,9 @@ describe('/api/push/notify-cancellation', () => {
       const data = await response.json()
       
       expect(response.status).toBe(400)
-      expect(data.error).toContain('barberId format')
+      expect(data.error).toBe('Invalid request')
+      expect(data.message).toContain('barberId')
+      expect(data.message).toContain('UUID')
     })
   })
 
@@ -233,7 +238,9 @@ describe('/api/push/notify-cancellation', () => {
       const data = await response.json()
       
       expect(response.status).toBe(400)
-      expect(data.error).toContain('customerId format')
+      expect(data.error).toBe('Invalid request')
+      expect(data.message).toContain('customerId')
+      expect(data.message).toContain('UUID')
     })
 
     it('should return success response for valid barber cancellation', async () => {
@@ -276,9 +283,9 @@ describe('/api/push/notify-cancellation', () => {
       const response = await POST(request)
       const data = await response.json()
       
-      expect(response.status).toBe(500)
-      expect(data.success).toBe(false)
-      expect(data.error).toBe('Internal server error')
+      // validateRequestBody catches JSON parse errors and returns 400
+      expect(response.status).toBe(400)
+      expect(data.error).toBe('Invalid JSON body')
     })
   })
 
@@ -290,13 +297,14 @@ describe('/api/push/notify-cancellation', () => {
       const data = await response.json()
       
       expect(response.status).toBe(400)
-      expect(data.error).toContain('reservationId')
-      expect(data.error).toContain('barberId')
-      expect(data.error).toContain('cancelledBy')
-      expect(data.error).toContain('customerName')
-      expect(data.error).toContain('serviceName')
-      expect(data.error).toContain('appointmentTime')
+      expect(data.error).toBe('Invalid request')
+      // The validation details include field names in the message
+      expect(data.message).toContain('reservationId')
+      expect(data.message).toContain('barberId')
+      expect(data.message).toContain('cancelledBy')
+      expect(data.message).toContain('customerName')
+      expect(data.message).toContain('serviceName')
+      expect(data.message).toContain('appointmentTime')
     })
   })
 })
-
