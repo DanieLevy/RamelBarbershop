@@ -5,7 +5,7 @@ import { useBookingStore } from '@/store/useBookingStore'
 import { useAuthStore } from '@/store/useAuthStore'
 import { sendPhoneOtp, verifyOtp, clearRecaptchaVerifier, isTestUser, TEST_USER } from '@/lib/firebase/config'
 import { sendEmailOtp, verifyEmailOtp, isValidEmail } from '@/lib/auth/email-auth'
-import { getOrCreateCustomer, getOrCreateCustomerWithEmail, checkEmailDuplicate, findCustomerByPhone } from '@/lib/services/customer.service'
+import { getOrCreateCustomer, getOrCreateCustomerWithEmail, checkEmailDuplicate, findCustomerByPhone, getCustomerAuthMethod } from '@/lib/services/customer.service'
 import { createReservation as createReservationService } from '@/lib/services/booking.service'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -52,6 +52,11 @@ export function OTPVerification() {
   const [smsError, setSmsError] = useState<string | null>(null)
   const [showEmailFallback, setShowEmailFallback] = useState(false)
   
+  // Auth choice state for users with both methods
+  const [showAuthChoice, setShowAuthChoice] = useState(false)
+  const [customerAuthMethod, setCustomerAuthMethod] = useState<'phone' | 'email' | 'both' | null>(null)
+  const [customerEmail, setCustomerEmail] = useState<string | null>(null)
+  
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
   const hasSentRef = useRef(false)
   const isMountedRef = useRef(true)
@@ -67,16 +72,53 @@ export function OTPVerification() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Check customer's auth method on mount
   useEffect(() => {
-    if (!hasSentRef.current && !sent && !sending && mode === 'sms') {
-      hasSentRef.current = true
-      const timer = setTimeout(() => {
-        if (isMountedRef.current) {
-          handleSendSmsOtp()
+    const checkAuthMethod = async () => {
+      if (!customer?.phone) return
+      
+      try {
+        const authMethod = await getCustomerAuthMethod(customer.phone)
+        setCustomerAuthMethod(authMethod)
+        
+        if (authMethod === 'both' || authMethod === 'email') {
+          // Get customer details for email
+          const existingCustomer = await findCustomerByPhone(customer.phone)
+          const existingEmail = existingCustomer?.email
+          if (existingEmail) {
+            setCustomerEmail(existingEmail)
+            
+            if (authMethod === 'both') {
+              // Show auth choice for users with both methods
+              setShowAuthChoice(true)
+              return
+            } else if (authMethod === 'email') {
+              // Auto-send email OTP for email-only users
+              setMode('email')
+              setEmail(existingEmail)
+              hasSentRef.current = true
+              setTimeout(() => handleSendEmailOtpDirect(existingEmail), 500)
+              return
+            }
+          }
         }
-      }, 500)
-      return () => clearTimeout(timer)
+        
+        // Default: send SMS OTP
+        if (!hasSentRef.current && !sent && !sending) {
+          hasSentRef.current = true
+          setTimeout(() => handleSendSmsOtp(), 500)
+        }
+      } catch (err) {
+        console.error('Error checking auth method:', err)
+        // Fall back to SMS
+        if (!hasSentRef.current && !sent && !sending) {
+          hasSentRef.current = true
+          setTimeout(() => handleSendSmsOtp(), 500)
+        }
+      }
     }
+    
+    checkAuthMethod()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -210,6 +252,59 @@ export function OTPVerification() {
     if (isMountedRef.current) {
       setSending(false)
     }
+  }
+
+  // Direct email OTP send (used when auto-selecting email for email-only users)
+  const handleSendEmailOtpDirect = async (targetEmail: string) => {
+    setSending(true)
+    setError(null)
+    
+    try {
+      const result = await sendEmailOtp(targetEmail.trim().toLowerCase())
+      
+      if (!isMountedRef.current) return
+      
+      if (result.success) {
+        setMode('email')
+        setSent(true)
+        setCountdown(RESEND_COOLDOWN_SECONDS)
+        haptics.light()
+        toast.success('קוד אימות נשלח לאימייל!')
+        setTimeout(() => inputRefs.current[0]?.focus(), 100)
+      } else {
+        setError(result.error || 'שגיאה בשליחת האימייל')
+        toast.error(result.error || 'שגיאה בשליחת האימייל')
+      }
+    } catch (err) {
+      console.error('Email OTP send error:', err)
+      await report(err, 'Sending email OTP (direct)')
+      if (isMountedRef.current) {
+        setError('שגיאה בשליחת האימייל')
+      }
+    }
+    
+    if (isMountedRef.current) {
+      setSending(false)
+    }
+  }
+
+  // Auth choice handlers for users with both methods
+  const handleAuthChoiceSms = async () => {
+    setShowAuthChoice(false)
+    hasSentRef.current = true
+    await handleSendSmsOtp()
+  }
+
+  const handleAuthChoiceEmail = async () => {
+    if (!customerEmail) {
+      setError('שגיאה - אימייל לא נמצא')
+      return
+    }
+    setShowAuthChoice(false)
+    setMode('email')
+    setEmail(customerEmail)
+    hasSentRef.current = true
+    await handleSendEmailOtpDirect(customerEmail)
   }
 
   const handleOtpChange = (index: number, value: string) => {
@@ -476,6 +571,82 @@ export function OTPVerification() {
   const otpCode = otp.join('')
   const canVerify = otpCode.length === 6 && !verifying && (mode === 'email' || !!otpConfirmation)
   const canResend = countdown === 0 && !sending
+
+  // Auth choice view for users with both SMS and Email methods
+  if (showAuthChoice && customerAuthMethod === 'both' && customerEmail) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="text-center">
+          <h2 className="text-xl text-foreground-light font-medium">בחר אופן אימות</h2>
+          <p className="text-foreground-muted text-sm mt-2">
+            שלום <span className="font-semibold text-accent-gold">{customer.fullname}</span>! 👋
+          </p>
+          <p className="text-foreground-muted text-xs mt-1">
+            יש לך שתי אפשרויות להתחבר
+          </p>
+        </div>
+        
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+            <p className="text-red-400 text-sm text-center">{error}</p>
+          </div>
+        )}
+        
+        {/* SMS Option */}
+        <button
+          onClick={handleAuthChoiceSms}
+          disabled={sending}
+          className={cn(
+            'w-full py-3.5 rounded-xl font-medium transition-all flex items-center justify-center gap-3 border',
+            sending
+              ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed border-foreground-muted/30'
+              : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90 border-transparent'
+          )}
+        >
+          <Phone size={20} />
+          <div className="flex flex-col items-start">
+            <span>קוד SMS לטלפון</span>
+            <span className="text-xs opacity-75" dir="ltr">{customer.phone}</span>
+          </div>
+        </button>
+        
+        {/* Email Option */}
+        <button
+          onClick={handleAuthChoiceEmail}
+          disabled={sending}
+          className={cn(
+            'w-full py-3.5 rounded-xl font-medium transition-all flex items-center justify-center gap-3 border',
+            sending
+              ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed border-foreground-muted/30'
+              : 'bg-transparent text-foreground-light border-white/20 hover:border-accent-gold/50 hover:bg-white/5'
+          )}
+        >
+          <Mail size={20} />
+          <div className="flex flex-col items-start">
+            <span>קוד לאימייל</span>
+            <span className="text-xs opacity-75">{customerEmail}</span>
+          </div>
+        </button>
+        
+        {sending && (
+          <p className="text-foreground-muted text-xs text-center animate-pulse">
+            שולח קוד אימות...
+          </p>
+        )}
+        
+        <button
+          onClick={() => {
+            clearRecaptchaVerifier()
+            unlockFlow()
+            prevStep()
+          }}
+          className="text-sm text-foreground-muted hover:text-foreground-light transition-colors"
+        >
+          ← חזור לפרטים אישיים
+        </button>
+      </div>
+    )
+  }
 
   // Email fallback input view
   if (showEmailFallback && mode === 'email' && !sent) {

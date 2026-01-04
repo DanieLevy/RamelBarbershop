@@ -8,7 +8,7 @@ import { sendPhoneOtp, verifyOtp, clearRecaptchaVerifier, isTestUser, TEST_USER,
 import { sendEmailOtp, verifyEmailOtp, isValidEmail } from '@/lib/auth/email-auth'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { X, Scissors, AlertTriangle, Mail, Phone, ArrowRight } from 'lucide-react'
+import { X, Scissors, AlertTriangle, Mail, Phone, ArrowRight, MessageSquare } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { ConfirmationResult } from 'firebase/auth'
 import { useBugReporter } from '@/hooks/useBugReporter'
@@ -28,6 +28,7 @@ type Step =
   | 'email-fallback'  // Show email input after SMS failure
   | 'email-otp'       // Verify email OTP
   | 'email-signup'    // New user email signup (name + email)
+  | 'auth-choice'     // User with both methods - choose SMS or Email
 
 const RECAPTCHA_CONTAINER_ID = 'login-recaptcha-container'
 
@@ -126,10 +127,18 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         setExistingEmail(existingCustomer.email || null)
         setIsNewUser(false)
         
-        // If user originally signed up with email, go directly to email OTP
+        // If user originally signed up with email only, go directly to email OTP
         if (authMethod === 'email' && existingCustomer.email) {
           setEmail(existingCustomer.email)
           await sendEmailOtpToUser(existingCustomer.email)
+          return
+        }
+        
+        // If user has both methods, let them choose
+        if (authMethod === 'both' && existingCustomer.email) {
+          setEmail(existingCustomer.email)
+          setStep('auth-choice')
+          setLoading(false)
           return
         }
       } else {
@@ -147,7 +156,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         return
       }
       
-      // Send SMS OTP
+      // Send SMS OTP (for phone-only users)
       await sendOtpToPhone(phoneClean)
     } catch (err) {
       console.error('Phone check error:', err)
@@ -161,6 +170,23 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setSkipDebugMode(!useDebug)
     setLoading(true)
     await sendOtpToPhone(phone.replace(/\D/g, ''), !useDebug)
+  }
+
+  // Handle auth method choice for users with both SMS and Email
+  const handleAuthChoiceSms = async () => {
+    setLoading(true)
+    setError(null)
+    await sendOtpToPhone(phone.replace(/\D/g, ''))
+  }
+
+  const handleAuthChoiceEmail = async () => {
+    if (!email) {
+      setError('שגיאה - אימייל לא נמצא')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    await sendEmailOtpToUser(email)
   }
 
   const handleNameSubmit = async () => {
@@ -473,6 +499,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           {step === 'email-fallback' && 'התחברות באימייל'}
           {step === 'email-otp' && 'אימות אימייל'}
           {step === 'email-signup' && 'הרשמה באימייל'}
+          {step === 'auth-choice' && 'בחר אופן אימות'}
         </h2>
         
         {/* Phone Step */}
@@ -706,6 +733,79 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             
             <button
               onClick={() => setStep('phone')}
+              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors flex items-center justify-center"
+            >
+              ← חזור
+            </button>
+          </div>
+        )}
+        
+        {/* Auth Choice Step - for users with both SMS and Email */}
+        {step === 'auth-choice' && (
+          <div className="flex flex-col gap-4">
+            <div className="text-center mb-2">
+              <p className="text-foreground-light text-sm">
+                שלום <span className="font-semibold text-accent-gold">{fullname}</span>! 👋
+              </p>
+              <p className="text-foreground-muted text-xs mt-1">
+                איך תרצה להתחבר הפעם?
+              </p>
+            </div>
+            
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                <p className="text-red-400 text-sm text-center">{error}</p>
+              </div>
+            )}
+            
+            {/* SMS Option */}
+            <button
+              onClick={handleAuthChoiceSms}
+              disabled={loading}
+              className={cn(
+                'w-full py-3.5 rounded-xl font-medium transition-all flex items-center justify-center gap-3 border',
+                loading
+                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed border-foreground-muted/30'
+                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90 border-transparent'
+              )}
+            >
+              <MessageSquare size={20} />
+              <div className="flex flex-col items-start">
+                <span>קוד SMS לטלפון</span>
+                <span className="text-xs opacity-75" dir="ltr">{phone}</span>
+              </div>
+            </button>
+            
+            {/* Email Option */}
+            <button
+              onClick={handleAuthChoiceEmail}
+              disabled={loading}
+              className={cn(
+                'w-full py-3.5 rounded-xl font-medium transition-all flex items-center justify-center gap-3 border',
+                loading
+                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed border-foreground-muted/30'
+                  : 'bg-transparent text-foreground-light border-white/20 hover:border-accent-gold/50 hover:bg-white/5'
+              )}
+            >
+              <Mail size={20} />
+              <div className="flex flex-col items-start">
+                <span>קוד לאימייל</span>
+                <span className="text-xs opacity-75">{email}</span>
+              </div>
+            </button>
+            
+            {loading && (
+              <p className="text-foreground-muted text-xs text-center animate-pulse">
+                שולח קוד אימות...
+              </p>
+            )}
+            
+            <button
+              onClick={() => {
+                setStep('phone')
+                setEmail('')
+                setError(null)
+              }}
               className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors flex items-center justify-center"
             >
               ← חזור
