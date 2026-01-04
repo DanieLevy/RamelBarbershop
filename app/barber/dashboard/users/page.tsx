@@ -171,8 +171,8 @@ export default function UsersManagementPage() {
           .from('reservations')
           .update({ 
             status: 'cancelled',
-            cancelled_at: new Date().toISOString(),
-            cancelled_by: 'system' // System cancellation due to user deletion
+            cancelled_by: 'system', // System cancellation due to user deletion
+            cancellation_reason: 'משתמש נמחק מהמערכת'
           })
           .eq('customer_id', customerId)
           .eq('status', 'confirmed')

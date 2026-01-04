@@ -407,14 +407,16 @@ export default function ProductsPage() {
                 type="button"
                 onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
                 className={cn(
-                  'w-12 h-6 rounded-full transition-colors relative',
-                  formData.is_active ? 'bg-accent-gold' : 'bg-white/20'
+                  'w-12 h-7 rounded-full transition-colors relative flex-shrink-0',
+                  formData.is_active ? 'bg-accent-gold' : 'bg-white/10'
                 )}
+                aria-checked={formData.is_active}
+                role="switch"
               >
                 <div 
                   className={cn(
-                    'absolute top-1 w-4 h-4 rounded-full bg-white transition-all',
-                    formData.is_active ? 'right-1' : 'right-7'
+                    'absolute top-1 w-5 h-5 rounded-full bg-white transition-all',
+                    formData.is_active ? 'right-1' : 'left-1'
                   )} 
                 />
               </button>

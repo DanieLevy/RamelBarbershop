@@ -47,7 +47,6 @@ export function MobileBottomNav() {
   // Check for various notification issues
   const hasPermissionIssue = permissionRealtime === 'denied'
   const needsSubscription = isSupportedRealtime && !isSubscribedRealtime
-  const hasPwaButNoPush = pwa.isStandalone && needsSubscription
   
   // Show notification badge for:
   // 1. PWA users who haven't enabled notifications

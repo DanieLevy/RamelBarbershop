@@ -381,17 +381,19 @@ export default function MySchedulePage() {
                       }}
                       disabled={!isShopOpen}
                       className={cn(
-                        'w-10 h-6 rounded-full transition-all relative',
+                        'w-12 h-7 rounded-full transition-colors relative flex-shrink-0',
                         !isShopOpen
                           ? 'bg-foreground-muted/20 cursor-not-allowed'
                           : isWorking
                             ? 'bg-accent-gold'
-                            : 'bg-foreground-muted/30'
+                            : 'bg-white/10'
                       )}
+                      aria-checked={isWorking}
+                      role="switch"
                     >
                       <div
                         className={cn(
-                          'absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm',
+                          'absolute top-1 w-5 h-5 rounded-full bg-white transition-all',
                           isWorking ? 'right-1' : 'left-1'
                         )}
                       />
