@@ -2,7 +2,7 @@
 
 import { MapPin, Navigation, Car, Clock } from 'lucide-react'
 import { SectionContainer, SectionHeader, SectionContent } from './home/SectionContainer'
-import { cn } from '@/lib/utils'
+import { cn, isTimeWithinBusinessHours } from '@/lib/utils'
 import type { BarbershopSettings } from '@/types/database'
 
 // Waze icon
@@ -38,11 +38,12 @@ export function LocationSection({ settings }: LocationSectionProps) {
   const workEnd = settings?.work_hours_end?.slice(0, 5) || '20:00'
   const openDays = settings?.open_days || ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday']
   
-  // Check if currently open
-  const now = new Date()
-  const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
-  const currentTime = now.toTimeString().slice(0, 5)
-  const isOpen = openDays.includes(currentDay) && currentTime >= workStart && currentTime <= workEnd
+  // Check if currently open (using Israel timezone)
+  const israelTime = new Date().toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' })
+  const israelDate = new Date(israelTime)
+  const currentDay = israelDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Jerusalem' }).toLowerCase()
+  const currentTime = israelDate.toTimeString().slice(0, 5)
+  const isOpen = openDays.includes(currentDay) && isTimeWithinBusinessHours(currentTime, workStart, workEnd)
 
   const openWaze = () => window.open(wazeLink, '_blank')
   const openGoogleMaps = () => window.open(googleMapsLink, '_blank')

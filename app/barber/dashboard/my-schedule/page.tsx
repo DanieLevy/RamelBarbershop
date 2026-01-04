@@ -52,6 +52,18 @@ export default function MySchedulePage() {
     return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`
   }, [])
 
+  // Helper to convert time string to minutes for proper comparison
+  // Treats "00:00" as 24:00 (end of day) when used as end time
+  const timeToMinutes = useCallback((time: string, isEndTime: boolean = false): number => {
+    const [hours, minutes] = time.split(':').map(Number)
+    const totalMinutes = hours * 60 + minutes
+    // If it's an end time and it's 00:00, treat it as 24:00 (end of day)
+    if (isEndTime && totalMinutes === 0) {
+      return 24 * 60
+    }
+    return totalMinutes
+  }, [])
+
   const fetchData = useCallback(async () => {
     if (!barber?.id) return
     
@@ -150,21 +162,28 @@ export default function MySchedulePage() {
     if (shopSettings) {
       const shopStart = normalizeTime(shopSettings.work_hours_start)
       const shopEnd = normalizeTime(shopSettings.work_hours_end)
+      const shopStartMinutes = timeToMinutes(shopStart, false)
+      const shopEndMinutes = timeToMinutes(shopEnd, true) // treat 00:00 as 24:00
       
       for (const day of workDays) {
         if (!day.isWorking) continue
         
-        if (day.startTime < shopStart) {
+        const dayStartMinutes = timeToMinutes(day.startTime, false)
+        const dayEndMinutes = timeToMinutes(day.endTime, true)
+        
+        if (dayStartMinutes < shopStartMinutes) {
           const dayLabel = DAYS.find(d => d.key === day.dayOfWeek)?.label || day.dayOfWeek
           toast.error(`ביום ${dayLabel}: שעת ההתחלה לא יכולה להיות לפני ${shopStart}`)
           return
         }
-        if (day.endTime > shopEnd) {
+        if (dayEndMinutes > shopEndMinutes) {
           const dayLabel = DAYS.find(d => d.key === day.dayOfWeek)?.label || day.dayOfWeek
-          toast.error(`ביום ${dayLabel}: שעת הסיום לא יכולה להיות אחרי ${shopEnd}`)
+          // Display "00:00" as "חצות" (midnight) for better UX
+          const displayShopEnd = shopEnd === '00:00' ? 'חצות (00:00)' : shopEnd
+          toast.error(`ביום ${dayLabel}: שעת הסיום לא יכולה להיות אחרי ${displayShopEnd}`)
           return
         }
-        if (day.startTime >= day.endTime) {
+        if (dayStartMinutes >= dayEndMinutes) {
           const dayLabel = DAYS.find(d => d.key === day.dayOfWeek)?.label || day.dayOfWeek
           toast.error(`ביום ${dayLabel}: שעת ההתחלה חייבת להיות לפני שעת הסיום`)
           return

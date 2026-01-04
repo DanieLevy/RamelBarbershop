@@ -347,6 +347,7 @@ export function isDateDisabled(date: Date): boolean {
 
 /**
  * Generate time slots for a given date (Israel timezone)
+ * Note: If endHour is 0 (midnight), it's treated as 24:00 (end of day)
  */
 export function generateTimeSlots(
   dateTimestamp: number,
@@ -360,7 +361,16 @@ export function generateTimeSlots(
   
   const baseDate = timestampToIsraelDate(dateTimestamp)
   const startDate = setMinutes(setHours(baseDate, startHour), startMinute)
-  const endDate = setMinutes(setHours(baseDate, endHour), endMinute)
+  
+  // Handle midnight (00:00) as end of day (24:00)
+  // If endHour is 0 and endMinute is 0, treat it as 24:00 (next day midnight)
+  let endDate: Date
+  if (endHour === 0 && endMinute === 0) {
+    // Set to 23:59 to generate slots up to the last slot before midnight
+    endDate = setMinutes(setHours(baseDate, 23), 59)
+  } else {
+    endDate = setMinutes(setHours(baseDate, endHour), endMinute)
+  }
   
   let currentTime = startDate.getTime()
   const endTime = endDate.getTime()
@@ -387,6 +397,40 @@ export function generateTimeSlots(
 export function parseTimeString(timeStr: string): { hour: number; minute: number } {
   const [hour, minute] = timeStr.split(':').map(Number)
   return { hour: hour || 0, minute: minute || 0 }
+}
+
+/**
+ * Convert time string to minutes for proper numeric comparison
+ * @param time Time string in HH:mm or HH:mm:ss format
+ * @param treatMidnightAsEndOfDay If true, "00:00" is treated as 24:00 (1440 minutes)
+ */
+export function timeToMinutes(time: string, treatMidnightAsEndOfDay = false): number {
+  const parts = time.split(':').map(Number)
+  const hours = parts[0] || 0
+  const minutes = parts[1] || 0
+  const totalMinutes = hours * 60 + minutes
+  
+  // If it's midnight and we should treat it as end of day
+  if (treatMidnightAsEndOfDay && totalMinutes === 0) {
+    return 24 * 60 // 1440 minutes = end of day
+  }
+  
+  return totalMinutes
+}
+
+/**
+ * Check if a current time is within business hours
+ * Properly handles midnight (00:00) as end of day
+ * @param currentTime Current time string (HH:mm)
+ * @param startTime Business start time (HH:mm)
+ * @param endTime Business end time (HH:mm) - 00:00 is treated as midnight/end of day
+ */
+export function isTimeWithinBusinessHours(currentTime: string, startTime: string, endTime: string): boolean {
+  const current = timeToMinutes(currentTime)
+  const start = timeToMinutes(startTime)
+  const end = timeToMinutes(endTime, true) // Treat 00:00 as 24:00
+  
+  return current >= start && current < end
 }
 
 /**

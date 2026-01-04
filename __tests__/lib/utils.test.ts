@@ -22,6 +22,8 @@ import {
   isDateDisabled,
   generateTimeSlots,
   parseTimeString,
+  timeToMinutes,
+  isTimeWithinBusinessHours,
   cn,
   formatPrice,
   formatOpenDaysRanges,
@@ -284,6 +286,50 @@ describe('Utility Functions', () => {
     it('should handle invalid input', () => {
       const result = parseTimeString('invalid')
       expect(result).toEqual({ hour: 0, minute: 0 })
+    })
+  })
+
+  describe('timeToMinutes', () => {
+    it('should convert time string to minutes', () => {
+      expect(timeToMinutes('09:00')).toBe(540)
+      expect(timeToMinutes('14:30')).toBe(870)
+      expect(timeToMinutes('23:59')).toBe(1439)
+    })
+
+    it('should handle midnight as 0 by default', () => {
+      expect(timeToMinutes('00:00')).toBe(0)
+    })
+
+    it('should treat midnight as end of day when flag is true', () => {
+      expect(timeToMinutes('00:00', true)).toBe(1440) // 24 * 60
+    })
+
+    it('should handle time with seconds', () => {
+      expect(timeToMinutes('14:30:00')).toBe(870)
+    })
+  })
+
+  describe('isTimeWithinBusinessHours', () => {
+    it('should return true when within business hours', () => {
+      expect(isTimeWithinBusinessHours('14:00', '09:00', '19:00')).toBe(true)
+      expect(isTimeWithinBusinessHours('09:00', '09:00', '19:00')).toBe(true)
+    })
+
+    it('should return false when outside business hours', () => {
+      expect(isTimeWithinBusinessHours('08:00', '09:00', '19:00')).toBe(false)
+      expect(isTimeWithinBusinessHours('19:30', '09:00', '19:00')).toBe(false)
+    })
+
+    it('should handle midnight (00:00) as end of day correctly', () => {
+      // When end time is 00:00, it should be treated as midnight (end of day)
+      expect(isTimeWithinBusinessHours('22:00', '09:00', '00:00')).toBe(true)
+      expect(isTimeWithinBusinessHours('23:59', '09:00', '00:00')).toBe(true)
+      expect(isTimeWithinBusinessHours('14:00', '09:00', '00:00')).toBe(true)
+    })
+
+    it('should exclude the end time itself', () => {
+      // 19:00 is NOT within 09:00-19:00 (exclusive end)
+      expect(isTimeWithinBusinessHours('19:00', '09:00', '19:00')).toBe(false)
     })
   })
 

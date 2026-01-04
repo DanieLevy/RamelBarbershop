@@ -4,11 +4,11 @@ import { useEffect, useState, useMemo } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { cn, formatTime as formatTimeUtil, nowInIsrael, generateTimeSlots, parseTimeString, getIsraelDayStart, getIsraelDayEnd, timestampToIsraelDate, isSameDayInIsrael } from '@/lib/utils'
+import { cn, formatTime as formatTimeUtil, nowInIsrael, generateTimeSlots, parseTimeString, getIsraelDayStart, getIsraelDayEnd, timestampToIsraelDate, isSameDayInIsrael, getDayKeyInIsrael } from '@/lib/utils'
 import { addDays, format, startOfWeek, endOfWeek, isSameDay } from 'date-fns'
 import { he } from 'date-fns/locale'
 import { Calendar, Phone, X, Plus } from 'lucide-react'
-import type { Reservation, Service, BarbershopSettings } from '@/types/database'
+import type { Reservation, Service, BarbershopSettings, WorkDay } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { CancelReservationModal } from '@/components/barber/CancelReservationModal'
 import { BulkCancelModal } from '@/components/barber/BulkCancelModal'
@@ -54,6 +54,9 @@ export default function ReservationsPage() {
   // Shop settings for work hours
   const [shopSettings, setShopSettings] = useState<BarbershopSettings | null>(null)
   
+  // Barber's day-specific work hours
+  const [barberWorkDays, setBarberWorkDays] = useState<WorkDay[]>([])
+  
   // Toggle for showing empty slots
   const [showEmptySlots, setShowEmptySlots] = useState(true)
   
@@ -68,6 +71,7 @@ export default function ReservationsPage() {
     if (barber?.id) {
       fetchReservations()
       fetchShopSettings()
+      fetchBarberWorkDays()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [barber?.id])
@@ -203,6 +207,19 @@ export default function ReservationsPage() {
     
     if (data) {
       setShopSettings(data as BarbershopSettings)
+    }
+  }
+
+  const fetchBarberWorkDays = async () => {
+    if (!barber?.id) return
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('work_days')
+      .select('*')
+      .eq('user_id', barber.id)
+    
+    if (data) {
+      setBarberWorkDays(data as WorkDay[])
     }
   }
 
@@ -489,9 +506,26 @@ export default function ReservationsPage() {
       return filteredReservations.map(res => ({ type: 'reservation' as const, data: res }))
     }
     
-    // Get work hours from shop settings
-    const workStart = shopSettings?.work_hours_start || '09:00'
-    const workEnd = shopSettings?.work_hours_end || '19:00'
+    // Get work hours - prioritize barber's day-specific hours over shop settings
+    const dayKey = getDayKeyInIsrael(selectedDate.getTime())
+    const barberDaySettings = barberWorkDays.find(wd => wd.day_of_week === dayKey)
+    
+    let workStart: string
+    let workEnd: string
+    
+    if (barberDaySettings && barberDaySettings.is_working && barberDaySettings.start_time && barberDaySettings.end_time) {
+      // Use barber's day-specific hours
+      workStart = barberDaySettings.start_time
+      workEnd = barberDaySettings.end_time
+    } else if (barberDaySettings && !barberDaySettings.is_working) {
+      // Barber doesn't work on this day - return only reservations (shouldn't have any)
+      return filteredReservations.map(res => ({ type: 'reservation' as const, data: res }))
+    } else {
+      // Fall back to shop settings
+      workStart = shopSettings?.work_hours_start || '09:00'
+      workEnd = shopSettings?.work_hours_end || '19:00'
+    }
+    
     const { hour: startHour, minute: startMinute } = parseTimeString(workStart)
     const { hour: endHour, minute: endMinute } = parseTimeString(workEnd)
     
@@ -528,7 +562,7 @@ export default function ReservationsPage() {
     
     return timeline
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredReservations, quickDate, customDate, activeTab, shopSettings, showEmptySlots, now])
+  }, [filteredReservations, quickDate, customDate, activeTab, shopSettings, barberWorkDays, showEmptySlots, now])
   
   // Get selected date for manual booking
   const getSelectedDate = (): Date | null => {

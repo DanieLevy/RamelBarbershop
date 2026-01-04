@@ -6,7 +6,7 @@ import { cn, generateTimeSlots, parseTimeString, nowInIsrael, getIsraelDayStart,
 import { createClient } from '@/lib/supabase/client'
 import { format, addDays, isSameDay } from 'date-fns'
 import { toast } from 'sonner'
-import type { Customer, BarbershopSettings, Service } from '@/types/database'
+import type { Customer, BarbershopSettings, Service, WorkDay } from '@/types/database'
 
 interface ManualBookingModalProps {
   isOpen: boolean
@@ -46,6 +46,7 @@ export function ManualBookingModal({
   // Data loading
   const [services, setServices] = useState<Service[]>([])
   const [reservedSlots, setReservedSlots] = useState<number[]>([])
+  const [barberWorkDays, setBarberWorkDays] = useState<WorkDay[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [saving, setSaving] = useState(false)
   
@@ -63,6 +64,7 @@ export function ManualBookingModal({
       setSearchQuery('')
       setSearchResults([])
       fetchServices()
+      fetchBarberWorkDays()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, preselectedDate, preselectedTime])
@@ -74,6 +76,18 @@ export function ManualBookingModal({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, selectedDate])
+
+  const fetchBarberWorkDays = async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('work_days')
+      .select('*')
+      .eq('user_id', barberId)
+    
+    if (data) {
+      setBarberWorkDays(data as WorkDay[])
+    }
+  }
 
   const fetchServices = async () => {
     const supabase = createClient()
@@ -140,10 +154,31 @@ export function ManualBookingModal({
     return () => clearTimeout(timer)
   }, [searchQuery])
 
-  // Generate available time slots
+  // Generate available time slots using barber's day-specific hours
   const availableSlots = useMemo(() => {
-    const workStart = shopSettings?.work_hours_start || '09:00'
-    const workEnd = shopSettings?.work_hours_end || '19:00'
+    // Get the day of week for the selected date
+    const dayKey = getDayKeyInIsrael(selectedDate.getTime())
+    
+    // Find the barber's work day settings for this specific day
+    const barberDaySettings = barberWorkDays.find(wd => wd.day_of_week === dayKey)
+    
+    // Determine work hours: priority is barber day-specific > shop settings
+    let workStart: string
+    let workEnd: string
+    
+    if (barberDaySettings && barberDaySettings.is_working && barberDaySettings.start_time && barberDaySettings.end_time) {
+      // Use barber's day-specific hours
+      workStart = barberDaySettings.start_time
+      workEnd = barberDaySettings.end_time
+    } else if (barberDaySettings && !barberDaySettings.is_working) {
+      // Barber doesn't work on this day - return empty slots
+      return []
+    } else {
+      // Fall back to shop settings
+      workStart = shopSettings?.work_hours_start || '09:00'
+      workEnd = shopSettings?.work_hours_end || '19:00'
+    }
+    
     const { hour: startHour, minute: startMinute } = parseTimeString(workStart)
     const { hour: endHour, minute: endMinute } = parseTimeString(workEnd)
     
@@ -168,7 +203,7 @@ export function ManualBookingModal({
         Math.abs(reserved - slot.timestamp) < 60000
       )
     })
-  }, [selectedDate, shopSettings, reservedSlots, israelNow])
+  }, [selectedDate, shopSettings, reservedSlots, israelNow, barberWorkDays])
 
   const handleSubmit = async () => {
     // Validation
