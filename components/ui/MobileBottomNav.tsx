@@ -40,13 +40,25 @@ export function MobileBottomNav() {
   const isSupportedRealtime = pushStore.isSupported || push.isSupported
   const permissionRealtime = pushStore.permission !== 'unavailable' ? pushStore.permission : push.permission
   
-  // Only show when: in PWA, logged in, push supported but not subscribed
+  // Show badge when: user is logged in (customer or barber), in PWA, push supported but not subscribed
+  // This covers all cases where user should enable notifications
+  const isLoggedInUser = userRole === 'customer' || userRole === 'barber'
+  
+  // Check for various notification issues
+  const hasPermissionIssue = permissionRealtime === 'denied'
+  const needsSubscription = isSupportedRealtime && !isSubscribedRealtime
+  const hasPwaButNoPush = pwa.isStandalone && needsSubscription
+  
+  // Show notification badge for:
+  // 1. PWA users who haven't enabled notifications
+  // 2. Users with denied permission (they need to fix this in settings)
   const showNotificationBadge = 
+    isLoggedInUser && 
     pwa.isStandalone && 
-    userRole === 'customer' && 
-    isSupportedRealtime && 
-    !isSubscribedRealtime &&
-    permissionRealtime !== 'denied'
+    (needsSubscription || hasPermissionIssue)
+  
+  // Different badge style for denied permission (more urgent)
+  const isUrgentBadge = hasPermissionIssue
   
   // UI State
   const [isVisible, setIsVisible] = useState(true)
@@ -363,8 +375,19 @@ export function MobileBottomNav() {
                   {item.id === 'profile' && showNotificationBadge && !isActive && (
                     <div className="absolute -top-1.5 -right-1.5 flex items-center justify-center">
                       <span className="relative flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border border-background-dark" />
+                        {isUrgentBadge ? (
+                          // Urgent: permission denied - solid amber badge
+                          <>
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500 border border-background-dark" />
+                          </>
+                        ) : (
+                          // Normal: needs subscription - red badge
+                          <>
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border border-background-dark" />
+                          </>
+                        )}
                       </span>
                     </div>
                   )}

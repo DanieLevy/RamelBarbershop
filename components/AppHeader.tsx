@@ -176,8 +176,8 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
     doScroll()
   }
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     setShowUserMenu(false)
     setShowMobileMenu(false)
   }

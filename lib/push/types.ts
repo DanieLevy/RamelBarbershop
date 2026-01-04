@@ -59,6 +59,9 @@ export interface WebPushSubscription {
   }
 }
 
+// Delivery status types - includes 'user_deleted' for orphaned subscriptions
+export type DeliveryStatus = 'success' | 'failed' | 'pending' | 'user_deleted' | null
+
 // Database push subscription record
 export interface PushSubscriptionRecord {
   id: string
@@ -70,11 +73,11 @@ export interface PushSubscriptionRecord {
   device_type: DeviceType
   device_name: string | null
   user_agent: string | null
-  is_active: boolean
-  consecutive_failures: number
-  last_delivery_status: 'success' | 'failed' | 'pending' | null
-  last_used: string
-  created_at: string
+  is_active: boolean | null
+  consecutive_failures: number | null
+  last_delivery_status: DeliveryStatus
+  last_used: string | null
+  created_at: string | null
 }
 
 // Customer notification settings record
@@ -157,8 +160,8 @@ export interface DeviceInfo {
   id: string
   deviceType: DeviceType
   deviceName: string | null
-  lastUsed: string
-  createdAt: string
+  lastUsed: string | null
+  createdAt: string | null
 }
 
 // Reminder context for sending reminders

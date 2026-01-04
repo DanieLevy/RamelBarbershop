@@ -165,8 +165,35 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
+    const { authMethod, customer } = get()
+    
+    // Deactivate push subscription for current device before logout
+    // This ensures this device won't receive notifications for the logged-out user
+    if (customer?.id && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      try {
+        const registration = await navigator.serviceWorker.ready
+        const subscription = await registration.pushManager.getSubscription()
+        
+        if (subscription) {
+          // Unsubscribe from browser's push manager
+          await subscription.unsubscribe()
+          
+          // Deactivate on server (by endpoint)
+          await fetch('/api/push/subscribe', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint: subscription.endpoint })
+          })
+          
+          console.log('[Auth] Push subscription deactivated on logout')
+        }
+      } catch (err) {
+        // Don't block logout if push cleanup fails
+        console.error('[Auth] Error cleaning up push subscription on logout:', err)
+      }
+    }
+    
     // Sign out from Supabase if user was logged in via email
-    const { authMethod } = get()
     if (authMethod === 'email') {
       await signOutSupabase()
     }

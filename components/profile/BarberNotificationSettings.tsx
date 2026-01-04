@@ -82,7 +82,8 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
     return <Smartphone size={16} strokeWidth={1.5} />
   }
 
-  const formatLastUsed = useCallback((dateString: string): string => {
+  const formatLastUsed = useCallback((dateString: string | null): string => {
+    if (!dateString) return 'לא ידוע'
     try {
       const date = new Date(dateString)
       const now = new Date()

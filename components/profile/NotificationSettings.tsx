@@ -73,7 +73,8 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
     return <Smartphone size={16} strokeWidth={1.5} />
   }
 
-  const formatLastUsed = (dateString: string): string => {
+  const formatLastUsed = (dateString: string | null): string => {
+    if (!dateString) return 'לא ידוע'
     try {
       const date = new Date(dateString)
       const now = new Date()

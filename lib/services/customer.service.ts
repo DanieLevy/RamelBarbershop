@@ -63,7 +63,12 @@ export async function createCustomer(
 }
 
 /**
- * Get or create a customer - optimized upsert logic using single query where possible
+ * Get or create a customer using SMS/Phone authentication
+ * 
+ * Auth method logic:
+ * - New user: set auth_method to 'phone'
+ * - Existing user with email (supabase_uid): set to 'both' 
+ * - Existing user without email: keep as 'phone'
  */
 export async function getOrCreateCustomer(
   phone: string,
@@ -73,38 +78,63 @@ export async function getOrCreateCustomer(
   const supabase = createClient()
   const normalizedPhone = phone.replace(/\D/g, '')
   
-  // Try to upsert in a single operation for better performance
-  // This inserts if not exists, updates if exists (based on unique phone constraint)
+  // First check if customer exists
+  const existing = await findCustomerByPhone(normalizedPhone)
+  
+  if (existing) {
+    // Customer exists - update their record
+    // Determine auth_method: if they have supabase_uid (email), set to 'both', otherwise 'phone'
+    const hasEmail = existing.supabase_uid !== null && existing.supabase_uid !== undefined
+    const newAuthMethod: AuthMethod = hasEmail ? 'both' : 'phone'
+    
+    const updateData: Record<string, unknown> = {
+      last_login_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    
+    if (firebaseUid) {
+      updateData.firebase_uid = firebaseUid
+    }
+    
+    // Only update auth_method if it needs to change to 'both' or if it wasn't set
+    if (newAuthMethod === 'both' || !existing.auth_method || existing.auth_method === 'email') {
+      updateData.auth_method = newAuthMethod
+    }
+    
+    const { data, error } = await supabase.from('customers')
+      .update(updateData)
+      .eq('id', existing.id)
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('Error updating customer:', error)
+      return existing // Return existing on update failure
+    }
+    
+    console.log(`[CustomerService] Updated customer ${existing.id}, auth_method: '${newAuthMethod}'`)
+    return data as Customer
+  }
+  
+  // Create new customer with phone auth
   const { data, error } = await supabase.from('customers')
-    .upsert(
-      {
-        phone: normalizedPhone,
-        fullname,
-        firebase_uid: firebaseUid || null,
-        last_login_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      { 
-        onConflict: 'phone',
-        ignoreDuplicates: false 
-      }
-    )
+    .insert({
+      phone: normalizedPhone,
+      fullname,
+      firebase_uid: firebaseUid || null,
+      auth_method: 'phone',
+      last_login_at: new Date().toISOString(),
+    })
     .select()
     .single()
   
   if (error) {
-    // If upsert fails (e.g., on old Supabase versions), fall back to original logic
-    console.warn('Upsert failed, falling back to find+create:', error)
-    
-    const existing = await findCustomerByPhone(phone)
-    if (existing) {
-      await updateLastLogin(existing.id, firebaseUid)
-      return { ...existing, firebase_uid: firebaseUid || existing.firebase_uid }
-    }
-    
-    return createCustomer(phone, fullname, firebaseUid)
+    console.error('Error creating customer:', error)
+    await reportSupabaseError(error, 'Creating customer with phone', { table: 'customers', operation: 'insert' })
+    return null
   }
   
+  console.log(`[CustomerService] Created new customer with phone, auth_method: 'phone'`)
   return data as Customer
 }
 
@@ -392,6 +422,10 @@ export async function getOrCreateCustomerWithEmail(
 /**
  * Link email to an existing customer account
  * Used when a phone-registered user adds email as fallback
+ * 
+ * Auth method logic:
+ * - If user has firebase_uid (previously used SMS) → set to 'both'
+ * - If user has no firebase_uid (never used SMS) → set to 'email'
  */
 export async function linkEmailToCustomer(
   customerId: string,
@@ -408,9 +442,22 @@ export async function linkEmailToCustomer(
     return null
   }
   
+  // First, fetch the current customer to check their firebase_uid
+  const { data: currentCustomer } = await supabase
+    .from('customers')
+    .select('firebase_uid, auth_method')
+    .eq('id', customerId)
+    .single()
+  
+  // Determine the correct auth_method:
+  // - If user has firebase_uid → they've used SMS before → 'both'
+  // - If user has no firebase_uid → never used SMS → 'email'
+  const hasUsedSms = currentCustomer?.firebase_uid !== null && currentCustomer?.firebase_uid !== undefined
+  const newAuthMethod: AuthMethod = hasUsedSms ? 'both' : 'email'
+  
   const updateData: Record<string, unknown> = {
     email: normalizedEmail,
-    auth_method: 'both', // User now has both phone and email auth
+    auth_method: newAuthMethod,
     updated_at: new Date().toISOString(),
     last_login_at: new Date().toISOString(),
   }
@@ -431,6 +478,7 @@ export async function linkEmailToCustomer(
     return null
   }
   
+  console.log(`[CustomerService] Linked email to customer ${customerId}, auth_method set to '${newAuthMethod}'`)
   return data as Customer
 }
 
@@ -470,4 +518,106 @@ export async function getCustomerAuthMethod(phone: string): Promise<AuthMethod |
   if (!customer) return null
   
   return (customer.auth_method as AuthMethod) || 'phone'
+}
+
+// ============================================
+// Duplicate Prevention Methods
+// ============================================
+
+export type DuplicateCheckResult = {
+  isDuplicate: boolean
+  conflictType?: 'email_exists' | 'phone_exists' | 'email_different_phone' | 'phone_different_email'
+  existingCustomer?: Customer
+  message?: string
+}
+
+/**
+ * Check if email is already registered to a different phone number
+ * Used to prevent duplicate accounts
+ */
+export async function checkEmailDuplicate(
+  email: string,
+  currentPhone?: string
+): Promise<DuplicateCheckResult> {
+  const normalizedEmail = email.trim().toLowerCase()
+  const existingByEmail = await findCustomerByEmail(normalizedEmail)
+  
+  if (!existingByEmail) {
+    return { isDuplicate: false }
+  }
+  
+  // If checking with a phone number, see if it matches
+  if (currentPhone) {
+    const normalizedPhone = currentPhone.replace(/\D/g, '')
+    if (existingByEmail.phone === normalizedPhone) {
+      // Same phone - this is the same user, not a duplicate
+      return { isDuplicate: false, existingCustomer: existingByEmail }
+    }
+  }
+  
+  // Email exists with different phone
+  return {
+    isDuplicate: true,
+    conflictType: 'email_different_phone',
+    existingCustomer: existingByEmail,
+    message: 'כתובת האימייל כבר רשומה למספר טלפון אחר'
+  }
+}
+
+/**
+ * Check if phone is already registered to a different email
+ * Used to prevent duplicate accounts
+ */
+export async function checkPhoneDuplicate(
+  phone: string,
+  currentEmail?: string
+): Promise<DuplicateCheckResult> {
+  const normalizedPhone = phone.replace(/\D/g, '')
+  const existingByPhone = await findCustomerByPhone(normalizedPhone)
+  
+  if (!existingByPhone) {
+    return { isDuplicate: false }
+  }
+  
+  // If user has email and we're checking against a different email
+  if (currentEmail && existingByPhone.email) {
+    const normalizedEmail = currentEmail.trim().toLowerCase()
+    if (existingByPhone.email !== normalizedEmail) {
+      return {
+        isDuplicate: true,
+        conflictType: 'phone_different_email',
+        existingCustomer: existingByPhone,
+        message: 'מספר הטלפון כבר רשום לכתובת אימייל אחרת'
+      }
+    }
+  }
+  
+  // Phone exists - return the existing customer
+  return { isDuplicate: false, existingCustomer: existingByPhone }
+}
+
+/**
+ * Comprehensive duplicate check for both email and phone
+ */
+export async function checkForDuplicates(
+  phone: string,
+  email?: string
+): Promise<DuplicateCheckResult> {
+  const normalizedPhone = phone.replace(/\D/g, '')
+  
+  // First check if phone exists
+  const phoneCheck = await checkPhoneDuplicate(normalizedPhone, email)
+  if (phoneCheck.isDuplicate) {
+    return phoneCheck
+  }
+  
+  // If email provided, check email
+  if (email) {
+    const emailCheck = await checkEmailDuplicate(email, normalizedPhone)
+    if (emailCheck.isDuplicate) {
+      return emailCheck
+    }
+  }
+  
+  return { isDuplicate: false, existingCustomer: phoneCheck.existingCustomer }
 }

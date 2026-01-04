@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
-import { findCustomerByPhone, getCustomerAuthMethod } from '@/lib/services/customer.service'
+import { findCustomerByPhone, getCustomerAuthMethod, checkEmailDuplicate, findCustomerByEmail } from '@/lib/services/customer.service'
 import { sendPhoneOtp, verifyOtp, clearRecaptchaVerifier, isTestUser, TEST_USER, setSkipDebugMode } from '@/lib/firebase/config'
 import { sendEmailOtp, verifyEmailOtp, isValidEmail } from '@/lib/auth/email-auth'
 import { toast } from 'sonner'
@@ -243,6 +243,20 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setLoading(true)
     setError(null)
     
+    // Check if this email is already registered to a different phone
+    const duplicateCheck = await checkEmailDuplicate(email, phone)
+    if (duplicateCheck.isDuplicate) {
+      setError(duplicateCheck.message || 'כתובת האימייל כבר רשומה במערכת')
+      setLoading(false)
+      return
+    }
+    
+    // If email exists with same phone, this is an existing user - just verify
+    if (duplicateCheck.existingCustomer) {
+      await sendEmailOtpToUser(duplicateCheck.existingCustomer.email || email.trim().toLowerCase())
+      return
+    }
+    
     await sendEmailOtpToUser(email.trim().toLowerCase())
   }
 
@@ -258,6 +272,28 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     
     setLoading(true)
     setError(null)
+    
+    // Check if this email is already in use
+    const existingByEmail = await findCustomerByEmail(email)
+    if (existingByEmail) {
+      // Email already exists - check if same phone
+      const normalizedPhone = phone.replace(/\D/g, '')
+      if (existingByEmail.phone !== normalizedPhone) {
+        setError('כתובת האימייל כבר רשומה למספר טלפון אחר')
+        setLoading(false)
+        return
+      }
+      // Same user - set their name and proceed
+      setFullname(existingByEmail.fullname)
+    }
+    
+    // Check if phone already has a different email
+    const existingByPhone = await findCustomerByPhone(phone)
+    if (existingByPhone && existingByPhone.email && existingByPhone.email !== email.trim().toLowerCase()) {
+      setError(`מספר הטלפון כבר רשום לאימייל אחר: ${existingByPhone.email}`)
+      setLoading(false)
+      return
+    }
     
     await sendEmailOtpToUser(email.trim().toLowerCase())
   }

@@ -10,7 +10,7 @@ import { format } from 'date-fns'
 import { he } from 'date-fns/locale'
 import { 
   Users, Search, Ban, Trash2, Shield, ShieldOff,
-  Calendar, Phone, User, X, ChevronLeft, ChevronRight
+  Calendar, Phone, User, X, ChevronLeft, ChevronRight, Mail, MessageSquare
 } from 'lucide-react'
 import type { Customer } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
@@ -152,16 +152,85 @@ export default function UsersManagementPage() {
     try {
       const supabase = createClient()
       
-      // First, delete the customer's reservations (can't be orphaned)
-      await supabase.from('reservations')
+      // 1. Cancel all active (confirmed) reservations first
+      // This ensures proper cleanup and notifications won't try to reach deleted user
+      const { data: activeReservations } = await supabase
+        .from('reservations')
+        .select('id, barber_id, time_timestamp')
+        .eq('customer_id', customerId)
+        .eq('status', 'confirmed')
+        .gt('time_timestamp', Date.now())
+      
+      if (activeReservations && activeReservations.length > 0) {
+        // Cancel all active reservations
+        const { error: cancelError } = await supabase
+          .from('reservations')
+          .update({ 
+            status: 'cancelled',
+            cancelled_at: new Date().toISOString(),
+            cancelled_by: 'system' // System cancellation due to user deletion
+          })
+          .eq('customer_id', customerId)
+          .eq('status', 'confirmed')
+        
+        if (cancelError) {
+          console.error('Error cancelling active reservations:', cancelError)
+        } else {
+          console.log(`Cancelled ${activeReservations.length} active reservations for deleted customer`)
+        }
+      }
+      
+      // 2. Deactivate push subscriptions (don't delete - mark inactive for audit trail)
+      const { error: pushError } = await supabase
+        .from('push_subscriptions')
+        .update({ 
+          is_active: false,
+          customer_id: null, // Orphan the subscription
+          last_delivery_status: 'user_deleted'
+        })
+        .eq('customer_id', customerId)
+      
+      if (pushError) {
+        console.error('Error deactivating push subscriptions:', pushError)
+      }
+      
+      // 3. Delete notification settings
+      const { error: notifError } = await supabase
+        .from('customer_notification_settings')
         .delete()
         .eq('customer_id', customerId)
       
-      // Then delete the customer
-      const { error } = await supabase
+      if (notifError) {
+        console.error('Error deleting notification settings:', notifError)
+      }
+      
+      // 4. Delete old/cancelled reservations (keep history clean)
+      const { error: resError } = await supabase
+        .from('reservations')
+        .delete()
+        .eq('customer_id', customerId)
+      
+      if (resError) {
+        console.error('Error deleting reservations:', resError)
+      }
+      
+      // 5. Delete notification logs for this customer
+      const { error: logError } = await supabase
+        .from('notification_logs')
+        .delete()
+        .eq('recipient_id', customerId)
+        .eq('recipient_type', 'customer')
+      
+      if (logError) {
+        console.error('Error deleting notification logs:', logError)
+      }
+      
+      // 6. Finally delete the customer
+      const { error, count } = await supabase
         .from('customers')
         .delete()
         .eq('id', customerId)
+        .select()
       
       if (error) {
         console.error('Error deleting customer:', error)
@@ -170,11 +239,19 @@ export default function UsersManagementPage() {
         return
       }
       
+      // Check if deletion actually occurred
+      if (!count || count === 0) {
+        console.error('Customer was not deleted - may have been already removed or RLS blocking')
+        toast.error('לא ניתן למחוק את המשתמש')
+        return
+      }
+      
       toast.success('המשתמש נמחק בהצלחה')
       setConfirmModal({ isOpen: false, type: 'delete', customer: null })
       await fetchCustomers()
     } catch (err) {
       console.error('Error:', err)
+      await report(err, 'Deleting customer (exception)')
       toast.error('שגיאה במחיקת המשתמש')
     } finally {
       setActionLoading(null)
@@ -294,10 +371,38 @@ export default function UsersManagementPage() {
                         חסום
                       </span>
                     )}
+                    {/* Auth method indicator */}
+                    {customer.auth_method === 'email' ? (
+                      <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded flex items-center gap-1">
+                        <Mail size={10} />
+                        אימייל
+                      </span>
+                    ) : customer.auth_method === 'both' ? (
+                      <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded flex items-center gap-1">
+                        <MessageSquare size={10} />
+                        SMS+אימייל
+                      </span>
+                    ) : (
+                      <span className="px-1.5 py-0.5 bg-green-500/20 text-green-400 text-xs rounded flex items-center gap-1">
+                        <Phone size={10} />
+                        SMS
+                      </span>
+                    )}
                   </div>
-                  <p className="text-foreground-muted text-xs flex items-center gap-2">
-                    <Phone size={10} className="inline" />
-                    <span dir="ltr">{customer.phone}</span>
+                  <p className="text-foreground-muted text-xs flex items-center gap-2 flex-wrap">
+                    <span className="flex items-center gap-1">
+                      <Phone size={10} className="inline" />
+                      <span dir="ltr">{customer.phone}</span>
+                    </span>
+                    {customer.email && (
+                      <>
+                        <span className="text-foreground-muted/50">•</span>
+                        <span className="flex items-center gap-1">
+                          <Mail size={10} className="inline" />
+                          <span dir="ltr">{customer.email}</span>
+                        </span>
+                      </>
+                    )}
                     <span className="text-foreground-muted/50">•</span>
                     <span>{customer.reservation_count} תורים</span>
                     <span className="text-foreground-muted/50">•</span>

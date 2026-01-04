@@ -5,7 +5,7 @@ import { useBookingStore } from '@/store/useBookingStore'
 import { useAuthStore } from '@/store/useAuthStore'
 import { sendPhoneOtp, verifyOtp, clearRecaptchaVerifier, isTestUser, TEST_USER } from '@/lib/firebase/config'
 import { sendEmailOtp, verifyEmailOtp, isValidEmail } from '@/lib/auth/email-auth'
-import { getOrCreateCustomer, getOrCreateCustomerWithEmail } from '@/lib/services/customer.service'
+import { getOrCreateCustomer, getOrCreateCustomerWithEmail, checkEmailDuplicate, findCustomerByPhone } from '@/lib/services/customer.service'
 import { createReservation as createReservationService } from '@/lib/services/booking.service'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -163,6 +163,27 @@ export function OTPVerification() {
     setError(null)
     
     try {
+      const customerPhone = customer?.phone || ''
+      
+      // Check if this email is already registered to a different phone
+      const duplicateCheck = await checkEmailDuplicate(email.trim().toLowerCase(), customerPhone)
+      
+      if (duplicateCheck.isDuplicate) {
+        setError(duplicateCheck.message || 'כתובת האימייל כבר רשומה במערכת')
+        setSending(false)
+        return
+      }
+      
+      // Check if phone already has a different email registered
+      if (customerPhone) {
+        const existingByPhone = await findCustomerByPhone(customerPhone)
+        if (existingByPhone && existingByPhone.email && existingByPhone.email !== email.trim().toLowerCase()) {
+          setError(`מספר הטלפון כבר רשום לאימייל אחר: ${existingByPhone.email}`)
+          setSending(false)
+          return
+        }
+      }
+      
       const result = await sendEmailOtp(email.trim().toLowerCase())
       
       if (!isMountedRef.current) return

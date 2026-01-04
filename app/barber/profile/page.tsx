@@ -69,9 +69,9 @@ export default function BarberProfilePage() {
     }
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setShowLogoutModal(false)
-    logout()
+    await logout()
     router.replace('/')
     toast.success('התנתקת בהצלחה')
   }

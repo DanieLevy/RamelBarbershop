@@ -127,9 +127,9 @@ export default function ProfilePage() {
     }
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setShowLogoutModal(false)
-    logout()
+    await logout()
     haptics.light() // Haptic feedback for logout
     router.replace('/')
     toast.success('התנתקת בהצלחה')

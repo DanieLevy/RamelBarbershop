@@ -16,7 +16,7 @@ interface BarberAuthState {
   
   // Actions
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
-  logout: () => void
+  logout: () => Promise<void>
   checkSession: () => Promise<void>
   setBarber: (barber: User) => void
 }
@@ -53,7 +53,35 @@ export const useBarberAuthStore = create<BarberAuthState>((set, get) => ({
     }
   },
 
-  logout: () => {
+  logout: async () => {
+    const { barber } = get()
+    
+    // Deactivate push subscription for current device before logout
+    // This ensures this device won't receive notifications for the logged-out barber
+    if (barber?.id && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      try {
+        const registration = await navigator.serviceWorker.ready
+        const subscription = await registration.pushManager.getSubscription()
+        
+        if (subscription) {
+          // Unsubscribe from browser's push manager
+          await subscription.unsubscribe()
+          
+          // Deactivate on server (by endpoint)
+          await fetch('/api/push/subscribe', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint: subscription.endpoint })
+          })
+          
+          console.log('[BarberAuth] Push subscription deactivated on logout')
+        }
+      } catch (err) {
+        // Don't block logout if push cleanup fails
+        console.error('[BarberAuth] Error cleaning up push subscription on logout:', err)
+      }
+    }
+    
     clearBarberSession()
     set({
       barber: null,

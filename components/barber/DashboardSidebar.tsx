@@ -78,8 +78,8 @@ export function DashboardSidebar({ isMobileOpen, onMobileClose }: DashboardSideb
     }
   }, [isMobileOpen])
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     router.push('/barber/login')
   }
 

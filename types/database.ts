@@ -390,6 +390,7 @@ export type Database = {
           devices_targeted: number
           error_message: string | null
           id: string
+          is_read: boolean | null
           notification_type: string
           payload: Json | null
           recipient_id: string
@@ -408,6 +409,7 @@ export type Database = {
           devices_targeted?: number
           error_message?: string | null
           id?: string
+          is_read?: boolean | null
           notification_type: string
           payload?: Json | null
           recipient_id: string
@@ -426,6 +428,7 @@ export type Database = {
           devices_targeted?: number
           error_message?: string | null
           id?: string
+          is_read?: boolean | null
           notification_type?: string
           payload?: Json | null
           recipient_id?: string
@@ -1024,11 +1027,11 @@ export interface PushSubscription {
   device_type: PushDeviceType
   device_name: string | null
   user_agent: string | null
-  is_active: boolean
-  consecutive_failures: number
-  last_delivery_status: 'success' | 'failed' | 'pending' | null
-  last_used: string
-  created_at: string
+  is_active: boolean | null
+  consecutive_failures: number | null
+  last_delivery_status: 'success' | 'failed' | 'pending' | 'user_deleted' | null
+  last_used: string | null
+  created_at: string | null
 }
 
 // Customer notification settings database record
@@ -1063,6 +1066,6 @@ export interface PushDeviceInfo {
   id: string
   deviceType: PushDeviceType
   deviceName: string | null
-  lastUsed: string
-  createdAt: string
+  lastUsed: string | null
+  createdAt: string | null
 }
