@@ -3,46 +3,61 @@
 import { useEffect, useState } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { createClient } from '@/lib/supabase/client'
-import { formatTime, cn, parseTimeString, generateTimeSlots, getIsraelDayStart, getIsraelDayEnd } from '@/lib/utils'
-import type { TimeSlot, BarbershopSettings, BarberSchedule } from '@/types/database'
+import { formatTime, cn, parseTimeString, generateTimeSlots, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael } from '@/lib/utils'
+import type { TimeSlot, BarbershopSettings, BarberSchedule, WorkDay } from '@/types/database'
 import { ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { getWorkHours as getWorkHoursFromService, workDaysToMap } from '@/lib/services/availability.service'
 
 interface TimeSelectionProps {
   barberId: string
   shopSettings?: BarbershopSettings | null
   barberSchedule?: BarberSchedule | null
+  barberWorkDays?: WorkDay[]
 }
 
 interface EnrichedTimeSlot extends TimeSlot {
   reservedBy?: string
 }
 
-export function TimeSelection({ barberId, shopSettings, barberSchedule }: TimeSelectionProps) {
+export function TimeSelection({ barberId, shopSettings, barberSchedule, barberWorkDays }: TimeSelectionProps) {
   const { date, timeTimestamp, setTime, nextStep, prevStep } = useBookingStore()
   const [availableSlots, setAvailableSlots] = useState<EnrichedTimeSlot[]>([])
   const [reservedSlots, setReservedSlots] = useState<EnrichedTimeSlot[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showReserved, setShowReserved] = useState(false)
+  const [workDays, setWorkDays] = useState<WorkDay[]>(barberWorkDays || [])
   const { report } = useBugReporter('TimeSelection')
 
-  // Get work hours from barber schedule or shop settings
-  const getWorkHours = (): { start: string; end: string } => {
-    if (barberSchedule?.work_hours_start && barberSchedule?.work_hours_end) {
-      return {
-        start: barberSchedule.work_hours_start,
-        end: barberSchedule.work_hours_end,
+  // Fetch work days if not provided as prop
+  useEffect(() => {
+    const fetchWorkDays = async () => {
+      if (barberWorkDays && barberWorkDays.length > 0) {
+        setWorkDays(barberWorkDays)
+        return
+      }
+      
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('work_days')
+        .select('*')
+        .eq('user_id', barberId)
+      
+      if (data) {
+        setWorkDays(data as WorkDay[])
       }
     }
-    if (shopSettings?.work_hours_start && shopSettings?.work_hours_end) {
-      return {
-        start: shopSettings.work_hours_start,
-        end: shopSettings.work_hours_end,
-      }
-    }
-    return { start: '09:00', end: '19:00' }
+    
+    fetchWorkDays()
+  }, [barberId, barberWorkDays])
+
+  // Get work hours for a specific day - uses day-specific hours from work_days
+  const getWorkHoursForDay = (dateTimestamp: number): { start: string; end: string } => {
+    const dayName = getDayKeyInIsrael(dateTimestamp)
+    const workDaysMap = workDaysToMap(workDays)
+    return getWorkHoursFromService(shopSettings || null, barberSchedule || null, dayName, workDaysMap)
   }
 
   useEffect(() => {
@@ -54,7 +69,8 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule }: TimeSe
       
       try {
         const supabase = createClient()
-        const workHours = getWorkHours()
+        // Get day-specific work hours for the selected date
+        const workHours = getWorkHoursForDay(date.dateTimestamp)
         const { hour: startHour, minute: startMinute } = parseTimeString(workHours.start)
         const { hour: endHour, minute: endMinute } = parseTimeString(workHours.end)
         
@@ -139,7 +155,7 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule }: TimeSe
 
     fetchTimeSlots()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [barberId, date])
+  }, [barberId, date, workDays])
 
   const handleSelect = (timestamp: number) => {
     setTime(timestamp)

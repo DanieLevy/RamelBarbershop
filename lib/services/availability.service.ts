@@ -1,7 +1,19 @@
 import { createClient } from '@/lib/supabase/client'
-import type { BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure, BarberMessage } from '@/types/database'
+import type { BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure, BarberMessage, WorkDay } from '@/types/database'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
 import { getTodayDateString, getIsraelDateString, getDayKeyInIsrael } from '@/lib/utils'
+
+/**
+ * Day-specific work hours for a barber
+ * Maps day name to hours
+ */
+export type DayWorkHours = {
+  [day: string]: {
+    isWorking: boolean
+    startTime: string | null
+    endTime: string | null
+  }
+}
 
 /**
  * Get barbershop settings
@@ -44,7 +56,8 @@ export async function getBarbershopClosures(): Promise<BarbershopClosure[]> {
 }
 
 /**
- * Get barber schedule
+ * Get barber schedule (legacy - global hours)
+ * @deprecated Use getBarberWorkDays for day-specific hours
  */
 export async function getBarberSchedule(barberId: string): Promise<BarberSchedule | null> {
   const supabase = createClient()
@@ -61,6 +74,61 @@ export async function getBarberSchedule(barberId: string): Promise<BarberSchedul
   }
   
   return data as BarberSchedule | null
+}
+
+/**
+ * Get barber work days with day-specific hours
+ * Returns an array of WorkDay objects, one per day of week
+ */
+export async function getBarberWorkDays(barberId: string): Promise<WorkDay[]> {
+  const supabase = createClient()
+  
+  const { data, error } = await supabase
+    .from('work_days')
+    .select('*')
+    .eq('user_id', barberId)
+  
+  if (error) {
+    console.error('Error fetching barber work days:', error)
+    await reportSupabaseError(error, 'Fetching barber work days', { table: 'work_days', operation: 'select' })
+    return []
+  }
+  
+  return (data as WorkDay[]) || []
+}
+
+/**
+ * Get barber work days as a convenient map
+ * Returns object with day names as keys for quick lookup
+ */
+export async function getBarberWorkDaysMap(barberId: string): Promise<DayWorkHours> {
+  const workDays = await getBarberWorkDays(barberId)
+  
+  const map: DayWorkHours = {}
+  for (const wd of workDays) {
+    map[wd.day_of_week] = {
+      isWorking: wd.is_working || false,
+      startTime: wd.start_time,
+      endTime: wd.end_time,
+    }
+  }
+  
+  return map
+}
+
+/**
+ * Convert WorkDay array to DayWorkHours map (for client-side use)
+ */
+export function workDaysToMap(workDays: WorkDay[]): DayWorkHours {
+  const map: DayWorkHours = {}
+  for (const wd of workDays) {
+    map[wd.day_of_week] = {
+      isWorking: wd.is_working || false,
+      startTime: wd.start_time,
+      endTime: wd.end_time,
+    }
+  }
+  return map
 }
 
 /**
@@ -107,13 +175,15 @@ export async function getBarberMessages(barberId: string): Promise<BarberMessage
 
 /**
  * Check if a specific date is available for booking
+ * Now supports day-specific work hours via barberWorkDays
  */
 export function isDateAvailable(
   dateTimestamp: number,
   shopSettings: BarbershopSettings | null,
   shopClosures: BarbershopClosure[],
   barberSchedule: BarberSchedule | null,
-  barberClosures: BarberClosure[]
+  barberClosures: BarberClosure[],
+  barberWorkDays?: DayWorkHours
 ): { available: boolean; reason?: string } {
   // Use Israel timezone for date calculations
   const dateStr = getIsraelDateString(dateTimestamp)
@@ -133,13 +203,19 @@ export function isDateAvailable(
     return { available: false, reason: shopClosure.reason || 'המספרה סגורה בתאריך זה' }
   }
   
-  // Check if barber works on this day
-  if (barberSchedule && !barberSchedule.work_days.includes(dayName)) {
+  // Check if barber works on this day using day-specific work days (new method)
+  if (barberWorkDays && barberWorkDays[dayName]) {
+    if (!barberWorkDays[dayName].isWorking) {
+      return { available: false, reason: 'הספר לא עובד ביום זה' }
+    }
+  }
+  // Fallback to legacy barberSchedule if no workDays provided
+  else if (barberSchedule && !barberSchedule.work_days.includes(dayName)) {
     return { available: false, reason: 'הספר לא עובד ביום זה' }
   }
   
-  // If no barber schedule, use shop settings as fallback
-  if (!barberSchedule && shopSettings && !shopSettings.open_days.includes(dayName)) {
+  // If no barber schedule at all, use shop settings as fallback
+  if (!barberSchedule && !barberWorkDays && shopSettings && !shopSettings.open_days.includes(dayName)) {
     return { available: false, reason: 'הספר לא עובד ביום זה' }
   }
   
@@ -156,12 +232,36 @@ export function isDateAvailable(
 
 /**
  * Get work hours for a barber on a specific date
+ * Now supports day-specific hours via barberWorkDays
+ * 
+ * @param shopSettings - Barbershop settings (fallback)
+ * @param barberSchedule - Legacy barber schedule (fallback)
+ * @param dayName - Day of week (e.g., 'sunday', 'monday')
+ * @param barberWorkDays - Day-specific work hours map
  */
 export function getWorkHours(
   shopSettings: BarbershopSettings | null,
-  barberSchedule: BarberSchedule | null
+  barberSchedule: BarberSchedule | null,
+  dayName?: string,
+  barberWorkDays?: DayWorkHours
 ): { start: string; end: string } {
-  // Barber schedule takes priority
+  // Day-specific hours take priority (new method)
+  if (dayName && barberWorkDays && barberWorkDays[dayName]) {
+    const dayHours = barberWorkDays[dayName]
+    if (dayHours.isWorking && dayHours.startTime && dayHours.endTime) {
+      // Normalize time format (remove seconds if present)
+      const normalizeTime = (time: string): string => {
+        const parts = time.split(':')
+        return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`
+      }
+      return {
+        start: normalizeTime(dayHours.startTime),
+        end: normalizeTime(dayHours.endTime),
+      }
+    }
+  }
+  
+  // Fallback to legacy barber schedule (global hours)
   if (barberSchedule) {
     return {
       start: barberSchedule.work_hours_start,
@@ -181,3 +281,39 @@ export function getWorkHours(
   return { start: '09:00', end: '19:00' }
 }
 
+/**
+ * Get work hours for a specific day from work days array
+ * Convenience function for use in components
+ */
+export function getDayWorkHours(
+  workDays: WorkDay[],
+  dayName: string,
+  shopSettings: BarbershopSettings | null
+): { start: string; end: string; isWorking: boolean } {
+  const normalizeTime = (time: string | null): string => {
+    if (!time) return '09:00'
+    const parts = time.split(':')
+    return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`
+  }
+  
+  const dayData = workDays.find(wd => wd.day_of_week === dayName)
+  
+  if (dayData) {
+    return {
+      start: normalizeTime(dayData.start_time),
+      end: normalizeTime(dayData.end_time),
+      isWorking: dayData.is_working || false,
+    }
+  }
+  
+  // Fallback to shop settings
+  if (shopSettings) {
+    return {
+      start: normalizeTime(shopSettings.work_hours_start),
+      end: normalizeTime(shopSettings.work_hours_end),
+      isWorking: shopSettings.open_days.includes(dayName),
+    }
+  }
+  
+  return { start: '09:00', end: '19:00', isWorking: false }
+}

@@ -152,17 +152,21 @@ export default function UsersManagementPage() {
     try {
       const supabase = createClient()
       
-      // 1. Cancel all active (confirmed) reservations first
-      // This ensures proper cleanup and notifications won't try to reach deleted user
-      const { data: activeReservations } = await supabase
+      // 1. First, cancel all active (confirmed) future reservations
+      // This is important to mark them as cancelled before deletion
+      const { data: activeReservations, error: fetchError } = await supabase
         .from('reservations')
         .select('id, barber_id, time_timestamp')
         .eq('customer_id', customerId)
         .eq('status', 'confirmed')
         .gt('time_timestamp', Date.now())
       
+      if (fetchError) {
+        console.error('Error fetching active reservations:', fetchError)
+      }
+      
       if (activeReservations && activeReservations.length > 0) {
-        // Cancel all active reservations
+        // Cancel all active future reservations
         const { error: cancelError } = await supabase
           .from('reservations')
           .update({ 
@@ -175,6 +179,7 @@ export default function UsersManagementPage() {
         
         if (cancelError) {
           console.error('Error cancelling active reservations:', cancelError)
+          await report(new Error(cancelError.message), 'Cancelling reservations before user deletion')
         } else {
           console.log(`Cancelled ${activeReservations.length} active reservations for deleted customer`)
         }
@@ -204,7 +209,9 @@ export default function UsersManagementPage() {
         console.error('Error deleting notification settings:', notifError)
       }
       
-      // 4. Delete old/cancelled reservations (keep history clean)
+      // 4. Delete ALL reservations for this customer (historical cleanup)
+      // The database trigger will also handle this, but we do it explicitly
+      // to ensure proper cleanup before the customer deletion
       const { error: resError } = await supabase
         .from('reservations')
         .delete()
@@ -212,6 +219,7 @@ export default function UsersManagementPage() {
       
       if (resError) {
         console.error('Error deleting reservations:', resError)
+        // Don't fail here - the trigger will handle cleanup
       }
       
       // 5. Delete notification logs for this customer
@@ -226,6 +234,7 @@ export default function UsersManagementPage() {
       }
       
       // 6. Finally delete the customer
+      // The database trigger will automatically clean up any remaining reservations
       const { error, count } = await supabase
         .from('customers')
         .delete()
@@ -235,7 +244,13 @@ export default function UsersManagementPage() {
       if (error) {
         console.error('Error deleting customer:', error)
         await report(new Error(error.message), 'Deleting customer')
-        toast.error('שגיאה במחיקת המשתמש')
+        
+        // Provide specific error message based on error type
+        if (error.message?.includes('active future reservations')) {
+          toast.error('לא ניתן למחוק - יש תורים פעילים. בטל אותם תחילה')
+        } else {
+          toast.error('שגיאה במחיקת המשתמש')
+        }
         return
       }
       
@@ -246,13 +261,20 @@ export default function UsersManagementPage() {
         return
       }
       
-      toast.success('המשתמש נמחק בהצלחה')
+      toast.success('המשתמש והתורים שלו נמחקו בהצלחה')
       setConfirmModal({ isOpen: false, type: 'delete', customer: null })
       await fetchCustomers()
     } catch (err) {
       console.error('Error:', err)
       await report(err, 'Deleting customer (exception)')
-      toast.error('שגיאה במחיקת המשתמש')
+      
+      // Check for specific error messages
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      if (errorMessage.includes('active future reservations')) {
+        toast.error('לא ניתן למחוק - יש תורים פעילים. בטל אותם תחילה')
+      } else {
+        toast.error('שגיאה במחיקת המשתמש')
+      }
     } finally {
       setActionLoading(null)
     }

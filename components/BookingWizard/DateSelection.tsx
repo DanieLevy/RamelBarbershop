@@ -188,13 +188,16 @@ export function DateSelection({
     }
     
     // 6. Check if barber works on this day
-    if (barberSchedule?.work_days && barberSchedule.work_days.length > 0) {
-      if (!barberSchedule.work_days.includes(day.dayKey)) {
+    // Priority: work_days table (day-specific) > barberSchedule (legacy global)
+    const workDay = workDays.find((wd) => wd.day_of_week.toLowerCase() === day.dayKey)
+    if (workDay) {
+      // Use day-specific work_days table (new method)
+      if (!workDay.is_working) {
         return { available: false, reason: 'הספר לא עובד', type: 'barber_not_working' }
       }
-    } else {
-      const legacyWorkDay = workDays.find((wd) => wd.day_of_week.toLowerCase() === day.dayKey)
-      if (!legacyWorkDay?.is_working) {
+    } else if (barberSchedule?.work_days && barberSchedule.work_days.length > 0) {
+      // Fallback to legacy barberSchedule
+      if (!barberSchedule.work_days.includes(day.dayKey)) {
         return { available: false, reason: 'הספר לא עובד', type: 'barber_not_working' }
       }
     }

@@ -1,39 +1,43 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { Plus, Trash, Calendar, Clock } from 'lucide-react'
-import type { BarberSchedule, BarberClosure, BarbershopSettings } from '@/types/database'
+import { Plus, Trash, Calendar, Clock, ChevronDown, ChevronUp } from 'lucide-react'
+import type { BarberClosure, BarbershopSettings, WorkDay } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
 
 const DAYS = [
-  { key: 'sunday', label: 'ראשון' },
-  { key: 'monday', label: 'שני' },
-  { key: 'tuesday', label: 'שלישי' },
-  { key: 'wednesday', label: 'רביעי' },
-  { key: 'thursday', label: 'חמישי' },
-  { key: 'friday', label: 'שישי' },
-  { key: 'saturday', label: 'שבת' },
+  { key: 'sunday', label: 'ראשון', shortLabel: 'א׳' },
+  { key: 'monday', label: 'שני', shortLabel: 'ב׳' },
+  { key: 'tuesday', label: 'שלישי', shortLabel: 'ג׳' },
+  { key: 'wednesday', label: 'רביעי', shortLabel: 'ד׳' },
+  { key: 'thursday', label: 'חמישי', shortLabel: 'ה׳' },
+  { key: 'friday', label: 'שישי', shortLabel: 'ו׳' },
+  { key: 'saturday', label: 'שבת', shortLabel: 'ש׳' },
 ]
+
+interface DaySchedule {
+  id: string
+  dayOfWeek: string
+  isWorking: boolean
+  startTime: string
+  endTime: string
+}
 
 export default function MySchedulePage() {
   const { barber } = useBarberAuthStore()
   const { report } = useBugReporter('MySchedulePage')
   
-  const [schedule, setSchedule] = useState<BarberSchedule | null>(null)
+  const [workDays, setWorkDays] = useState<DaySchedule[]>([])
   const [closures, setClosures] = useState<BarberClosure[]>([])
   const [shopSettings, setShopSettings] = useState<BarbershopSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [savingSchedule, setSavingSchedule] = useState(false)
   const [savingClosure, setSavingClosure] = useState(false)
-  
-  // Schedule form
-  const [workDays, setWorkDays] = useState<string[]>([])
-  const [startTime, setStartTime] = useState('09:00')
-  const [endTime, setEndTime] = useState('19:00')
+  const [expandedDay, setExpandedDay] = useState<string | null>(null)
   
   // Closure form
   const [showClosureForm, setShowClosureForm] = useState(false)
@@ -42,20 +46,13 @@ export default function MySchedulePage() {
   const [closureReason, setClosureReason] = useState('')
 
   // Helper to normalize time format for consistent comparison
-  // Handles both "HH:MM" and "HH:MM:SS" formats, returns "HH:MM"
-  const normalizeTime = (time: string): string => {
+  const normalizeTime = useCallback((time: string | null): string => {
+    if (!time) return '09:00'
     const parts = time.split(':')
     return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`
-  }
+  }, [])
 
-  useEffect(() => {
-    if (barber?.id) {
-      fetchData()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [barber?.id])
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!barber?.id) return
     
     const supabase = createClient()
@@ -70,29 +67,41 @@ export default function MySchedulePage() {
       setShopSettings(shopData as BarbershopSettings)
     }
     
-    // Fetch barber schedule
-    const { data: scheduleData } = await supabase
-      .from('barber_schedules')
+    // Fetch barber work days with day-specific hours
+    const { data: workDaysData, error: workDaysError } = await supabase
+      .from('work_days')
       .select('*')
-      .eq('barber_id', barber.id)
-      .single()
+      .eq('user_id', barber.id)
     
-    if (scheduleData) {
-      const s = scheduleData as BarberSchedule
-      setSchedule(s)
-      setWorkDays(s.work_days || [])
-      // Normalize time format when loading from database
-      setStartTime(normalizeTime(s.work_hours_start || '09:00'))
-      setEndTime(normalizeTime(s.work_hours_end || '19:00'))
+    if (workDaysError) {
+      console.error('Error fetching work days:', workDaysError)
+      await report(new Error(workDaysError.message), 'Fetching barber work days')
+    }
+    
+    if (workDaysData && workDaysData.length > 0) {
+      const mapped: DaySchedule[] = (workDaysData as WorkDay[]).map(wd => ({
+        id: wd.id,
+        dayOfWeek: wd.day_of_week,
+        isWorking: wd.is_working || false,
+        startTime: normalizeTime(wd.start_time),
+        endTime: normalizeTime(wd.end_time),
+      }))
+      
+      // Sort by day order
+      const dayOrder = DAYS.map(d => d.key)
+      mapped.sort((a, b) => dayOrder.indexOf(a.dayOfWeek) - dayOrder.indexOf(b.dayOfWeek))
+      
+      setWorkDays(mapped)
     } else {
-      // Use shop defaults
-      if (shopData) {
-        const shop = shopData as BarbershopSettings
-        setWorkDays(shop.open_days || [])
-        // Normalize time format when loading from database
-        setStartTime(normalizeTime(shop.work_hours_start || '09:00'))
-        setEndTime(normalizeTime(shop.work_hours_end || '19:00'))
-      }
+      // Initialize with defaults if no work_days exist
+      const defaults: DaySchedule[] = DAYS.map(day => ({
+        id: '',
+        dayOfWeek: day.key,
+        isWorking: shopData?.open_days?.includes(day.key) || false,
+        startTime: normalizeTime(shopData?.work_hours_start || '09:00'),
+        endTime: normalizeTime(shopData?.work_hours_end || '19:00'),
+      }))
+      setWorkDays(defaults)
     }
     
     // Fetch barber closures
@@ -104,20 +113,34 @@ export default function MySchedulePage() {
     
     setClosures((closuresData as BarberClosure[]) || [])
     setLoading(false)
-  }
+  }, [barber?.id, normalizeTime, report])
 
-  const toggleDay = (day: string) => {
+  useEffect(() => {
+    if (barber?.id) {
+      fetchData()
+    }
+  }, [barber?.id, fetchData])
+
+  const toggleDay = (dayKey: string) => {
     // Only allow days that are open in the shop
-    if (!shopSettings?.open_days.includes(day)) {
+    if (!shopSettings?.open_days.includes(dayKey)) {
       toast.error('המספרה סגורה ביום זה')
       return
     }
     
-    if (workDays.includes(day)) {
-      setWorkDays(workDays.filter(d => d !== day))
-    } else {
-      setWorkDays([...workDays, day])
-    }
+    setWorkDays(prev => prev.map(day => 
+      day.dayOfWeek === dayKey 
+        ? { ...day, isWorking: !day.isWorking }
+        : day
+    ))
+  }
+
+  const updateDayTime = (dayKey: string, field: 'startTime' | 'endTime', value: string) => {
+    setWorkDays(prev => prev.map(day => 
+      day.dayOfWeek === dayKey 
+        ? { ...day, [field]: value }
+        : day
+    ))
   }
 
   const handleSaveSchedule = async () => {
@@ -127,55 +150,92 @@ export default function MySchedulePage() {
     if (shopSettings) {
       const shopStart = normalizeTime(shopSettings.work_hours_start)
       const shopEnd = normalizeTime(shopSettings.work_hours_end)
-      const barberStart = normalizeTime(startTime)
-      const barberEnd = normalizeTime(endTime)
       
-      if (barberStart < shopStart) {
-        toast.error(`שעת ההתחלה לא יכולה להיות לפני ${shopStart}`)
-        return
-      }
-      if (barberEnd > shopEnd) {
-        toast.error(`שעת הסיום לא יכולה להיות אחרי ${shopEnd}`)
-        return
+      for (const day of workDays) {
+        if (!day.isWorking) continue
+        
+        if (day.startTime < shopStart) {
+          const dayLabel = DAYS.find(d => d.key === day.dayOfWeek)?.label || day.dayOfWeek
+          toast.error(`ביום ${dayLabel}: שעת ההתחלה לא יכולה להיות לפני ${shopStart}`)
+          return
+        }
+        if (day.endTime > shopEnd) {
+          const dayLabel = DAYS.find(d => d.key === day.dayOfWeek)?.label || day.dayOfWeek
+          toast.error(`ביום ${dayLabel}: שעת הסיום לא יכולה להיות אחרי ${shopEnd}`)
+          return
+        }
+        if (day.startTime >= day.endTime) {
+          const dayLabel = DAYS.find(d => d.key === day.dayOfWeek)?.label || day.dayOfWeek
+          toast.error(`ביום ${dayLabel}: שעת ההתחלה חייבת להיות לפני שעת הסיום`)
+          return
+        }
       }
     }
     
     setSavingSchedule(true)
     const supabase = createClient()
     
-    const scheduleData = {
-      barber_id: barber.id,
-      work_days: workDays,
-      work_hours_start: startTime,
-      work_hours_end: endTime,
-      updated_at: new Date().toISOString(),
-    }
-    
-    if (schedule) {
-      const { error } = await supabase.from('barber_schedules')
-        .update(scheduleData)
-        .eq('id', schedule.id)
-      
-      if (error) {
-        console.error('Error updating schedule:', error)
-        await report(new Error(error.message), 'Updating barber schedule')
-        toast.error('שגיאה בעדכון הלוח')
-      } else {
-        toast.success('הלוח עודכן בהצלחה!')
-        fetchData()
+    try {
+      // Update each day's work hours
+      for (const day of workDays) {
+        if (day.id) {
+          // Update existing record
+          const { error } = await supabase
+            .from('work_days')
+            .update({
+              is_working: day.isWorking,
+              start_time: day.isWorking ? day.startTime : null,
+              end_time: day.isWorking ? day.endTime : null,
+            })
+            .eq('id', day.id)
+          
+          if (error) {
+            console.error(`Error updating ${day.dayOfWeek}:`, error)
+            throw error
+          }
+        } else {
+          // Insert new record (shouldn't happen normally)
+          const { error } = await supabase
+            .from('work_days')
+            .insert({
+              user_id: barber.id,
+              day_of_week: day.dayOfWeek,
+              is_working: day.isWorking,
+              start_time: day.isWorking ? day.startTime : null,
+              end_time: day.isWorking ? day.endTime : null,
+            })
+          
+          if (error) {
+            console.error(`Error inserting ${day.dayOfWeek}:`, error)
+            throw error
+          }
+        }
       }
-    } else {
-      const { error } = await supabase.from('barber_schedules')
-        .insert(scheduleData)
       
-      if (error) {
-        console.error('Error creating schedule:', error)
-        await report(new Error(error.message), 'Creating barber schedule')
-        toast.error('שגיאה ביצירת הלוח')
-      } else {
-        toast.success('הלוח נשמר בהצלחה!')
-        fetchData()
+      // Also update the legacy barber_schedules table for backward compatibility
+      const workingDays = workDays.filter(d => d.isWorking).map(d => d.dayOfWeek)
+      const { error: scheduleError } = await supabase
+        .from('barber_schedules')
+        .upsert({
+          barber_id: barber.id,
+          work_days: workingDays,
+          // Use the first working day's hours as the "global" hours for legacy compatibility
+          work_hours_start: workDays.find(d => d.isWorking)?.startTime || '09:00',
+          work_hours_end: workDays.find(d => d.isWorking)?.endTime || '19:00',
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'barber_id' })
+      
+      if (scheduleError) {
+        console.error('Error updating barber_schedules:', scheduleError)
+        // Don't throw - this is just for backward compatibility
       }
+      
+      toast.success('לוח הזמנים עודכן בהצלחה!')
+      fetchData()
+    } catch (err) {
+      console.error('Error saving schedule:', err)
+      await report(err, 'Saving barber work days')
+      toast.error('שגיאה בשמירת לוח הזמנים')
     }
     
     setSavingSchedule(false)
@@ -265,14 +325,14 @@ export default function MySchedulePage() {
     <div className="max-w-2xl">
       <div className="mb-8">
         <h1 className="text-2xl font-medium text-foreground-light">הלוז שלי</h1>
-        <p className="text-foreground-muted mt-1">הגדר את ימי ושעות העבודה שלך</p>
+        <p className="text-foreground-muted mt-1">הגדר את ימי ושעות העבודה שלך - לכל יום בנפרד</p>
       </div>
 
       {/* Work Schedule */}
       <div className="bg-background-card border border-white/10 rounded-2xl p-6 mb-6">
         <h3 className="text-lg font-medium text-foreground-light mb-4 flex items-center gap-2">
           <Clock size={20} strokeWidth={1.5} className="text-accent-gold" />
-          שעות עבודה
+          שעות עבודה לפי יום
         </h3>
         
         {/* Info about shop hours */}
@@ -281,62 +341,128 @@ export default function MySchedulePage() {
             <p className="text-blue-400 text-sm">
               שעות פתיחה של המספרה: {normalizeTime(shopSettings.work_hours_start)} - {normalizeTime(shopSettings.work_hours_end)}
             </p>
+            <p className="text-blue-400/70 text-xs mt-1">
+              ניתן לקבוע שעות שונות לכל יום בשבוע
+            </p>
           </div>
         )}
 
-        {/* Work Days - Grid layout for mobile */}
-        <div className="mb-6">
-          <label className="text-foreground-light text-sm block mb-3">ימי עבודה</label>
-          <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
-            {DAYS.map((day) => {
-              const isShopOpen = shopSettings?.open_days.includes(day.key)
-              const isActive = workDays.includes(day.key)
-              return (
-                <button
-                  key={day.key}
-                  onClick={() => toggleDay(day.key)}
-                  disabled={!isShopOpen}
-                  className={cn(
-                    'min-w-[60px] px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all flex items-center justify-center',
-                    !isShopOpen
-                      ? 'bg-background-dark/50 text-foreground-muted/30 cursor-not-allowed'
-                      : isActive
-                        ? 'bg-accent-gold text-background-dark shadow-sm shadow-accent-gold/30'
-                        : 'bg-white/[0.03] border border-white/[0.06] text-foreground-muted hover:bg-white/[0.06]'
-                  )}
-                  title={!isShopOpen ? 'המספרה סגורה ביום זה' : ''}
+        {/* Day-specific schedule */}
+        <div className="space-y-2 mb-6">
+          {DAYS.map((day) => {
+            const daySchedule = workDays.find(d => d.dayOfWeek === day.key)
+            const isShopOpen = shopSettings?.open_days.includes(day.key)
+            const isWorking = daySchedule?.isWorking || false
+            const isExpanded = expandedDay === day.key
+            
+            return (
+              <div
+                key={day.key}
+                className={cn(
+                  'border rounded-xl overflow-hidden transition-all',
+                  !isShopOpen 
+                    ? 'bg-background-dark/30 border-white/5 opacity-50' 
+                    : isWorking 
+                      ? 'bg-background-dark/50 border-accent-gold/30' 
+                      : 'bg-background-dark/50 border-white/5'
+                )}
+              >
+                {/* Day header */}
+                <div 
+                  className="flex items-center justify-between p-3 cursor-pointer"
+                  onClick={() => isShopOpen && setExpandedDay(isExpanded ? null : day.key)}
                 >
-                  {day.label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Work Hours - Mobile stacked, tablet+ side by side */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="flex-1 flex flex-col gap-2">
-            <label className="text-foreground-light text-sm">שעת התחלה</label>
-            <input
-              type="time"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              min={shopSettings ? normalizeTime(shopSettings.work_hours_start) : undefined}
-              max={shopSettings ? normalizeTime(shopSettings.work_hours_end) : undefined}
-              className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-base"
-            />
-          </div>
-          <div className="flex-1 flex flex-col gap-2">
-            <label className="text-foreground-light text-sm">שעת סיום</label>
-            <input
-              type="time"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-              min={shopSettings ? normalizeTime(shopSettings.work_hours_start) : undefined}
-              max={shopSettings ? normalizeTime(shopSettings.work_hours_end) : undefined}
-              className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-base"
-            />
-          </div>
+                  <div className="flex items-center gap-3">
+                    {/* Toggle working */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleDay(day.key)
+                      }}
+                      disabled={!isShopOpen}
+                      className={cn(
+                        'w-10 h-6 rounded-full transition-all relative',
+                        !isShopOpen
+                          ? 'bg-foreground-muted/20 cursor-not-allowed'
+                          : isWorking
+                            ? 'bg-accent-gold'
+                            : 'bg-foreground-muted/30'
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          'absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm',
+                          isWorking ? 'right-1' : 'left-1'
+                        )}
+                      />
+                    </button>
+                    
+                    <span className={cn(
+                      'font-medium',
+                      isWorking ? 'text-foreground-light' : 'text-foreground-muted'
+                    )}>
+                      {day.label}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    {isWorking && daySchedule && (
+                      <span className="text-sm text-foreground-muted" dir="ltr">
+                        {daySchedule.startTime} - {daySchedule.endTime}
+                      </span>
+                    )}
+                    {!isWorking && isShopOpen && (
+                      <span className="text-sm text-foreground-muted">לא עובד</span>
+                    )}
+                    {!isShopOpen && (
+                      <span className="text-xs text-foreground-muted">המספרה סגורה</span>
+                    )}
+                    {isShopOpen && (
+                      isExpanded ? <ChevronUp size={16} className="text-foreground-muted" /> : <ChevronDown size={16} className="text-foreground-muted" />
+                    )}
+                  </div>
+                </div>
+                
+                {/* Expanded time inputs */}
+                {isExpanded && isShopOpen && (
+                  <div className="px-3 pb-3 pt-1 border-t border-white/5">
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label className="text-foreground-muted text-xs block mb-1">התחלה</label>
+                        <input
+                          type="time"
+                          value={daySchedule?.startTime || '09:00'}
+                          onChange={(e) => updateDayTime(day.key, 'startTime', e.target.value)}
+                          disabled={!isWorking}
+                          min={shopSettings ? normalizeTime(shopSettings.work_hours_start) : undefined}
+                          max={shopSettings ? normalizeTime(shopSettings.work_hours_end) : undefined}
+                          className={cn(
+                            'w-full p-2 rounded-lg bg-background-card border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-sm',
+                            !isWorking && 'opacity-50'
+                          )}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-foreground-muted text-xs block mb-1">סיום</label>
+                        <input
+                          type="time"
+                          value={daySchedule?.endTime || '19:00'}
+                          onChange={(e) => updateDayTime(day.key, 'endTime', e.target.value)}
+                          disabled={!isWorking}
+                          min={shopSettings ? normalizeTime(shopSettings.work_hours_start) : undefined}
+                          max={shopSettings ? normalizeTime(shopSettings.work_hours_end) : undefined}
+                          className={cn(
+                            'w-full p-2 rounded-lg bg-background-card border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-sm',
+                            !isWorking && 'opacity-50'
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
 
         <button
@@ -462,4 +588,3 @@ export default function MySchedulePage() {
     </div>
   )
 }
-

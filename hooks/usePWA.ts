@@ -55,7 +55,19 @@ const checkStandalone = (): boolean => {
 
 // Local storage keys
 const INSTALL_DISMISSED_KEY = 'pwa_install_dismissed'
+const INSTALL_DISMISS_COUNT_KEY = 'pwa_install_dismiss_count'
 const VISIT_COUNT_KEY = 'pwa_visit_count'
+
+// Dismiss duration based on how many times user dismissed (gets shorter each time)
+const getDismissDuration = (dismissCount: number): number => {
+  switch (dismissCount) {
+    case 0: return 2 * 60 * 60 * 1000 // First dismiss: 2 hours
+    case 1: return 1 * 60 * 60 * 1000 // Second dismiss: 1 hour
+    case 2: return 30 * 60 * 1000     // Third dismiss: 30 minutes
+    case 3: return 15 * 60 * 1000     // Fourth dismiss: 15 minutes
+    default: return 10 * 60 * 1000    // After that: 10 minutes
+  }
+}
 
 export const usePWA = (): UsePWAReturn => {
   const [state, setState] = useState<PWAState>({
@@ -314,8 +326,17 @@ export const usePWA = (): UsePWAReturn => {
 
   // Dismiss install prompt
   const dismissInstallPrompt = useCallback(() => {
-    const dismissedUntil = Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 days
+    // Track dismiss count
+    const currentCount = parseInt(localStorage.getItem(INSTALL_DISMISS_COUNT_KEY) || '0', 10)
+    const newCount = currentCount + 1
+    localStorage.setItem(INSTALL_DISMISS_COUNT_KEY, String(newCount))
+    
+    // Get duration based on dismiss count (gets shorter each time)
+    const duration = getDismissDuration(currentCount)
+    const dismissedUntil = Date.now() + duration
     localStorage.setItem(INSTALL_DISMISSED_KEY, String(dismissedUntil))
+    
+    console.log(`[PWA] Install dismissed ${newCount} time(s), will show again in ${Math.round(duration / 60000)} minutes`)
   }, [])
 
   // Get OS-specific installation instructions
@@ -377,3 +398,8 @@ export const getVisitCount = (): number => {
   return parseInt(localStorage.getItem(VISIT_COUNT_KEY) || '0', 10)
 }
 
+// Helper to get dismiss count (how many times user dismissed the install prompt)
+export const getDismissCount = (): number => {
+  if (typeof window === 'undefined') return 0
+  return parseInt(localStorage.getItem(INSTALL_DISMISS_COUNT_KEY) || '0', 10)
+}
