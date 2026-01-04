@@ -1,7 +1,7 @@
 'use client'
 
 import { cn, formatTime as formatTimeUtil, timestampToIsraelDate, nowInIsrael, isSameDayInIsrael } from '@/lib/utils'
-import { Phone, X, Clock, Scissors, User, AlertCircle } from 'lucide-react'
+import { Phone, X, Clock, Scissors, User, AlertCircle, StickyNote } from 'lucide-react'
 import type { Reservation, Service, User as UserType } from '@/types/database'
 
 interface ReservationWithService extends Reservation {
@@ -96,6 +96,12 @@ export function CompactAppointmentCard({
             <Clock className="w-3 h-3" />
             <span>{formatSmartDateTime(reservation.time_timestamp)}</span>
           </span>
+          {/* Notes indicator */}
+          {variant === 'barber' && reservation.barber_notes && (
+            <span className="flex items-center gap-1 text-amber-400" title={reservation.barber_notes}>
+              <StickyNote className="w-3 h-3" />
+            </span>
+          )}
         </div>
 
         {/* Cancelled info */}

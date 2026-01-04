@@ -1,7 +1,7 @@
 'use client'
 
 import { cn, formatDateHebrew, formatTime as formatTimeUtil } from '@/lib/utils'
-import { X, Calendar, Scissors, User, Phone, AlertCircle, CheckCircle, XCircle, History } from 'lucide-react'
+import { X, Calendar, Scissors, User, Phone, AlertCircle, CheckCircle, XCircle, History, StickyNote } from 'lucide-react'
 import type { Reservation, Service, User as UserType, Customer } from '@/types/database'
 
 interface ReservationWithDetails extends Reservation {
@@ -170,6 +170,19 @@ export function AppointmentDetailModal({
                 )}
               </div>
             </div>
+
+            {/* Barber Notes */}
+            {variant === 'barber' && reservation.barber_notes && (
+              <div className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                <StickyNote className="w-5 h-5 text-amber-400 mt-0.5" />
+                <div>
+                  <p className="text-sm text-amber-400/80">הערות הספר</p>
+                  <p className="font-medium text-foreground-light text-sm whitespace-pre-wrap">
+                    {reservation.barber_notes}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Booking Info */}
             {reservation.created_at && (

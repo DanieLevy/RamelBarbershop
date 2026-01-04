@@ -5,7 +5,8 @@ import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
 
 const SALT_ROUNDS = 10
 const SESSION_KEY = 'ramel_barber_session'
-const SESSION_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
+// Session never expires - only manual logout clears the session
+// This ensures barbers stay logged in permanently for best UX
 
 /**
  * Hash a password
@@ -76,6 +77,7 @@ export async function loginBarber(
 
 /**
  * Save barber session to localStorage
+ * Sessions are permanent - no expiration (only manual logout clears them)
  */
 export function saveBarberSession(user: User): void {
   if (typeof window === 'undefined') return
@@ -85,7 +87,7 @@ export function saveBarberSession(user: User): void {
     email: user.email || '',
     fullname: user.fullname,
     role: user.role as UserRole,
-    expiresAt: Date.now() + SESSION_EXPIRY_MS,
+    expiresAt: 0, // 0 = never expires (kept for backward compatibility)
   }
   
   localStorage.setItem(SESSION_KEY, JSON.stringify(session))
@@ -93,6 +95,7 @@ export function saveBarberSession(user: User): void {
 
 /**
  * Get barber session from localStorage
+ * Sessions are permanent - only manual logout clears them
  */
 export function getBarberSession(): BarberSession | null {
   if (typeof window === 'undefined') return null
@@ -103,10 +106,16 @@ export function getBarberSession(): BarberSession | null {
   try {
     const session: BarberSession = JSON.parse(stored)
     
-    // Check if session is expired
-    if (session.expiresAt < Date.now()) {
-      localStorage.removeItem(SESSION_KEY)
-      return null
+    // Sessions are now permanent - skip expiration check
+    // expiresAt === 0 means never expires (new behavior)
+    // For backward compatibility, also accept old sessions with future dates
+    // Only reject if expiresAt is set to a past date AND is not 0
+    if (session.expiresAt !== 0 && session.expiresAt > 0 && session.expiresAt < Date.now()) {
+      // Migrate old expired sessions: re-save without expiration
+      // This allows previously logged-in barbers to stay logged in
+      console.log('[BarberAuth] Migrating old session to permanent format')
+      session.expiresAt = 0
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session))
     }
     
     return session

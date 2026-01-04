@@ -5,7 +5,8 @@ import { usePWA, wasInstallDismissed, getVisitCount } from '@/hooks/usePWA'
 import { useBadgeManager } from '@/hooks/useBadgeManager'
 import { InstallBanner } from './InstallBanner'
 import { UpdateModal } from './UpdateModal'
-import { NotificationPermissionModal } from './NotificationPermissionModal'
+import { AutoPushSubscriber } from './AutoPushSubscriber'
+import { PushDeniedBanner } from './PushDeniedBanner'
 
 // PWA Context
 interface PWAContextType {
@@ -91,8 +92,11 @@ export function PWAProvider({ children }: PWAProviderProps) {
             />
           )}
           
-          {/* Notification Permission Modal - Shows in PWA for logged-in users */}
-          <NotificationPermissionModal />
+          {/* Auto Push Subscriber - Silently triggers native OS permission after PWA install */}
+          <AutoPushSubscriber />
+          
+          {/* Push Denied Banner - Shows only when user declined, with recovery instructions */}
+          <PushDeniedBanner />
         </>
       )}
     </PWAContext.Provider>

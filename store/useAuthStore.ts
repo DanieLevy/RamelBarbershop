@@ -9,7 +9,8 @@ import {
 import { signOutSupabase } from '@/lib/auth/email-auth'
 
 const SESSION_KEY = 'ramel_auth_session'
-const SESSION_EXPIRY_MS = 60 * 24 * 60 * 60 * 1000 // 60 days in milliseconds
+// Session never expires - only manual logout clears the session
+// This ensures users stay logged in permanently for best UX
 
 // Auth method type
 export type SessionAuthMethod = 'phone' | 'email'
@@ -38,6 +39,7 @@ interface ExtendedSession extends StoredSession {
 
 /**
  * Save session to localStorage
+ * Sessions are permanent - no expiration (only manual logout clears them)
  */
 function saveSession(customer: Customer, authMethod: SessionAuthMethod = 'phone'): void {
   if (typeof window === 'undefined') return
@@ -46,7 +48,7 @@ function saveSession(customer: Customer, authMethod: SessionAuthMethod = 'phone'
     customerId: customer.id,
     phone: customer.phone,
     fullname: customer.fullname,
-    expiresAt: Date.now() + SESSION_EXPIRY_MS,
+    expiresAt: 0, // 0 = never expires (kept for backward compatibility with stored sessions)
     authMethod,
     email: customer.email || undefined,
   }
@@ -56,6 +58,7 @@ function saveSession(customer: Customer, authMethod: SessionAuthMethod = 'phone'
 
 /**
  * Get session from localStorage
+ * Sessions are permanent - only manual logout clears them
  */
 function getStoredSession(): ExtendedSession | null {
   if (typeof window === 'undefined') return null
@@ -66,10 +69,16 @@ function getStoredSession(): ExtendedSession | null {
   try {
     const session: ExtendedSession = JSON.parse(stored)
     
-    // Check if session is expired
-    if (session.expiresAt < Date.now()) {
-      localStorage.removeItem(SESSION_KEY)
-      return null
+    // Sessions are now permanent - skip expiration check
+    // expiresAt === 0 means never expires (new behavior)
+    // For backward compatibility, also accept old sessions with future dates
+    // Only reject if expiresAt is set to a past date AND is not 0
+    if (session.expiresAt !== 0 && session.expiresAt > 0 && session.expiresAt < Date.now()) {
+      // Migrate old expired sessions: re-save without expiration
+      // This allows previously logged-in users to stay logged in
+      console.log('[Auth] Migrating old session to permanent format')
+      session.expiresAt = 0
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session))
     }
     
     return session

@@ -237,7 +237,7 @@ export default function ReservationsPage() {
         .select(`
           id, barber_id, service_id, customer_id, customer_name, customer_phone,
           date_timestamp, time_timestamp, day_name, day_num, status, 
-          cancelled_by, cancellation_reason, version, created_at,
+          cancelled_by, cancellation_reason, version, created_at, barber_notes,
           services (id, name_he, duration, price)
         `)
         .eq('barber_id', barber.id)

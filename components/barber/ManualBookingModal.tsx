@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { X, Loader2, Search, User, Calendar, Clock, UserPlus } from 'lucide-react'
+import { X, Loader2, Search, User, Calendar, Clock, UserPlus, Scissors } from 'lucide-react'
 import { cn, generateTimeSlots, parseTimeString, nowInIsrael, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { format, addDays, isSameDay } from 'date-fns'
@@ -37,6 +37,8 @@ export function ManualBookingModal({
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [selectedService, setSelectedService] = useState<Service | null>(null)
   const [walkinName, setWalkinName] = useState('')
+  const [walkinPhone, setWalkinPhone] = useState('')
+  const [barberNotes, setBarberNotes] = useState('')
   
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
@@ -45,6 +47,7 @@ export function ManualBookingModal({
   
   // Data loading
   const [services, setServices] = useState<Service[]>([])
+  const [loadingServices, setLoadingServices] = useState(true)
   const [reservedSlots, setReservedSlots] = useState<number[]>([])
   const [barberWorkDays, setBarberWorkDays] = useState<WorkDay[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
@@ -61,6 +64,8 @@ export function ManualBookingModal({
       setSelectedCustomer(null)
       setSelectedService(null)
       setWalkinName('')
+      setWalkinPhone('')
+      setBarberNotes('')
       setSearchQuery('')
       setSearchResults([])
       fetchServices()
@@ -90,6 +95,7 @@ export function ManualBookingModal({
   }
 
   const fetchServices = async () => {
+    setLoadingServices(true)
     const supabase = createClient()
     const { data } = await supabase
       .from('services')
@@ -104,6 +110,7 @@ export function ManualBookingModal({
         setSelectedService(data[0] as Service)
       }
     }
+    setLoadingServices(false)
   }
 
   const fetchReservedSlots = async () => {
@@ -256,12 +263,15 @@ export function ManualBookingModal({
         customerName = selectedCustomer!.fullname
         customerPhone = selectedCustomer!.phone
       } else {
-        // Create a walkin customer record (no role field - customers table doesn't have it)
+        // Create a walkin customer record
+        // Use provided phone if available, otherwise generate a placeholder
+        const phoneToUse = walkinPhone.trim() || 'walkin-' + Date.now()
+        
         const { data: newCustomer, error: customerError } = await supabase
           .from('customers')
           .insert({
             fullname: walkinName.trim(),
-            phone: 'walkin-' + Date.now(), // Unique placeholder phone
+            phone: phoneToUse,
           })
           .select()
           .single()
@@ -275,7 +285,7 @@ export function ManualBookingModal({
         
         customerId = newCustomer.id
         customerName = walkinName.trim()
-        customerPhone = ''
+        customerPhone = walkinPhone.trim()
       }
       
       // Calculate date-related fields - USING ISRAEL TIMEZONE
@@ -293,6 +303,7 @@ export function ManualBookingModal({
         day_name: dayName,
         day_num: format(selectedDate, 'dd/MM'),
         status: 'confirmed' as const,
+        barber_notes: barberNotes.trim() || null,
       }
       
       const { error } = await supabase
@@ -327,9 +338,9 @@ export function ManualBookingModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="relative w-full sm:max-w-lg sm:mx-4 bg-background-darker sm:bg-background-dark border-t sm:border border-white/10 sm:rounded-2xl rounded-t-2xl p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto animate-slide-in-up sm:animate-fade-in">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+      <div className="relative w-full sm:max-w-lg sm:mx-4 bg-background-darker sm:bg-background-dark border-t sm:border border-white/10 sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[90vh] flex flex-col animate-slide-in-up sm:animate-fade-in">
+        {/* Header - Fixed */}
+        <div className="flex items-center justify-between p-5 sm:p-6 pb-3 border-b border-white/5 flex-shrink-0">
           <div>
             <h3 className="text-lg font-medium text-foreground-light">הוספת תור ידני</h3>
             <p className="text-foreground-muted text-xs mt-0.5">רישום תור על-ידי הספר</p>
@@ -342,6 +353,9 @@ export function ManualBookingModal({
             <X size={20} className="text-foreground-muted" />
           </button>
         </div>
+        
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6 pt-4">
 
         {/* Mode Toggle */}
         <div className="flex gap-2 mb-4 p-1 bg-white/[0.03] rounded-xl">
@@ -450,38 +464,84 @@ export function ManualBookingModal({
               )}
             </div>
           ) : (
-            <div className="flex flex-col gap-2">
-              <label htmlFor="walkin-name" className="text-foreground-light text-sm">שם הלקוח</label>
-              <input
-                id="walkin-name"
-                type="text"
-                value={walkinName}
-                onChange={(e) => setWalkinName(e.target.value)}
-                placeholder="הזן שם הלקוח"
-                className="w-full p-3 rounded-xl bg-background-card border border-white/10 text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold"
-              />
+            <div className="space-y-3">
+              {/* Walk-in Name */}
+              <div className="flex flex-col gap-2">
+                <label htmlFor="walkin-name" className="text-foreground-light text-sm">שם הלקוח *</label>
+                <input
+                  id="walkin-name"
+                  type="text"
+                  value={walkinName}
+                  onChange={(e) => setWalkinName(e.target.value)}
+                  placeholder="הזן שם הלקוח"
+                  className="w-full p-3 rounded-xl bg-background-card border border-white/10 text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold"
+                />
+              </div>
+              
+              {/* Walk-in Phone (optional) */}
+              <div className="flex flex-col gap-2">
+                <label htmlFor="walkin-phone" className="text-foreground-light text-sm">טלפון (אופציונלי)</label>
+                <input
+                  id="walkin-phone"
+                  type="tel"
+                  value={walkinPhone}
+                  onChange={(e) => setWalkinPhone(e.target.value)}
+                  placeholder="לדוגמה: 050-1234567"
+                  dir="ltr"
+                  className="w-full p-3 rounded-xl bg-background-card border border-white/10 text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold"
+                />
+              </div>
+              
+              {/* Barber Notes (optional) */}
+              <div className="flex flex-col gap-2">
+                <label htmlFor="barber-notes" className="text-foreground-light text-sm">הערות (אופציונלי)</label>
+                <textarea
+                  id="barber-notes"
+                  value={barberNotes}
+                  onChange={(e) => setBarberNotes(e.target.value)}
+                  placeholder="הערות לתור - נראה רק לספר"
+                  rows={2}
+                  className="w-full p-3 rounded-xl bg-background-card border border-white/10 text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold resize-none"
+                />
+              </div>
             </div>
           )}
 
           {/* Service Selection */}
           <div className="flex flex-col gap-2">
-            <label className="text-foreground-light text-sm">שירות</label>
-            <div className="flex flex-wrap gap-2">
-              {services.map(service => (
-                <button
-                  key={service.id}
-                  onClick={() => setSelectedService(service)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-lg text-sm transition-all',
-                    selectedService?.id === service.id
-                      ? 'bg-accent-gold text-background-dark'
-                      : 'bg-white/[0.05] text-foreground-muted hover:bg-white/[0.1] border border-white/[0.08]'
-                  )}
-                >
-                  {service.name_he}
-                </button>
-              ))}
-            </div>
+            <label className="text-foreground-light text-sm flex items-center gap-2">
+              <Scissors size={14} className="text-accent-gold" />
+              שירות
+            </label>
+            {loadingServices ? (
+              <div className="flex items-center justify-center py-3">
+                <Loader2 size={18} className="text-accent-gold animate-spin" />
+                <span className="text-foreground-muted text-sm mr-2">טוען שירותים...</span>
+              </div>
+            ) : services.length === 0 ? (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+                <p className="text-red-400 text-sm text-center">
+                  לא נמצאו שירותים עבור ספר זה. יש להוסיף שירותים בהגדרות.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {services.map(service => (
+                  <button
+                    key={service.id}
+                    onClick={() => setSelectedService(service)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg text-sm transition-all',
+                      selectedService?.id === service.id
+                        ? 'bg-accent-gold text-background-dark'
+                        : 'bg-white/[0.05] text-foreground-muted hover:bg-white/[0.1] border border-white/[0.08]'
+                    )}
+                  >
+                    {service.name_he}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Date Selection */}
@@ -542,7 +602,7 @@ export function ManualBookingModal({
                 אין משבצות פנויות ביום זה
               </p>
             ) : (
-              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+              <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto pb-2">
                 {availableSlots.map(slot => (
                   <button
                     key={slot.timestamp}
@@ -561,15 +621,16 @@ export function ManualBookingModal({
             )}
           </div>
         </div>
+        </div>
 
-        {/* Actions */}
-        <div className="flex gap-3 mt-6">
+        {/* Actions - Sticky Footer */}
+        <div className="flex gap-3 p-5 sm:p-6 pt-4 border-t border-white/5 flex-shrink-0 bg-background-darker sm:bg-background-dark">
           <button
             onClick={handleSubmit}
-            disabled={saving}
+            disabled={saving || loadingServices || services.length === 0}
             className={cn(
               'flex-1 py-3 rounded-xl font-medium transition-all text-center',
-              saving
+              saving || loadingServices || services.length === 0
                 ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                 : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
             )}
