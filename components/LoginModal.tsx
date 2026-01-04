@@ -3,11 +3,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
-import { findCustomerByPhone } from '@/lib/services/customer.service'
+import { findCustomerByPhone, getCustomerAuthMethod } from '@/lib/services/customer.service'
 import { sendPhoneOtp, verifyOtp, clearRecaptchaVerifier, isTestUser, TEST_USER, setSkipDebugMode } from '@/lib/firebase/config'
+import { sendEmailOtp, verifyEmailOtp, isValidEmail } from '@/lib/auth/email-auth'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { X, Scissors, AlertTriangle } from 'lucide-react'
+import { X, Scissors, AlertTriangle, Mail, Phone, ArrowRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { ConfirmationResult } from 'firebase/auth'
 import { useBugReporter } from '@/hooks/useBugReporter'
@@ -18,26 +19,41 @@ interface LoginModalProps {
   onClose: () => void
 }
 
-type Step = 'phone' | 'name' | 'otp' | 'debug-choice' | 'blocked'
+type Step = 
+  | 'phone' 
+  | 'name' 
+  | 'otp' 
+  | 'debug-choice' 
+  | 'blocked' 
+  | 'email-fallback'  // Show email input after SMS failure
+  | 'email-otp'       // Verify email OTP
+  | 'email-signup'    // New user email signup (name + email)
 
 const RECAPTCHA_CONTAINER_ID = 'login-recaptcha-container'
 
 export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const router = useRouter()
-  const { login } = useAuthStore()
+  const { login, loginWithEmail } = useAuthStore()
   const { isLoggedIn: isBarberLoggedIn, barber, logout: barberLogout } = useBarberAuthStore()
   const { report } = useBugReporter('LoginModal')
   const haptics = useHaptics()
   
+  // Core state
   const [step, setStep] = useState<Step>('phone')
   const [phone, setPhone] = useState('')
   const [fullname, setFullname] = useState('')
+  const [email, setEmail] = useState('')
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [, setIsNewUser] = useState(false)
+  const [isNewUser, setIsNewUser] = useState(false)
   const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null)
   const [countdown, setCountdown] = useState(0)
+  
+  // Email fallback state
+  const [smsError, setSmsError] = useState<string | null>(null)
+  const [existingEmail, setExistingEmail] = useState<string | null>(null) // Email from existing user
+  const [customerAuthMethod, setCustomerAuthMethod] = useState<'phone' | 'email' | 'both' | null>(null)
   
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([])
 
@@ -54,12 +70,16 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       setStep('phone')
       setPhone('')
       setFullname('')
+      setEmail('')
       setOtp(['', '', '', '', '', ''])
       setError(null)
       setLoading(false)
       setIsNewUser(false)
       setConfirmation(null)
       setCountdown(0)
+      setSmsError(null)
+      setExistingEmail(null)
+      setCustomerAuthMethod(null)
       clearRecaptchaVerifier()
     }
   }, [isOpen])
@@ -95,13 +115,23 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setError(null)
     
     try {
-      // Check if customer exists
+      // Check if customer exists and their auth method
       const existingCustomer = await findCustomerByPhone(phoneClean)
+      const authMethod = await getCustomerAuthMethod(phoneClean)
+      setCustomerAuthMethod(authMethod)
       
       if (existingCustomer) {
-        // Existing customer - use their name
+        // Existing customer
         setFullname(existingCustomer.fullname)
+        setExistingEmail(existingCustomer.email || null)
         setIsNewUser(false)
+        
+        // If user originally signed up with email, go directly to email OTP
+        if (authMethod === 'email' && existingCustomer.email) {
+          setEmail(existingCustomer.email)
+          await sendEmailOtpToUser(existingCustomer.email)
+          return
+        }
       } else {
         // New customer - need to ask for name
         setIsNewUser(true)
@@ -117,7 +147,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         return
       }
       
-      // Send OTP
+      // Send SMS OTP
       await sendOtpToPhone(phoneClean)
     } catch (err) {
       console.error('Phone check error:', err)
@@ -154,7 +184,8 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         setConfirmation(result.confirmation)
         setStep('otp')
         setCountdown(60)
-        haptics.light() // Haptic feedback for OTP sent
+        setSmsError(null)
+        haptics.light()
         if (process.env.NODE_ENV === 'development' && result.isDebugUser) {
           toast.success('מצב בדיקה - קוד: ' + TEST_USER.otpCode)
         } else {
@@ -162,16 +193,73 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         }
         setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
       } else {
-        setError(result.error || 'שגיאה בשליחת הקוד')
-        toast.error('שגיאה בשליחת הקוד')
+        // SMS failed - offer email fallback
+        const errorMsg = result.error || 'שגיאה בשליחת הקוד'
+        setSmsError(errorMsg)
+        
+        // Show email fallback after any SMS failure
+        setStep('email-fallback')
+        toast.error('שגיאה בשליחת SMS - נסה באמצעות אימייל')
       }
     } catch (err) {
       console.error('OTP send error:', err)
       await report(err, 'Sending OTP to customer phone')
-      setError('שגיאה בשליחת הקוד')
+      setSmsError('שגיאה בשליחת הקוד')
+      setStep('email-fallback')
     }
     
     setLoading(false)
+  }
+
+  const sendEmailOtpToUser = async (emailAddress: string) => {
+    try {
+      const result = await sendEmailOtp(emailAddress)
+      
+      if (result.success) {
+        setStep('email-otp')
+        setCountdown(60)
+        haptics.light()
+        toast.success('קוד אימות נשלח לאימייל!')
+        setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
+      } else {
+        setError(result.error || 'שגיאה בשליחת האימייל')
+        toast.error(result.error || 'שגיאה בשליחת האימייל')
+      }
+    } catch (err) {
+      console.error('Email OTP send error:', err)
+      await report(err, 'Sending email OTP to customer')
+      setError('שגיאה בשליחת האימייל')
+    }
+    
+    setLoading(false)
+  }
+
+  const handleEmailFallbackSubmit = async () => {
+    if (!isValidEmail(email)) {
+      setError('נא להזין כתובת אימייל תקינה')
+      return
+    }
+    
+    setLoading(true)
+    setError(null)
+    
+    await sendEmailOtpToUser(email.trim().toLowerCase())
+  }
+
+  const handleEmailSignupSubmit = async () => {
+    if (!fullname.trim()) {
+      setError('נא להזין שם מלא')
+      return
+    }
+    if (!isValidEmail(email)) {
+      setError('נא להזין כתובת אימייל תקינה')
+      return
+    }
+    
+    setLoading(true)
+    setError(null)
+    
+    await sendEmailOtpToUser(email.trim().toLowerCase())
   }
 
   const handleOtpChange = (index: number, value: string) => {
@@ -217,7 +305,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         const customer = await login(phone.replace(/\D/g, ''), fullname, result.firebaseUid)
         
         if (customer) {
-          haptics.success() // Haptic feedback for successful login
+          haptics.success()
           toast.success(`שלום ${customer.fullname}!`)
           onClose()
         } else {
@@ -237,10 +325,88 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setLoading(false)
   }
 
+  const handleVerifyEmailOtp = async () => {
+    const code = otp.join('')
+    
+    if (code.length !== 6) {
+      setError('נא להזין קוד בן 6 ספרות')
+      return
+    }
+    
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const result = await verifyEmailOtp(email, code)
+      
+      if (result.success) {
+        // Email verification successful - login/signup via email
+        const customer = await loginWithEmail(
+          phone.replace(/\D/g, ''), 
+          fullname, 
+          email.trim().toLowerCase(),
+          result.supabaseUserId
+        )
+        
+        if (customer) {
+          haptics.success()
+          toast.success(`שלום ${customer.fullname}!`)
+          onClose()
+        } else {
+          setError('שגיאה בהתחברות')
+        }
+      } else {
+        setError(result.error || 'קוד שגוי')
+        setOtp(['', '', '', '', '', ''])
+        otpInputRefs.current[0]?.focus()
+      }
+    } catch (err) {
+      console.error('Email verify error:', err)
+      await report(err, 'Verifying customer email OTP code')
+      setError('שגיאה באימות')
+    }
+    
+    setLoading(false)
+  }
+
   const handleResendOtp = async () => {
     if (countdown > 0) return
     
     setLoading(true)
+    setOtp(['', '', '', '', '', ''])
+    await sendOtpToPhone(phone.replace(/\D/g, ''))
+  }
+
+  const handleResendEmailOtp = async () => {
+    if (countdown > 0) return
+    
+    setLoading(true)
+    setOtp(['', '', '', '', '', ''])
+    await sendEmailOtpToUser(email)
+  }
+
+  const handleUseEmailInstead = () => {
+    // Navigate to email fallback
+    setError(null)
+    setOtp(['', '', '', '', '', ''])
+    
+    // If existing customer has email, pre-fill it
+    if (existingEmail) {
+      setEmail(existingEmail)
+    }
+    
+    // If new user, go to email signup, otherwise to email fallback
+    if (isNewUser) {
+      setStep('email-signup')
+    } else {
+      setStep('email-fallback')
+    }
+  }
+
+  const handleTrySmsAgain = async () => {
+    setLoading(true)
+    setError(null)
+    setStep('phone')
     await sendOtpToPhone(phone.replace(/\D/g, ''))
   }
 
@@ -268,6 +434,9 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           {step === 'otp' && 'אימות טלפון'}
           {step === 'debug-choice' && '🧪 מצב בדיקה'}
           {step === 'blocked' && 'לא ניתן להתחבר'}
+          {step === 'email-fallback' && 'התחברות באימייל'}
+          {step === 'email-otp' && 'אימות אימייל'}
+          {step === 'email-signup' && 'הרשמה באימייל'}
         </h2>
         
         {/* Phone Step */}
@@ -299,13 +468,14 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               onClick={handlePhoneSubmit}
               disabled={loading}
               className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center',
+                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2',
                 loading
                   ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                   : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
               )}
             >
-              {loading ? 'בודק...' : 'המשך'}
+              <Phone size={18} />
+              {loading ? 'בודק...' : 'המשך עם SMS'}
             </button>
             
             {/* Dev helper - fill test user */}
@@ -356,13 +526,23 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               onClick={handleNameSubmit}
               disabled={loading}
               className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center',
+                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2',
                 loading
                   ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                   : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
               )}
             >
-              {loading ? 'שולח קוד...' : 'המשך'}
+              <Phone size={18} />
+              {loading ? 'שולח קוד...' : 'קבל קוד ב-SMS'}
+            </button>
+            
+            {/* Email alternative */}
+            <button
+              onClick={() => setStep('email-signup')}
+              className="w-full py-2.5 text-sm text-foreground-muted hover:text-accent-gold transition-colors flex items-center justify-center gap-2"
+            >
+              <Mail size={16} />
+              העדף הרשמה באימייל
             </button>
             
             <button
@@ -370,6 +550,78 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors flex items-center justify-center"
             >
               ← חזור
+            </button>
+          </div>
+        )}
+        
+        {/* Email Signup Step (new user email registration) */}
+        {step === 'email-signup' && (
+          <div className="flex flex-col gap-4">
+            <p className="text-foreground-muted text-sm text-center">
+              הרשמה באמצעות אימייל
+            </p>
+            
+            <div className="flex flex-col gap-2">
+              <label htmlFor="fullname-email" className="text-foreground-light text-sm">
+                שם מלא
+              </label>
+              <input
+                id="fullname-email"
+                type="text"
+                value={fullname}
+                onChange={(e) => {
+                  setFullname(e.target.value)
+                  setError(null)
+                }}
+                placeholder="הזן את שמך"
+                className={cn(
+                  'w-full p-3.5 rounded-xl bg-background-card border text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold transition-all text-base',
+                  error && !fullname.trim() ? 'border-red-400' : 'border-white/10'
+                )}
+              />
+            </div>
+            
+            <div className="flex flex-col gap-2">
+              <label htmlFor="email-signup" className="text-foreground-light text-sm">
+                אימייל
+              </label>
+              <input
+                id="email-signup"
+                type="email"
+                dir="ltr"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  setError(null)
+                }}
+                placeholder="your@email.com"
+                className={cn(
+                  'w-full p-3.5 rounded-xl bg-background-card border text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold transition-all text-left text-base',
+                  error && !isValidEmail(email) ? 'border-red-400' : 'border-white/10'
+                )}
+              />
+              {error && <p className="text-red-400 text-xs">{error}</p>}
+            </div>
+            
+            <button
+              onClick={handleEmailSignupSubmit}
+              disabled={loading}
+              className={cn(
+                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2',
+                loading
+                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
+                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
+              )}
+            >
+              <Mail size={18} />
+              {loading ? 'שולח קוד...' : 'קבל קוד לאימייל'}
+            </button>
+            
+            <button
+              onClick={() => setStep('name')}
+              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors flex items-center justify-center"
+            >
+              ← חזור להרשמה ב-SMS
             </button>
           </div>
         )}
@@ -425,7 +677,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           </div>
         )}
         
-        {/* OTP Step */}
+        {/* SMS OTP Step */}
         {step === 'otp' && (
           <div className="flex flex-col gap-4">
             <p className="text-foreground-muted text-sm text-center">
@@ -494,8 +746,174 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               )}
             </div>
             
+            {/* Email fallback option - always visible */}
+            <div className="border-t border-white/10 pt-3 mt-2">
+              <button
+                onClick={handleUseEmailInstead}
+                className="w-full text-sm text-foreground-muted hover:text-accent-gold transition-colors flex items-center justify-center gap-2"
+              >
+                <Mail size={16} />
+                לא מקבל SMS? המשך באימייל
+              </button>
+            </div>
+            
             <button
               onClick={() => setStep('phone')}
+              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors flex items-center justify-center"
+            >
+              ← חזור
+            </button>
+          </div>
+        )}
+        
+        {/* Email Fallback Step (after SMS failure) */}
+        {step === 'email-fallback' && (
+          <div className="flex flex-col gap-4">
+            {/* SMS Error Notice */}
+            {smsError && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
+                <div className="flex items-center gap-2 text-amber-400 text-sm">
+                  <AlertTriangle size={18} />
+                  <span>שגיאה בשליחת SMS</span>
+                </div>
+                <p className="text-amber-400/80 text-xs mt-1">
+                  ניתן להתחבר באמצעות אימייל במקום
+                </p>
+              </div>
+            )}
+            
+            <p className="text-foreground-muted text-sm text-center">
+              {existingEmail 
+                ? `נשלח קוד לאימייל שלך: ${existingEmail}`
+                : 'הזן את כתובת האימייל שלך לקבלת קוד אימות'
+              }
+            </p>
+            
+            <div className="flex flex-col gap-2">
+              <label htmlFor="email" className="text-foreground-light text-sm">
+                אימייל
+              </label>
+              <input
+                id="email"
+                type="email"
+                dir="ltr"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  setError(null)
+                }}
+                placeholder="your@email.com"
+                className={cn(
+                  'w-full p-3.5 rounded-xl bg-background-card border text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold transition-all text-left text-base',
+                  error ? 'border-red-400' : 'border-white/10'
+                )}
+              />
+              {error && <p className="text-red-400 text-xs">{error}</p>}
+            </div>
+            
+            <button
+              onClick={handleEmailFallbackSubmit}
+              disabled={loading}
+              className={cn(
+                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2',
+                loading
+                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
+                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
+              )}
+            >
+              <Mail size={18} />
+              {loading ? 'שולח קוד...' : 'שלח קוד לאימייל'}
+            </button>
+            
+            {/* Try SMS again option */}
+            <button
+              onClick={handleTrySmsAgain}
+              disabled={loading}
+              className="w-full py-2.5 text-sm text-foreground-muted hover:text-accent-gold transition-colors flex items-center justify-center gap-2"
+            >
+              <Phone size={16} />
+              נסה שוב ב-SMS
+            </button>
+            
+            <button
+              onClick={() => setStep('phone')}
+              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors flex items-center justify-center"
+            >
+              ← חזור
+            </button>
+          </div>
+        )}
+        
+        {/* Email OTP Verification Step */}
+        {step === 'email-otp' && (
+          <div className="flex flex-col gap-4">
+            <p className="text-foreground-muted text-sm text-center">
+              קוד אימות נשלח ל-{email}
+            </p>
+            
+            <div className="flex justify-center gap-2 xs:gap-3" dir="ltr">
+              {otp.map((digit, index) => (
+                <input
+                  key={index}
+                  ref={(el) => { otpInputRefs.current[index] = el }}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handleOtpChange(index, e.target.value)}
+                  onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                  disabled={loading}
+                  className={cn(
+                    'w-10 h-12 xs:w-11 xs:h-13 text-center text-lg font-bold rounded-lg bg-background-card border-2 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold transition-all',
+                    error ? 'border-red-400' : digit ? 'border-accent-gold/50' : 'border-white/20'
+                  )}
+                />
+              ))}
+            </div>
+            
+            {error && (
+              <p className="text-red-400 text-xs text-center">{error}</p>
+            )}
+            
+            <button
+              onClick={handleVerifyEmailOtp}
+              disabled={loading || otp.join('').length !== 6}
+              className={cn(
+                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center',
+                loading || otp.join('').length !== 6
+                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
+                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
+              )}
+            >
+              {loading ? 'מאמת...' : 'התחבר'}
+            </button>
+            
+            <div className="text-center">
+              {countdown > 0 ? (
+                <p className="text-foreground-muted text-sm">
+                  ניתן לשלוח שוב בעוד {countdown} שניות
+                </p>
+              ) : (
+                <button
+                  onClick={handleResendEmailOtp}
+                  disabled={loading}
+                  className="text-accent-gold hover:underline text-sm"
+                >
+                  שלח קוד חדש
+                </button>
+              )}
+            </div>
+            
+            <button
+              onClick={() => {
+                setOtp(['', '', '', '', '', ''])
+                setError(null)
+                if (customerAuthMethod === 'email') {
+                  setStep('email-fallback')
+                } else {
+                  setStep('otp')
+                }
+              }}
               className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors flex items-center justify-center"
             >
               ← חזור
@@ -557,6 +975,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             >
               <Scissors size={14} strokeWidth={1.5} />
               <span>כניסה לספרים</span>
+              <ArrowRight size={14} strokeWidth={1.5} />
             </button>
           </div>
         )}

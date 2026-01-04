@@ -335,39 +335,48 @@ export type Database = {
       }
       customers: {
         Row: {
+          auth_method: string | null
           blocked_at: string | null
           blocked_reason: string | null
           created_at: string | null
+          email: string | null
           firebase_uid: string | null
           fullname: string
           id: string
           is_blocked: boolean | null
           last_login_at: string | null
           phone: string
+          supabase_uid: string | null
           updated_at: string | null
         }
         Insert: {
+          auth_method?: string | null
           blocked_at?: string | null
           blocked_reason?: string | null
           created_at?: string | null
+          email?: string | null
           firebase_uid?: string | null
           fullname: string
           id?: string
           is_blocked?: boolean | null
           last_login_at?: string | null
           phone: string
+          supabase_uid?: string | null
           updated_at?: string | null
         }
         Update: {
+          auth_method?: string | null
           blocked_at?: string | null
           blocked_reason?: string | null
           created_at?: string | null
+          email?: string | null
           firebase_uid?: string | null
           fullname?: string
           id?: string
           is_blocked?: boolean | null
           last_login_at?: string | null
           phone?: string
+          supabase_uid?: string | null
           updated_at?: string | null
         }
         Relationships: []

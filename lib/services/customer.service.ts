@@ -2,8 +2,11 @@ import { createClient } from '@/lib/supabase/client'
 import type { Customer } from '@/types/database'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
 
+// Auth method types for customer authentication
+export type AuthMethod = 'phone' | 'email' | 'both'
+
 // Define commonly needed customer columns for optimized queries
-const CUSTOMER_COLUMNS = 'id, phone, fullname, firebase_uid, is_blocked, blocked_reason, last_login_at, created_at, updated_at'
+const CUSTOMER_COLUMNS = 'id, phone, fullname, email, auth_method, firebase_uid, supabase_uid, is_blocked, blocked_reason, last_login_at, created_at, updated_at'
 
 /**
  * Find a customer by phone number
@@ -110,16 +113,21 @@ export async function getOrCreateCustomer(
  */
 export async function updateLastLogin(
   customerId: string,
-  firebaseUid?: string
+  firebaseUid?: string,
+  supabaseUid?: string
 ): Promise<void> {
   const supabase = createClient()
   
-  const updateData: { last_login_at: string; firebase_uid?: string } = {
+  const updateData: { last_login_at: string; firebase_uid?: string; supabase_uid?: string } = {
     last_login_at: new Date().toISOString(),
   }
   
   if (firebaseUid) {
     updateData.firebase_uid = firebaseUid
+  }
+  
+  if (supabaseUid) {
+    updateData.supabase_uid = supabaseUid
   }
   
   const { error } = await supabase.from('customers')
@@ -300,4 +308,166 @@ export async function isCustomerId(id: string): Promise<boolean> {
     .single()
   
   return data !== null
+}
+
+// ============================================
+// Email Authentication Methods
+// ============================================
+
+/**
+ * Find a customer by email address
+ */
+export async function findCustomerByEmail(email: string): Promise<Customer | null> {
+  const supabase = createClient()
+  
+  const normalizedEmail = email.trim().toLowerCase()
+  
+  const { data, error } = await supabase
+    .from('customers')
+    .select(CUSTOMER_COLUMNS)
+    .eq('email', normalizedEmail)
+    .maybeSingle()
+  
+  if (error) {
+    console.error('Error finding customer by email:', error)
+    return null
+  }
+  
+  return data as Customer | null
+}
+
+/**
+ * Get or create a customer using email authentication
+ * This is used when a user signs up via email fallback
+ */
+export async function getOrCreateCustomerWithEmail(
+  phone: string,
+  fullname: string,
+  email: string,
+  supabaseUid?: string
+): Promise<Customer | null> {
+  const supabase = createClient()
+  const normalizedPhone = phone.replace(/\D/g, '')
+  const normalizedEmail = email.trim().toLowerCase()
+  
+  // First check if customer exists with this phone
+  const existingByPhone = await findCustomerByPhone(normalizedPhone)
+  
+  if (existingByPhone) {
+    // Customer exists - link email to their account
+    const updated = await linkEmailToCustomer(existingByPhone.id, normalizedEmail, supabaseUid)
+    return updated || existingByPhone
+  }
+  
+  // Check if email is already used by another customer
+  const existingByEmail = await findCustomerByEmail(normalizedEmail)
+  if (existingByEmail) {
+    // Email already in use - update last login and return
+    await updateLastLogin(existingByEmail.id, undefined, supabaseUid)
+    return existingByEmail
+  }
+  
+  // Create new customer with email auth
+  const { data, error } = await supabase.from('customers')
+    .insert({
+      phone: normalizedPhone,
+      fullname,
+      email: normalizedEmail,
+      auth_method: 'email',
+      supabase_uid: supabaseUid || null,
+      last_login_at: new Date().toISOString(),
+    })
+    .select()
+    .single()
+  
+  if (error) {
+    console.error('Error creating customer with email:', error)
+    await reportSupabaseError(error, 'Creating customer with email', { table: 'customers', operation: 'insert' })
+    return null
+  }
+  
+  return data as Customer
+}
+
+/**
+ * Link email to an existing customer account
+ * Used when a phone-registered user adds email as fallback
+ */
+export async function linkEmailToCustomer(
+  customerId: string,
+  email: string,
+  supabaseUid?: string
+): Promise<Customer | null> {
+  const supabase = createClient()
+  const normalizedEmail = email.trim().toLowerCase()
+  
+  // Check if email is already used by another customer
+  const existingWithEmail = await findCustomerByEmail(normalizedEmail)
+  if (existingWithEmail && existingWithEmail.id !== customerId) {
+    console.error('Email already linked to another customer')
+    return null
+  }
+  
+  const updateData: Record<string, unknown> = {
+    email: normalizedEmail,
+    auth_method: 'both', // User now has both phone and email auth
+    updated_at: new Date().toISOString(),
+    last_login_at: new Date().toISOString(),
+  }
+  
+  if (supabaseUid) {
+    updateData.supabase_uid = supabaseUid
+  }
+  
+  const { data, error } = await supabase.from('customers')
+    .update(updateData)
+    .eq('id', customerId)
+    .select()
+    .single()
+  
+  if (error) {
+    console.error('Error linking email to customer:', error)
+    await reportSupabaseError(error, 'Linking email to customer', { table: 'customers', operation: 'update' })
+    return null
+  }
+  
+  return data as Customer
+}
+
+/**
+ * Update customer's last login timestamp with optional Supabase UID
+ */
+export async function updateLastLoginWithSupabase(
+  customerId: string,
+  supabaseUid?: string
+): Promise<void> {
+  const supabase = createClient()
+  
+  const updateData: Record<string, unknown> = {
+    last_login_at: new Date().toISOString(),
+  }
+  
+  if (supabaseUid) {
+    updateData.supabase_uid = supabaseUid
+  }
+  
+  const { error } = await supabase.from('customers')
+    .update(updateData)
+    .eq('id', customerId)
+  
+  if (error) {
+    console.error('Error updating last login with supabase:', error)
+    await reportSupabaseError(error, 'Updating customer last login', { table: 'customers', operation: 'update' })
+  }
+}
+
+/**
+ * Get customer's authentication method
+ * Returns the primary auth method used by the customer
+ */
+export async function getCustomerAuthMethod(phone: string): Promise<AuthMethod | null> {
+  const customer = await findCustomerByPhone(phone)
+  if (!customer) return null
+  
+  return (customer.auth_method as AuthMethod) || 'phone'
 }

@@ -4,16 +4,20 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { useAuthStore } from '@/store/useAuthStore'
 import { sendPhoneOtp, verifyOtp, clearRecaptchaVerifier, isTestUser, TEST_USER } from '@/lib/firebase/config'
-import { getOrCreateCustomer } from '@/lib/services/customer.service'
+import { sendEmailOtp, verifyEmailOtp, isValidEmail } from '@/lib/auth/email-auth'
+import { getOrCreateCustomer, getOrCreateCustomerWithEmail } from '@/lib/services/customer.service'
 import { createReservation as createReservationService } from '@/lib/services/booking.service'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { useHaptics } from '@/hooks/useHaptics'
+import { Mail, Phone, AlertTriangle } from 'lucide-react'
 
 const RECAPTCHA_CONTAINER_ID = 'recaptcha-container'
 const RESEND_COOLDOWN_SECONDS = 60
 const MAX_RETRY_ATTEMPTS = 3
+
+type VerificationMode = 'sms' | 'email'
 
 export function OTPVerification() {
   const {
@@ -30,7 +34,7 @@ export function OTPVerification() {
     unlockFlow,
   } = useBookingStore()
   
-  const { login } = useAuthStore()
+  const { login, loginWithEmail } = useAuthStore()
   const { report } = useBugReporter('OTPVerification')
   const haptics = useHaptics()
 
@@ -41,6 +45,12 @@ export function OTPVerification() {
   const [error, setError] = useState<string | null>(null)
   const [countdown, setCountdown] = useState(0)
   const [retryCount, setRetryCount] = useState(0)
+  
+  // Email fallback state
+  const [mode, setMode] = useState<VerificationMode>('sms')
+  const [email, setEmail] = useState('')
+  const [smsError, setSmsError] = useState<string | null>(null)
+  const [showEmailFallback, setShowEmailFallback] = useState(false)
   
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
   const hasSentRef = useRef(false)
@@ -58,11 +68,11 @@ export function OTPVerification() {
   }, [])
 
   useEffect(() => {
-    if (!hasSentRef.current && !sent && !sending) {
+    if (!hasSentRef.current && !sent && !sending && mode === 'sms') {
       hasSentRef.current = true
       const timer = setTimeout(() => {
         if (isMountedRef.current) {
-          handleSendOtp()
+          handleSendSmsOtp()
         }
       }, 500)
       return () => clearTimeout(timer)
@@ -92,10 +102,11 @@ export function OTPVerification() {
     return `+972${cleaned}`
   }, [])
 
-  const handleSendOtp = useCallback(async () => {
+  const handleSendSmsOtp = useCallback(async () => {
     if (countdown > 0 || sending) return
     if (retryCount >= MAX_RETRY_ATTEMPTS) {
-      setError('יותר מדי ניסיונות נכשלו. נסה שוב מאוחר יותר.')
+      setError('יותר מדי ניסיונות נכשלו. נסה באימייל במקום.')
+      setShowEmailFallback(true)
       return
     }
     
@@ -114,20 +125,26 @@ export function OTPVerification() {
         setSent(true)
         setCountdown(RESEND_COOLDOWN_SECONDS)
         setRetryCount(0)
-        haptics.light() // Haptic feedback for OTP sent
+        setSmsError(null)
+        haptics.light()
         toast.success('קוד אימות נשלח בהצלחה!')
         setTimeout(() => inputRefs.current[0]?.focus(), 100)
       } else {
-        setError(result.error || 'שגיאה בשליחת קוד האימות')
+        const errorMsg = result.error || 'שגיאה בשליחת קוד האימות'
+        setSmsError(errorMsg)
+        setError(errorMsg)
         setRetryCount(prev => prev + 1)
-        toast.error('שגיאה בשליחת הקוד')
+        setShowEmailFallback(true)
+        toast.error('שגיאה בשליחת SMS - נסה באימייל')
       }
     } catch (err) {
       console.error('Unexpected OTP send error:', err)
       await report(err, 'Sending OTP during booking wizard')
       if (isMountedRef.current) {
-        setError('שגיאה בלתי צפויה - נסה שוב')
+        setSmsError('שגיאה בלתי צפויה')
+        setError('שגיאה בלתי צפויה - נסה באימייל')
         setRetryCount(prev => prev + 1)
+        setShowEmailFallback(true)
       }
     }
     
@@ -135,6 +152,44 @@ export function OTPVerification() {
       setSending(false)
     }
   }, [countdown, sending, customer.phone, setOtpConfirmation, formatPhoneNumber, retryCount, report, haptics])
+
+  const handleSendEmailOtp = async () => {
+    if (!isValidEmail(email)) {
+      setError('נא להזין כתובת אימייל תקינה')
+      return
+    }
+    
+    setSending(true)
+    setError(null)
+    
+    try {
+      const result = await sendEmailOtp(email.trim().toLowerCase())
+      
+      if (!isMountedRef.current) return
+      
+      if (result.success) {
+        setMode('email')
+        setSent(true)
+        setCountdown(RESEND_COOLDOWN_SECONDS)
+        haptics.light()
+        toast.success('קוד אימות נשלח לאימייל!')
+        setTimeout(() => inputRefs.current[0]?.focus(), 100)
+      } else {
+        setError(result.error || 'שגיאה בשליחת האימייל')
+        toast.error(result.error || 'שגיאה בשליחת האימייל')
+      }
+    } catch (err) {
+      console.error('Email OTP send error:', err)
+      await report(err, 'Sending email OTP during booking wizard')
+      if (isMountedRef.current) {
+        setError('שגיאה בשליחת האימייל')
+      }
+    }
+    
+    if (isMountedRef.current) {
+      setSending(false)
+    }
+  }
 
   const handleOtpChange = (index: number, value: string) => {
     if (!/^\d*$/.test(value)) return
@@ -179,7 +234,7 @@ export function OTPVerification() {
     }
   }
 
-  const handleVerify = async () => {
+  const handleVerifySmsOtp = async () => {
     const code = otp.join('')
     
     if (code.length !== 6) {
@@ -225,7 +280,7 @@ export function OTPVerification() {
         if (!isMountedRef.current) return
         
         if (reservationResult.success) {
-          haptics.success() // Haptic feedback for successful booking
+          haptics.success()
           toast.success('התור נקבע בהצלחה!')
           nextStep()
         } else {
@@ -247,6 +302,87 @@ export function OTPVerification() {
     
     if (isMountedRef.current) {
       setVerifying(false)
+    }
+  }
+
+  const handleVerifyEmailOtp = async () => {
+    const code = otp.join('')
+    
+    if (code.length !== 6) {
+      setError('נא להזין קוד בן 6 ספרות')
+      return
+    }
+    
+    setVerifying(true)
+    setError(null)
+    
+    try {
+      const result = await verifyEmailOtp(email, code)
+      
+      if (!isMountedRef.current) return
+      
+      if (result.success) {
+        toast.info('מאמת ויוצר תור...')
+        
+        // Get or create customer with email and log them in
+        const customerRecord = await getOrCreateCustomerWithEmail(
+          customer.phone.replace(/\D/g, ''),
+          customer.fullname,
+          email.trim().toLowerCase(),
+          result.supabaseUserId
+        )
+        
+        if (!customerRecord) {
+          setError('שגיאה ביצירת משתמש')
+          setVerifying(false)
+          return
+        }
+        
+        // Log the user in via email
+        await loginWithEmail(
+          customer.phone.replace(/\D/g, ''),
+          customer.fullname,
+          email.trim().toLowerCase(),
+          result.supabaseUserId
+        )
+        
+        // Create reservation using the centralized booking service
+        const reservationResult = await handleCreateReservation(customerRecord.id)
+        
+        if (!isMountedRef.current) return
+        
+        if (reservationResult.success) {
+          haptics.success()
+          toast.success('התור נקבע בהצלחה!')
+          nextStep()
+        } else {
+          setError(reservationResult.message || 'שגיאה ביצירת התור - נסה שוב')
+          toast.error(reservationResult.message || 'שגיאה ביצירת התור')
+        }
+      } else {
+        setError(result.error || 'קוד שגוי, נסה שוב')
+        toast.error('קוד שגוי')
+        setOtp(['', '', '', '', '', ''])
+        inputRefs.current[0]?.focus()
+      }
+    } catch (err) {
+      console.error('Email verify error:', err)
+      await report(err, 'Verifying email OTP during booking wizard')
+      if (isMountedRef.current) {
+        setError('שגיאה בלתי צפויה - נסה שוב')
+      }
+    }
+    
+    if (isMountedRef.current) {
+      setVerifying(false)
+    }
+  }
+
+  const handleVerify = () => {
+    if (mode === 'email') {
+      handleVerifyEmailOtp()
+    } else {
+      handleVerifySmsOtp()
     }
   }
 
@@ -297,28 +433,135 @@ export function OTPVerification() {
     return { success: true, reservationId: result.reservationId }
   }
 
+  const handleSwitchToEmail = () => {
+    setShowEmailFallback(true)
+    setMode('email')
+    setSent(false)
+    setOtp(['', '', '', '', '', ''])
+    setError(null)
+  }
+
+  const handleSwitchToSms = () => {
+    setShowEmailFallback(false)
+    setMode('sms')
+    setSent(false)
+    setOtp(['', '', '', '', '', ''])
+    setError(null)
+    setRetryCount(0)
+    hasSentRef.current = false
+    setTimeout(() => handleSendSmsOtp(), 100)
+  }
+
   const otpCode = otp.join('')
-  const canVerify = otpCode.length === 6 && !!otpConfirmation && !verifying
-  const canResend = countdown === 0 && !sending && retryCount < MAX_RETRY_ATTEMPTS
+  const canVerify = otpCode.length === 6 && !verifying && (mode === 'email' || !!otpConfirmation)
+  const canResend = countdown === 0 && !sending
+
+  // Email fallback input view
+  if (showEmailFallback && mode === 'email' && !sent) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="text-center">
+          <h2 className="text-xl text-foreground-light font-medium">התחברות באימייל</h2>
+          <p className="text-foreground-muted text-sm mt-2">
+            הזן את כתובת האימייל שלך לקבלת קוד אימות
+          </p>
+        </div>
+        
+        {/* SMS Error Notice */}
+        {smsError && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
+            <div className="flex items-center gap-2 text-amber-400 text-sm">
+              <AlertTriangle size={18} />
+              <span>שגיאה בשליחת SMS</span>
+            </div>
+            <p className="text-amber-400/80 text-xs mt-1">
+              ניתן להתחבר באמצעות אימייל במקום
+            </p>
+          </div>
+        )}
+        
+        <div className="flex flex-col gap-2">
+          <label htmlFor="email-fallback" className="text-foreground-light text-sm">
+            אימייל
+          </label>
+          <input
+            id="email-fallback"
+            type="email"
+            dir="ltr"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value)
+              setError(null)
+            }}
+            placeholder="your@email.com"
+            className={cn(
+              'w-full p-3.5 rounded-xl bg-background-card border text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold transition-all text-left text-base',
+              error ? 'border-red-400' : 'border-white/10'
+            )}
+          />
+          {error && <p className="text-red-400 text-xs">{error}</p>}
+        </div>
+        
+        <button
+          onClick={handleSendEmailOtp}
+          disabled={sending}
+          className={cn(
+            'w-full py-3.5 px-4 rounded-xl font-medium transition-all text-lg flex items-center justify-center gap-2',
+            sending
+              ? 'bg-foreground-muted/20 text-foreground-muted cursor-not-allowed'
+              : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90 cursor-pointer'
+          )}
+        >
+          <Mail size={20} />
+          {sending ? 'שולח קוד...' : 'שלח קוד לאימייל'}
+        </button>
+        
+        {/* Switch back to SMS */}
+        <button
+          onClick={handleSwitchToSms}
+          className="w-full py-2.5 text-sm text-foreground-muted hover:text-accent-gold transition-colors flex items-center justify-center gap-2"
+        >
+          <Phone size={16} />
+          נסה שוב ב-SMS
+        </button>
+        
+        <button
+          onClick={() => {
+            clearRecaptchaVerifier()
+            unlockFlow()
+            prevStep()
+          }}
+          disabled={verifying}
+          className="text-sm text-foreground-muted hover:text-foreground-light transition-colors"
+        >
+          ← חזור לפרטים אישיים
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6">
       <div className="text-center">
-        <h2 className="text-xl text-foreground-light font-medium">אימות מספר טלפון</h2>
+        <h2 className="text-xl text-foreground-light font-medium">
+          {mode === 'email' ? 'אימות אימייל' : 'אימות מספר טלפון'}
+        </h2>
         <p className="text-foreground-muted text-sm mt-2">
           {sending && !sent 
-            ? 'שולח קוד אימות...'
+            ? mode === 'email' ? 'שולח קוד לאימייל...' : 'שולח קוד אימות...'
             : sent 
-              ? `קוד אימות נשלח ל-${customer.phone}`
+              ? mode === 'email' 
+                ? `קוד אימות נשלח ל-${email}`
+                : `קוד אימות נשלח ל-${customer.phone}`
               : 'מכין שליחת קוד...'
           }
         </p>
         <p className="text-foreground-muted/70 text-xs mt-1">
-          אימות הטלפון הכרחי להשלמת ההזמנה
+          אימות הכרחי להשלמת ההזמנה
         </p>
         
-        {/* Test user hint - only in development */}
-        {process.env.NODE_ENV === 'development' && isTestUser(customer.phone || '') && (
+        {/* Test user hint - only in development for SMS mode */}
+        {process.env.NODE_ENV === 'development' && mode === 'sms' && isTestUser(customer.phone || '') && (
           <div className="mt-3 px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
             <p className="text-blue-400 text-xs">
               🧪 משתמש בדיקה - הקוד הוא: <span className="font-mono font-bold">{TEST_USER.otpCode}</span>
@@ -332,15 +575,17 @@ export function OTPVerification() {
       {sending && !sent && (
         <div className="flex flex-col items-center gap-3 py-6">
           <div className="w-10 h-10 border-3 border-accent-gold border-t-transparent rounded-full animate-spin" />
-          <p className="text-foreground-muted text-sm">שולח SMS...</p>
+          <p className="text-foreground-muted text-sm">
+            {mode === 'email' ? 'שולח אימייל...' : 'שולח SMS...'}
+          </p>
         </div>
       )}
       
-      {!sending && !sent && !error && (
+      {!sending && !sent && !error && mode === 'sms' && (
         <div className="flex flex-col items-center gap-3 py-4">
           <p className="text-foreground-muted text-sm">לא נשלח אוטומטית?</p>
           <button
-            onClick={handleSendOtp}
+            onClick={handleSendSmsOtp}
             className="px-6 py-2 bg-accent-gold text-background-dark rounded-lg font-medium hover:bg-accent-gold/90 transition-colors"
           >
             שלח קוד עכשיו
@@ -412,13 +657,13 @@ export function OTPVerification() {
               <p className="text-foreground-muted text-sm">
                 לא קיבלת? ניתן לשלוח שוב בעוד <span className="text-accent-gold font-medium">{countdown}</span> שניות
               </p>
-            ) : retryCount >= MAX_RETRY_ATTEMPTS ? (
+            ) : retryCount >= MAX_RETRY_ATTEMPTS && mode === 'sms' ? (
               <p className="text-red-400 text-sm">
-                יותר מדי ניסיונות. נסה שוב מאוחר יותר.
+                יותר מדי ניסיונות. נסה באימייל במקום.
               </p>
             ) : (
               <button
-                onClick={handleSendOtp}
+                onClick={mode === 'email' ? handleSendEmailOtp : handleSendSmsOtp}
                 disabled={!canResend}
                 className={cn(
                   'text-sm transition-colors',
@@ -431,6 +676,32 @@ export function OTPVerification() {
               </button>
             )}
           </div>
+          
+          {/* Email fallback option - only show for SMS mode */}
+          {mode === 'sms' && (
+            <div className="border-t border-white/10 pt-3 mt-2">
+              <button
+                onClick={handleSwitchToEmail}
+                className="w-full text-sm text-foreground-muted hover:text-accent-gold transition-colors flex items-center justify-center gap-2"
+              >
+                <Mail size={16} />
+                לא מקבל SMS? המשך באימייל
+              </button>
+            </div>
+          )}
+          
+          {/* Switch back to SMS option - only show for email mode */}
+          {mode === 'email' && (
+            <div className="border-t border-white/10 pt-3 mt-2">
+              <button
+                onClick={handleSwitchToSms}
+                className="w-full text-sm text-foreground-muted hover:text-accent-gold transition-colors flex items-center justify-center gap-2"
+              >
+                <Phone size={16} />
+                נסה שוב ב-SMS
+              </button>
+            </div>
+          )}
         </>
       )}
       

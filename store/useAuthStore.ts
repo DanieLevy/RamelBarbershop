@@ -1,34 +1,54 @@
 import { create } from 'zustand'
 import type { Customer, StoredSession } from '@/types/database'
-import { getOrCreateCustomer, getCustomerById } from '@/lib/services/customer.service'
+import { 
+  getOrCreateCustomer, 
+  getOrCreateCustomerWithEmail, 
+  linkEmailToCustomer,
+  getCustomerById 
+} from '@/lib/services/customer.service'
+import { signOutSupabase } from '@/lib/auth/email-auth'
 
 const SESSION_KEY = 'ramel_auth_session'
 const SESSION_EXPIRY_MS = 60 * 24 * 60 * 60 * 1000 // 60 days in milliseconds
+
+// Auth method type
+export type SessionAuthMethod = 'phone' | 'email'
 
 interface AuthState {
   customer: Customer | null
   isLoggedIn: boolean
   isLoading: boolean
   isInitialized: boolean
+  authMethod: SessionAuthMethod | null // Track how user logged in this session
   
   // Actions
   login: (phone: string, fullname: string, firebaseUid?: string) => Promise<Customer | null>
+  loginWithEmail: (phone: string, fullname: string, email: string, supabaseUid?: string) => Promise<Customer | null>
+  linkEmail: (email: string, supabaseUid?: string) => Promise<boolean>
   logout: () => void
   checkSession: () => Promise<void>
   setLoading: (loading: boolean) => void
 }
 
+// Extended session type to include auth method
+interface ExtendedSession extends StoredSession {
+  authMethod?: SessionAuthMethod
+  email?: string
+}
+
 /**
  * Save session to localStorage
  */
-function saveSession(customer: Customer): void {
+function saveSession(customer: Customer, authMethod: SessionAuthMethod = 'phone'): void {
   if (typeof window === 'undefined') return
   
-  const session: StoredSession = {
+  const session: ExtendedSession = {
     customerId: customer.id,
     phone: customer.phone,
     fullname: customer.fullname,
     expiresAt: Date.now() + SESSION_EXPIRY_MS,
+    authMethod,
+    email: customer.email || undefined,
   }
   
   localStorage.setItem(SESSION_KEY, JSON.stringify(session))
@@ -37,14 +57,14 @@ function saveSession(customer: Customer): void {
 /**
  * Get session from localStorage
  */
-function getStoredSession(): StoredSession | null {
+function getStoredSession(): ExtendedSession | null {
   if (typeof window === 'undefined') return null
   
   const stored = localStorage.getItem(SESSION_KEY)
   if (!stored) return null
   
   try {
-    const session: StoredSession = JSON.parse(stored)
+    const session: ExtendedSession = JSON.parse(stored)
     
     // Check if session is expired
     if (session.expiresAt < Date.now()) {
@@ -72,6 +92,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoggedIn: false,
   isLoading: false,
   isInitialized: false,
+  authMethod: null,
 
   login: async (phone: string, fullname: string, firebaseUid?: string) => {
     set({ isLoading: true })
@@ -80,11 +101,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const customer = await getOrCreateCustomer(phone, fullname, firebaseUid)
       
       if (customer) {
-        saveSession(customer)
+        saveSession(customer, 'phone')
         set({ 
           customer, 
           isLoggedIn: true, 
-          isLoading: false 
+          isLoading: false,
+          authMethod: 'phone'
         })
         return customer
       }
@@ -98,11 +120,62 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  logout: () => {
+  loginWithEmail: async (phone: string, fullname: string, email: string, supabaseUid?: string) => {
+    set({ isLoading: true })
+    
+    try {
+      const customer = await getOrCreateCustomerWithEmail(phone, fullname, email, supabaseUid)
+      
+      if (customer) {
+        saveSession(customer, 'email')
+        set({ 
+          customer, 
+          isLoggedIn: true, 
+          isLoading: false,
+          authMethod: 'email'
+        })
+        return customer
+      }
+      
+      set({ isLoading: false })
+      return null
+    } catch (error) {
+      console.error('Email login error:', error)
+      set({ isLoading: false })
+      return null
+    }
+  },
+
+  linkEmail: async (email: string, supabaseUid?: string) => {
+    const { customer } = get()
+    if (!customer) return false
+    
+    try {
+      const updated = await linkEmailToCustomer(customer.id, email, supabaseUid)
+      if (updated) {
+        saveSession(updated, get().authMethod || 'phone')
+        set({ customer: updated })
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('Link email error:', error)
+      return false
+    }
+  },
+
+  logout: async () => {
+    // Sign out from Supabase if user was logged in via email
+    const { authMethod } = get()
+    if (authMethod === 'email') {
+      await signOutSupabase()
+    }
+    
     clearSession()
     set({ 
       customer: null, 
-      isLoggedIn: false 
+      isLoggedIn: false,
+      authMethod: null
     })
   },
 
@@ -131,7 +204,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           customer, 
           isLoggedIn: true, 
           isLoading: false,
-          isInitialized: true 
+          isInitialized: true,
+          authMethod: session.authMethod || 'phone'
         })
       } else {
         // Invalid session - customer not found
