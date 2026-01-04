@@ -18,7 +18,8 @@ import {
   ChevronDown,
   ChevronUp,
   X,
-  HelpCircle
+  HelpCircle,
+  RefreshCw
 } from 'lucide-react'
 
 interface NotificationSettingsProps {
@@ -29,6 +30,7 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
   const pwa = usePWA()
   const push = usePushNotifications()
   const [isEnabling, setIsEnabling] = useState(false)
+  const [isRecheckingPermission, setIsRecheckingPermission] = useState(false)
   const [showDevices, setShowDevices] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
   const [deviceToRemove, setDeviceToRemove] = useState<{ id: string; name: string } | null>(null)
@@ -43,6 +45,38 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
       toast.error(push.error)
     }
     setIsEnabling(false)
+  }
+
+  /**
+   * Re-check permission after user manually changes settings
+   * If permission changed from 'denied' to 'default' or 'granted', allow subscription
+   */
+  const handleRecheckPermission = async () => {
+    setIsRecheckingPermission(true)
+    
+    // Refresh status to get current permission from browser
+    await push.refreshStatus()
+    
+    // Check if permission is now available
+    const currentPermission = typeof Notification !== 'undefined' ? Notification.permission : 'denied'
+    
+    if (currentPermission === 'granted') {
+      // Permission granted in settings! Auto-subscribe
+      toast.success('הרשאה זוהתה! מפעיל התראות...')
+      const success = await push.subscribe()
+      if (success) {
+        toast.success('התראות הופעלו בהצלחה!')
+      }
+    } else if (currentPermission === 'default') {
+      // Permission reset to default - user can now request again
+      toast.success('ההרשאה אופסה! כעת ניתן להפעיל התראות')
+      setShowHelp(false)
+    } else {
+      // Still denied
+      toast.error('ההתראות עדיין חסומות. יש לשנות בהגדרות המכשיר.')
+    }
+    
+    setIsRecheckingPermission(false)
   }
 
   const handleDisableNotifications = async () => {
@@ -225,7 +259,7 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
           <div className="mt-4 pt-4 border-t border-white/10">
             <div className="flex items-start gap-3">
               <AlertTriangle size={18} className="text-amber-400 mt-0.5 flex-shrink-0" />
-              <div>
+              <div className="flex-1">
                 <h4 className="font-medium text-amber-400">{issueHelp.title}</h4>
                 <p className="text-sm text-foreground-muted mt-1">{issueHelp.message}</p>
                 <ol className="mt-3 space-y-2">
@@ -238,6 +272,37 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
                     </li>
                   ))}
                 </ol>
+                
+                {/* Check Again Button - shown when permission is denied */}
+                {push.permission === 'denied' && (
+                  <div className="mt-4 pt-3 border-t border-white/5">
+                    <p className="text-xs text-foreground-muted mb-3">
+                      לאחר שינוי ההגדרות, לחץ כאן לבדיקה:
+                    </p>
+                    <button
+                      onClick={handleRecheckPermission}
+                      disabled={isRecheckingPermission}
+                      className={cn(
+                        'w-full py-2.5 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2',
+                        isRecheckingPermission
+                          ? 'bg-accent-gold/50 text-background-dark cursor-not-allowed'
+                          : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
+                      )}
+                    >
+                      {isRecheckingPermission ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          <span>בודק...</span>
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw size={16} />
+                          <span>בדוק שוב</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

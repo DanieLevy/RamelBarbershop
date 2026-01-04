@@ -18,7 +18,8 @@ import {
   ChevronDown,
   ChevronUp,
   X,
-  HelpCircle
+  HelpCircle,
+  RefreshCw
 } from 'lucide-react'
 
 interface BarberNotificationSettingsProps {
@@ -30,6 +31,7 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
   const pwa = usePWA()
   const push = usePushNotifications()
   const [isEnabling, setIsEnabling] = useState(false)
+  const [isRecheckingPermission, setIsRecheckingPermission] = useState(false)
   const [showDevices, setShowDevices] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
   const [deviceToRemove, setDeviceToRemove] = useState<{ id: string; name: string } | null>(null)
@@ -52,6 +54,37 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
       toast.error(push.error)
     }
     setIsEnabling(false)
+  }
+
+  /**
+   * Re-check permission after user manually changes settings
+   * If permission changed from 'denied' to 'default' or 'granted', allow subscription
+   */
+  const handleRecheckPermission = async () => {
+    setIsRecheckingPermission(true)
+    
+    // Refresh status to get current permission from browser
+    await push.refreshStatus()
+    
+    // Check if permission is now available
+    const currentPermission = typeof Notification !== 'undefined' ? Notification.permission : 'denied'
+    
+    if (currentPermission === 'granted') {
+      // Permission granted in settings! Auto-subscribe
+      toast.success('הרשאה זוהתה! מפעיל התראות...')
+      const success = await push.subscribe()
+      if (success) {
+        toast.success('התראות הופעלו בהצלחה!')
+      }
+    } else if (currentPermission === 'default') {
+      // Permission reset to default - user can now request again
+      toast.success('ההרשאה אופסה! כעת ניתן להפעיל התראות')
+    } else {
+      // Still denied
+      toast.error('ההתראות עדיין חסומות. יש לשנות בהגדרות המכשיר.')
+    }
+    
+    setIsRecheckingPermission(false)
   }
 
   const handleDisableNotifications = async () => {
@@ -161,11 +194,43 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
         )}
 
         {push.permission === 'denied' && (
-          <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl mb-4">
-            <AlertTriangle size={16} className="text-red-400 flex-shrink-0" />
-            <p className="text-red-300 text-xs">
-              התראות חסומות. אפשר אותן בהגדרות הדפדפן
+          <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle size={16} className="text-red-400 flex-shrink-0" />
+              <p className="text-red-300 text-sm font-medium">
+                התראות חסומות
+              </p>
+            </div>
+            
+            <p className="text-foreground-muted text-xs mb-3">
+              {push.isIOS 
+                ? 'יש לפתוח הגדרות המכשיר → התראות → רמאל ברברשופ → הפעל'
+                : 'יש ללחוץ על 🔒 ליד שורת הכתובת → התראות → אפשר'
+              }
             </p>
+            
+            <button
+              onClick={handleRecheckPermission}
+              disabled={isRecheckingPermission}
+              className={cn(
+                'w-full py-2.5 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 text-sm',
+                isRecheckingPermission
+                  ? 'bg-accent-gold/50 text-background-dark cursor-not-allowed'
+                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
+              )}
+            >
+              {isRecheckingPermission ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>בודק...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw size={16} />
+                  <span>בדוק שוב</span>
+                </>
+              )}
+            </button>
           </div>
         )}
 
