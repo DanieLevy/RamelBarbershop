@@ -254,11 +254,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           authMethod: null
         })
       }
-    } catch (error) {
+    } catch (err) {
       // This catch is hit for network errors (where getCustomerById throws)
       // getCustomerById throws for network errors but returns null for "not found"
       // We should NOT log them out - use cached session data for offline experience
-      console.warn('[AuthStore] Network error during session check - keeping session, will retry on next interaction')
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      console.warn('[AuthStore] Network error during session check:', errorMessage, '- keeping session, will retry on next interaction')
       
       // Use cached session data for offline experience
       set({ 

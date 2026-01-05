@@ -1,6 +1,6 @@
 // Service Worker for Ramel Barbershop PWA
 // Version is updated automatically during build
-const APP_VERSION = '2.0.0-2026.01.04.2036';
+const APP_VERSION = '2.0.0-2026.01.05.1042';
 const CACHE_NAME = `ramel-pwa-${APP_VERSION}`;
 
 // Assets to cache - critical for app shell and fast loading
@@ -73,6 +73,23 @@ self.addEventListener('activate', (event) => {
 });
 
 // Fetch event - Network first, cache fallback for static assets only
+// 
+// IMPORTANT: What gets cached vs what stays REAL-TIME:
+// ======================================================
+// ✅ CACHED (truly static, never changes):
+//    - /_next/static/* (JS/CSS with content hashes - immutable)
+//    - /fonts/* (static font files)
+//    - /icons/* (static icons)
+//    - /manifest.json, /icon.png, etc.
+//
+// ❌ NEVER CACHED (must be real-time for reservations):
+//    - /api/* (all API endpoints)
+//    - Supabase requests (database queries)
+//    - RSC payloads (?_rsc=* params - dynamic React data)
+//    - /_next/data/* (getServerSideProps data)
+//    - Page navigations (always network-first)
+//    - /_next/image/* (optimized images - short cache via headers)
+//
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -80,13 +97,30 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (request.method !== 'GET') return;
 
-  // Skip API calls - always fresh data
+  // ========================================
+  // NEVER CACHE - Real-time data sources
+  // ========================================
+  
+  // Skip API calls - ALWAYS fresh data for reservations, availability, etc.
   if (url.pathname.startsWith('/api/')) return;
 
-  // Skip Supabase and external requests
+  // Skip Supabase and external requests - database must be real-time
   if (!url.origin.includes(self.location.origin)) return;
 
-  // For navigation requests - network first with offline fallback
+  // Skip RSC (React Server Components) payloads - these contain dynamic data
+  // RSC payloads have ?_rsc= query parameter and must be fresh for reservations
+  if (url.searchParams.has('_rsc')) return;
+
+  // Skip Next.js data routes (getServerSideProps/getStaticProps with revalidation)
+  if (url.pathname.startsWith('/_next/data/')) return;
+
+  // Skip optimized images - let browser cache headers handle these
+  // User-uploaded images (barber photos, products) should be fresh
+  if (url.pathname.startsWith('/_next/image')) return;
+
+  // ========================================
+  // Navigation - Network first with offline fallback
+  // ========================================
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
@@ -101,22 +135,34 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For Next.js static assets - stale-while-revalidate strategy
+  // For Next.js static assets - cache-first strategy (no background revalidation)
+  // IMPORTANT: Next.js static chunks have content hashes in filenames, so they're immutable
+  // We don't need stale-while-revalidate because the hash changes when content changes
+  // This prevents duplicate fetches that were doubling our network requests!
   if (NEXT_STATIC_PATTERN.test(url.pathname)) {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
         const cachedResponse = await cache.match(request);
         
-        // Fetch in background to update cache
-        const fetchPromise = fetch(request).then((networkResponse) => {
+        if (cachedResponse) {
+          // Cache hit - return immediately, NO background fetch
+          // These files are immutable (content hash in filename)
+          return cachedResponse;
+        }
+        
+        // Cache miss - fetch from network and cache for future
+        try {
+          const networkResponse = await fetch(request);
           if (networkResponse.ok) {
+            // Clone before caching since response body can only be read once
             cache.put(request, networkResponse.clone());
           }
           return networkResponse;
-        }).catch(() => cachedResponse);
-
-        // Return cached immediately, or wait for network
-        return cachedResponse || fetchPromise;
+        } catch (error) {
+          // Network failed and no cache - return error
+          console.error('[SW] Failed to fetch static asset:', url.pathname);
+          throw error;
+        }
       })
     );
     return;

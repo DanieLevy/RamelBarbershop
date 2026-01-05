@@ -127,11 +127,12 @@ export const useBarberAuthStore = create<BarberAuthState>((set, get) => ({
           isInitialized: true,
         })
       }
-    } catch (error) {
+    } catch (err) {
       // This catch is hit for network errors (where session is PRESERVED)
       // validateBarberSession throws for network errors but doesn't clear session
       // We should NOT log them out - just mark as "offline" state with preserved session data
-      console.warn('[BarberAuthStore] Network error during session check - keeping session, will retry on next interaction')
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      console.warn('[BarberAuthStore] Network error during session check:', errorMessage, '- keeping session, will retry on next interaction')
       
       // Use cached session data for offline experience
       // The barber can still browse the app with cached data

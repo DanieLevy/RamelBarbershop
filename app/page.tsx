@@ -9,6 +9,10 @@ import { Footer } from '@/components/Footer'
 import { UpcomingAppointmentBanner } from '@/components/UpcomingAppointmentBanner'
 import type { BarberWithWorkDays, BarbershopSettings, Product } from '@/types/database'
 
+// Force dynamic rendering - barber availability (work_days, is_active) must be fresh
+// This ensures the homepage always shows current barber status
+export const dynamic = 'force-dynamic'
+
 export default async function HomePage() {
   const supabase = await createClient()
   

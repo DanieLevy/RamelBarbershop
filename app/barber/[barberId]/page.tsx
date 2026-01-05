@@ -4,6 +4,10 @@ import { AppHeader } from '@/components/AppHeader'
 import { BarberProfileClient } from '@/components/BarberProfile/BarberProfileClient'
 import type { BarberWithWorkDays, Service, BarbershopSettings, BarberMessage } from '@/types/database'
 
+// Force dynamic rendering - barber data, services, and availability must always be fresh
+// This ensures users see real-time availability when booking appointments
+export const dynamic = 'force-dynamic'
+
 interface BarberPageProps {
   params: Promise<{ barberId: string }>
 }
