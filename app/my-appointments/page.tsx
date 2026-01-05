@@ -55,8 +55,9 @@ function MyAppointmentsContent() {
   const { report } = useBugReporter('MyAppointmentsPage')
   const haptics = useHaptics()
   
-  // Get highlight param from URL (from push notification deep link)
+  // Get URL params from push notification deep links
   const highlightId = searchParams.get('highlight')
+  const tabParam = searchParams.get('tab') as TabType | null
   
   const [reservations, setReservations] = useState<ReservationWithDetails[]>([])
   const [loading, setLoading] = useState(true)
@@ -76,7 +77,8 @@ function MyAppointmentsContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customer?.id, customer?.phone])
 
-  // Handle highlight param from push notification deep link
+  // Handle URL params from push notification deep links
+  // This processes highlight and tab params to show the specific reservation
   useEffect(() => {
     if (!highlightId || loading || reservations.length === 0) return
     
@@ -84,21 +86,28 @@ function MyAppointmentsContent() {
     const targetReservation = reservations.find(r => r.id === highlightId)
     
     if (targetReservation) {
+      console.log('[DeepLink] Found target reservation:', highlightId)
+      
       // Set visual highlight
       setHighlightedId(highlightId)
       
-      // Determine which tab the reservation belongs to
-      const now = Date.now()
-      const resTime = targetReservation.time_timestamp < 946684800000 
-        ? targetReservation.time_timestamp * 1000 
-        : targetReservation.time_timestamp
-      
-      if (targetReservation.status === 'cancelled') {
-        setActiveTab('cancelled')
-      } else if (resTime <= now) {
-        setActiveTab('past')
+      // Switch to the correct tab based on URL param or reservation status
+      if (tabParam) {
+        setActiveTab(tabParam)
       } else {
-        setActiveTab('upcoming')
+        // Determine which tab the reservation belongs to
+        const now = Date.now()
+        const resTime = targetReservation.time_timestamp < 946684800000 
+          ? targetReservation.time_timestamp * 1000 
+          : targetReservation.time_timestamp
+        
+        if (targetReservation.status === 'cancelled') {
+          setActiveTab('cancelled')
+        } else if (resTime <= now) {
+          setActiveTab('past')
+        } else {
+          setActiveTab('upcoming')
+        }
       }
       
       // Auto-open the detail modal
@@ -106,7 +115,7 @@ function MyAppointmentsContent() {
         setDetailModal({ isOpen: true, reservation: targetReservation })
       }, 300)
       
-      // Clear the highlight param from URL without page reload
+      // Clear the URL params without page reload
       window.history.replaceState({}, '', '/my-appointments')
       
       // Clear visual highlight after 5 seconds
@@ -114,7 +123,7 @@ function MyAppointmentsContent() {
         setHighlightedId(null)
       }, 5000)
     }
-  }, [highlightId, loading, reservations])
+  }, [highlightId, tabParam, loading, reservations])
 
   const fetchReservations = async () => {
     if (!customer) return

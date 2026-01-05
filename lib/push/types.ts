@@ -20,6 +20,23 @@ export type RecipientType = 'customer' | 'barber'
 // Notification log status
 export type NotificationStatus = 'pending' | 'sent' | 'partial' | 'failed'
 
+/**
+ * Notification data payload structure for SW routing
+ * This is the data that gets passed to the service worker for click handling
+ */
+export interface NotificationDataPayload {
+  type: NotificationType
+  recipientType: RecipientType
+  reservationId?: string
+  url?: string
+  appointmentTime?: number
+  date?: string
+  cancelledBy?: 'customer' | 'barber'
+  reason?: string
+  senderId?: string
+  [key: string]: unknown
+}
+
 // Notification payload structure
 export interface NotificationPayload {
   title: string
@@ -31,7 +48,7 @@ export interface NotificationPayload {
   tag?: string
   requireInteraction?: boolean
   actions?: Array<{ action: string; title: string; icon?: string }>
-  data?: Record<string, unknown>
+  data?: NotificationDataPayload
   badgeCount?: number
   /**
    * Whether this notification type should increment the app badge.

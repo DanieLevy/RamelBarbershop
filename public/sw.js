@@ -332,8 +332,60 @@ self.addEventListener('push', (event) => {
 });
 
 /**
+ * Get the target URL for a notification based on type and recipient
+ * This provides recipient-type-aware routing with fallback logic
+ * 
+ * @param {Object} data - Notification data payload
+ * @param {string} action - The action clicked (view, rebook, dismiss, etc.)
+ * @returns {string} - The target URL to navigate to
+ */
+function getTargetUrlForNotification(data, action) {
+  // Handle rebook action - always go to home for booking
+  if (action === 'rebook') {
+    return '/?action=book';
+  }
+  
+  // If URL is provided in notification data, use it (preferred)
+  if (data && data.url) {
+    return data.url;
+  }
+  
+  // Fallback routing based on notification type and recipient
+  const { type, recipientType, reservationId, cancelledBy } = data || {};
+  
+  // Barber-targeted notifications
+  if (recipientType === 'barber') {
+    if (reservationId) {
+      // For booking_confirmed and cancellation (to barber), link to reservations with highlight
+      if (type === 'cancellation' && cancelledBy === 'customer') {
+        return `/barber/dashboard/reservations?highlight=${reservationId}&tab=cancelled`;
+      }
+      return `/barber/dashboard/reservations?highlight=${reservationId}`;
+    }
+    return '/barber/dashboard/reservations';
+  }
+  
+  // Customer-targeted notifications (default)
+  if (reservationId) {
+    // For reminder and cancellation (to customer), link to my-appointments with highlight
+    if (type === 'cancellation' && cancelledBy === 'barber') {
+      return `/my-appointments?highlight=${reservationId}&tab=cancelled`;
+    }
+    return `/my-appointments?highlight=${reservationId}`;
+  }
+  
+  // Default fallback based on type
+  if (type === 'reminder' || type === 'cancellation' || type === 'booking_confirmed') {
+    return recipientType === 'barber' ? '/barber/dashboard/reservations' : '/my-appointments';
+  }
+  
+  // Final fallback
+  return '/';
+}
+
+/**
  * Handle notification click
- * Supports deep linking for reminders and cancellations
+ * Supports deep linking for all notification types with recipient-type awareness
  */
 self.addEventListener('notificationclick', (event) => {
   console.log('[SW] Notification clicked:', event.action);
@@ -342,11 +394,12 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
   const notificationData = event.notification.data || {};
-  let targetUrl = notificationData.url || '/';
+  
+  // Log notification data for debugging
+  console.log('[SW] Notification data:', JSON.stringify(notificationData));
 
-  // Handle different actions
+  // Handle dismiss action - just clear badge and notify clients
   if (event.action === 'dismiss') {
-    // User dismissed, just clear badge and notify clients
     event.waitUntil(
       Promise.all([
         updateBadge(0),
@@ -361,25 +414,32 @@ self.addEventListener('notificationclick', (event) => {
     event.waitUntil(
       Promise.all([
         updateBadge(0),
-        openOrFocusWindow('/'),
+        openOrFocusWindow('/?action=book'),
+        notifyClientsNotificationClicked(notificationData)
+      ])
+    );
+    return;
+  }
+  
+  // Handle reply action (placeholder for future chat feature)
+  if (event.action === 'reply') {
+    // For now, just navigate to the URL
+    const targetUrl = getTargetUrlForNotification(notificationData, event.action);
+    event.waitUntil(
+      Promise.all([
+        updateBadge(0),
+        openOrFocusWindow(targetUrl),
         notifyClientsNotificationClicked(notificationData)
       ])
     );
     return;
   }
 
-  // For reminder notifications, ensure we use the deep link URL
-  if (notificationData.type === 'reminder' && notificationData.reservationId) {
-    targetUrl = `/my-appointments?highlight=${notificationData.reservationId}`;
-  }
-  
-  // For cancellation notifications to customer, use deep link
-  if (notificationData.type === 'cancellation' && notificationData.cancelledBy === 'barber' && notificationData.reservationId) {
-    targetUrl = `/my-appointments?highlight=${notificationData.reservationId}`;
-  }
-
+  // Handle view action or no action (direct click on notification body)
   if (event.action === 'view' || !event.action) {
-    // Navigate to the target URL and notify clients
+    const targetUrl = getTargetUrlForNotification(notificationData, event.action);
+    console.log('[SW] Navigating to:', targetUrl);
+    
     event.waitUntil(
       Promise.all([
         updateBadge(0),

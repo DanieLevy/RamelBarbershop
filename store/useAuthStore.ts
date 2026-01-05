@@ -244,19 +244,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           authMethod: session.authMethod || 'phone'
         })
       } else {
-        // Invalid session - customer not found
+        // Customer genuinely not found (deleted, etc.) - clear session
         clearSession()
         set({ 
+          customer: null,
+          isLoggedIn: false,
           isLoading: false,
-          isInitialized: true 
+          isInitialized: true,
+          authMethod: null
         })
       }
     } catch (error) {
-      console.error('Session check error:', error)
-      clearSession()
+      // This catch is hit for network errors (where getCustomerById throws)
+      // getCustomerById throws for network errors but returns null for "not found"
+      // We should NOT log them out - use cached session data for offline experience
+      console.warn('[AuthStore] Network error during session check - keeping session, will retry on next interaction')
+      
+      // Use cached session data for offline experience
       set({ 
+        customer: {
+          id: session.customerId,
+          phone: session.phone,
+          fullname: session.fullname,
+          email: session.email || null,
+          auth_method: session.authMethod || 'phone',
+          is_blocked: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as Customer,
+        isLoggedIn: true,
         isLoading: false,
-        isInitialized: true 
+        isInitialized: true,
+        authMethod: session.authMethod || 'phone'
       })
     }
   },

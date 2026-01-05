@@ -1,21 +1,22 @@
 /**
  * POST /api/push/mark-read
- * Mark all notifications as read for a user and clear their badge
+ * Mark notifications as read for a user and clear their badge
  * 
- * This endpoint is called when:
- * 1. User opens the app (visibility change)
- * 2. User clicks on a notification
+ * This endpoint supports:
+ * 1. markAll: true - Mark all notifications as read
+ * 2. notificationId: string - Mark a specific notification as read
  * 
  * This ensures the badge count is reset and the user has acknowledged their notifications.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { pushService } from '@/lib/push/push-service'
+import { createClient } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { customerId, barberId } = body
+    const { customerId, barberId, notificationId, markAll } = body
 
     if (!customerId && !barberId) {
       return NextResponse.json(
@@ -27,6 +28,54 @@ export async function POST(request: NextRequest) {
     // Determine recipient type and ID
     const recipientType = customerId ? 'customer' : 'barber'
     const recipientId = customerId || barberId
+
+    // Mark single notification as read
+    if (notificationId && !markAll) {
+      const supabase = await createClient()
+      
+      // Verify the notification belongs to this user
+      const { data: notification, error: fetchError } = await supabase
+        .from('notification_logs')
+        .select('id, recipient_type, recipient_id')
+        .eq('id', notificationId)
+        .single()
+      
+      if (fetchError || !notification) {
+        return NextResponse.json(
+          { success: false, error: 'Notification not found' },
+          { status: 404 }
+        )
+      }
+      
+      // Security check: ensure notification belongs to this user
+      if (notification.recipient_type !== recipientType || notification.recipient_id !== recipientId) {
+        return NextResponse.json(
+          { success: false, error: 'Unauthorized' },
+          { status: 403 }
+        )
+      }
+      
+      const { error: updateError } = await supabase
+        .from('notification_logs')
+        .update({ is_read: true })
+        .eq('id', notificationId)
+      
+      if (updateError) {
+        console.error('[API] Error marking notification as read:', updateError)
+        return NextResponse.json(
+          { success: false, error: 'Failed to mark notification as read' },
+          { status: 500 }
+        )
+      }
+      
+      console.log(`[API] Marked notification ${notificationId} as read`)
+      
+      return NextResponse.json({
+        success: true,
+        message: 'Notification marked as read',
+        notificationId
+      })
+    }
 
     // Mark all notifications as read
     const success = await pushService.markAllAsRead(

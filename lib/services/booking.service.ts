@@ -204,6 +204,12 @@ export async function createReservation(
     }
   } catch (err) {
     console.error('[BookingService] Unexpected error:', err)
+    // Report unexpected errors (not already reported DB errors)
+    await reportSupabaseError(
+      { message: err instanceof Error ? err.message : String(err), code: 'BOOKING_EXCEPTION' },
+      'Creating reservation - unexpected error',
+      { table: 'reservations', operation: 'rpc' }
+    )
     return {
       success: false,
       error: 'UNKNOWN_ERROR',
@@ -269,6 +275,11 @@ export async function cancelReservation(
     return { success: true }
   } catch (err) {
     console.error('[BookingService] Cancel exception:', err)
+    await reportSupabaseError(
+      { message: err instanceof Error ? err.message : String(err), code: 'CANCEL_EXCEPTION' },
+      'Cancelling reservation - unexpected error',
+      { table: 'reservations', operation: 'update' }
+    )
     return { success: false, error: 'שגיאה בלתי צפויה בביטול התור' }
   }
 }

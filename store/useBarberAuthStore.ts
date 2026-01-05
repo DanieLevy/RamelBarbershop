@@ -116,15 +116,37 @@ export const useBarberAuthStore = create<BarberAuthState>((set, get) => ({
           isInitialized: true,
         })
       } else {
+        // validateBarberSession returns null for:
+        // 1. User not found (session already cleared by validateBarberSession)
+        // 2. Auth errors (session already cleared by validateBarberSession)
         set({
+          barber: null,
+          isLoggedIn: false,
+          isAdmin: false,
           isLoading: false,
           isInitialized: true,
         })
       }
     } catch (error) {
-      console.error('Session check error:', error)
-      clearBarberSession()
+      // This catch is hit for network errors (where session is PRESERVED)
+      // validateBarberSession throws for network errors but doesn't clear session
+      // We should NOT log them out - just mark as "offline" state with preserved session data
+      console.warn('[BarberAuthStore] Network error during session check - keeping session, will retry on next interaction')
+      
+      // Use cached session data for offline experience
+      // The barber can still browse the app with cached data
       set({
+        barber: {
+          id: session.barberId,
+          fullname: session.fullname,
+          email: session.email,
+          role: session.role,
+          is_barber: true,
+          is_active: true,
+          username: session.email.split('@')[0] || 'barber',
+        } as User,
+        isLoggedIn: true,
+        isAdmin: session.role === 'admin',
         isLoading: false,
         isInitialized: true,
       })

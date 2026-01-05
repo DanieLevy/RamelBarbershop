@@ -11,6 +11,7 @@ import { timestampToIsraelDate } from '@/lib/utils'
 import type { 
   NotificationPayload, 
   NotificationType,
+  NotificationDataPayload,
   ReminderContext,
   CancellationContext,
   BroadcastContext 
@@ -32,6 +33,12 @@ function formatDate(timestamp: number): string {
 function formatShortDate(timestamp: number): string {
   const israelDate = timestampToIsraelDate(timestamp)
   return format(israelDate, 'd/M', { locale: he })
+}
+
+// Format date for URL param (YYYY-MM-DD) - ALWAYS ISRAEL TIMEZONE
+function formatUrlDate(timestamp: number): string {
+  const israelDate = timestampToIsraelDate(timestamp)
+  return format(israelDate, 'yyyy-MM-dd')
 }
 
 /**
@@ -112,6 +119,15 @@ function getReminderTemplate(context: ReminderContext): NotificationPayload {
   // Deep link with highlight param for focused view
   const deepLinkUrl = `/my-appointments?highlight=${context.reservationId}`
   
+  const notificationData: NotificationDataPayload = {
+    type: 'reminder',
+    recipientType: 'customer',
+    reservationId: context.reservationId,
+    appointmentTime: context.appointmentTime,
+    date,
+    url: deepLinkUrl
+  }
+  
   return {
     title: `⏰ תזכורת: התור שלך ${timeUntilText}`,
     body: `היי ${context.customerName}! יש לך תור ל${context.serviceName} אצל ${context.barberName} ב${fullDate} בשעה ${time}`,
@@ -121,13 +137,7 @@ function getReminderTemplate(context: ReminderContext): NotificationPayload {
     url: deepLinkUrl,
     requireInteraction: true,
     shouldBadge: true, // High priority - should show badge
-    data: {
-      type: 'reminder',
-      reservationId: context.reservationId,
-      appointmentTime: context.appointmentTime,
-      date,
-      url: deepLinkUrl
-    },
+    data: notificationData,
     actions: [
       { action: 'view', title: 'צפה בתור' },
       { action: 'dismiss', title: 'סגור' }
@@ -137,29 +147,40 @@ function getReminderTemplate(context: ReminderContext): NotificationPayload {
 
 /**
  * Cancellation notification template
+ * Routes to appropriate destination based on who cancelled:
+ * - Customer cancelled → Barber gets notification with highlight on cancelled reservations
+ * - Barber cancelled → Customer gets notification with highlight on their appointments
  */
 function getCancellationTemplate(context: CancellationContext): NotificationPayload {
   const time = formatTime(context.appointmentTime)
   const date = formatDate(context.appointmentTime)
+  const urlDate = formatUrlDate(context.appointmentTime)
   const isCancelledByCustomer = context.cancelledBy === 'customer'
   
   if (isCancelledByCustomer) {
     // Notification to barber when customer cancels
+    // Deep link with highlight param, cancelled tab, and date filter
+    const barberDeepLinkUrl = `/barber/dashboard/reservations?highlight=${context.reservationId}&tab=cancelled&date=${urlDate}`
+    
+    const barberNotificationData: NotificationDataPayload = {
+      type: 'cancellation',
+      recipientType: 'barber',
+      reservationId: context.reservationId,
+      cancelledBy: 'customer',
+      reason: context.reason,
+      url: barberDeepLinkUrl
+    }
+    
     return {
       title: '❌ תור בוטל',
       body: `${context.customerName} ביטל/ה את התור ל${context.serviceName} ב${date} בשעה ${time}`,
       icon: '/icons/icon-192x192.png',
       badge: '/icons/icon-72x72.png',
       tag: `cancel-${context.reservationId}`,
-      url: '/barber/dashboard/reservations',
+      url: barberDeepLinkUrl,
       requireInteraction: true,
       shouldBadge: true, // High priority - should show badge
-      data: {
-        type: 'cancellation',
-        reservationId: context.reservationId,
-        cancelledBy: 'customer',
-        reason: context.reason
-      },
+      data: barberNotificationData,
       actions: [
         { action: 'view', title: 'צפה בלוח' },
         { action: 'dismiss', title: 'סגור' }
@@ -169,7 +190,16 @@ function getCancellationTemplate(context: CancellationContext): NotificationPayl
   
   // Notification to customer when barber cancels
   // Deep link with highlight param to show the cancelled appointment
-  const deepLinkUrl = `/my-appointments?highlight=${context.reservationId}`
+  const customerDeepLinkUrl = `/my-appointments?highlight=${context.reservationId}&tab=cancelled`
+  
+  const customerNotificationData: NotificationDataPayload = {
+    type: 'cancellation',
+    recipientType: 'customer',
+    reservationId: context.reservationId,
+    cancelledBy: 'barber',
+    reason: context.reason,
+    url: customerDeepLinkUrl
+  }
   
   return {
     title: '❌ התור שלך בוטל',
@@ -177,16 +207,10 @@ function getCancellationTemplate(context: CancellationContext): NotificationPayl
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-72x72.png',
     tag: `cancel-${context.reservationId}`,
-    url: deepLinkUrl,
+    url: customerDeepLinkUrl,
     requireInteraction: true,
     shouldBadge: true, // High priority - should show badge
-    data: {
-      type: 'cancellation',
-      reservationId: context.reservationId,
-      cancelledBy: 'barber',
-      reason: context.reason,
-      url: deepLinkUrl
-    },
+    data: customerNotificationData,
     actions: [
       { action: 'rebook', title: 'קבע תור חדש' },
       { action: 'dismiss', title: 'סגור' }
@@ -196,10 +220,23 @@ function getCancellationTemplate(context: CancellationContext): NotificationPayl
 
 /**
  * Booking confirmed template (for barber when customer books)
+ * Deep links to barber reservations page with highlight on the new booking
  */
 function getBookingConfirmedTemplate(context: ReminderContext): NotificationPayload {
   const time = formatTime(context.appointmentTime)
   const date = formatDate(context.appointmentTime)
+  const urlDate = formatUrlDate(context.appointmentTime)
+  
+  // Deep link with highlight param and date for focused view
+  const barberDeepLinkUrl = `/barber/dashboard/reservations?highlight=${context.reservationId}&date=${urlDate}`
+  
+  const notificationData: NotificationDataPayload = {
+    type: 'booking_confirmed',
+    recipientType: 'barber',
+    reservationId: context.reservationId,
+    appointmentTime: context.appointmentTime,
+    url: barberDeepLinkUrl
+  }
   
   return {
     title: '📅 תור חדש!',
@@ -207,13 +244,10 @@ function getBookingConfirmedTemplate(context: ReminderContext): NotificationPayl
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-72x72.png',
     tag: `booking-${context.reservationId}`,
-    url: '/barber/dashboard/reservations',
+    url: barberDeepLinkUrl,
     requireInteraction: false,
     shouldBadge: true, // Medium priority - should show badge for barbers
-    data: {
-      type: 'booking_confirmed',
-      reservationId: context.reservationId
-    },
+    data: notificationData,
     actions: [
       { action: 'view', title: 'צפה בפרטים' },
       { action: 'dismiss', title: 'סגור' }
@@ -223,12 +257,25 @@ function getBookingConfirmedTemplate(context: ReminderContext): NotificationPayl
 
 /**
  * Chat message template
+ * Placeholder for future chat functionality
  */
-function getChatMessageTemplate(context: { senderName: string; message: string }): NotificationPayload {
+function getChatMessageTemplate(context: { senderName: string; message: string; recipientType?: 'customer' | 'barber' }): NotificationPayload {
   // Truncate message if too long
   const truncatedMessage = context.message.length > 100 
     ? context.message.substring(0, 97) + '...'
     : context.message
+  
+  // Determine URL based on recipient type
+  const recipientType = context.recipientType || 'customer'
+  const deepLinkUrl = recipientType === 'barber' 
+    ? '/barber/dashboard/reservations'
+    : '/my-appointments'
+  
+  const notificationData: NotificationDataPayload = {
+    type: 'chat_message',
+    recipientType,
+    url: deepLinkUrl
+  }
   
   return {
     title: `💬 הודעה מ${context.senderName}`,
@@ -236,11 +283,9 @@ function getChatMessageTemplate(context: { senderName: string; message: string }
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-72x72.png',
     tag: 'chat-message',
-    url: '/my-appointments',
+    url: deepLinkUrl,
     requireInteraction: true,
-    data: {
-      type: 'chat_message'
-    },
+    data: notificationData,
     actions: [
       { action: 'reply', title: 'השב' },
       { action: 'dismiss', title: 'סגור' }
@@ -253,6 +298,13 @@ function getChatMessageTemplate(context: { senderName: string; message: string }
  * NOTE: Broadcasts do NOT increment badge to reduce noise
  */
 function getBarberBroadcastTemplate(context: BroadcastContext): NotificationPayload {
+  const notificationData: NotificationDataPayload = {
+    type: 'barber_broadcast',
+    recipientType: 'customer',
+    senderId: context.senderId,
+    url: '/'
+  }
+  
   return {
     title: `📢 הודעה מ${context.senderName}`,
     body: context.message,
@@ -262,10 +314,7 @@ function getBarberBroadcastTemplate(context: BroadcastContext): NotificationPayl
     url: '/',
     requireInteraction: false,
     shouldBadge: false, // Low priority - informational only, no badge
-    data: {
-      type: 'barber_broadcast',
-      senderId: context.senderId
-    },
+    data: notificationData,
     actions: [
       { action: 'view', title: 'צפה' },
       { action: 'dismiss', title: 'סגור' }
@@ -276,8 +325,18 @@ function getBarberBroadcastTemplate(context: BroadcastContext): NotificationPayl
 /**
  * Admin broadcast template (admin to all users)
  * NOTE: Broadcasts do NOT increment badge to reduce noise
+ * recipientType will be set dynamically when sending to customers vs barbers
  */
-function getAdminBroadcastTemplate(context: BroadcastContext): NotificationPayload {
+function getAdminBroadcastTemplate(context: BroadcastContext & { recipientType?: 'customer' | 'barber' }): NotificationPayload {
+  const recipientType = context.recipientType || 'customer'
+  
+  const notificationData: NotificationDataPayload = {
+    type: 'admin_broadcast',
+    recipientType,
+    senderId: context.senderId,
+    url: '/'
+  }
+  
   return {
     title: '📣 רמאל ברברשופ',
     body: context.message,
@@ -287,10 +346,7 @@ function getAdminBroadcastTemplate(context: BroadcastContext): NotificationPaylo
     url: '/',
     requireInteraction: false,
     shouldBadge: false, // Low priority - informational only, no badge
-    data: {
-      type: 'admin_broadcast',
-      senderId: context.senderId
-    },
+    data: notificationData,
     actions: [
       { action: 'view', title: 'צפה' },
       { action: 'dismiss', title: 'סגור' }
@@ -302,6 +358,12 @@ function getAdminBroadcastTemplate(context: BroadcastContext): NotificationPaylo
  * Default template fallback
  */
 function getDefaultTemplate(): NotificationPayload {
+  const notificationData: NotificationDataPayload = {
+    type: 'admin_broadcast', // Default to admin_broadcast as fallback type
+    recipientType: 'customer',
+    url: '/'
+  }
+  
   return {
     title: 'רמאל ברברשופ',
     body: 'יש לך הודעה חדשה',
@@ -309,7 +371,8 @@ function getDefaultTemplate(): NotificationPayload {
     badge: '/icons/icon-72x72.png',
     tag: 'default',
     url: '/',
-    requireInteraction: false
+    requireInteraction: false,
+    data: notificationData
   }
 }
 

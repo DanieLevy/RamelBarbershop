@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs'
 import { createClient } from '@/lib/supabase/client'
 import type { User, BarberSession, UserRole } from '@/types/database'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
+import { withSupabaseRetry, isRetryableError } from '@/lib/utils/retry'
 
 const SALT_ROUNDS = 10
 const SESSION_KEY = 'ramel_barber_session'
@@ -135,6 +136,9 @@ export function clearBarberSession(): void {
 
 /**
  * Validate session against database
+ * 
+ * IMPORTANT: Uses retry logic for transient network failures (e.g., iOS Safari "Load failed")
+ * Only clears session on authentication errors (user not found), NOT on network errors.
  */
 export async function validateBarberSession(): Promise<User | null> {
   const session = getBarberSession()
@@ -142,31 +146,70 @@ export async function validateBarberSession(): Promise<User | null> {
   
   const supabase = createClient()
   
-  // Note: We do NOT filter by is_active here - paused barbers should still be able to access their dashboard
-  // The is_active flag only controls visibility for public booking, not dashboard access
-  const { data: user, error } = await supabase
-    .from('users')
-    .select('id, username, fullname, email, phone, role, is_barber, is_active, img_url, created_at, updated_at')
-    .eq('id', session.barberId)
-    .eq('is_barber', true)
-    .maybeSingle()
-  
-  if (error) {
-    console.error('Error validating session:', error)
-    await reportSupabaseError(error, 'Barber Session Validation', {
-      table: 'users',
-      operation: 'select',
+  try {
+    // Use retry logic for transient network failures (iOS Safari "Load failed", etc.)
+    const result = await withSupabaseRetry(async () => {
+      // Note: We do NOT filter by is_active here - paused barbers should still be able to access their dashboard
+      // The is_active flag only controls visibility for public booking, not dashboard access
+      const { data: user, error } = await supabase
+        .from('users')
+        .select('id, username, fullname, email, phone, role, is_barber, is_active, img_url, created_at, updated_at')
+        .eq('id', session.barberId)
+        .eq('is_barber', true)
+        .maybeSingle()
+      
+      if (error) {
+        // Throw to trigger retry for transient errors
+        throw error
+      }
+      
+      return user
+    }, {
+      maxRetries: 3,
+      initialDelayMs: 500,
+      onRetry: (attempt, error, delay) => {
+        console.log(`[BarberAuth] Session validation retry ${attempt}: ${error.message}. Retrying in ${delay}ms...`)
+      }
     })
-    clearBarberSession()
-    return null
+    
+    if (!result) {
+      // User genuinely not found in database - clear session (they were deleted or barber status removed)
+      console.log('[BarberAuth] User not found in database - clearing session')
+      clearBarberSession()
+      return null
+    }
+    
+    return result as User
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error))
+    console.error('[BarberAuth] Session validation failed:', err.message)
+    
+    // Determine if this is a network error vs. an auth error
+    const isNetworkError = isRetryableError(err)
+    
+    if (isNetworkError) {
+      // Network error - DON'T clear session, the user might just have poor connectivity
+      // Return null to indicate validation failed, but preserve the session for retry
+      console.warn('[BarberAuth] Network error during session validation - session preserved for retry')
+      await reportSupabaseError(
+        { message: err.message, code: 'NETWORK_ERROR', details: 'Transient network failure - session preserved' },
+        'Barber Session Validation - Network Error',
+        { table: 'users', operation: 'select' }
+      )
+      // Throw the error so the store can handle the offline case
+      throw err
+    } else {
+      // Non-network error (auth issue, etc.) - clear session and report
+      console.error('[BarberAuth] Auth error - clearing session')
+      await reportSupabaseError(
+        { message: err.message, code: 'AUTH_ERROR' },
+        'Barber Session Validation - Auth Error',
+        { table: 'users', operation: 'select' }
+      )
+      clearBarberSession()
+      return null
+    }
   }
-  
-  if (!user) {
-    clearBarberSession()
-    return null
-  }
-  
-  return user as User
 }
 
 /**

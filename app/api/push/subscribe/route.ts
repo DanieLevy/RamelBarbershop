@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pushService } from '@/lib/push/push-service'
 import type { DeviceType } from '@/lib/push/types'
+import { reportServerError } from '@/lib/bug-reporter/helpers'
 
 // Detect device type from user agent
 function detectDeviceType(userAgent: string): DeviceType {
@@ -69,6 +70,10 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('[API] Error saving push subscription:', error)
+    await reportServerError(error, 'POST /api/push/subscribe', {
+      route: '/api/push/subscribe',
+      severity: 'high'
+    })
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -104,6 +109,9 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('[API] Error removing push subscription:', error)
+    await reportServerError(error, 'DELETE /api/push/subscribe', {
+      route: '/api/push/subscribe',
+    })
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

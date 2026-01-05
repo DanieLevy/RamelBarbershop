@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/client'
 import type { Customer } from '@/types/database'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
+import { withSupabaseRetry, isRetryableError } from '@/lib/utils/retry'
 
 // Auth method types for customer authentication
 export type AuthMethod = 'phone' | 'email' | 'both'
@@ -171,24 +172,61 @@ export async function updateLastLogin(
 }
 
 /**
- * Get customer by ID
+ * Get customer by ID - used for session validation
+ * 
+ * This function is called during app startup to validate sessions.
+ * It uses retry logic for transient network failures (iOS Safari "Load failed").
+ * 
+ * IMPORTANT: Throws on network errors to allow calling code to handle offline state.
+ * Returns null only when customer is genuinely not found.
  */
 export async function getCustomerById(customerId: string): Promise<Customer | null> {
   const supabase = createClient()
   
-  // Use maybeSingle() to avoid 406 error when customer doesn't exist
-  const { data, error } = await supabase
-    .from('customers')
-    .select(CUSTOMER_COLUMNS)
-    .eq('id', customerId)
-    .maybeSingle()
-  
-  if (error) {
-    console.error('Error getting customer by ID:', error)
+  try {
+    // Use retry logic for transient network failures
+    const result = await withSupabaseRetry(async () => {
+      // Use maybeSingle() to avoid 406 error when customer doesn't exist
+      const { data, error } = await supabase
+        .from('customers')
+        .select(CUSTOMER_COLUMNS)
+        .eq('id', customerId)
+        .maybeSingle()
+      
+      if (error) {
+        // Throw to trigger retry for transient errors
+        throw error
+      }
+      
+      return data
+    }, {
+      maxRetries: 3,
+      initialDelayMs: 500,
+      onRetry: (attempt, error, delay) => {
+        console.log(`[CustomerService] getCustomerById retry ${attempt}: ${error.message}. Retrying in ${delay}ms...`)
+      }
+    })
+    
+    return result as Customer | null
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error))
+    console.error('[CustomerService] Error getting customer by ID:', err.message)
+    
+    // Determine if this is a retryable network error
+    if (isRetryableError(err)) {
+      // Network error - throw to allow store to handle offline state
+      console.warn('[CustomerService] Network error fetching customer - allowing retry')
+      await reportSupabaseError(
+        { message: err.message, code: 'NETWORK_ERROR', details: 'Transient network failure' },
+        'Customer Session Validation - Network Error',
+        { table: 'customers', operation: 'select' }
+      )
+      throw err
+    }
+    
+    // Non-network error - log and return null
     return null
   }
-  
-  return data as Customer | null
 }
 
 /**

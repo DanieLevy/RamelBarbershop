@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn, formatTime as formatTimeUtil, nowInIsrael, generateTimeSlots, parseTimeString, getIsraelDayStart, getIsraelDayEnd, timestampToIsraelDate, isSameDayInIsrael, getDayKeyInIsrael } from '@/lib/utils'
-import { addDays, format, startOfWeek, endOfWeek, isSameDay } from 'date-fns'
+import { addDays, format, startOfWeek, endOfWeek, isSameDay, parse } from 'date-fns'
 import { he } from 'date-fns/locale'
 import { Calendar, Phone, X, Plus } from 'lucide-react'
 import type { Reservation, Service, BarbershopSettings, WorkDay } from '@/types/database'
@@ -22,14 +23,34 @@ interface ReservationWithService extends Reservation {
 type TabType = 'upcoming' | 'past' | 'cancelled'
 type QuickDateType = 'today' | 'tomorrow' | 'week' | 'all' | 'custom'
 
+// Wrap in Suspense for useSearchParams
 export default function ReservationsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center py-12">
+        <div className="w-8 h-8 border-2 border-accent-gold border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <ReservationsContent />
+    </Suspense>
+  )
+}
+
+function ReservationsContent() {
+  const searchParams = useSearchParams()
   const { barber } = useBarberAuthStore()
   const { report } = useBugReporter('ReservationsPage')
+  
+  // Get URL params from push notification deep links
+  const highlightId = searchParams.get('highlight')
+  const tabParam = searchParams.get('tab') as TabType | null
+  const dateParam = searchParams.get('date')
   
   const [reservations, setReservations] = useState<ReservationWithService[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabType>('upcoming')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [highlightedId, setHighlightedId] = useState<string | null>(null)
   
   // Date filter state
   const [quickDate, setQuickDate] = useState<QuickDateType>('today')
@@ -75,6 +96,69 @@ export default function ReservationsPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [barber?.id])
+  
+  // Handle URL params from push notification deep links
+  // This processes highlight, tab, and date params to show the specific reservation
+  useEffect(() => {
+    if (!highlightId || loading || reservations.length === 0) return
+    
+    // Find the highlighted reservation
+    const targetReservation = reservations.find(r => r.id === highlightId)
+    
+    if (targetReservation) {
+      console.log('[DeepLink] Found target reservation:', highlightId)
+      
+      // Set visual highlight
+      setHighlightedId(highlightId)
+      
+      // Switch to the correct tab based on URL param or reservation status
+      if (tabParam) {
+        setActiveTab(tabParam)
+      } else if (targetReservation.status === 'cancelled') {
+        setActiveTab('cancelled')
+      }
+      
+      // Set date filter based on URL param or reservation date
+      if (dateParam) {
+        try {
+          const parsedDate = parse(dateParam, 'yyyy-MM-dd', new Date())
+          if (!isNaN(parsedDate.getTime())) {
+            const israelNow = nowInIsrael()
+            if (isSameDay(parsedDate, israelNow)) {
+              setQuickDate('today')
+              setCustomDate(null)
+            } else if (isSameDay(parsedDate, addDays(israelNow, 1))) {
+              setQuickDate('tomorrow')
+              setCustomDate(null)
+            } else {
+              setCustomDate(parsedDate)
+              setQuickDate('custom')
+            }
+          }
+        } catch (err) {
+          console.error('[DeepLink] Failed to parse date param:', dateParam, err)
+        }
+      } else {
+        // No date param - switch to 'all' to ensure the reservation is visible
+        setQuickDate('all')
+      }
+      
+      // Auto-open the detail modal after a short delay
+      setTimeout(() => {
+        setDetailModal({ isOpen: true, reservation: targetReservation })
+      }, 300)
+      
+      // Clear the URL params without page reload
+      window.history.replaceState({}, '', '/barber/dashboard/reservations')
+      
+      // Clear visual highlight after 5 seconds
+      setTimeout(() => {
+        setHighlightedId(null)
+      }, 5000)
+    } else {
+      console.log('[DeepLink] Target reservation not found:', highlightId)
+    }
+  }, [highlightId, tabParam, dateParam, loading, reservations])
   
   // Connection status for realtime
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(true)
@@ -832,6 +916,7 @@ export default function ReservationsPage() {
               const isUpcoming = normalizeTs(res.time_timestamp) > now && res.status === 'confirmed'
               const isCancelled = res.status === 'cancelled'
               const isPast = normalizeTs(res.time_timestamp) <= now && res.status !== 'cancelled'
+              const isHighlighted = highlightedId === res.id
               
               return (
                 <div
@@ -839,7 +924,8 @@ export default function ReservationsPage() {
                   onClick={() => setDetailModal({ isOpen: true, reservation: res })}
                   className={cn(
                     'flex items-center gap-3 px-3 sm:px-4 py-3 transition-all cursor-pointer hover:bg-white/[0.03]',
-                    (isCancelled || isPast) && 'opacity-60'
+                    (isCancelled || isPast) && 'opacity-60',
+                    isHighlighted && 'bg-accent-gold/10 ring-2 ring-accent-gold/50 ring-inset animate-pulse'
                   )}
                 >
                   {/* Time Display - Before indicator */}
