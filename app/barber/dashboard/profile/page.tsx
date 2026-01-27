@@ -6,8 +6,8 @@ import { updateBarber, setBarberPassword } from '@/lib/auth/barber-auth'
 import { createClient } from '@/lib/supabase/client'
 import { uploadAvatar } from '@/lib/storage/upload'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
-import { User, Camera, Bell, Plus, Trash, Pencil, Upload } from 'lucide-react'
+import { cn, buildShareableBarberLink, isValidSlug, generateSlugFromName } from '@/lib/utils'
+import { User, Camera, Bell, Plus, Trash, Pencil, Upload, Link2, Copy, Check, ExternalLink } from 'lucide-react'
 import type { BarberMessage } from '@/types/database'
 import Image from 'next/image'
 import { useBugReporter } from '@/hooks/useBugReporter'
@@ -26,6 +26,10 @@ export default function ProfilePage() {
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [imgUrl, setImgUrl] = useState('')
+  const [username, setUsername] = useState('')
+  
+  // Shareable link
+  const [linkCopied, setLinkCopied] = useState(false)
   
   // Password form
   const [newPassword, setNewPassword] = useState('')
@@ -47,6 +51,7 @@ export default function ProfilePage() {
       setEmail(barber.email || '')
       setPhone(barber.phone || '')
       setImgUrl(barber.img_url || '')
+      setUsername(barber.username || '')
       fetchMessages()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,18 +123,42 @@ export default function ProfilePage() {
       return
     }
     
+    // Validate username/slug format
+    if (username && !isValidSlug(username)) {
+      toast.error('שם המשתמש חייב להכיל רק אותיות באנגלית, מספרים ומקפים')
+      return
+    }
+    
     setSavingProfile(true)
+    
+    // Check if username is already taken (if changed)
+    if (username && username !== barber.username) {
+      const supabase = createClient()
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .ilike('username', username)
+        .neq('id', barber.id)
+        .single()
+      
+      if (existingUser) {
+        toast.error('שם המשתמש כבר תפוס, נסה שם אחר')
+        setSavingProfile(false)
+        return
+      }
+    }
     
     const result = await updateBarber(barber.id, {
       fullname,
       email: email || undefined,
       phone: phone || undefined,
       img_url: imgUrl || undefined,
+      username: username || undefined,
     })
     
     if (result.success) {
       toast.success('הפרופיל עודכן בהצלחה!')
-      setBarber({ ...barber, fullname, email, phone, img_url: imgUrl })
+      setBarber({ ...barber, fullname, email, phone, img_url: imgUrl, username })
     } else {
       toast.error(result.error || 'שגיאה בעדכון')
     }
@@ -401,6 +430,123 @@ export default function ProfilePage() {
             {savingProfile ? 'שומר...' : 'שמור פרופיל'}
           </button>
         </div>
+      </div>
+
+      {/* Shareable Link Section */}
+      <div className="bg-background-card border border-white/10 rounded-2xl p-6 mb-6">
+        <h3 className="text-lg font-medium text-foreground-light mb-4 flex items-center gap-2">
+          <Link2 size={20} strokeWidth={1.5} className="text-accent-gold" />
+          קישור לשיתוף
+        </h3>
+        
+        <p className="text-foreground-muted text-sm mb-4">
+          שלח את הקישור הזה ללקוחות שלך כדי שיוכלו לקבוע תור ישירות אצלך
+        </p>
+        
+        {username ? (
+          <div className="space-y-4">
+            {/* Shareable Link Display */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                dir="ltr"
+                readOnly
+                value={typeof window !== 'undefined' 
+                  ? buildShareableBarberLink(username, window.location.origin)
+                  : `/barber/${username}`
+                }
+                className="flex-1 p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light text-sm text-left overflow-hidden"
+              />
+              <button
+                onClick={() => {
+                  const link = typeof window !== 'undefined'
+                    ? buildShareableBarberLink(username, window.location.origin)
+                    : `/barber/${username}`
+                  navigator.clipboard.writeText(link)
+                  setLinkCopied(true)
+                  toast.success('הקישור הועתק!')
+                  setTimeout(() => setLinkCopied(false), 2000)
+                }}
+                className={cn(
+                  'px-4 py-3 rounded-xl font-medium transition-all flex items-center gap-2',
+                  linkCopied
+                    ? 'bg-green-500 text-white'
+                    : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
+                )}
+                aria-label="העתק קישור"
+              >
+                {linkCopied ? <Check size={18} strokeWidth={2} /> : <Copy size={18} strokeWidth={2} />}
+              </button>
+              <a
+                href={`/barber/${username}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-3 rounded-xl bg-background-dark border border-white/10 text-foreground-muted hover:text-foreground-light hover:border-white/20 transition-colors flex items-center"
+                aria-label="פתח בחלון חדש"
+              >
+                <ExternalLink size={18} strokeWidth={1.5} />
+              </a>
+            </div>
+            
+            {/* Username/Slug Edit */}
+            <div className="flex flex-col gap-2">
+              <label className="text-foreground-light text-sm">
+                שם משתמש בקישור
+                <span className="text-foreground-muted text-xs mr-2">
+                  (באנגלית, ללא רווחים)
+                </span>
+              </label>
+              <div className="flex gap-2">
+                <div className="flex-1 flex items-center gap-0 bg-background-dark border border-white/10 rounded-xl overflow-hidden">
+                  <span className="text-foreground-muted text-sm px-3">/barber/</span>
+                  <input
+                    type="text"
+                    dir="ltr"
+                    value={username}
+                    onChange={(e) => {
+                      // Only allow valid slug characters
+                      const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
+                      setUsername(value)
+                    }}
+                    placeholder={generateSlugFromName(fullname) || 'your-name'}
+                    className="flex-1 py-3 pr-3 bg-transparent text-foreground-light outline-none text-left"
+                  />
+                </div>
+              </div>
+              {username && !isValidSlug(username) && (
+                <p className="text-red-400 text-xs">
+                  השם חייב להכיל רק אותיות באנגלית, מספרים ומקפים
+                </p>
+              )}
+            </div>
+            
+            <p className="text-foreground-muted/60 text-xs">
+              טיפ: שנה את שם המשתמש לשם קצר וקל לזכירה, למשל: ramel, david-barber
+            </p>
+          </div>
+        ) : (
+          <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+            <p className="text-amber-300 text-sm">
+              כדי לקבל קישור לשיתוף, הגדר שם משתמש בשדה למטה ושמור את הפרופיל
+            </p>
+            <div className="mt-3 flex gap-2">
+              <div className="flex-1 flex items-center gap-0 bg-background-dark border border-white/10 rounded-xl overflow-hidden">
+                <span className="text-foreground-muted text-sm px-3">/barber/</span>
+                <input
+                  type="text"
+                  dir="ltr"
+                  value={username}
+                  onChange={(e) => {
+                    const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
+                    setUsername(value)
+                  }}
+                  placeholder={generateSlugFromName(fullname) || 'your-name'}
+                  className="flex-1 py-3 pr-3 bg-transparent text-foreground-light outline-none text-left"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Password Section */}

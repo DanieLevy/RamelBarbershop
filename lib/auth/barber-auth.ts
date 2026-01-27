@@ -381,6 +381,7 @@ export async function updateBarber(
     phone?: string
     img_url?: string
     is_active?: boolean
+    username?: string
   }
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = createClient()

@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import type { BarberWithWorkDays } from '@/types/database'
 import { Calendar, Loader2, ChevronLeft } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, buildBarberProfileUrl } from '@/lib/utils'
 
 interface BarberCardProps {
   barber: BarberWithWorkDays
@@ -62,10 +62,15 @@ export function BarberCard({ barber, index = 0 }: BarberCardProps) {
     setTilt({ x: 0, y: 0 })
   }, [])
 
+  // Build URL using username (slug) for nicer URLs, fallback to UUID
+  const barberUrl = barber.username 
+    ? buildBarberProfileUrl(barber.username)
+    : `/barber/${barber.id}`
+
   return (
     <Link
       ref={cardRef}
-      href={`/barber/${barber.id}`}
+      href={barberUrl}
       prefetch={true}
       onClick={handleNavigation}
       onMouseMove={handleMouseMove}

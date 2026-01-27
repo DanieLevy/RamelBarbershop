@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { AppHeader } from '@/components/AppHeader'
 import { HeroSection } from '@/components/home/HeroSection'
 import { TeamSection } from '@/components/home/TeamSection'
@@ -7,14 +8,47 @@ import { LocationSection } from '@/components/LocationSection'
 import { ContactSection } from '@/components/ContactSection'
 import { Footer } from '@/components/Footer'
 import { UpcomingAppointmentBanner } from '@/components/UpcomingAppointmentBanner'
+import { buildBarberProfileUrl } from '@/lib/utils'
 import type { BarberWithWorkDays, BarbershopSettings, Product } from '@/types/database'
 
 // Force dynamic rendering - barber availability (work_days, is_active) must be fresh
 // This ensures the homepage always shows current barber status
 export const dynamic = 'force-dynamic'
 
-export default async function HomePage() {
+interface HomePageProps {
+  searchParams: Promise<{ barber?: string }>
+}
+
+/**
+ * Homepage with optional barber deep-linking
+ * 
+ * URL patterns supported:
+ * - / (normal homepage)
+ * - /?barber=ramel (redirects directly to barber's profile page)
+ * 
+ * This allows barbers to share a simple link that takes customers
+ * directly to their profile for booking.
+ */
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const { barber: barberSlug } = await searchParams
   const supabase = await createClient()
+  
+  // If a barber slug is provided, redirect to their profile page
+  if (barberSlug) {
+    // Verify the barber exists and is active before redirecting
+    const { data: barberCheck } = await supabase
+      .from('users')
+      .select('username, is_active')
+      .eq('is_barber', true)
+      .ilike('username', barberSlug)
+      .single()
+    
+    if (barberCheck?.is_active && barberCheck.username) {
+      redirect(buildBarberProfileUrl(barberCheck.username))
+    }
+    // If barber not found or inactive, continue to show homepage
+    // (don't redirect to error page from homepage link)
+  }
   
   // Fetch barbers, settings, and products in parallel for better performance
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

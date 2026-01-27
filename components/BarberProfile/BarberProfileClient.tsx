@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Phone, Clock, ChevronLeft, Bell, Loader2 } from 'lucide-react'
-import { cn, formatPrice } from '@/lib/utils'
+import { cn, formatPrice, buildBarberBookingUrl } from '@/lib/utils'
 import type { BarberWithWorkDays, Service, BarbershopSettings, BarberMessage } from '@/types/database'
 
 interface BarberProfileClientProps {
@@ -34,20 +34,23 @@ export function BarberProfileClient({
 }: BarberProfileClientProps) {
   const router = useRouter()
   const [loadingServiceId, setLoadingServiceId] = useState<string | null>(null)
+  
+  // Use username (slug) for nicer URLs, fallback to UUID
+  const barberSlug = barber.username || barber.id
 
   // Prefetch the booking page on mount for instant navigation
   useEffect(() => {
     // Prefetch the booking page with each service option
     services.forEach(service => {
-      router.prefetch(`/barber/${barber.id}/book?service=${service.id}`)
+      router.prefetch(buildBarberBookingUrl(barberSlug, service.id))
     })
     // Also prefetch without a service (fallback)
-    router.prefetch(`/barber/${barber.id}/book`)
-  }, [barber.id, services, router])
+    router.prefetch(buildBarberBookingUrl(barberSlug))
+  }, [barberSlug, services, router])
 
   const handleServiceSelect = (serviceId: string) => {
     setLoadingServiceId(serviceId)
-    router.push(`/barber/${barber.id}/book?service=${serviceId}`)
+    router.push(buildBarberBookingUrl(barberSlug, serviceId))
   }
 
   // Get working days - intersect barber's work days with shop's open days
