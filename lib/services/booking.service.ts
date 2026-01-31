@@ -24,6 +24,7 @@ export interface CreateReservationData {
   timeTimestamp: number
   dayName: string
   dayNum: string
+  barberNotes?: string
 }
 
 export interface CreateReservationResult {
@@ -149,6 +150,7 @@ export async function createReservation(
       p_time_timestamp: data.timeTimestamp,
       p_day_name: data.dayName,
       p_day_num: data.dayNum,
+      p_barber_notes: data.barberNotes?.trim() || null,
     })
     
     if (error) {

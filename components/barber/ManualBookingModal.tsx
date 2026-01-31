@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { X, Loader2, Search, User, Calendar, Clock, UserPlus, Scissors } from 'lucide-react'
 import { cn, generateTimeSlots, parseTimeString, nowInIsrael, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { createReservation } from '@/lib/services/booking.service'
 import { format, addDays, isSameDay } from 'date-fns'
 import { toast } from 'sonner'
 import type { Customer, BarbershopSettings, Service, WorkDay } from '@/types/database'
@@ -236,23 +237,8 @@ export function ManualBookingModal({
     try {
       const supabase = createClient()
       
-      // Pre-check: Verify slot is still available (race condition prevention)
-      const { data: existingSlot } = await supabase
-        .from('reservations')
-        .select('id')
-        .eq('barber_id', barberId)
-        .eq('time_timestamp', selectedTime)
-        .eq('status', 'confirmed')
-        .maybeSingle()
-      
-      if (existingSlot) {
-        toast.error('השעה כבר נתפסה. אנא בחר שעה אחרת.')
-        // Refresh available slots
-        await fetchReservedSlots()
-        setSelectedTime(null)
-        setSaving(false)
-        return
-      }
+      // Note: Slot availability is verified atomically by the createReservation function
+      // No pre-check needed - the atomic database function handles race conditions
       
       let customerId: string
       let customerName: string
@@ -292,33 +278,29 @@ export function ManualBookingModal({
       const dayName = getDayKeyInIsrael(selectedTime)
       const dateTimestamp = getIsraelDayStart(selectedTime)
       
-      const reservationData = {
-        barber_id: barberId,
-        customer_id: customerId,
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        service_id: selectedService.id,
-        time_timestamp: selectedTime,
-        date_timestamp: dateTimestamp,
-        day_name: dayName,
-        day_num: format(selectedDate, 'dd/MM'),
-        status: 'confirmed' as const,
-        barber_notes: barberNotes.trim() || null,
-      }
+      // Use atomic function for race-condition-safe booking
+      // barber_notes is now included in the atomic operation
+      const result = await createReservation({
+        barberId,
+        serviceId: selectedService.id,
+        customerId,
+        customerName,
+        customerPhone,
+        dateTimestamp,
+        timeTimestamp: selectedTime,
+        dayName,
+        dayNum: format(selectedDate, 'dd/MM'),
+        barberNotes: barberNotes.trim() || undefined,
+      })
       
-      const { error } = await supabase
-        .from('reservations')
-        .insert(reservationData)
-      
-      if (error) {
-        console.error('Error creating reservation:', error)
-        // Handle unique constraint violation specifically
-        if (error.code === '23505') {
-          toast.error('השעה כבר נתפסה. אנא בחר שעה אחרת.')
+      if (!result.success) {
+        console.error('Error creating reservation:', result.error)
+        toast.error(result.message || 'שגיאה ביצירת התור')
+        
+        // Refresh available slots if slot was taken
+        if (result.error === 'SLOT_ALREADY_TAKEN' || result.error === 'CUSTOMER_DOUBLE_BOOKING') {
           await fetchReservedSlots()
           setSelectedTime(null)
-        } else {
-          toast.error('שגיאה ביצירת התור')
         }
         return
       }

@@ -263,34 +263,50 @@ export default function DebugPage() {
       return
     }
 
-    // Enrich with user data
-    const enrichedData: PushSubscriptionRow[] = []
+    // Batch fetch related user data to avoid N+1 queries
+    const customerIds = [...new Set(
+      (data || []).filter(s => s.customer_id).map(s => s.customer_id as string)
+    )]
+    const barberIds = [...new Set(
+      (data || []).filter(s => s.barber_id).map(s => s.barber_id as string)
+    )]
     
-    for (const sub of data || []) {
+    // Fetch all customers and barbers in parallel with batch queries
+    const [customersRes, barbersRes] = await Promise.all([
+      customerIds.length > 0
+        ? supabase.from('customers').select('id, fullname, phone').in('id', customerIds)
+        : Promise.resolve({ data: [] }),
+      barberIds.length > 0
+        ? supabase.from('users').select('id, fullname, email').in('id', barberIds)
+        : Promise.resolve({ data: [] })
+    ])
+    
+    // Create lookup maps for O(1) access
+    const customerMap = new Map(
+      (customersRes.data || []).map(c => [c.id, c])
+    )
+    const barberMap = new Map(
+      (barbersRes.data || []).map(b => [b.id, b])
+    )
+    
+    // Enrich subscriptions with user data using maps
+    const enrichedData: PushSubscriptionRow[] = (data || []).map(sub => {
       const enriched: PushSubscriptionRow = { ...sub }
       
       if (sub.customer_id) {
-        const { data: customer } = await supabase
-          .from('customers')
-          .select('fullname, phone')
-          .eq('id', sub.customer_id)
-          .single()
+        const customer = customerMap.get(sub.customer_id)
         enriched.customer_name = customer?.fullname
         enriched.customer_phone = customer?.phone
       }
       
       if (sub.barber_id) {
-        const { data: barber } = await supabase
-          .from('users')
-          .select('fullname, email')
-          .eq('id', sub.barber_id)
-          .single()
+        const barber = barberMap.get(sub.barber_id)
         enriched.barber_name = barber?.fullname
         enriched.barber_email = barber?.email
       }
       
-      enrichedData.push(enriched)
-    }
+      return enriched
+    })
     
     setSubscriptions(enrichedData)
     setLoading(false)

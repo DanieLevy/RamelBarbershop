@@ -1,3 +1,31 @@
+/**
+ * Database Types - Auto-generated from Supabase schema
+ * 
+ * INDEX MONITORING (Added: 2026-01-27)
+ * =====================================
+ * The following indexes have 0 scans as of this date and should be monitored
+ * for 30 days before considering removal. Check usage with:
+ * 
+ * SELECT indexrelname, idx_scan FROM pg_stat_user_indexes 
+ * WHERE indexrelname IN (...) ORDER BY idx_scan;
+ * 
+ * Indexes to monitor (review after 2026-02-27):
+ * - idx_reservations_date (reservations)
+ * - idx_reservations_barber_id (reservations)
+ * - idx_reservations_service_id (reservations)
+ * - idx_reservations_reminder_window (reservations)
+ * - idx_notification_logs_unread (notification_logs)
+ * - idx_notification_logs_recipient (notification_logs)
+ * - idx_notification_logs_type (notification_logs)
+ * - idx_services_barber_id (services)
+ * - idx_users_is_barber (users)
+ * 
+ * New indexes added (2026-01-27):
+ * - idx_users_active_barbers (users) - for barber homepage queries
+ * - idx_services_barber_active_cover (services) - covering index for service lookups
+ * - idx_reservations_date_barber_status (reservations) - composite for date range queries
+ */
+
 export type Json =
   | string
   | number
@@ -776,6 +804,7 @@ export type Database = {
           p_time_timestamp: number
           p_day_name: string
           p_day_num: string
+          p_barber_notes?: string | null
         }
         Returns: string
       }
