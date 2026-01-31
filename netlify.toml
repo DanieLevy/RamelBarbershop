@@ -1,10 +1,16 @@
 # Netlify Configuration for Next.js App
 # This enables full Next.js support including API routes, SSR, ISR, and Scheduled Functions
+# Updated for Next.js 16.1.6 with proxy (formerly middleware) support
 
 [build]
   command = "npm run build"
   publish = ".next"
   functions = "netlify/functions"
+
+# Environment-specific build settings
+[build.environment]
+  NODE_VERSION = "22"
+  NPM_FLAGS = "--legacy-peer-deps"
 
 # Functions Configuration
 [functions]
@@ -12,13 +18,17 @@
   external_node_modules = ["@supabase/supabase-js", "web-push"]
   included_files = ["netlify/functions/**"]
 
-# Increase timeout for reminder function (max 26 seconds on Pro, 10 on free)
+# Scheduled function for reminders (runs every hour)
 [functions."send-reminders"]
   schedule = "0 * * * *"
 
 # Use the official Netlify Next.js plugin for full support
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# Edge Functions configuration
+[edge_functions]
+  # Uses the Next.js proxy (formerly middleware) automatically
 
 # Headers for security and caching
 [[headers]]
@@ -27,6 +37,8 @@
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+    X-XSS-Protection = "1; mode=block"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
 
 # Cache static assets
 [[headers]]
@@ -60,3 +72,30 @@
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
     Content-Type = "application/manifest+json"
+
+# PWA icons with long cache
+[[headers]]
+  for = "/icons/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Fonts with long cache
+[[headers]]
+  for = "/fonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# API routes - no caching, CORS enabled
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "no-store, no-cache, must-revalidate"
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization, X-Dev-Token"
+
+# Developer dashboard API - stricter cache control
+[[headers]]
+  for = "/api/dev/*"
+  [headers.values]
+    Cache-Control = "no-store, no-cache, must-revalidate, private"
