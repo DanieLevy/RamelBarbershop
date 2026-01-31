@@ -1,5 +1,5 @@
 /**
- * Next.js Middleware for Rate Limiting and Security
+ * Next.js Proxy for Rate Limiting and Security
  * 
  * Implements in-memory rate limiting for critical API endpoints.
  * Includes:
@@ -8,6 +8,8 @@
  * - Suspicious activity detection and logging
  * 
  * For production with multiple instances, consider using Redis (e.g., Upstash).
+ * 
+ * Note: Migrated from middleware.ts to proxy.ts per Next.js 16+ convention.
  */
 
 import { NextResponse } from 'next/server'
@@ -209,7 +211,7 @@ function recordViolation(ip: string) {
     entry.blocked = true
     entry.blockedUntil = now + BLOCK_DURATION_MS
     
-    console.warn(`[Middleware] Blocked suspicious IP: ${ip} - ${entry.count} violations in ${Math.round((now - entry.firstViolation) / 1000)}s`)
+    console.warn(`[Proxy] Blocked suspicious IP: ${ip} - ${entry.count} violations in ${Math.round((now - entry.firstViolation) / 1000)}s`)
   }
 }
 
@@ -254,7 +256,7 @@ function checkRateLimit(ip: string, pathname: string): {
     // Rate limit exceeded - record violation
     recordViolation(ip)
     
-    console.log(`[Middleware] Rate limit exceeded: IP=${ip}, path=${pathname}, count=${entry.count}`)
+    console.log(`[Proxy] Rate limit exceeded: IP=${ip}, path=${pathname}, count=${entry.count}`)
     
     return { 
       allowed: false, 
@@ -270,10 +272,10 @@ function checkRateLimit(ip: string, pathname: string): {
 }
 
 // ============================================================
-// Middleware
+// Proxy Handler
 // ============================================================
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   
   // Only apply rate limiting to API routes
@@ -317,7 +319,7 @@ export function middleware(request: NextRequest) {
   return response
 }
 
-// Configure which paths the middleware runs on
+// Configure which paths the proxy runs on
 export const config = {
   matcher: [
     // Match all API routes
