@@ -26,10 +26,6 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Edge Functions configuration
-[edge_functions]
-  # Uses the Next.js proxy (formerly middleware) automatically
-
 # Headers for security and caching
 [[headers]]
   for = "/*"
