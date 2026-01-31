@@ -1,11 +1,17 @@
 'use client'
 
+import { useState, useRef, useCallback } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { MapPin, Phone, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import type { BarbershopSettings } from '@/types/database'
+
+// Hidden dev access - tap copyright 5 times within 3 seconds
+const DEV_TAP_COUNT = 5
+const DEV_TAP_TIMEOUT_MS = 3000
 
 // Social icons
 const WhatsAppIcon = () => (
@@ -41,9 +47,37 @@ interface FooterProps {
  * - Safe area padding for bottom nav
  */
 export function Footer({ settings }: FooterProps) {
+  const router = useRouter()
   const { isAdmin, isLoggedIn: isBarberLoggedIn } = useBarberAuthStore()
   const currentYear = new Date().getFullYear()
   const shopName = settings?.name || 'רמאל ברברשופ'
+  
+  // Hidden dev access: tap copyright 5 times within 3 seconds
+  const [tapCount, setTapCount] = useState(0)
+  const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  const handleCopyrightTap = useCallback(() => {
+    // Clear existing timeout
+    if (tapTimeoutRef.current) {
+      clearTimeout(tapTimeoutRef.current)
+    }
+    
+    const newCount = tapCount + 1
+    
+    if (newCount >= DEV_TAP_COUNT) {
+      // Success! Navigate to dev login
+      setTapCount(0)
+      router.push('/dev/login')
+      return
+    }
+    
+    setTapCount(newCount)
+    
+    // Reset after timeout
+    tapTimeoutRef.current = setTimeout(() => {
+      setTapCount(0)
+    }, DEV_TAP_TIMEOUT_MS)
+  }, [tapCount, router])
   const phone = settings?.contact_phone || settings?.phone || '052-384-0981'
   const addressText = settings?.address_text || 'יעקב טהון 13, ירושלים, ישראל'
   const whatsappNumber = settings?.contact_whatsapp || '972523840981'
@@ -153,7 +187,14 @@ export function Footer({ settings }: FooterProps) {
       {/* Bottom bar */}
       <div className="border-t border-white/5">
         <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-foreground-muted">
-          <p className="order-3 sm:order-1">© {currentYear} {shopName}. כל הזכויות שמורות.</p>
+          {/* Hidden dev access: tap 5 times quickly to access /dev/login */}
+          <button
+            onClick={handleCopyrightTap}
+            className="order-3 sm:order-1 cursor-default select-none"
+            aria-label="Copyright"
+          >
+            © {currentYear} {shopName}. כל הזכויות שמורות.
+          </button>
           
           {/* Legal Links - nowrap to prevent breaking */}
           <div className="order-1 sm:order-2 flex items-start justify-start whitespace-nowrap h-[22px]">
