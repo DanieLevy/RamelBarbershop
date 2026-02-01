@@ -127,20 +127,24 @@ export async function POST(request: NextRequest) {
       subscriptions = [subscription]
     }
 
-    // Build notification payload
+    // Build notification payload - MUST wrap in 'notification' object for service worker
     const payload = JSON.stringify({
-      title,
-      body: messageBody,
-      icon: '/icons/icon-192x192.png',
-      badge: '/icons/icon-72x72.png',
-      tag: `barber-message-${Date.now()}`,
-      requireInteraction: true,
-      data: {
-        url: url || '/my-appointments',
-        timestamp: Date.now(),
-        type: 'barber_broadcast',
-        barberName: barberName || undefined,
+      notification: {
+        title,
+        body: messageBody,
+        icon: '/icons/icon-192x192.png',
+        badge: '/icons/icon-72x72.png',
+        tag: `barber-message-${Date.now()}`,
+        requireInteraction: true,
+        data: {
+          url: url || '/my-appointments',
+          timestamp: Date.now(),
+          type: 'barber_broadcast',
+          recipientType: 'customer',
+          barberName: barberName || undefined,
+        },
       },
+      badgeCount: 1
     })
 
     // Send to all subscriptions

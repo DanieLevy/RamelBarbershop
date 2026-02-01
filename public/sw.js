@@ -1,6 +1,6 @@
 // Service Worker for Ramel Barbershop PWA
 // Version is updated automatically during build
-const APP_VERSION = '2.0.0-2026.02.02.0000';
+const APP_VERSION = '2.0.0-2026.02.02.0014';
 const CACHE_NAME = `ramel-pwa-${APP_VERSION}`;
 
 // Assets to cache - critical for app shell and fast loading
@@ -405,6 +405,10 @@ function getTargetUrlForNotification(data, action) {
       // For booking_confirmed and cancellation (to barber), link to reservations with highlight
       if (type === 'cancellation' && cancelledBy === 'customer') {
         return `/barber/dashboard/reservations?highlight=${reservationId}&tab=cancelled`;
+      }
+      // For cancel_request, link to reservations with highlight
+      if (type === 'cancel_request') {
+        return `/barber/dashboard/reservations?highlight=${reservationId}`;
       }
       return `/barber/dashboard/reservations?highlight=${reservationId}`;
     }

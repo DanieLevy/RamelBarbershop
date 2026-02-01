@@ -72,26 +72,30 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Build notification payload
+    // Build notification payload - MUST wrap in 'notification' object for service worker
     const payload = JSON.stringify({
-      title: `🙏 בקשת ביטול מ${customerName}`,
-      body: `${customerName} מבקש/ת לבטל את התור ל${serviceName} ב${formattedDate} בשעה ${formattedTime}`,
-      icon: '/icons/icon-192x192.png',
-      badge: '/icons/icon-72x72.png',
-      tag: `cancel-request-${reservationId}`,
-      requireInteraction: true,
-      data: {
-        url: `/barber/dashboard/reservations?highlight=${reservationId}`,
-        timestamp: Date.now(),
-        type: 'cancel_request',
-        reservationId,
-        customerId,
-        customerName
+      notification: {
+        title: `🙏 בקשת ביטול מ${customerName}`,
+        body: `${customerName} מבקש/ת לבטל את התור ל${serviceName} ב${formattedDate} בשעה ${formattedTime}`,
+        icon: '/icons/icon-192x192.png',
+        badge: '/icons/icon-72x72.png',
+        tag: `cancel-request-${reservationId}`,
+        requireInteraction: true,
+        data: {
+          url: `/barber/dashboard/reservations?highlight=${reservationId}`,
+          timestamp: Date.now(),
+          type: 'cancel_request',
+          recipientType: 'barber',
+          reservationId,
+          customerId,
+          customerName
+        },
+        actions: [
+          { action: 'view', title: 'צפה בפרטים' },
+          { action: 'dismiss', title: 'סגור' }
+        ]
       },
-      actions: [
-        { action: 'approve', title: 'בטל את התור' },
-        { action: 'view', title: 'צפה בפרטים' }
-      ]
+      badgeCount: 1
     })
 
     // Send to all barber's devices
