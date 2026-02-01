@@ -34,6 +34,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'סקירה כללית', href: '/barber/dashboard', icon: Home },
   { label: 'התורים שלי', href: '/barber/dashboard/reservations', icon: Calendar },
+  { label: 'הלקוחות שלי', href: '/barber/dashboard/customers', icon: Users },
   { label: 'השירותים שלי', href: '/barber/dashboard/services', icon: Scissors },
   { label: 'הלו"ז שלי', href: '/barber/dashboard/my-schedule', icon: Clock },
   { label: 'פרופיל', href: '/barber/dashboard/profile', icon: User },

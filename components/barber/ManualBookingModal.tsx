@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { X, Loader2, Search, User, Calendar, Clock, UserPlus, Scissors } from 'lucide-react'
+import { X, Loader2, Search, User, Calendar, Clock, UserPlus, Scissors, AlertTriangle } from 'lucide-react'
 import { cn, generateTimeSlots, parseTimeString, nowInIsrael, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { createReservation } from '@/lib/services/booking.service'
@@ -27,7 +27,7 @@ export function ManualBookingModal({
   onClose,
   onSuccess,
   barberId,
-  // barberName - available for future use
+  barberName,
   shopSettings,
   preselectedDate,
   preselectedTime
@@ -40,6 +40,11 @@ export function ManualBookingModal({
   const [walkinName, setWalkinName] = useState('')
   const [walkinPhone, setWalkinPhone] = useState('')
   const [barberNotes, setBarberNotes] = useState('')
+  
+  // Out-of-hours booking state
+  const [isOutOfHours, setIsOutOfHours] = useState(false)
+  const [customHour, setCustomHour] = useState('')
+  const [customMinute, setCustomMinute] = useState('00')
   
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
@@ -56,6 +61,64 @@ export function ManualBookingModal({
   
   const israelNow = nowInIsrael()
 
+  // Get the barber's work hours for the currently selected date
+  const currentDayWorkHours = useMemo(() => {
+    const dayKey = getDayKeyInIsrael(selectedDate.getTime())
+    const barberDaySettings = barberWorkDays.find(wd => wd.day_of_week === dayKey)
+    
+    // Default work hours from shop settings
+    const defaultStart = shopSettings?.work_hours_start || '09:00'
+    const defaultEnd = shopSettings?.work_hours_end || '19:00'
+    
+    if (barberDaySettings && barberDaySettings.is_working && barberDaySettings.start_time && barberDaySettings.end_time) {
+      return {
+        start: barberDaySettings.start_time,
+        end: barberDaySettings.end_time,
+        isWorking: true,
+        dayName: dayKey
+      }
+    } else if (barberDaySettings && !barberDaySettings.is_working) {
+      return {
+        start: defaultStart,
+        end: defaultEnd,
+        isWorking: false,
+        dayName: dayKey
+      }
+    }
+    
+    return {
+      start: defaultStart,
+      end: defaultEnd,
+      isWorking: true,
+      dayName: dayKey
+    }
+  }, [selectedDate, barberWorkDays, shopSettings])
+  
+  // Calculate smart default time for out-of-hours (30 min after work ends)
+  const getSmartOutOfHoursDefault = () => {
+    const { hour: endHour, minute: endMinute } = parseTimeString(currentDayWorkHours.end)
+    
+    // Default to 30 minutes after work ends
+    let defaultHour = endHour
+    let defaultMinute = endMinute + 30
+    
+    if (defaultMinute >= 60) {
+      defaultMinute = defaultMinute - 60
+      defaultHour = defaultHour + 1
+    }
+    
+    // Cap at 23:00 max
+    if (defaultHour > 23) {
+      defaultHour = 23
+      defaultMinute = 0
+    }
+    
+    return {
+      hour: defaultHour.toString().padStart(2, '0'),
+      minute: defaultMinute < 15 ? '00' : defaultMinute < 30 ? '15' : defaultMinute < 45 ? '30' : '45'
+    }
+  }
+
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -69,11 +132,25 @@ export function ManualBookingModal({
       setBarberNotes('')
       setSearchQuery('')
       setSearchResults([])
+      setIsOutOfHours(false)
+      // Will be set dynamically when out-of-hours is enabled
+      setCustomHour('')
+      setCustomMinute('00')
       fetchServices()
       fetchBarberWorkDays()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, preselectedDate, preselectedTime])
+  
+  // Set smart defaults when out-of-hours is enabled or date changes
+  useEffect(() => {
+    if (isOutOfHours && barberWorkDays.length > 0) {
+      const defaults = getSmartOutOfHoursDefault()
+      setCustomHour(defaults.hour)
+      setCustomMinute(defaults.minute)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOutOfHours, selectedDate, barberWorkDays])
 
   // Fetch available time slots when date changes
   useEffect(() => {
@@ -162,6 +239,28 @@ export function ManualBookingModal({
     return () => clearTimeout(timer)
   }, [searchQuery])
 
+  // Compute custom time timestamp for out-of-hours booking
+  const customTimeTimestamp = useMemo(() => {
+    if (!isOutOfHours) return null
+    
+    const hour = parseInt(customHour, 10)
+    const minute = parseInt(customMinute, 10)
+    
+    if (isNaN(hour) || isNaN(minute)) return null
+    
+    // Create timestamp for the selected date with custom time
+    const date = new Date(selectedDate)
+    date.setHours(hour, minute, 0, 0)
+    
+    return date.getTime()
+  }, [isOutOfHours, selectedDate, customHour, customMinute])
+  
+  // Check if custom time slot is already reserved
+  const isCustomTimeReserved = useMemo(() => {
+    if (!customTimeTimestamp) return false
+    return reservedSlots.some(reserved => Math.abs(reserved - customTimeTimestamp) < 60000)
+  }, [customTimeTimestamp, reservedSlots])
+
   // Generate available time slots using barber's day-specific hours
   const availableSlots = useMemo(() => {
     // Get the day of week for the selected date
@@ -214,8 +313,11 @@ export function ManualBookingModal({
   }, [selectedDate, shopSettings, reservedSlots, israelNow, barberWorkDays])
 
   const handleSubmit = async () => {
+    // Determine the final time to use
+    const finalTime = isOutOfHours ? customTimeTimestamp : selectedTime
+    
     // Validation
-    if (!selectedTime) {
+    if (!finalTime) {
       toast.error('נא לבחור שעה')
       return
     }
@@ -230,6 +332,19 @@ export function ManualBookingModal({
     if (mode === 'walkin' && !walkinName.trim()) {
       toast.error('נא להזין שם הלקוח')
       return
+    }
+    
+    // Out-of-hours specific validations
+    if (isOutOfHours) {
+      if (isCustomTimeReserved) {
+        toast.error('השעה כבר תפוסה')
+        return
+      }
+      // Validate time is not in the past for today
+      if (isSameDay(selectedDate, israelNow) && finalTime < Date.now()) {
+        toast.error('לא ניתן לקבוע תור בשעה שעברה')
+        return
+      }
     }
     
     setSaving(true)
@@ -275,8 +390,15 @@ export function ManualBookingModal({
       }
       
       // Calculate date-related fields - USING ISRAEL TIMEZONE
-      const dayName = getDayKeyInIsrael(selectedTime)
-      const dateTimestamp = getIsraelDayStart(selectedTime)
+      const dayName = getDayKeyInIsrael(finalTime)
+      const dateTimestamp = getIsraelDayStart(finalTime)
+      
+      // Add note for out-of-hours bookings
+      let finalNotes = barberNotes.trim()
+      if (isOutOfHours) {
+        const oohNote = 'תור מחוץ לשעות העבודה הרגילות'
+        finalNotes = finalNotes ? `${oohNote} | ${finalNotes}` : oohNote
+      }
       
       // Use atomic function for race-condition-safe booking
       // barber_notes is now included in the atomic operation
@@ -287,10 +409,10 @@ export function ManualBookingModal({
         customerName,
         customerPhone,
         dateTimestamp,
-        timeTimestamp: selectedTime,
+        timeTimestamp: finalTime,
         dayName,
         dayNum: format(selectedDate, 'dd/MM'),
-        barberNotes: barberNotes.trim() || undefined,
+        barberNotes: finalNotes || undefined,
       })
       
       if (!result.success) {
@@ -305,7 +427,36 @@ export function ManualBookingModal({
         return
       }
       
-      toast.success('התור נוצר בהצלחה')
+      // Send push notification to the customer (for existing customers only)
+      if (mode === 'existing' && selectedCustomer?.id) {
+        try {
+          console.log('[ManualBooking] Sending push notification to customer:', customerId)
+          fetch('/api/push/notify-booking', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              reservationId: result.reservationId,
+              customerId: customerId,
+              barberId: barberId,
+              barberName: barberName || 'הספר',
+              serviceName: selectedService.name_he,
+              appointmentTime: finalTime,
+              isManualBooking: true,
+            })
+          })
+            .then(res => res.json())
+            .then(data => console.log('[ManualBooking] Push notification result:', data))
+            .catch(err => console.error('[ManualBooking] Push notification error:', err))
+        } catch (pushErr) {
+          console.error('[ManualBooking] Failed to send push notification:', pushErr)
+          // Don't fail the booking if push fails
+        }
+      }
+      
+      toast.success(isOutOfHours 
+        ? 'התור מחוץ לשעות נוצר בהצלחה!' 
+        : 'התור נוצר בהצלחה'
+      )
       onSuccess()
       onClose()
     } catch (err) {
@@ -323,9 +474,24 @@ export function ManualBookingModal({
       <div className="relative w-full sm:max-w-lg sm:mx-4 bg-background-darker sm:bg-background-dark border-t sm:border border-white/10 sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[90vh] flex flex-col animate-slide-in-up sm:animate-fade-in">
         {/* Header - Fixed */}
         <div className="flex items-center justify-between p-5 sm:p-6 pb-3 border-b border-white/5 flex-shrink-0">
-          <div>
-            <h3 className="text-lg font-medium text-foreground-light">הוספת תור ידני</h3>
-            <p className="text-foreground-muted text-xs mt-0.5">רישום תור על-ידי הספר</p>
+          <div className="flex items-start gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-medium text-foreground-light">הוספת תור ידני</h3>
+                {isOutOfHours && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-500/30 text-orange-400 text-[10px] font-medium animate-pulse">
+                    <AlertTriangle size={10} />
+                    מחוץ לשעות
+                  </span>
+                )}
+              </div>
+              <p className="text-foreground-muted text-xs mt-0.5">
+                {isOutOfHours 
+                  ? `שעות העבודה: ${currentDayWorkHours.start} - ${currentDayWorkHours.end}` 
+                  : 'רישום תור על-ידי הספר'
+                }
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -571,35 +737,141 @@ export function ManualBookingModal({
 
           {/* Time Selection */}
           <div className="flex flex-col gap-2">
-            <label className="text-foreground-light text-sm flex items-center gap-2">
-              <Clock size={14} className="text-accent-gold" />
-              שעה
-            </label>
-            {loadingSlots ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 size={20} className="text-accent-gold animate-spin" />
-              </div>
-            ) : availableSlots.length === 0 ? (
-              <p className="text-foreground-muted text-sm text-center py-4">
-                אין משבצות פנויות ביום זה
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto pb-2">
-                {availableSlots.map(slot => (
-                  <button
-                    key={slot.timestamp}
-                    onClick={() => setSelectedTime(slot.timestamp)}
-                    className={cn(
-                      'px-3 py-1.5 rounded-lg text-sm font-medium transition-all tabular-nums',
-                      selectedTime === slot.timestamp
-                        ? 'bg-accent-gold text-background-dark'
-                        : 'bg-white/[0.05] text-foreground-muted hover:bg-white/[0.1] border border-white/[0.08]'
+            <div className="flex items-center justify-between">
+              <label className="text-foreground-light text-sm flex items-center gap-2">
+                <Clock size={14} className="text-accent-gold" />
+                שעה
+              </label>
+              
+              {/* Out-of-Hours Toggle */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOutOfHours(!isOutOfHours)
+                  if (!isOutOfHours) {
+                    setSelectedTime(null) // Clear regular time when switching to OOH
+                  }
+                }}
+                className={cn(
+                  'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all',
+                  isOutOfHours
+                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                    : 'bg-white/[0.05] text-foreground-muted hover:bg-white/[0.1] border border-white/[0.08]'
+                )}
+              >
+                <AlertTriangle size={12} />
+                מחוץ לשעות
+              </button>
+            </div>
+            
+            {/* Out-of-Hours Custom Time Input */}
+            {isOutOfHours ? (
+              <div className="space-y-3">
+                {/* Warning Banner */}
+                <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20">
+                  <div className="flex gap-2">
+                    <AlertTriangle size={16} className="text-orange-400 shrink-0 mt-0.5" />
+                    <div className="text-xs text-orange-300">
+                      <p className="font-medium mb-1">תור מחוץ לשעות העבודה</p>
+                      <p className="text-orange-300/80 mb-1.5">
+                        שעות העבודה שלך ביום זה: <span className="font-semibold text-orange-300">{currentDayWorkHours.start} - {currentDayWorkHours.end}</span>
+                        {!currentDayWorkHours.isWorking && (
+                          <span className="block text-red-400 mt-1">שים לב: יום זה מוגדר כיום חופש!</span>
+                        )}
+                      </p>
+                      <p className="text-orange-300/60">
+                        רק אתה, כספר, יכול ליצור תורים מחוץ לשעות העבודה.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Custom Time Picker */}
+                <div className="flex items-center gap-3 justify-center">
+                  <div className="flex flex-col items-center">
+                    <label className="text-foreground-muted text-xs mb-1">שעה</label>
+                    <select
+                      value={customHour}
+                      onChange={(e) => setCustomHour(e.target.value)}
+                      className="w-20 p-2.5 rounded-xl bg-background-card border border-white/10 text-foreground-light text-center text-lg font-medium outline-none focus:ring-2 focus:ring-orange-500/50"
+                    >
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <option key={i} value={i.toString().padStart(2, '0')}>
+                          {i.toString().padStart(2, '0')}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <span className="text-foreground-light text-2xl font-bold mt-5">:</span>
+                  <div className="flex flex-col items-center">
+                    <label className="text-foreground-muted text-xs mb-1">דקות</label>
+                    <select
+                      value={customMinute}
+                      onChange={(e) => setCustomMinute(e.target.value)}
+                      className="w-20 p-2.5 rounded-xl bg-background-card border border-white/10 text-foreground-light text-center text-lg font-medium outline-none focus:ring-2 focus:ring-orange-500/50"
+                    >
+                      {['00', '15', '30', '45'].map(min => (
+                        <option key={min} value={min}>{min}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                
+                {/* Time Preview */}
+                <div className="text-center">
+                  <p className="text-foreground-muted text-xs">
+                    התור ייקבע ל:
+                  </p>
+                  <p className={cn(
+                    'text-lg font-bold tabular-nums mt-1',
+                    isCustomTimeReserved ? 'text-red-400' : 'text-orange-400'
+                  )}>
+                    {customHour}:{customMinute}
+                    {isCustomTimeReserved && (
+                      <span className="text-xs text-red-400 mr-2">(תפוס!)</span>
                     )}
-                  >
-                    {slot.time}
-                  </button>
-                ))}
+                  </p>
+                </div>
               </div>
+            ) : (
+              /* Regular Time Slots */
+              <>
+                {loadingSlots ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 size={20} className="text-accent-gold animate-spin" />
+                  </div>
+                ) : availableSlots.length === 0 ? (
+                  <div className="text-center py-4">
+                    <p className="text-foreground-muted text-sm mb-2">
+                      אין משבצות פנויות ביום זה
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setIsOutOfHours(true)}
+                      className="text-orange-400 text-xs underline hover:text-orange-300"
+                    >
+                      קבע תור מחוץ לשעות העבודה
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto pb-2">
+                    {availableSlots.map(slot => (
+                      <button
+                        key={slot.timestamp}
+                        onClick={() => setSelectedTime(slot.timestamp)}
+                        className={cn(
+                          'px-3 py-1.5 rounded-lg text-sm font-medium transition-all tabular-nums',
+                          selectedTime === slot.timestamp
+                            ? 'bg-accent-gold text-background-dark'
+                            : 'bg-white/[0.05] text-foreground-muted hover:bg-white/[0.1] border border-white/[0.08]'
+                        )}
+                      >
+                        {slot.time}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
