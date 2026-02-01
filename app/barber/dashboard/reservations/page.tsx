@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, Suspense } from 'react'
+import { useEffect, useState, useMemo, Suspense, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { cn, formatTime as formatTimeUtil, nowInIsrael, generateTimeSlots, parseTimeString, getIsraelDayStart, getIsraelDayEnd, timestampToIsraelDate, isSameDayInIsrael, getDayKeyInIsrael } from '@/lib/utils'
 import { addDays, format, startOfWeek, endOfWeek, isSameDay, parse } from 'date-fns'
 import { he } from 'date-fns/locale'
-import { Calendar, Phone, X, Plus } from 'lucide-react'
+import { Calendar, Phone, X, Plus, ChevronDown, MessageCircle } from 'lucide-react'
 import type { Reservation, Service, BarbershopSettings, WorkDay } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { CancelReservationModal } from '@/components/barber/CancelReservationModal'
@@ -20,7 +20,7 @@ interface ReservationWithService extends Reservation {
   services?: Service
 }
 
-type TabType = 'upcoming' | 'past' | 'cancelled'
+type ViewMode = 'all' | 'upcoming_only' | 'cancelled'
 type QuickDateType = 'today' | 'tomorrow' | 'week' | 'all' | 'custom'
 
 // Wrap in Suspense for useSearchParams
@@ -43,18 +43,23 @@ function ReservationsContent() {
   
   // Get URL params from push notification deep links
   const highlightId = searchParams.get('highlight')
-  const tabParam = searchParams.get('tab') as TabType | null
+  const tabParam = searchParams.get('tab')
   const dateParam = searchParams.get('date')
   
   const [reservations, setReservations] = useState<ReservationWithService[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<TabType>('upcoming')
+  const [viewMode, setViewMode] = useState<ViewMode>('all') // 'all' shows unified timeline
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
   
   // Date filter state
   const [quickDate, setQuickDate] = useState<QuickDateType>('today')
   const [customDate, setCustomDate] = useState<Date | null>(null)
+  
+  // Scroll refs for auto-scroll to upcoming
+  const upcomingDividerRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const hasScrolledRef = useRef(false)
   
   // Modal states
   const [cancelModal, setCancelModal] = useState<{
@@ -111,11 +116,11 @@ function ReservationsContent() {
       // Set visual highlight
       setHighlightedId(highlightId)
       
-      // Switch to the correct tab based on URL param or reservation status
-      if (tabParam) {
-        setActiveTab(tabParam)
-      } else if (targetReservation.status === 'cancelled') {
-        setActiveTab('cancelled')
+      // Switch to the correct view based on URL param or reservation status
+      if (tabParam === 'cancelled' || targetReservation.status === 'cancelled') {
+        setViewMode('cancelled')
+      } else {
+        setViewMode('all') // Unified timeline
       }
       
       // Set date filter based on URL param or reservation date
@@ -484,6 +489,25 @@ function ReservationsContent() {
     return ts
   }
 
+  // Format phone number for WhatsApp (Israeli format)
+  // WhatsApp requires international format without + or spaces
+  // e.g., "050-1234567" -> "972501234567"
+  const formatPhoneForWhatsApp = (phone: string): string => {
+    // Remove all non-digit characters
+    let cleaned = phone.replace(/\D/g, '')
+    
+    // Handle Israeli numbers
+    if (cleaned.startsWith('0')) {
+      // Replace leading 0 with 972 (Israel country code)
+      cleaned = '972' + cleaned.substring(1)
+    } else if (!cleaned.startsWith('972')) {
+      // If doesn't start with 972, add it
+      cleaned = '972' + cleaned
+    }
+    
+    return cleaned
+  }
+
   const formatTime = (timestamp: number): string => {
     return formatTimeUtil(normalizeTs(timestamp))
   }
@@ -533,7 +557,7 @@ function ReservationsContent() {
     return { date: dateStr, time: formatTime(normalizedTs), isToday }
   }
 
-  // Filter reservations
+  // Filter reservations with unified timeline support
   const filteredReservations = useMemo(() => {
     let filtered = [...reservations]
     const { startMs, endMs } = getDateRange()
@@ -546,107 +570,180 @@ function ReservationsContent() {
       })
     }
     
-    // Tab filter
-    switch (activeTab) {
-      case 'upcoming':
+    // View mode filter
+    switch (viewMode) {
+      case 'all':
+        // Unified view: show both past and upcoming, exclude cancelled
+        filtered = filtered.filter(res => res.status !== 'cancelled')
+        break
+      case 'upcoming_only':
+        // Only upcoming confirmed appointments
         filtered = filtered.filter(res => 
           normalizeTs(res.time_timestamp) > now && res.status === 'confirmed'
         )
         break
-      case 'past':
-        filtered = filtered.filter(res => 
-          normalizeTs(res.time_timestamp) < now && res.status !== 'cancelled'
-        )
-        break
       case 'cancelled':
+        // Only cancelled
         filtered = filtered.filter(res => res.status === 'cancelled')
         break
     }
     
+    // Sort by time_timestamp for proper chronological order
+    filtered.sort((a, b) => normalizeTs(a.time_timestamp) - normalizeTs(b.time_timestamp))
+    
     return filtered
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reservations, quickDate, customDate, activeTab, now])
+  }, [reservations, quickDate, customDate, viewMode, now])
+  
+  // Split reservations into past and upcoming for the unified view
+  const { pastReservations, upcomingReservations } = useMemo(() => {
+    if (viewMode !== 'all') {
+      return { pastReservations: [], upcomingReservations: filteredReservations }
+    }
+    
+    const past: ReservationWithService[] = []
+    const upcoming: ReservationWithService[] = []
+    
+    filteredReservations.forEach((res) => {
+      if (normalizeTs(res.time_timestamp) > now) {
+        upcoming.push(res)
+      } else {
+        past.push(res)
+      }
+    })
+    
+    return { pastReservations: past, upcomingReservations: upcoming }
+  }, [filteredReservations, viewMode, now])
   
   // Generate timeline with empty slots for single-day views
   type TimelineItem = 
-    | { type: 'reservation'; data: ReservationWithService }
+    | { type: 'reservation'; data: ReservationWithService; isPast: boolean }
     | { type: 'empty'; timestamp: number; time: string }
+    | { type: 'divider'; label: string }
   
   const timelineItems = useMemo((): TimelineItem[] => {
-    // Only show empty slots for single-day views and upcoming tab
-    if (!showEmptySlots || quickDate === 'week' || quickDate === 'all' || activeTab !== 'upcoming') {
-      return filteredReservations.map(res => ({ type: 'reservation' as const, data: res }))
-    }
+    const items: TimelineItem[] = []
     
-    // Get the selected date
-    let selectedDate: Date
-    if (quickDate === 'today') {
-      selectedDate = israelNow
-    } else if (quickDate === 'tomorrow') {
-      selectedDate = addDays(israelNow, 1)
-    } else if (quickDate === 'custom' && customDate) {
-      selectedDate = customDate
-    } else {
-      return filteredReservations.map(res => ({ type: 'reservation' as const, data: res }))
-    }
-    
-    // Get work hours - prioritize barber's day-specific hours over shop settings
-    const dayKey = getDayKeyInIsrael(selectedDate.getTime())
-    const barberDaySettings = barberWorkDays.find(wd => wd.day_of_week === dayKey)
-    
-    let workStart: string
-    let workEnd: string
-    
-    if (barberDaySettings && barberDaySettings.is_working && barberDaySettings.start_time && barberDaySettings.end_time) {
-      // Use barber's day-specific hours
-      workStart = barberDaySettings.start_time
-      workEnd = barberDaySettings.end_time
-    } else if (barberDaySettings && !barberDaySettings.is_working) {
-      // Barber doesn't work on this day - return only reservations (shouldn't have any)
-      return filteredReservations.map(res => ({ type: 'reservation' as const, data: res }))
-    } else {
-      // Fall back to shop settings
-      workStart = shopSettings?.work_hours_start || '09:00'
-      workEnd = shopSettings?.work_hours_end || '19:00'
-    }
-    
-    const { hour: startHour, minute: startMinute } = parseTimeString(workStart)
-    const { hour: endHour, minute: endMinute } = parseTimeString(workEnd)
-    
-    // Generate all time slots for the day
-    const allSlots = generateTimeSlots(
-      selectedDate.getTime(),
-      startHour,
-      startMinute,
-      endHour,
-      endMinute,
-      30
-    )
-    
-    // Build timeline
-    const timeline: TimelineItem[] = []
-    
-    for (const slot of allSlots) {
-      // Skip past slots for today
-      if (isSameDay(selectedDate, israelNow) && slot.timestamp < now) {
-        continue
+    // For unified view ('all'), build a timeline with past, divider, and upcoming
+    if (viewMode === 'all') {
+      // Add past reservations
+      pastReservations.forEach(res => {
+        items.push({ type: 'reservation', data: res, isPast: true })
+      })
+      
+      // Add divider between past and upcoming if both exist
+      if (pastReservations.length > 0 && upcomingReservations.length > 0) {
+        items.push({ type: 'divider', label: 'תורים קרובים' })
+      } else if (pastReservations.length > 0 && upcomingReservations.length === 0) {
+        items.push({ type: 'divider', label: 'אין תורים נוספים היום' })
+      } else if (pastReservations.length === 0 && upcomingReservations.length > 0) {
+        // No past, just show upcoming without divider
       }
       
-      // Check if this slot is reserved
-      const reservation = filteredReservations.find(res => 
-        Math.abs(normalizeTs(res.time_timestamp) - slot.timestamp) < 60000 // within 1 minute
-      )
-      
-      if (reservation) {
-        timeline.push({ type: 'reservation', data: reservation })
+      // Add upcoming reservations with empty slots if enabled
+      if (showEmptySlots && (quickDate === 'today' || quickDate === 'tomorrow' || quickDate === 'custom')) {
+        // Get the selected date
+        let selectedDate: Date
+        if (quickDate === 'today') {
+          selectedDate = israelNow
+        } else if (quickDate === 'tomorrow') {
+          selectedDate = addDays(israelNow, 1)
+        } else if (quickDate === 'custom' && customDate) {
+          selectedDate = customDate
+        } else {
+          // Just add upcoming without empty slots
+          upcomingReservations.forEach(res => {
+            items.push({ type: 'reservation', data: res, isPast: false })
+          })
+          return items
+        }
+        
+        // Get work hours
+        const dayKey = getDayKeyInIsrael(selectedDate.getTime())
+        const barberDaySettings = barberWorkDays.find(wd => wd.day_of_week === dayKey)
+        
+        let workStart: string
+        let workEnd: string
+        
+        if (barberDaySettings && barberDaySettings.is_working && barberDaySettings.start_time && barberDaySettings.end_time) {
+          workStart = barberDaySettings.start_time
+          workEnd = barberDaySettings.end_time
+        } else if (barberDaySettings && !barberDaySettings.is_working) {
+          upcomingReservations.forEach(res => {
+            items.push({ type: 'reservation', data: res, isPast: false })
+          })
+          return items
+        } else {
+          workStart = shopSettings?.work_hours_start || '09:00'
+          workEnd = shopSettings?.work_hours_end || '19:00'
+        }
+        
+        const { hour: startHour, minute: startMinute } = parseTimeString(workStart)
+        const { hour: endHour, minute: endMinute } = parseTimeString(workEnd)
+        
+        const allSlots = generateTimeSlots(
+          selectedDate.getTime(),
+          startHour,
+          startMinute,
+          endHour,
+          endMinute,
+          30
+        )
+        
+        for (const slot of allSlots) {
+          // Only show future slots
+          if (slot.timestamp <= now) continue
+          
+          const reservation = upcomingReservations.find(res => 
+            Math.abs(normalizeTs(res.time_timestamp) - slot.timestamp) < 60000
+          )
+          
+          if (reservation) {
+            items.push({ type: 'reservation', data: reservation, isPast: false })
+          } else {
+            items.push({ type: 'empty', timestamp: slot.timestamp, time: slot.time })
+          }
+        }
       } else {
-        timeline.push({ type: 'empty', timestamp: slot.timestamp, time: slot.time })
+        // No empty slots, just add upcoming
+        upcomingReservations.forEach(res => {
+          items.push({ type: 'reservation', data: res, isPast: false })
+        })
       }
+      
+      return items
     }
     
-    return timeline
+    // For other views, just map the filtered reservations
+    return filteredReservations.map(res => ({ 
+      type: 'reservation' as const, 
+      data: res, 
+      isPast: normalizeTs(res.time_timestamp) <= now 
+    }))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredReservations, quickDate, customDate, activeTab, shopSettings, barberWorkDays, showEmptySlots, now])
+  }, [filteredReservations, pastReservations, upcomingReservations, quickDate, customDate, viewMode, shopSettings, barberWorkDays, showEmptySlots, now])
+  
+  // Auto-scroll to upcoming section when data loads
+  const scrollToUpcoming = useCallback(() => {
+    if (upcomingDividerRef.current && !hasScrolledRef.current) {
+      setTimeout(() => {
+        upcomingDividerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        hasScrolledRef.current = true
+      }, 100)
+    }
+  }, [])
+  
+  // Trigger scroll when timeline loads
+  useEffect(() => {
+    if (!loading && viewMode === 'all' && pastReservations.length > 0 && upcomingReservations.length > 0) {
+      scrollToUpcoming()
+    }
+  }, [loading, viewMode, pastReservations.length, upcomingReservations.length, scrollToUpcoming])
+  
+  // Reset scroll flag when date filter changes
+  useEffect(() => {
+    hasScrolledRef.current = false
+  }, [quickDate, customDate])
   
   // Get selected date for manual booking
   const getSelectedDate = (): Date | null => {
@@ -656,8 +753,8 @@ function ReservationsContent() {
     return null
   }
 
-  // Tab counts
-  const getTabCounts = () => {
+  // View counts
+  const getViewCounts = () => {
     const { startMs, endMs } = getDateRange()
     let base = [...reservations]
     
@@ -668,18 +765,24 @@ function ReservationsContent() {
       })
     }
     
+    const upcoming = base.filter(r => normalizeTs(r.time_timestamp) > now && r.status === 'confirmed').length
+    const past = base.filter(r => normalizeTs(r.time_timestamp) <= now && r.status !== 'cancelled').length
+    const cancelled = base.filter(r => r.status === 'cancelled').length
+    
     return {
-      upcoming: base.filter(r => normalizeTs(r.time_timestamp) > now && r.status === 'confirmed').length,
-      past: base.filter(r => normalizeTs(r.time_timestamp) < now && r.status !== 'cancelled').length,
-      cancelled: base.filter(r => r.status === 'cancelled').length
+      all: upcoming + past, // Total active (past + upcoming)
+      upcoming,
+      past,
+      cancelled
     }
   }
 
-  const counts = getTabCounts()
+  const counts = getViewCounts()
 
-  const tabs: { key: TabType; label: string; count: number }[] = [
-    { key: 'upcoming', label: 'קרובים', count: counts.upcoming },
-    { key: 'past', label: 'קודמים', count: counts.past },
+  // View mode options with improved UX
+  const viewModes: { key: ViewMode; label: string; count: number; description?: string }[] = [
+    { key: 'all', label: 'הכל', count: counts.all, description: 'קודמים + קרובים' },
+    { key: 'upcoming_only', label: 'קרובים בלבד', count: counts.upcoming },
     { key: 'cancelled', label: 'מבוטלים', count: counts.cancelled },
   ]
 
@@ -810,34 +913,68 @@ function ReservationsContent() {
         </div>
       </div>
 
-      {/* Tabs - Compact Pills */}
-      <div className="flex gap-1.5 mb-4 p-1 bg-white/[0.03] rounded-xl border border-white/[0.06]">
-        {tabs.map((tab) => (
+      {/* View Mode Selector - Compact Pills */}
+      <div className="flex gap-1.5 mb-3 p-1 bg-white/[0.03] rounded-xl border border-white/[0.06]">
+        {viewModes.map((mode) => (
           <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            key={mode.key}
+            onClick={() => {
+              setViewMode(mode.key)
+              hasScrolledRef.current = false // Reset scroll on mode change
+            }}
             className={cn(
               'flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5',
-              activeTab === tab.key
+              viewMode === mode.key
                 ? 'bg-white/[0.1] text-foreground-light shadow-sm'
                 : 'text-foreground-muted hover:text-foreground-light'
             )}
           >
-            {tab.label}
+            {mode.label}
             <span className={cn(
               'px-1.5 py-0.5 rounded text-xs min-w-[20px]',
-              activeTab === tab.key
+              viewMode === mode.key
                 ? 'bg-accent-gold/20 text-accent-gold'
                 : 'bg-white/[0.08] text-foreground-muted'
             )}>
-              {tab.count}
+              {mode.count}
             </span>
           </button>
         ))}
       </div>
-
-      {/* Toggle Empty Slots - Only for single day views */}
-      {(quickDate === 'today' || quickDate === 'tomorrow' || quickDate === 'custom') && activeTab === 'upcoming' && (
+      
+      {/* Quick Info Bar - Unified view indicator */}
+      {viewMode === 'all' && (
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2 text-xs text-foreground-muted">
+            <ChevronDown size={12} className="text-accent-gold animate-bounce" />
+            <span>גלול למעלה לתורים קודמים</span>
+          </div>
+          
+          {/* Toggle Empty Slots - Only for single day views */}
+          {(quickDate === 'today' || quickDate === 'tomorrow' || quickDate === 'custom') && (
+            <label className="flex items-center gap-2 text-xs text-foreground-muted cursor-pointer">
+              <span>משבצות פנויות</span>
+              <button
+                onClick={() => setShowEmptySlots(!showEmptySlots)}
+                className={cn(
+                  'w-10 h-6 rounded-full transition-colors relative flex-shrink-0',
+                  showEmptySlots ? 'bg-accent-gold' : 'bg-white/10'
+                )}
+                aria-checked={showEmptySlots}
+                role="switch"
+              >
+                <div className={cn(
+                  'absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all',
+                  showEmptySlots ? 'right-0.5' : 'left-0.5'
+                )} />
+              </button>
+            </label>
+          )}
+        </div>
+      )}
+      
+      {/* Toggle Empty Slots for upcoming_only view */}
+      {viewMode === 'upcoming_only' && (quickDate === 'today' || quickDate === 'tomorrow' || quickDate === 'custom') && (
         <div className="flex items-center justify-end mb-3">
           <label className="flex items-center gap-2 text-sm text-foreground-muted cursor-pointer">
             <span>הצג משבצות פנויות</span>
@@ -860,15 +997,36 @@ function ReservationsContent() {
       )}
 
       {/* Reservations List */}
-      <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden">
+      <div ref={containerRef} className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden">
         {timelineItems.length === 0 ? (
           <div className="text-center py-12">
             <Calendar size={40} strokeWidth={1} className="text-foreground-muted/30 mx-auto mb-3" />
-            <p className="text-foreground-muted text-sm">אין תורים להציג</p>
+            <p className="text-foreground-muted text-sm">
+              {viewMode === 'cancelled' ? 'אין תורים מבוטלים' : 'אין תורים להציג'}
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-white/[0.04]">
-            {timelineItems.map((item) => {
+            {timelineItems.map((item, index) => {
+              // Divider between past and upcoming
+              if (item.type === 'divider') {
+                return (
+                  <div
+                    key={`divider-${index}`}
+                    ref={upcomingDividerRef}
+                    className="sticky top-0 z-10 bg-background-dark/95 backdrop-blur-sm border-y border-accent-gold/30 px-4 py-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-px bg-accent-gold/30" />
+                      <span className="text-accent-gold text-xs font-medium px-2">
+                        {item.label}
+                      </span>
+                      <div className="flex-1 h-px bg-accent-gold/30" />
+                    </div>
+                  </div>
+                )
+              }
+              
               if (item.type === 'empty') {
                 // Empty slot row
                 return (
@@ -915,7 +1073,7 @@ function ReservationsContent() {
               const smartDate = getSmartDateTime(res.time_timestamp)
               const isUpcoming = normalizeTs(res.time_timestamp) > now && res.status === 'confirmed'
               const isCancelled = res.status === 'cancelled'
-              const isPast = normalizeTs(res.time_timestamp) <= now && res.status !== 'cancelled'
+              const isPast = item.isPast && res.status !== 'cancelled'
               const isHighlighted = highlightedId === res.id
               
               return (
@@ -924,7 +1082,8 @@ function ReservationsContent() {
                   onClick={() => setDetailModal({ isOpen: true, reservation: res })}
                   className={cn(
                     'flex items-center gap-3 px-3 sm:px-4 py-3 transition-all cursor-pointer hover:bg-white/[0.03]',
-                    (isCancelled || isPast) && 'opacity-60',
+                    isPast && 'opacity-50 bg-white/[0.01]',
+                    isCancelled && 'opacity-60',
                     isHighlighted && 'bg-accent-gold/10 ring-2 ring-accent-gold/50 ring-inset animate-pulse'
                   )}
                 >
@@ -932,7 +1091,7 @@ function ReservationsContent() {
                   <div className="flex flex-col items-center shrink-0 w-12">
                     <span className={cn(
                       'text-lg font-medium tabular-nums',
-                      isUpcoming ? 'text-accent-gold' : 'text-foreground-muted'
+                      isUpcoming ? 'text-accent-gold' : isPast ? 'text-foreground-muted/60' : 'text-foreground-muted'
                     )}>
                       {smartDate.time}
                     </span>
@@ -944,37 +1103,57 @@ function ReservationsContent() {
                   {/* Status Line */}
                   <div className={cn(
                     'w-1 h-10 rounded-full shrink-0',
-                    isCancelled ? 'bg-red-500/60' : isUpcoming ? 'bg-accent-gold' : 'bg-foreground-muted/30'
+                    isCancelled ? 'bg-red-500/60' : isUpcoming ? 'bg-accent-gold' : 'bg-foreground-muted/20'
                   )} />
                   
                   {/* Main Content */}
                   <div className="flex-1 min-w-0">
-                    <p className={cn(
-                      'text-foreground-light font-medium text-sm truncate',
-                      (isCancelled || isPast) && 'line-through decoration-foreground-muted/50'
-                    )}>
-                      {res.customer_name}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className={cn(
+                        'text-foreground-light font-medium text-sm truncate',
+                        isCancelled && 'line-through decoration-foreground-muted/50'
+                      )}>
+                        {res.customer_name}
+                      </p>
+                      {/* Past indicator badge */}
+                      {isPast && !isCancelled && (
+                        <span className="px-1.5 py-0.5 rounded bg-white/[0.08] text-foreground-muted/60 text-[10px] shrink-0">
+                          הסתיים
+                        </span>
+                      )}
+                    </div>
                     <p className={cn(
                       'text-foreground-muted text-xs truncate',
-                      (isCancelled || isPast) && 'line-through decoration-foreground-muted/30'
+                      isCancelled && 'line-through decoration-foreground-muted/30'
                     )}>
                       {res.services?.name_he || 'שירות'}
                     </p>
-                    {/* Past appointment indicator */}
-                    {isPast && !isCancelled && (
-                      <span className="text-[10px] text-foreground-muted/60">הסתיים</span>
-                    )}
                   </div>
                   
                   {/* Actions */}
                   <div className="flex items-center gap-1 shrink-0">
+                    {/* WhatsApp */}
+                    {res.customer_phone && (
+                      <a
+                        href={`https://wa.me/${formatPhoneForWhatsApp(res.customer_phone)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="icon-btn p-2 rounded-lg hover:bg-green-500/10 transition-colors"
+                        aria-label="שלח הודעה בוואטסאפ"
+                        title="וואטסאפ"
+                      >
+                        <MessageCircle size={16} strokeWidth={1.5} className="text-green-500" />
+                      </a>
+                    )}
+                    
                     {/* Phone */}
                     <a
                       href={`tel:${res.customer_phone}`}
                       onClick={(e) => e.stopPropagation()}
                       className="icon-btn p-2 rounded-lg hover:bg-accent-gold/10 transition-colors"
                       aria-label="התקשר"
+                      title="התקשר"
                     >
                       <Phone size={16} strokeWidth={1.5} className="text-accent-gold" />
                     </a>

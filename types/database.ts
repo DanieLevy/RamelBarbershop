@@ -83,6 +83,8 @@ export type Database = {
           barber_id: string
           image_url: string
           display_order: number
+          position_x: number | null
+          position_y: number | null
           caption: string | null
           created_at: string | null
         }
@@ -91,6 +93,8 @@ export type Database = {
           barber_id: string
           image_url: string
           display_order?: number
+          position_x?: number | null
+          position_y?: number | null
           caption?: string | null
           created_at?: string | null
         }
@@ -99,6 +103,8 @@ export type Database = {
           barber_id?: string
           image_url?: string
           display_order?: number
+          position_x?: number | null
+          position_y?: number | null
           caption?: string | null
           created_at?: string | null
         }
@@ -748,6 +754,8 @@ export type Database = {
           fullname: string
           id: string
           img_url: string | null
+          img_position_x: number | null
+          img_position_y: number | null
           instagram_url: string | null
           is_active: boolean
           is_barber: boolean | null
@@ -765,6 +773,8 @@ export type Database = {
           fullname: string
           id?: string
           img_url?: string | null
+          img_position_x?: number | null
+          img_position_y?: number | null
           instagram_url?: string | null
           is_active?: boolean
           is_barber?: boolean | null
@@ -782,6 +792,8 @@ export type Database = {
           fullname?: string
           id?: string
           img_url?: string | null
+          img_position_x?: number | null
+          img_position_y?: number | null
           instagram_url?: string | null
           is_active?: boolean
           is_barber?: boolean | null

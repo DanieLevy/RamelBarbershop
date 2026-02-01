@@ -10,6 +10,10 @@ interface GallerySlideshowProps {
   images: BarberGalleryImage[]
   /** Fallback image URL (profile picture) */
   fallbackImage?: string | null
+  /** Fallback image position X (0-100%) */
+  fallbackPositionX?: number
+  /** Fallback image position Y (0-100%) */
+  fallbackPositionY?: number
   /** Barber name for alt text */
   barberName: string
   /** Transition interval in ms (default: 4000) */
@@ -26,6 +30,8 @@ interface GallerySlideshowProps {
 export function GallerySlideshow({
   images,
   fallbackImage,
+  fallbackPositionX = 50,
+  fallbackPositionY = 30,
   barberName,
   interval = 4000,
   className,
@@ -37,7 +43,11 @@ export function GallerySlideshow({
   
   // If no gallery images, show fallback
   const hasGallery = sortedImages.length > 0
-  const displayImages = hasGallery ? sortedImages : fallbackImage ? [{ id: 'fallback', image_url: fallbackImage }] : []
+  const displayImages = hasGallery 
+    ? sortedImages 
+    : fallbackImage 
+      ? [{ id: 'fallback', image_url: fallbackImage, position_x: fallbackPositionX, position_y: fallbackPositionY }] 
+      : []
   
   const nextSlide = useCallback(() => {
     if (displayImages.length <= 1) return
@@ -122,7 +132,10 @@ export function GallerySlideshow({
             src={image.image_url}
             alt={hasGallery ? `${barberName} - עבודה ${index + 1}` : barberName}
             fill
-            className="object-cover object-top"
+            className="object-cover"
+            style={{ 
+              objectPosition: `${(image as { position_x?: number | null }).position_x ?? 50}% ${(image as { position_y?: number | null }).position_y ?? 50}%`
+            }}
             sizes="(max-width: 640px) 100vw, 400px"
             priority={index === 0}
           />

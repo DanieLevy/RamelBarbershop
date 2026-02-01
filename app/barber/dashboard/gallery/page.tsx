@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { uploadGalleryImage, deleteGalleryImage } from '@/lib/storage/upload'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { Images, Upload, Trash2, GripVertical, Plus, Info, Loader2 } from 'lucide-react'
+import { Images, Upload, Trash2, GripVertical, Plus, Info, Loader2, Move, X, Check, RotateCcw } from 'lucide-react'
 import Image from 'next/image'
 import type { BarberGalleryImage } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
@@ -21,6 +21,17 @@ export default function GalleryPage() {
   const [images, setImages] = useState<BarberGalleryImage[]>([])
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Position editor state
+  const [positionModal, setPositionModal] = useState<{
+    isOpen: boolean
+    image: BarberGalleryImage | null
+    posX: number
+    posY: number
+  }>({ isOpen: false, image: null, posX: 50, posY: 50 })
+  const [savingPosition, setSavingPosition] = useState(false)
+  const positionEditorRef = useRef<HTMLDivElement>(null)
+  const [isDragging, setIsDragging] = useState(false)
 
   useEffect(() => {
     if (barber?.id) {
@@ -192,6 +203,111 @@ export default function GalleryPage() {
     }
   }
 
+  // Position Editor Handlers
+  const openPositionEditor = (image: BarberGalleryImage) => {
+    setPositionModal({
+      isOpen: true,
+      image,
+      posX: image.position_x ?? 50,
+      posY: image.position_y ?? 50,
+    })
+  }
+
+  const closePositionEditor = () => {
+    setPositionModal({ isOpen: false, image: null, posX: 50, posY: 50 })
+  }
+
+  const handlePositionMove = useCallback((clientX: number, clientY: number) => {
+    if (!positionEditorRef.current) return
+    
+    const rect = positionEditorRef.current.getBoundingClientRect()
+    const x = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100))
+    const y = Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100))
+    
+    setPositionModal(prev => ({ ...prev, posX: Math.round(x), posY: Math.round(y) }))
+  }, [])
+
+  const handlePositionMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+    handlePositionMove(e.clientX, e.clientY)
+  }
+
+  const handlePositionMouseMove = useCallback((e: MouseEvent) => {
+    if (isDragging) {
+      handlePositionMove(e.clientX, e.clientY)
+    }
+  }, [isDragging, handlePositionMove])
+
+  const handlePositionMouseUp = useCallback(() => {
+    setIsDragging(false)
+  }, [])
+
+  const handlePositionTouchStart = (e: React.TouchEvent) => {
+    setIsDragging(true)
+    const touch = e.touches[0]
+    handlePositionMove(touch.clientX, touch.clientY)
+  }
+
+  const handlePositionTouchMove = useCallback((e: TouchEvent) => {
+    if (isDragging && e.touches[0]) {
+      handlePositionMove(e.touches[0].clientX, e.touches[0].clientY)
+    }
+  }, [isDragging, handlePositionMove])
+
+  // Add/remove global event listeners for position dragging
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handlePositionMouseMove)
+      window.addEventListener('mouseup', handlePositionMouseUp)
+      window.addEventListener('touchmove', handlePositionTouchMove)
+      window.addEventListener('touchend', handlePositionMouseUp)
+    }
+    
+    return () => {
+      window.removeEventListener('mousemove', handlePositionMouseMove)
+      window.removeEventListener('mouseup', handlePositionMouseUp)
+      window.removeEventListener('touchmove', handlePositionTouchMove)
+      window.removeEventListener('touchend', handlePositionMouseUp)
+    }
+  }, [isDragging, handlePositionMouseMove, handlePositionMouseUp, handlePositionTouchMove])
+
+  const handleSavePosition = async () => {
+    if (!positionModal.image) return
+    
+    setSavingPosition(true)
+    const supabase = createClient()
+    
+    const { error } = await supabase
+      .from('barber_gallery')
+      .update({
+        position_x: positionModal.posX,
+        position_y: positionModal.posY,
+      })
+      .eq('id', positionModal.image.id)
+    
+    if (error) {
+      console.error('Error saving position:', error)
+      await report(new Error(error.message), 'Saving gallery image position')
+      toast.error('שגיאה בשמירת המיקום')
+    } else {
+      // Update local state
+      setImages(images.map(img => 
+        img.id === positionModal.image?.id 
+          ? { ...img, position_x: positionModal.posX, position_y: positionModal.posY }
+          : img
+      ))
+      toast.success('מיקום התמונה נשמר!')
+      closePositionEditor()
+    }
+    
+    setSavingPosition(false)
+  }
+
+  const handleResetPosition = () => {
+    setPositionModal(prev => ({ ...prev, posX: 50, posY: 50 }))
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -221,6 +337,7 @@ export default function GalleryPage() {
             <ul className="space-y-1 text-blue-300/80">
               <li>• התמונות יוצגו כסליידר אוטומטי בעמוד הפרופיל שלך</li>
               <li>• גרור את התמונות כדי לשנות את הסדר</li>
+              <li>• לחץ על <Move size={12} className="inline mx-1" /> כדי לכוון את מיקום התמונה</li>
               <li>• עד {MAX_GALLERY_IMAGES} תמונות, מקסימום 5MB לתמונה</li>
               <li>• אם אין תמונות בגלריה, תוצג תמונת הפרופיל שלך</li>
             </ul>
@@ -296,6 +413,7 @@ export default function GalleryPage() {
                   alt={`תמונה ${index + 1}`}
                   fill
                   className="object-cover"
+                  style={{ objectPosition: `${image.position_x ?? 50}% ${image.position_y ?? 50}%` }}
                   sizes="(max-width: 640px) 50vw, 25vw"
                 />
                 
@@ -304,6 +422,21 @@ export default function GalleryPage() {
                   <div className="absolute top-2 left-2 p-1.5 bg-background-dark/80 rounded-lg">
                     <GripVertical size={16} className="text-foreground-muted" />
                   </div>
+                  
+                  {/* Position button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openPositionEditor(image)
+                    }}
+                    className="p-2 bg-accent-gold text-background-dark rounded-lg hover:bg-accent-gold/90 transition-colors"
+                    aria-label="כוון מיקום"
+                    title="כוון מיקום התמונה"
+                  >
+                    <Move size={18} />
+                  </button>
+                  
+                  {/* Delete button */}
                   <button
                     onClick={() => handleDeleteImage(image.id)}
                     className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
@@ -313,9 +446,16 @@ export default function GalleryPage() {
                   </button>
                 </div>
                 
-                {/* Order number */}
-                <div className="absolute bottom-2 right-2 w-6 h-6 bg-background-dark/80 rounded-full flex items-center justify-center text-xs text-foreground-light">
-                  {index + 1}
+                {/* Order number + position indicator */}
+                <div className="absolute bottom-2 right-2 flex items-center gap-1">
+                  {(image.position_x !== null && image.position_x !== 50) || (image.position_y !== null && image.position_y !== 50) ? (
+                    <div className="w-5 h-5 bg-accent-gold/80 rounded-full flex items-center justify-center" title="מיקום מותאם">
+                      <Move size={10} className="text-background-dark" />
+                    </div>
+                  ) : null}
+                  <div className="w-6 h-6 bg-background-dark/80 rounded-full flex items-center justify-center text-xs text-foreground-light">
+                    {index + 1}
+                  </div>
                 </div>
               </div>
             ))}
@@ -345,6 +485,155 @@ export default function GalleryPage() {
           <p className="text-emerald-300 text-sm">
             ✓ הגלריה מוכנה! התמונות יוצגו כסליידר אוטומטי בעמוד הפרופיל שלך
           </p>
+        </div>
+      )}
+
+      {/* Position Editor Modal */}
+      {positionModal.isOpen && positionModal.image && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={closePositionEditor}
+          />
+          
+          {/* Modal */}
+          <div className="relative w-full max-w-md bg-background-card border border-white/10 rounded-2xl p-6 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-foreground-light flex items-center gap-2">
+                <Move size={18} className="text-accent-gold" />
+                מיקום התמונה
+              </h3>
+              <button
+                onClick={closePositionEditor}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                aria-label="סגור"
+              >
+                <X size={20} className="text-foreground-muted" />
+              </button>
+            </div>
+            
+            {/* Instructions */}
+            <p className="text-foreground-muted text-sm mb-4 text-center">
+              גרור את הנקודה כדי לבחור את מוקד התמונה
+            </p>
+            
+            {/* Position Editor */}
+            <div
+              ref={positionEditorRef}
+              className={cn(
+                'relative aspect-[4/3] w-full rounded-xl overflow-hidden cursor-crosshair mb-4',
+                'border-2 border-dashed transition-colors',
+                isDragging ? 'border-accent-gold' : 'border-white/20'
+              )}
+              onMouseDown={handlePositionMouseDown}
+              onTouchStart={handlePositionTouchStart}
+            >
+              {/* Image */}
+              <Image
+                src={positionModal.image.image_url}
+                alt="תצוגה מקדימה"
+                fill
+                className="object-cover pointer-events-none"
+                style={{ objectPosition: `${positionModal.posX}% ${positionModal.posY}%` }}
+                sizes="400px"
+              />
+              
+              {/* Grid overlay */}
+              <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute top-1/3 left-0 right-0 h-px bg-white/20" />
+                <div className="absolute top-2/3 left-0 right-0 h-px bg-white/20" />
+                <div className="absolute left-1/3 top-0 bottom-0 w-px bg-white/20" />
+                <div className="absolute left-2/3 top-0 bottom-0 w-px bg-white/20" />
+              </div>
+              
+              {/* Focal Point Indicator */}
+              <div
+                className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                style={{ left: `${positionModal.posX}%`, top: `${positionModal.posY}%` }}
+              >
+                <div className="absolute inset-0 rounded-full border-2 border-accent-gold bg-accent-gold/20 animate-pulse" />
+                <div className="absolute inset-2 rounded-full bg-accent-gold" />
+              </div>
+            </div>
+            
+            {/* Preview - How it will look */}
+            <div className="mb-4">
+              <p className="text-foreground-muted text-xs text-center mb-2">כך התמונה תיראה בגלריה:</p>
+              <div className="flex justify-center gap-3">
+                {/* Mobile preview */}
+                <div className="text-center">
+                  <div className="relative w-16 h-20 rounded-lg overflow-hidden border border-white/10">
+                    <Image
+                      src={positionModal.image.image_url}
+                      alt="תצוגה מקדימה"
+                      fill
+                      className="object-cover"
+                      style={{ objectPosition: `${positionModal.posX}% ${positionModal.posY}%` }}
+                      sizes="64px"
+                    />
+                  </div>
+                  <p className="text-[10px] text-foreground-muted mt-1">נייד</p>
+                </div>
+                {/* Desktop preview */}
+                <div className="text-center">
+                  <div className="relative w-24 h-16 rounded-lg overflow-hidden border border-white/10">
+                    <Image
+                      src={positionModal.image.image_url}
+                      alt="תצוגה מקדימה"
+                      fill
+                      className="object-cover"
+                      style={{ objectPosition: `${positionModal.posX}% ${positionModal.posY}%` }}
+                      sizes="96px"
+                    />
+                  </div>
+                  <p className="text-[10px] text-foreground-muted mt-1">מחשב</p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Position Display */}
+            <div className="flex justify-center gap-4 text-xs text-foreground-muted mb-4">
+              <span>X: {positionModal.posX}%</span>
+              <span>Y: {positionModal.posY}%</span>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleResetPosition}
+                disabled={positionModal.posX === 50 && positionModal.posY === 50}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all',
+                  'bg-white/5 text-foreground-muted hover:bg-white/10 hover:text-foreground-light',
+                  'disabled:opacity-50 disabled:cursor-not-allowed'
+                )}
+              >
+                <RotateCcw size={14} />
+                איפוס
+              </button>
+              
+              <button
+                type="button"
+                onClick={handleSavePosition}
+                disabled={savingPosition}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all',
+                  'bg-accent-gold text-background-dark hover:bg-accent-gold/90',
+                  'disabled:opacity-50 disabled:cursor-not-allowed'
+                )}
+              >
+                {savingPosition ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Check size={14} />
+                )}
+                {savingPosition ? 'שומר...' : 'שמור מיקום'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

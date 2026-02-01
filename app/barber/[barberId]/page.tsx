@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: BarberPageProps): Promise<Met
   if (isUuidLookup) {
     const { data } = await supabase
       .from('users')
-      .select('id, fullname, img_url, name_en, username')
+      .select('id, fullname, img_url, img_position_x, img_position_y, name_en, username')
       .eq('is_barber', true)
       .eq('id', barberId)
       .single()
@@ -39,7 +39,7 @@ export async function generateMetadata({ params }: BarberPageProps): Promise<Met
   } else {
     const { data: allBarbers } = await supabase
       .from('users')
-      .select('id, fullname, img_url, name_en, username')
+      .select('id, fullname, img_url, img_position_x, img_position_y, name_en, username')
       .eq('is_barber', true)
     
     if (allBarbers) {

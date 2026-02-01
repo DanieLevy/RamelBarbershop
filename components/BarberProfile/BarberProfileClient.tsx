@@ -91,6 +91,8 @@ export function BarberProfileClient({
           <GallerySlideshow
             images={galleryImages}
             fallbackImage={barber.img_url || '/icon.png'}
+            fallbackPositionX={(barber as { img_position_x?: number }).img_position_x ?? 50}
+            fallbackPositionY={(barber as { img_position_y?: number }).img_position_y ?? 30}
             barberName={barber.fullname}
             interval={5000}
           />

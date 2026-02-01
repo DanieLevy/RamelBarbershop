@@ -11,6 +11,7 @@ import { User, Camera, Bell, Plus, Trash, Pencil, Upload, Link2, Copy, Check, Ex
 import type { BarberMessage } from '@/types/database'
 import Image from 'next/image'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { ImagePositionEditor } from '@/components/barber/ImagePositionEditor'
 
 export default function ProfilePage() {
   const { barber, setBarber } = useBarberAuthStore()
@@ -27,6 +28,8 @@ export default function ProfilePage() {
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [imgUrl, setImgUrl] = useState('')
+  const [imgPositionX, setImgPositionX] = useState(50)
+  const [imgPositionY, setImgPositionY] = useState(30)
   const [username, setUsername] = useState('')
   const [instagramUrl, setInstagramUrl] = useState('')
   
@@ -54,6 +57,8 @@ export default function ProfilePage() {
       setEmail(barber.email || '')
       setPhone(barber.phone || '')
       setImgUrl(barber.img_url || '')
+      setImgPositionX((barber as { img_position_x?: number }).img_position_x ?? 50)
+      setImgPositionY((barber as { img_position_y?: number }).img_position_y ?? 30)
       setUsername(barber.username || '')
       setInstagramUrl((barber as { instagram_url?: string }).instagram_url || '')
       fetchMessages()
@@ -111,6 +116,25 @@ export default function ProfilePage() {
     // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
+    }
+  }
+
+  const handleSaveImagePosition = async (x: number, y: number) => {
+    if (!barber?.id) return
+    
+    const result = await updateBarber(barber.id, {
+      img_position_x: x,
+      img_position_y: y,
+    })
+    
+    if (result.success) {
+      setImgPositionX(x)
+      setImgPositionY(y)
+      setBarber({ ...barber, img_position_x: x, img_position_y: y } as typeof barber)
+      toast.success('מיקום התמונה נשמר!')
+    } else {
+      await report(new Error(result.error || 'Position save failed'), 'Saving image position')
+      toast.error('שגיאה בשמירת המיקום')
     }
   }
 
@@ -412,6 +436,19 @@ export default function ProfilePage() {
             </p>
           </div>
         </div>
+
+        {/* Image Position Editor - Only show if image exists */}
+        {imgUrl && (
+          <div className="pt-4 border-t border-white/10">
+            <ImagePositionEditor
+              imageUrl={imgUrl}
+              initialX={imgPositionX}
+              initialY={imgPositionY}
+              onSave={handleSaveImagePosition}
+              barberName={fullname}
+            />
+          </div>
+        )}
 
         <div className="space-y-4">
           <div className="flex flex-col gap-2">

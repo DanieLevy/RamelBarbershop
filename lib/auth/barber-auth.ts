@@ -39,7 +39,7 @@ export async function loginBarber(
   // The is_active flag only controls visibility for public booking, not dashboard access
   const { data: user, error } = await supabase
     .from('users')
-    .select('id, username, fullname, email, phone, role, is_barber, is_active, img_url, password_hash, name_en, instagram_url, created_at, updated_at')
+    .select('id, username, fullname, email, phone, role, is_barber, is_active, img_url, img_position_x, img_position_y, password_hash, name_en, instagram_url, created_at, updated_at')
     .eq('email', normalizedEmail)
     .eq('is_barber', true)
     .maybeSingle()
@@ -153,7 +153,7 @@ export async function validateBarberSession(): Promise<User | null> {
       // The is_active flag only controls visibility for public booking, not dashboard access
       const { data: user, error } = await supabase
         .from('users')
-        .select('id, username, fullname, email, phone, role, is_barber, is_active, img_url, name_en, instagram_url, created_at, updated_at')
+        .select('id, username, fullname, email, phone, role, is_barber, is_active, img_url, img_position_x, img_position_y, name_en, instagram_url, created_at, updated_at')
         .eq('id', session.barberId)
         .eq('is_barber', true)
         .maybeSingle()
@@ -380,6 +380,8 @@ export async function updateBarber(
     email?: string
     phone?: string
     img_url?: string
+    img_position_x?: number
+    img_position_y?: number
     is_active?: boolean
     username?: string
     name_en?: string

@@ -133,7 +133,10 @@ export function BarberCard({ barber, index = 0 }: BarberCardProps) {
               src={barber.img_url || '/icon.png'}
               alt={barber.fullname}
               fill
-              className="object-cover object-top"
+              className="object-cover"
+              style={{ 
+                objectPosition: `${(barber as { img_position_x?: number }).img_position_x ?? 50}% ${(barber as { img_position_y?: number }).img_position_y ?? 30}%` 
+              }}
               sizes="(max-width: 640px) 100vw, 400px"
             />
           </div>
