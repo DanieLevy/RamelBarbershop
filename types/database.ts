@@ -77,6 +77,41 @@ export type Database = {
           },
         ]
       }
+      barber_gallery: {
+        Row: {
+          id: string
+          barber_id: string
+          image_url: string
+          display_order: number
+          caption: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          barber_id: string
+          image_url: string
+          display_order?: number
+          caption?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          barber_id?: string
+          image_url?: string
+          display_order?: number
+          caption?: string | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "barber_gallery_barber_id_fkey"
+            columns: ["barber_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       barber_messages: {
         Row: {
           barber_id: string
@@ -713,8 +748,10 @@ export type Database = {
           fullname: string
           id: string
           img_url: string | null
+          instagram_url: string | null
           is_active: boolean
           is_barber: boolean | null
+          name_en: string | null
           password_hash: string | null
           phone: string | null
           role: string
@@ -728,8 +765,10 @@ export type Database = {
           fullname: string
           id?: string
           img_url?: string | null
+          instagram_url?: string | null
           is_active?: boolean
           is_barber?: boolean | null
+          name_en?: string | null
           password_hash?: string | null
           phone?: string | null
           role?: string
@@ -743,8 +782,10 @@ export type Database = {
           fullname?: string
           id?: string
           img_url?: string | null
+          instagram_url?: string | null
           is_active?: boolean
           is_barber?: boolean | null
+          name_en?: string | null
           password_hash?: string | null
           phone?: string | null
           role?: string
@@ -977,6 +1018,7 @@ export type BarbershopClosure = Tables<'barbershop_closures'>
 export type BarberSchedule = Tables<'barber_schedules'>
 export type BarberClosure = Tables<'barber_closures'>
 export type BarberMessage = Tables<'barber_messages'>
+export type BarberGalleryImage = Tables<'barber_gallery'>
 export type WorkDay = Tables<'work_days'>
 export type Service = Tables<'services'>
 export type Reservation = Tables<'reservations'>

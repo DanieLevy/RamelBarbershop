@@ -131,11 +131,14 @@ export function InstallBanner({
         className={cn(
           'fixed inset-0 z-[60] flex items-center justify-center p-4',
           'transition-all duration-300',
-          isClosing ? 'opacity-0' : 'opacity-100'
+          isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'
         )}
       >
         {/* Backdrop */}
-        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+        <div className={cn(
+          'absolute inset-0 bg-black/70 backdrop-blur-sm',
+          isClosing && 'pointer-events-none'
+        )} />
 
         {/* Confirmation Modal */}
         <div
@@ -286,12 +289,15 @@ export function InstallBanner({
       className={cn(
         'fixed inset-0 z-50 flex items-center justify-center p-4',
         'transition-all duration-300',
-        isClosing ? 'opacity-0' : 'opacity-100'
+        isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'
       )}
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className={cn(
+          'absolute inset-0 bg-black/60 backdrop-blur-sm',
+          isClosing && 'pointer-events-none'
+        )}
         onClick={handleClose}
       />
 

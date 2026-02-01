@@ -2,7 +2,7 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react'
 import { reportBug, getEnvironmentInfo } from '@/lib/bug-reporter'
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react'
+import { AlertTriangle, Home } from 'lucide-react'
 import Link from 'next/link'
 
 interface Props {
@@ -65,10 +65,6 @@ class ErrorBoundary extends Component<Props, State> {
     }
   }
 
-  handleRefresh = () => {
-    window.location.reload()
-  }
-
   render() {
     if (this.state.hasError) {
       // Custom fallback if provided
@@ -76,7 +72,7 @@ class ErrorBoundary extends Component<Props, State> {
         return this.props.fallback
       }
 
-      // Default error UI
+      // Default error UI - Hebrew
       return (
         <div className="min-h-[400px] flex items-center justify-center p-4">
           <div className="glass-card p-6 sm:p-8 max-w-md w-full text-center">
@@ -87,17 +83,17 @@ class ErrorBoundary extends Component<Props, State> {
 
             {/* Title */}
             <h2 className="text-xl font-bold text-foreground-light mb-2">
-              Something went wrong
+              משהו השתבש
             </h2>
 
             {/* Description */}
             <p className="text-foreground-muted text-sm mb-4">
-              An unexpected error occurred. Our team has been automatically notified.
+              אירעה שגיאה בלתי צפויה. הצוות שלנו קיבל התראה אוטומטית.
             </p>
 
             {/* Error Details (Development only) */}
             {process.env.NODE_ENV === 'development' && this.state.error && (
-              <div className="mb-4 p-3 bg-red-500/10 rounded-lg text-left">
+              <div className="mb-4 p-3 bg-red-500/10 rounded-lg text-left" dir="ltr">
                 <p className="text-xs font-mono text-red-400 break-all">
                   {this.state.error.name}: {this.state.error.message}
                 </p>
@@ -107,30 +103,22 @@ class ErrorBoundary extends Component<Props, State> {
             {/* Report Status */}
             {this.state.isReporting ? (
               <p className="text-xs text-foreground-muted mb-4">
-                Reporting error...
+                מדווח על השגיאה...
               </p>
             ) : this.state.reportId ? (
               <p className="text-xs text-green-500 mb-4">
-                Error reported (ID: {this.state.reportId})
+                השגיאה דווחה (מזהה: {this.state.reportId})
               </p>
             ) : null}
 
-            {/* Action Buttons */}
-            <div className="flex gap-3 justify-center">
-              <button
-                onClick={this.handleRefresh}
-                className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-background-dark rounded-lg font-medium text-sm hover:bg-accent-gold/90 transition-colors"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Refresh Page
-              </button>
-
+            {/* Action Button */}
+            <div className="flex justify-center">
               <Link
                 href="/"
-                className="flex items-center gap-2 px-4 py-2 bg-white/10 text-foreground-light rounded-lg font-medium text-sm hover:bg-white/20 transition-colors"
+                className="flex items-center gap-2 px-6 py-3 bg-accent-gold text-background-dark rounded-lg font-medium text-sm hover:bg-accent-gold/90 transition-colors"
               >
                 <Home className="w-4 h-4" />
-                Go Home
+                לדף הבית
               </Link>
             </div>
           </div>

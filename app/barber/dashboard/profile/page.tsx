@@ -6,8 +6,8 @@ import { updateBarber, setBarberPassword } from '@/lib/auth/barber-auth'
 import { createClient } from '@/lib/supabase/client'
 import { uploadAvatar } from '@/lib/storage/upload'
 import { toast } from 'sonner'
-import { cn, buildShareableBarberLink, isValidSlug, generateSlugFromName } from '@/lib/utils'
-import { User, Camera, Bell, Plus, Trash, Pencil, Upload, Link2, Copy, Check, ExternalLink } from 'lucide-react'
+import { cn, buildShareableBarberLink, generateSlugFromEnglishName, getPreferredBarberSlug } from '@/lib/utils'
+import { User, Camera, Bell, Plus, Trash, Pencil, Upload, Link2, Copy, Check, ExternalLink, Globe, Instagram } from 'lucide-react'
 import type { BarberMessage } from '@/types/database'
 import Image from 'next/image'
 import { useBugReporter } from '@/hooks/useBugReporter'
@@ -23,10 +23,12 @@ export default function ProfilePage() {
   
   // Profile form
   const [fullname, setFullname] = useState('')
+  const [nameEn, setNameEn] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [imgUrl, setImgUrl] = useState('')
   const [username, setUsername] = useState('')
+  const [instagramUrl, setInstagramUrl] = useState('')
   
   // Shareable link
   const [linkCopied, setLinkCopied] = useState(false)
@@ -48,10 +50,12 @@ export default function ProfilePage() {
   useEffect(() => {
     if (barber) {
       setFullname(barber.fullname)
+      setNameEn((barber as { name_en?: string }).name_en || '')
       setEmail(barber.email || '')
       setPhone(barber.phone || '')
       setImgUrl(barber.img_url || '')
       setUsername(barber.username || '')
+      setInstagramUrl((barber as { instagram_url?: string }).instagram_url || '')
       fetchMessages()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,29 +127,47 @@ export default function ProfilePage() {
       return
     }
     
-    // Validate username/slug format
-    if (username && !isValidSlug(username)) {
-      toast.error('שם המשתמש חייב להכיל רק אותיות באנגלית, מספרים ומקפים')
+    setSavingProfile(true)
+    
+    // Validate English name format (only English letters and spaces)
+    if (nameEn && !/^[a-zA-Z\s]+$/.test(nameEn.trim())) {
+      toast.error('שם באנגלית חייב להכיל רק אותיות באנגלית')
+      setSavingProfile(false)
       return
     }
     
-    setSavingProfile(true)
-    
-    // Check if username is already taken (if changed)
-    if (username && username !== barber.username) {
+    // Check if the new English name slug would conflict with another barber
+    if (nameEn && nameEn.trim()) {
+      const newSlug = generateSlugFromEnglishName(nameEn)
       const supabase = createClient()
-      const { data: existingUser } = await supabase
+      const { data: allBarbers } = await supabase
         .from('users')
-        .select('id')
-        .ilike('username', username)
+        .select('id, name_en')
+        .eq('is_barber', true)
         .neq('id', barber.id)
-        .single()
       
-      if (existingUser) {
-        toast.error('שם המשתמש כבר תפוס, נסה שם אחר')
-        setSavingProfile(false)
-        return
+      if (allBarbers) {
+        const conflict = allBarbers.find(b => {
+          if (b.name_en) {
+            return generateSlugFromEnglishName(b.name_en) === newSlug
+          }
+          return false
+        })
+        
+        if (conflict) {
+          toast.error('השם באנגלית כבר תפוס על ידי ספר אחר, נסה שם אחר')
+          setSavingProfile(false)
+          return
+        }
       }
+    }
+    
+    // Validate Instagram URL format if provided
+    const cleanedInstagramUrl = instagramUrl.trim()
+    if (cleanedInstagramUrl && !cleanedInstagramUrl.includes('instagram.com')) {
+      toast.error('נא להזין קישור תקין לאינסטגרם')
+      setSavingProfile(false)
+      return
     }
     
     const result = await updateBarber(barber.id, {
@@ -154,11 +176,13 @@ export default function ProfilePage() {
       phone: phone || undefined,
       img_url: imgUrl || undefined,
       username: username || undefined,
+      name_en: nameEn.trim() || undefined,
+      instagram_url: cleanedInstagramUrl || null,
     })
     
     if (result.success) {
       toast.success('הפרופיל עודכן בהצלחה!')
-      setBarber({ ...barber, fullname, email, phone, img_url: imgUrl, username })
+      setBarber({ ...barber, fullname, email, phone, img_url: imgUrl, username, name_en: nameEn.trim() || null, instagram_url: cleanedInstagramUrl || null } as typeof barber)
     } else {
       toast.error(result.error || 'שגיאה בעדכון')
     }
@@ -417,6 +441,53 @@ export default function ProfilePage() {
             />
           </div>
 
+          {/* English Name for URL */}
+          <div className="flex flex-col gap-2">
+            <label className="text-foreground-light text-sm flex items-center gap-2">
+              <Globe size={14} className="text-accent-gold" />
+              שם באנגלית (לקישור)
+            </label>
+            <input
+              type="text"
+              dir="ltr"
+              value={nameEn}
+              onChange={(e) => {
+                // Only allow English letters and spaces
+                const value = e.target.value.replace(/[^a-zA-Z\s]/g, '')
+                setNameEn(value)
+              }}
+              placeholder="Tamir Shabo"
+              className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-left"
+            />
+            {nameEn && (
+              <p className="text-foreground-muted text-xs">
+                הקישור שלך יהיה: <span className="text-accent-gold">/barber/{generateSlugFromEnglishName(nameEn)}</span>
+              </p>
+            )}
+            <p className="text-foreground-muted/60 text-xs">
+              הזן את שמך באנגלית (למשל: Tamir Shabo) ליצירת קישור נקי ומקצועי
+            </p>
+          </div>
+
+          {/* Instagram URL */}
+          <div className="flex flex-col gap-2">
+            <label className="text-foreground-light text-sm flex items-center gap-2">
+              <Instagram size={14} className="text-pink-500" />
+              קישור לאינסטגרם
+            </label>
+            <input
+              type="url"
+              dir="ltr"
+              value={instagramUrl}
+              onChange={(e) => setInstagramUrl(e.target.value)}
+              placeholder="https://instagram.com/your_username"
+              className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-left"
+            />
+            <p className="text-foreground-muted/60 text-xs">
+              הוסף את הקישור לפרופיל האינסטגרם שלך - יוצג כאייקון בכרטיס שלך בדף הבית
+            </p>
+          </div>
+
           <button
             onClick={handleSaveProfile}
             disabled={savingProfile}
@@ -443,108 +514,97 @@ export default function ProfilePage() {
           שלח את הקישור הזה ללקוחות שלך כדי שיוכלו לקבוע תור ישירות אצלך
         </p>
         
-        {username ? (
+        {(username || nameEn) ? (
           <div className="space-y-4">
             {/* Shareable Link Display */}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                dir="ltr"
-                readOnly
-                value={typeof window !== 'undefined' 
-                  ? buildShareableBarberLink(username, window.location.origin)
-                  : `/barber/${username}`
-                }
-                className="flex-1 p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light text-sm text-left overflow-hidden"
-              />
-              <button
-                onClick={() => {
-                  const link = typeof window !== 'undefined'
-                    ? buildShareableBarberLink(username, window.location.origin)
-                    : `/barber/${username}`
-                  navigator.clipboard.writeText(link)
-                  setLinkCopied(true)
-                  toast.success('הקישור הועתק!')
-                  setTimeout(() => setLinkCopied(false), 2000)
-                }}
-                className={cn(
-                  'px-4 py-3 rounded-xl font-medium transition-all flex items-center gap-2',
-                  linkCopied
-                    ? 'bg-green-500 text-white'
-                    : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
-                )}
-                aria-label="העתק קישור"
-              >
-                {linkCopied ? <Check size={18} strokeWidth={2} /> : <Copy size={18} strokeWidth={2} />}
-              </button>
-              <a
-                href={`/barber/${username}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-4 py-3 rounded-xl bg-background-dark border border-white/10 text-foreground-muted hover:text-foreground-light hover:border-white/20 transition-colors flex items-center"
-                aria-label="פתח בחלון חדש"
-              >
-                <ExternalLink size={18} strokeWidth={1.5} />
-              </a>
-            </div>
-            
-            {/* Username/Slug Edit */}
-            <div className="flex flex-col gap-2">
-              <label className="text-foreground-light text-sm">
-                שם משתמש בקישור
-                <span className="text-foreground-muted text-xs mr-2">
-                  (באנגלית, ללא רווחים)
-                </span>
-              </label>
-              <div className="flex gap-2">
-                <div className="flex-1 flex items-center gap-0 bg-background-dark border border-white/10 rounded-xl overflow-hidden">
-                  <span className="text-foreground-muted text-sm px-3">/barber/</span>
-                  <input
-                    type="text"
-                    dir="ltr"
-                    value={username}
-                    onChange={(e) => {
-                      // Only allow valid slug characters
-                      const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
-                      setUsername(value)
-                    }}
-                    placeholder={generateSlugFromName(fullname) || 'your-name'}
-                    className="flex-1 py-3 pr-3 bg-transparent text-foreground-light outline-none text-left"
-                  />
-                </div>
-              </div>
-              {username && !isValidSlug(username) && (
-                <p className="text-red-400 text-xs">
-                  השם חייב להכיל רק אותיות באנגלית, מספרים ומקפים
-                </p>
-              )}
-            </div>
-            
-            <p className="text-foreground-muted/60 text-xs">
-              טיפ: שנה את שם המשתמש לשם קצר וקל לזכירה, למשל: ramel, david-barber
-            </p>
+            {(() => {
+              const preferredSlug = getPreferredBarberSlug(nameEn || null, username)
+              const fullUrl = typeof window !== 'undefined' 
+                ? buildShareableBarberLink(preferredSlug, window.location.origin)
+                : `https://ramel-barbershop.netlify.app/barber/${preferredSlug}`
+              
+              return (
+                <>
+                  {/* Full URL Display with Copy */}
+                  <div className="p-4 bg-background-dark rounded-xl border border-white/10">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="text-foreground-muted text-xs">הקישור האישי שלך:</span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(fullUrl)
+                            setLinkCopied(true)
+                            toast.success('הקישור הועתק!')
+                            setTimeout(() => setLinkCopied(false), 2000)
+                          }}
+                          className={cn(
+                            'px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5',
+                            linkCopied
+                              ? 'bg-green-500 text-white'
+                              : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
+                          )}
+                          aria-label="העתק קישור"
+                        >
+                          {linkCopied ? <Check size={14} /> : <Copy size={14} />}
+                          {linkCopied ? 'הועתק!' : 'העתק'}
+                        </button>
+                        <a
+                          href={`/barber/${preferredSlug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-foreground-muted hover:text-foreground-light text-xs flex items-center gap-1.5"
+                          aria-label="פתח בחלון חדש"
+                        >
+                          <ExternalLink size={14} />
+                          פתח
+                        </a>
+                      </div>
+                    </div>
+                    <div 
+                      dir="ltr"
+                      className="p-3 bg-background-card rounded-lg text-accent-gold text-sm font-mono break-all select-all cursor-pointer hover:bg-white/5 transition-colors"
+                      onClick={() => {
+                        navigator.clipboard.writeText(fullUrl)
+                        setLinkCopied(true)
+                        toast.success('הקישור הועתק!')
+                        setTimeout(() => setLinkCopied(false), 2000)
+                      }}
+                    >
+                      {fullUrl}
+                    </div>
+                  </div>
+                  
+                  {/* English name status */}
+                  {nameEn ? (
+                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                      <p className="text-emerald-300 text-sm flex items-center gap-2">
+                        <Check size={14} />
+                        קישור מקצועי עם שמך באנגלית: <span className="font-mono font-medium">{preferredSlug}</span>
+                      </p>
+                      <p className="text-emerald-300/70 text-xs mt-1">
+                        כשישתפו את הקישור בוואטסאפ, התמונה שלך תופיע בתצוגה המקדימה!
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                      <p className="text-amber-300 text-sm flex items-center gap-2">
+                        <Globe size={14} />
+                        טיפ: הוסף שם באנגלית לקישור יפה יותר!
+                      </p>
+                      <p className="text-amber-300/70 text-xs mt-1">
+                        במקום <span className="font-mono">{username}</span> יהיה לך קישור כמו <span className="font-mono">tamir.shabo</span>
+                      </p>
+                    </div>
+                  )}
+                </>
+              )
+            })()}
           </div>
         ) : (
           <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
             <p className="text-amber-300 text-sm">
-              כדי לקבל קישור לשיתוף, הגדר שם משתמש בשדה למטה ושמור את הפרופיל
+              כדי לקבל קישור לשיתוף, הוסף את שמך באנגלית בעמוד הפרופיל ושמור
             </p>
-            <div className="mt-3 flex gap-2">
-              <div className="flex-1 flex items-center gap-0 bg-background-dark border border-white/10 rounded-xl overflow-hidden">
-                <span className="text-foreground-muted text-sm px-3">/barber/</span>
-                <input
-                  type="text"
-                  dir="ltr"
-                  value={username}
-                  onChange={(e) => {
-                    const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
-                    setUsername(value)
-                  }}
-                  placeholder={generateSlugFromName(fullname) || 'your-name'}
-                  className="flex-1 py-3 pr-3 bg-transparent text-foreground-light outline-none text-left"
-                />
-              </div>
-            </div>
           </div>
         )}
       </div>

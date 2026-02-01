@@ -4,8 +4,8 @@ import { useState, useTransition, useRef, useCallback } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { BarberWithWorkDays } from '@/types/database'
-import { Calendar, Loader2, ChevronLeft } from 'lucide-react'
-import { cn, buildBarberProfileUrl } from '@/lib/utils'
+import { Calendar, Loader2, ChevronLeft, Instagram } from 'lucide-react'
+import { cn, getPreferredBarberSlug } from '@/lib/utils'
 
 interface BarberCardProps {
   barber: BarberWithWorkDays
@@ -62,10 +62,12 @@ export function BarberCard({ barber, index = 0 }: BarberCardProps) {
     setTilt({ x: 0, y: 0 })
   }, [])
 
-  // Build URL using username (slug) for nicer URLs, fallback to UUID
-  const barberUrl = barber.username 
-    ? buildBarberProfileUrl(barber.username)
-    : `/barber/${barber.id}`
+  // Build URL using preferred slug (name_en-based if available, else username, else UUID)
+  const preferredSlug = getPreferredBarberSlug(
+    (barber as { name_en?: string | null }).name_en,
+    barber.username
+  )
+  const barberUrl = preferredSlug ? `/barber/${preferredSlug}` : `/barber/${barber.id}`
 
   return (
     <Link
@@ -139,6 +141,20 @@ export function BarberCard({ barber, index = 0 }: BarberCardProps) {
           {/* Gradient Overlays */}
           <div className="absolute inset-0 bg-gradient-to-t from-background-dark via-background-dark/30 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-b from-background-dark/20 via-transparent to-transparent" />
+          
+          {/* Instagram Link - Top Left */}
+          {(barber as { instagram_url?: string | null }).instagram_url && (
+            <a
+              href={(barber as { instagram_url?: string }).instagram_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="absolute top-4 left-4 z-20 w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-transform"
+              aria-label={`עקוב אחרי ${barber.fullname} באינסטגרם`}
+            >
+              <Instagram size={20} strokeWidth={1.5} className="text-white" />
+            </a>
+          )}
           
           {/* Top Decorative Line */}
           <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-accent-gold to-transparent opacity-50 group-hover:opacity-100 transition-opacity duration-300" />

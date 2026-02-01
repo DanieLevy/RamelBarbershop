@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import { usePWA, wasInstallDismissed, getVisitCount } from '@/hooks/usePWA'
 import { useBadgeManager } from '@/hooks/useBadgeManager'
 import { InstallBanner } from './InstallBanner'
@@ -38,6 +38,9 @@ export function PWAProvider({ children }: PWAProviderProps) {
   const pwa = usePWA()
   const [isMounted, setIsMounted] = useState(false)
   
+  // Track if install banner is dismissed - this state triggers re-render to unmount the modal
+  const [isInstallDismissed, setIsInstallDismissed] = useState(false)
+  
   // Badge manager handles clearing badges when app is opened
   useBadgeManager()
   
@@ -45,13 +48,21 @@ export function PWAProvider({ children }: PWAProviderProps) {
   // This prevents hydration issues and SSR errors
   useEffect(() => {
     setIsMounted(true)
+    // Check localStorage on mount
+    setIsInstallDismissed(wasInstallDismissed())
   }, [])
+  
+  // Handle install banner dismiss - updates state to trigger re-render
+  const handleInstallDismiss = useCallback(() => {
+    pwa.dismissInstallPrompt()
+    setIsInstallDismissed(true) // This triggers re-render to unmount the modal
+  }, [pwa])
   
   // Determine if we should show install banner
   const shouldShowInstallBanner = 
     !pwa.isInstalled && 
     !pwa.isStandalone && 
-    !wasInstallDismissed()
+    !isInstallDismissed
   
   // Get visit count for smart banner behavior
   const visitCount = getVisitCount()
@@ -87,7 +98,7 @@ export function PWAProvider({ children }: PWAProviderProps) {
               deviceOS={pwa.deviceOS}
               isInstallable={pwa.isInstallable}
               onInstall={pwa.installApp}
-              onDismiss={pwa.dismissInstallPrompt}
+              onDismiss={handleInstallDismiss}
               instructions={pwa.getInstallInstructions()}
             />
           )}

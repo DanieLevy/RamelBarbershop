@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { AppHeader } from '@/components/AppHeader'
 import { BookingWizardClient } from '@/components/BookingWizard/BookingWizardClient'
 import { BarberNotFoundClient } from '@/components/BarberProfile/BarberNotFoundClient'
-import { isValidUUID, buildBarberBookingUrl } from '@/lib/utils'
+import { isValidUUID, generateSlugFromEnglishName, getPreferredBarberSlug } from '@/lib/utils'
 import type { BarberWithWorkDays, Service, BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure, BarberMessage } from '@/types/database'
 
 interface BookPageProps {
@@ -12,44 +12,76 @@ interface BookPageProps {
 }
 
 /**
- * Booking wizard page - supports both UUID and username (slug) lookups
+ * Booking wizard page - supports UUID, username, and English name slugs
  * 
- * URL patterns supported:
- * - /barber/ramel/book?service=xxx (username/slug - preferred)
- * - /barber/abc123-uuid/book?service=xxx (legacy UUID - redirects to slug)
+ * URL patterns supported (in priority order):
+ * - /barber/tamir.shabo/book (English name slug - preferred)
+ * - /barber/ndava/book (legacy username - redirects to English name if available)
+ * - /barber/abc123-uuid/book (UUID - redirects to preferred slug)
  */
 export default async function BookPage({ params, searchParams }: BookPageProps) {
   const { barberId } = await params
   const { service: preSelectedServiceId } = await searchParams
   const supabase = await createClient()
+  const slugLower = barberId.toLowerCase()
   
-  // Determine if this is a UUID or slug lookup
+  // Determine lookup strategy
   const isUuidLookup = isValidUUID(barberId)
   
-  // Fetch barber by UUID or username (slug)
-  let barberQuery = supabase
-    .from('users')
-    .select('*, work_days(*)')
-    .eq('is_barber', true)
+  let barber: BarberWithWorkDays | null = null
   
   if (isUuidLookup) {
-    barberQuery = barberQuery.eq('id', barberId)
+    // UUID lookup
+    const { data } = await supabase
+      .from('users')
+      .select('*, work_days(*)')
+      .eq('is_barber', true)
+      .eq('id', barberId)
+      .single()
+    barber = data as BarberWithWorkDays | null
   } else {
-    // Lookup by username (case-insensitive)
-    barberQuery = barberQuery.ilike('username', barberId)
+    // First try: Match by English name-based slug
+    const { data: allBarbers } = await supabase
+      .from('users')
+      .select('*, work_days(*)')
+      .eq('is_barber', true)
+    
+    if (allBarbers) {
+      // Look for a barber whose name_en generates this slug
+      for (const b of allBarbers) {
+        if (b.name_en) {
+          const expectedSlug = generateSlugFromEnglishName(b.name_en)
+          if (expectedSlug === slugLower) {
+            barber = b as BarberWithWorkDays
+            break
+          }
+        }
+      }
+      
+      // Second try: Fall back to username lookup
+      if (!barber) {
+        barber = allBarbers.find(
+          b => b.username?.toLowerCase() === slugLower
+        ) as BarberWithWorkDays | null
+      }
+    }
   }
   
-  const barberResult = await barberQuery.single()
-  const barber = barberResult.data as BarberWithWorkDays | null
-  
   // Barber not found at all - return 404
-  if (barberResult.error || !barber) {
+  if (!barber) {
     notFound()
   }
   
-  // If accessed via UUID, redirect to slug-based URL for better UX/SEO
-  if (isUuidLookup && barber.username) {
-    redirect(buildBarberBookingUrl(barber.username, preSelectedServiceId))
+  // Determine the preferred slug for this barber
+  const preferredSlug = getPreferredBarberSlug(barber.name_en, barber.username)
+  const currentSlugNormalized = slugLower
+  
+  // Redirect to preferred slug if not already using it
+  if (currentSlugNormalized !== preferredSlug.toLowerCase()) {
+    const redirectUrl = preSelectedServiceId
+      ? `/barber/${preferredSlug}/book?service=${encodeURIComponent(preSelectedServiceId)}`
+      : `/barber/${preferredSlug}/book`
+    redirect(redirectUrl)
   }
   
   // Barber exists but is disabled - show friendly message

@@ -698,6 +698,53 @@ export function makeUniqueSlug(baseSlug: string, existingSlugs: string[]): strin
 }
 
 /**
+ * Generate a URL slug from English name
+ * Converts "Tamir Shabo" → "tamir.shabo"
+ * Uses dots as separators for a cleaner look
+ * @param nameEn English name to convert
+ * @returns URL-friendly slug with dots
+ */
+export function generateSlugFromEnglishName(nameEn: string): string {
+  if (!nameEn || typeof nameEn !== 'string') return ''
+  
+  return nameEn
+    .toLowerCase()
+    .trim()
+    // Remove any characters that aren't letters, numbers, or spaces
+    .replace(/[^a-z0-9\s]/g, '')
+    // Replace multiple spaces with single space
+    .replace(/\s+/g, ' ')
+    // Replace spaces with dots
+    .replace(/\s/g, '.')
+    // Remove any leading/trailing dots
+    .replace(/^\.+|\.+$/g, '')
+}
+
+/**
+ * Check if a slug is in the English name format (contains dots)
+ * @param slug The slug to check
+ * @returns True if it's an English name slug (e.g., "tamir.shabo")
+ */
+export function isEnglishNameSlug(slug: string): boolean {
+  if (!slug) return false
+  // English name slugs contain dots and only lowercase letters
+  return /^[a-z]+(\.[a-z]+)+$/.test(slug)
+}
+
+/**
+ * Get the preferred slug for a barber (name_en-based if available, otherwise username)
+ * @param nameEn Optional English name
+ * @param username Fallback username
+ * @returns The preferred slug to use
+ */
+export function getPreferredBarberSlug(nameEn: string | null | undefined, username: string): string {
+  if (nameEn && nameEn.trim()) {
+    return generateSlugFromEnglishName(nameEn)
+  }
+  return normalizeSlug(username)
+}
+
+/**
  * Build a barber profile URL using slug
  * @param slug The barber's URL slug (username)
  * @returns Full path to barber profile

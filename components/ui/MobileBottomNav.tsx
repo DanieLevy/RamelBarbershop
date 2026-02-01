@@ -311,9 +311,9 @@ export function MobileBottomNav() {
         <nav
           className={cn(
             'pointer-events-auto',
-            // Mobile: Floating pill shape
-            'inline-flex items-center gap-1',
-            'px-2 py-2',
+            // Mobile: Floating pill shape with labels - compact
+            'inline-flex items-center gap-0',
+            'px-1.5 py-1',
             'rounded-full',
             // Desktop: Full width bar
             'md:w-full md:rounded-none md:px-0 md:py-0',
@@ -338,23 +338,19 @@ export function MobileBottomNav() {
                 key={item.id}
                 onClick={() => handleClick(item)}
                 className={cn(
-                  // Base styles
-                  'relative flex items-center justify-center gap-2',
-                  'transition-all duration-300 ease-out',
-                  // Mobile: Rounded pill for each item
+                  // Base styles - vertical stack
+                  'relative flex flex-col items-center justify-center gap-0',
+                  'transition-all duration-200 ease-out',
+                  // Mobile: compact padding for each item
+                  'px-3 py-1',
                   'rounded-full',
                   // Desktop: Square items in row
                   'md:rounded-none md:flex-1 md:max-w-[200px]',
-                  // Size and padding - Mobile
+                  'md:px-6 md:py-3',
+                  // Active state
                   isActive 
-                    ? 'px-4 py-2.5' 
-                    : 'p-3',
-                  // Desktop padding
-                  'md:px-6 md:py-4',
-                  // Active state - gold background (mobile) / gold underline (desktop)
-                  isActive 
-                    ? 'bg-accent-gold text-background-dark md:bg-transparent md:text-accent-gold md:border-b-2 md:border-accent-gold' 
-                    : 'text-foreground-muted hover:text-foreground-light md:border-b-2 md:border-transparent',
+                    ? 'text-accent-gold md:border-b-2 md:border-accent-gold' 
+                    : 'text-foreground-muted/70 hover:text-foreground-light md:border-b-2 md:border-transparent',
                   // Touch feedback
                   'active:scale-95 md:active:scale-100',
                   // Focus styles
@@ -366,25 +362,23 @@ export function MobileBottomNav() {
                 {/* Icon container with optional badge */}
                 <div className="relative flex-shrink-0">
                   <Icon
-                    size={20}
-                    strokeWidth={isActive ? 2.5 : 1.5}
+                    size={18}
+                    strokeWidth={isActive ? 2 : 1.5}
                   />
                   
                   {/* Notification badge for profile tab */}
-                  {item.id === 'profile' && showNotificationBadge && !isActive && (
-                    <div className="absolute -top-1.5 -right-1.5 flex items-center justify-center">
-                      <span className="relative flex h-3 w-3">
+                  {item.id === 'profile' && showNotificationBadge && (
+                    <div className="absolute -top-1 -right-1 flex items-center justify-center">
+                      <span className="relative flex h-2 w-2">
                         {isUrgentBadge ? (
-                          // Urgent: permission denied - solid amber badge
                           <>
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500 border border-background-dark" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
                           </>
                         ) : (
-                          // Normal: needs subscription - red badge
                           <>
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border border-background-dark" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
                           </>
                         )}
                       </span>
@@ -393,12 +387,11 @@ export function MobileBottomNav() {
                   
                   {/* Upcoming appointments count badge for calendar tab */}
                   {item.id === 'calendar' && upcomingCount > 0 && (
-                    <div className="absolute -top-1.5 -right-2 flex items-center justify-center">
+                    <div className="absolute -top-1.5 -right-2.5 flex items-center justify-center">
                       <span className={cn(
-                        'inline-flex items-center justify-center min-w-[18px] h-[18px] px-1',
-                        'text-[10px] font-bold rounded-full',
-                        'bg-accent-gold text-background-dark',
-                        'border border-background-dark'
+                        'inline-flex items-center justify-center min-w-[16px] h-[16px] px-0.5',
+                        'text-[9px] font-bold rounded-full',
+                        'bg-accent-gold text-background-dark'
                       )}>
                         {upcomingCount > 9 ? '9+' : upcomingCount}
                       </span>
@@ -406,13 +399,10 @@ export function MobileBottomNav() {
                   )}
                 </div>
                 
-                {/* Label - Mobile: only visible when active. Desktop: always visible */}
+                {/* Label - Always visible, tiny */}
                 <span className={cn(
-                  'text-sm font-semibold whitespace-nowrap',
-                  // Mobile: hide when not active
-                  !isActive && 'hidden md:block',
-                  // Desktop: always show, adjust font weight
-                  'md:font-medium'
+                  'text-[9px] font-medium whitespace-nowrap leading-tight',
+                  isActive ? 'opacity-100' : 'opacity-60'
                 )}>
                   {displayLabel}
                 </span>

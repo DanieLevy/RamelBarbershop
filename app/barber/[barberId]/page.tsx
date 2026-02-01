@@ -3,8 +3,9 @@ import { notFound, redirect } from 'next/navigation'
 import { AppHeader } from '@/components/AppHeader'
 import { BarberProfileClient } from '@/components/BarberProfile/BarberProfileClient'
 import { BarberNotFoundClient } from '@/components/BarberProfile/BarberNotFoundClient'
-import { isValidUUID, buildBarberProfileUrl } from '@/lib/utils'
-import type { BarberWithWorkDays, Service, BarbershopSettings, BarberMessage } from '@/types/database'
+import { isValidUUID, generateSlugFromEnglishName, getPreferredBarberSlug } from '@/lib/utils'
+import type { BarberWithWorkDays, Service, BarbershopSettings, BarberMessage, BarberGalleryImage } from '@/types/database'
+import type { Metadata } from 'next'
 
 // Force dynamic rendering - barber data, services, and availability must always be fresh
 // This ensures users see real-time availability when booking appointments
@@ -15,48 +16,148 @@ interface BarberPageProps {
 }
 
 /**
- * Barber profile page - supports both UUID and username (slug) lookups
+ * Generate dynamic metadata for barber pages
+ * This enables proper Open Graph tags for WhatsApp/social media link previews
+ */
+export async function generateMetadata({ params }: BarberPageProps): Promise<Metadata> {
+  const { barberId } = await params
+  const supabase = await createClient()
+  const slugLower = barberId.toLowerCase()
+  
+  // Find barber (same logic as page)
+  let barber = null
+  const isUuidLookup = isValidUUID(barberId)
+  
+  if (isUuidLookup) {
+    const { data } = await supabase
+      .from('users')
+      .select('id, fullname, img_url, name_en, username')
+      .eq('is_barber', true)
+      .eq('id', barberId)
+      .single()
+    barber = data
+  } else {
+    const { data: allBarbers } = await supabase
+      .from('users')
+      .select('id, fullname, img_url, name_en, username')
+      .eq('is_barber', true)
+    
+    if (allBarbers) {
+      for (const b of allBarbers) {
+        if (b.name_en) {
+          const expectedSlug = generateSlugFromEnglishName(b.name_en)
+          if (expectedSlug === slugLower) {
+            barber = b
+            break
+          }
+        }
+      }
+      if (!barber) {
+        barber = allBarbers.find(b => b.username?.toLowerCase() === slugLower)
+      }
+    }
+  }
+  
+  const barberName = barber?.fullname || 'ספר'
+  const preferredSlug = barber ? getPreferredBarberSlug(barber.name_en, barber.username) : barberId
+  const canonicalUrl = `https://ramel-barbershop.netlify.app/barber/${preferredSlug}`
+  
+  return {
+    title: `${barberName} | רמאל ברברשופ`,
+    description: `קבע תור אצל ${barberName} ברמאל ברברשופ. שירות מקצועי, תספורות איכותיות.`,
+    openGraph: {
+      title: `${barberName} | רמאל ברברשופ`,
+      description: `קבע תור אצל ${barberName} ברמאל ברברשופ`,
+      url: canonicalUrl,
+      siteName: 'רמאל ברברשופ',
+      locale: 'he_IL',
+      type: 'profile',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${barberName} | רמאל ברברשופ`,
+      description: `קבע תור אצל ${barberName} ברמאל ברברשופ`,
+    },
+    alternates: {
+      canonical: canonicalUrl,
+    },
+  }
+}
+
+/**
+ * Barber profile page - supports UUID, username, and English name slugs
  * 
- * URL patterns supported:
- * - /barber/ramel (username/slug - preferred, user-friendly)
- * - /barber/abc123-uuid-456 (legacy UUID - redirects to slug)
+ * URL patterns supported (in priority order):
+ * - /barber/tamir.shabo (English name slug - preferred, cleanest)
+ * - /barber/ndava (legacy username - redirects to English name if available)
+ * - /barber/abc123-uuid-456 (UUID - redirects to preferred slug)
  * 
  * Edge cases handled:
  * - Barber not found → 404
  * - Barber disabled (is_active: false) → Shows "unavailable" message with return link
- * - UUID access → Redirects to slug URL for better SEO and UX
+ * - Legacy URL access → Redirects to preferred slug (name_en-based if available)
  */
 export default async function BarberPage({ params }: BarberPageProps) {
   const { barberId } = await params
   const supabase = await createClient()
+  const slugLower = barberId.toLowerCase()
   
-  // Determine if this is a UUID or slug lookup
+  // Determine lookup strategy
   const isUuidLookup = isValidUUID(barberId)
   
-  // Fetch barber by UUID or username (slug)
-  let barberQuery = supabase
-    .from('users')
-    .select('*, work_days(*)')
-    .eq('is_barber', true)
+  let barber: BarberWithWorkDays | null = null
   
   if (isUuidLookup) {
-    barberQuery = barberQuery.eq('id', barberId)
+    // UUID lookup
+    const { data } = await supabase
+      .from('users')
+      .select('*, work_days(*)')
+      .eq('is_barber', true)
+      .eq('id', barberId)
+      .single()
+    barber = data as BarberWithWorkDays | null
   } else {
-    // Lookup by username (case-insensitive)
-    barberQuery = barberQuery.ilike('username', barberId)
+    // First try: Match by English name-based slug
+    // Check if any barber's name_en generates this slug
+    const { data: allBarbers } = await supabase
+      .from('users')
+      .select('*, work_days(*)')
+      .eq('is_barber', true)
+    
+    if (allBarbers) {
+      // Look for a barber whose name_en generates this slug
+      for (const b of allBarbers) {
+        if (b.name_en) {
+          const expectedSlug = generateSlugFromEnglishName(b.name_en)
+          if (expectedSlug === slugLower) {
+            barber = b as BarberWithWorkDays
+            break
+          }
+        }
+      }
+      
+      // Second try: Fall back to username lookup
+      if (!barber) {
+        barber = allBarbers.find(
+          b => b.username?.toLowerCase() === slugLower
+        ) as BarberWithWorkDays | null
+      }
+    }
   }
   
-  const barberResult = await barberQuery.single()
-  const barber = barberResult.data as BarberWithWorkDays | null
-  
   // Barber not found at all - return 404
-  if (barberResult.error || !barber) {
+  if (!barber) {
     notFound()
   }
   
-  // If accessed via UUID, redirect to slug-based URL for better UX/SEO
-  if (isUuidLookup && barber.username) {
-    redirect(buildBarberProfileUrl(barber.username))
+  // Determine the preferred slug for this barber
+  const preferredSlug = getPreferredBarberSlug(barber.name_en, barber.username)
+  const currentSlugNormalized = slugLower
+  
+  // Redirect to preferred slug if not already using it
+  // This handles: UUID → slug, old username → new name_en slug
+  if (currentSlugNormalized !== preferredSlug.toLowerCase()) {
+    redirect(`/barber/${preferredSlug}`)
   }
   
   // Barber exists but is disabled - show friendly message
@@ -75,7 +176,7 @@ export default async function BarberPage({ params }: BarberPageProps) {
   }
   
   // Fetch remaining data in parallel now that we have a valid barber
-  const [servicesResult, shopSettingsResult, barberMessagesResult] = await Promise.all([
+  const [servicesResult, shopSettingsResult, barberMessagesResult, galleryResult] = await Promise.all([
     // Barber-specific services
     supabase
       .from('services')
@@ -93,12 +194,19 @@ export default async function BarberPage({ params }: BarberPageProps) {
       .from('barber_messages')
       .select('*')
       .eq('barber_id', barber.id)
-      .eq('is_active', true)
+      .eq('is_active', true),
+    // Barber gallery images
+    supabase
+      .from('barber_gallery')
+      .select('*')
+      .eq('barber_id', barber.id)
+      .order('display_order', { ascending: true })
   ])
   
   const services = servicesResult.data as Service[] | null
   const shopSettings = shopSettingsResult.data as BarbershopSettings | null
   const barberMessages = barberMessagesResult.data as BarberMessage[] | null
+  const galleryImages = galleryResult.data as BarberGalleryImage[] | null
   
   return (
     <>
@@ -110,6 +218,7 @@ export default async function BarberPage({ params }: BarberPageProps) {
           services={services || []} 
           shopSettings={shopSettings}
           barberMessages={barberMessages || []}
+          galleryImages={galleryImages || []}
         />
       </main>
     </>
