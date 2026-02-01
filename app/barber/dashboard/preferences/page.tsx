@@ -5,7 +5,7 @@ import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { Clock, BellRing, CalendarPlus, XCircle, Loader2 } from 'lucide-react'
+import { Clock, BellRing, CalendarPlus, XCircle, Loader2, ShieldAlert } from 'lucide-react'
 import type { BarberNotificationSettings } from '@/lib/push/types'
 import { useBugReporter } from '@/hooks/useBugReporter'
 
@@ -18,6 +18,7 @@ export default function PreferencesPage() {
   const [reminderHours, setReminderHours] = useState(3)
   const [notifyOnCancel, setNotifyOnCancel] = useState(true)
   const [notifyOnNewBooking, setNotifyOnNewBooking] = useState(true)
+  const [minCancelHours, setMinCancelHours] = useState(3)
   const [savingNotifSettings, setSavingNotifSettings] = useState(false)
 
   const fetchNotificationSettings = useCallback(async () => {
@@ -38,11 +39,12 @@ export default function PreferencesPage() {
     }
     
     if (data) {
-      const settings = data as BarberNotificationSettings
+      const settings = data as BarberNotificationSettings & { min_cancel_hours?: number }
       setNotifSettings(settings)
       setReminderHours(settings.reminder_hours_before)
       setNotifyOnCancel(settings.notify_on_customer_cancel)
       setNotifyOnNewBooking(settings.notify_on_new_booking)
+      setMinCancelHours(settings.min_cancel_hours ?? 3)
     } else {
       // Create default settings for this barber
       const { data: newSettings, error: insertError } = await supabase.from('barber_notification_settings')
@@ -53,11 +55,12 @@ export default function PreferencesPage() {
       if (insertError) {
         console.error('Error creating notification settings:', insertError)
       } else if (newSettings) {
-        const settings = newSettings as BarberNotificationSettings
+        const settings = newSettings as BarberNotificationSettings & { min_cancel_hours?: number }
         setNotifSettings(settings)
         setReminderHours(settings.reminder_hours_before)
         setNotifyOnCancel(settings.notify_on_customer_cancel)
         setNotifyOnNewBooking(settings.notify_on_new_booking)
+        setMinCancelHours(settings.min_cancel_hours ?? 3)
       }
     }
     setLoading(false)
@@ -82,6 +85,7 @@ export default function PreferencesPage() {
           reminder_hours_before: reminderHours,
           notify_on_customer_cancel: notifyOnCancel,
           notify_on_new_booking: notifyOnNewBooking,
+          min_cancel_hours: minCancelHours,
           updated_at: new Date().toISOString()
         })
         .eq('barber_id', barber.id)
@@ -218,6 +222,64 @@ export default function PreferencesPage() {
                 )} />
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Cancellation Policy Section */}
+        <div className="bg-background-card border border-white/10 rounded-2xl p-6 mb-6">
+          <h3 className="text-lg font-medium text-foreground-light mb-4 flex items-center gap-2">
+            <ShieldAlert size={20} strokeWidth={1.5} className="text-orange-400" />
+            מדיניות ביטולים
+          </h3>
+          
+          <p className="text-foreground-muted text-sm mb-6">
+            הגדר כמה זמן לפני התור לקוחות לא יוכלו לבטל בעצמם
+          </p>
+
+          <div className="space-y-4">
+            {/* Minimum Cancel Hours */}
+            <div className="flex flex-col gap-2">
+              <label className="text-foreground-light text-sm flex items-center gap-2">
+                <Clock size={14} className="text-foreground-muted" />
+                זמן מינימום לביטול
+              </label>
+              <select
+                value={minCancelHours}
+                onChange={(e) => setMinCancelHours(parseInt(e.target.value))}
+                className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold"
+              >
+                <option value={0}>ללא הגבלה - לקוחות יכולים לבטל תמיד</option>
+                <option value={1}>שעה אחת לפני התור</option>
+                <option value={2}>שעתיים לפני התור</option>
+                <option value={3}>3 שעות לפני התור</option>
+                <option value={4}>4 שעות לפני התור</option>
+                <option value={6}>6 שעות לפני התור</option>
+                <option value={12}>12 שעות לפני התור</option>
+                <option value={24}>יום לפני התור</option>
+                <option value={48}>יומיים לפני התור</option>
+              </select>
+              <p className="text-foreground-muted/60 text-xs">
+                {minCancelHours === 0 
+                  ? 'לקוחות יכולים לבטל תורים בכל זמן'
+                  : `לקוחות לא יוכלו לבטל תורים ${minCancelHours === 1 ? 'שעה' : minCancelHours === 24 ? 'יום' : minCancelHours === 48 ? 'יומיים' : `${minCancelHours} שעות`} לפני. במקום, הם יוכלו לבקש ממך לבטל.`
+                }
+              </p>
+            </div>
+
+            {/* Info Box */}
+            <div className="p-3 bg-orange-500/10 border border-orange-500/20 rounded-xl">
+              <div className="flex gap-2">
+                <ShieldAlert size={16} className="text-orange-400 shrink-0 mt-0.5" />
+                <div className="text-xs text-orange-300/80">
+                  <p className="font-medium text-orange-300 mb-1">איך זה עובד?</p>
+                  <ul className="space-y-1 list-disc list-inside">
+                    <li>לקוח שמנסה לבטל בחלון הזמן הזה יראה הודעה שהוא לא יכול</li>
+                    <li>הוא יוכל לבקש ממך לבטל, ותקבל התראה</li>
+                    <li>אתה תמיד יכול לבטל תורים בכל זמן</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
 
             <button
               onClick={handleSaveNotifSettings}
@@ -230,7 +292,7 @@ export default function PreferencesPage() {
               )}
             >
               {savingNotifSettings && <Loader2 size={18} className="animate-spin" />}
-              {savingNotifSettings ? 'שומר...' : 'שמור הגדרות התראות'}
+              {savingNotifSettings ? 'שומר...' : 'שמור הגדרות'}
             </button>
           </div>
         </div>

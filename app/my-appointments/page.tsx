@@ -18,6 +18,7 @@ import { useBugReporter } from '@/hooks/useBugReporter'
 import { useHaptics } from '@/hooks/useHaptics'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { cancelReservation } from '@/lib/services/booking.service'
+import { CancelBlockedModal } from '@/components/booking/CancelBlockedModal'
 
 type TabType = 'upcoming' | 'past' | 'cancelled'
 
@@ -69,6 +70,17 @@ function MyAppointmentsContent() {
     isOpen: boolean
     reservation: ReservationWithDetails | null
   }>({ isOpen: false, reservation: null })
+  
+  // Cancel blocked modal state
+  const [cancelBlockedModal, setCancelBlockedModal] = useState<{
+    isOpen: boolean
+    reservation: ReservationWithDetails | null
+    hoursUntil: number
+    minCancelHours: number
+  }>({ isOpen: false, reservation: null, hoursUntil: 0, minCancelHours: 3 })
+  
+  // Cache for barber cancellation settings
+  const [barberCancelSettings, setBarberCancelSettings] = useState<Map<string, number>>(new Map())
 
   useEffect(() => {
     if (customer?.id || customer?.phone) {
@@ -176,16 +188,73 @@ function MyAppointmentsContent() {
     }
   }
 
-  const handleCancelReservation = async (reservationId: string) => {
-    const confirmed = window.confirm('האם אתה בטוח שברצונך לבטל את התור?')
-    if (!confirmed) return
+  // Get barber's minimum cancel hours setting
+  const getBarberMinCancelHours = async (barberId: string): Promise<number> => {
+    // Check cache first
+    if (barberCancelSettings.has(barberId)) {
+      return barberCancelSettings.get(barberId)!
+    }
     
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('barber_notification_settings')
+        .select('min_cancel_hours')
+        .eq('barber_id', barberId)
+        .single()
+      
+      if (error || !data) {
+        // Default to 3 hours if no setting found
+        return 3
+      }
+      
+      const minHours = data.min_cancel_hours ?? 3
+      
+      // Cache the result
+      setBarberCancelSettings(prev => new Map(prev).set(barberId, minHours))
+      
+      return minHours
+    } catch (err) {
+      console.error('Error fetching barber cancel settings:', err)
+      return 3 // Default fallback
+    }
+  }
+
+  const handleCancelReservation = async (reservationId: string) => {
     // Get reservation details before cancelling for notification
     const reservation = reservations.find(r => r.id === reservationId)
     if (!reservation) {
       toast.error('התור לא נמצא')
       return
     }
+    
+    // Check if cancellation is blocked by time restriction
+    if (reservation.barber_id) {
+      const minCancelHours = await getBarberMinCancelHours(reservation.barber_id)
+      
+      if (minCancelHours > 0) {
+        const now = Date.now()
+        const resTime = reservation.time_timestamp < 946684800000 
+          ? reservation.time_timestamp * 1000 
+          : reservation.time_timestamp
+        const hoursUntil = (resTime - now) / (1000 * 60 * 60)
+        
+        if (hoursUntil < minCancelHours && hoursUntil > 0) {
+          // Show the cancel blocked modal
+          setCancelBlockedModal({
+            isOpen: true,
+            reservation,
+            hoursUntil,
+            minCancelHours
+          })
+          return
+        }
+      }
+    }
+    
+    // Standard cancellation flow
+    const confirmed = window.confirm('האם אתה בטוח שברצונך לבטל את התור?')
+    if (!confirmed) return
     
     setCancellingId(reservationId)
     
@@ -582,6 +651,23 @@ function MyAppointmentsContent() {
         reservation={detailModal.reservation}
         variant="customer"
       />
+
+      {/* Cancel Blocked Modal */}
+      {cancelBlockedModal.reservation && (
+        <CancelBlockedModal
+          isOpen={cancelBlockedModal.isOpen}
+          onClose={() => setCancelBlockedModal({ isOpen: false, reservation: null, hoursUntil: 0, minCancelHours: 3 })}
+          reservationId={cancelBlockedModal.reservation.id}
+          barberId={cancelBlockedModal.reservation.barber_id}
+          barberName={cancelBlockedModal.reservation.users?.fullname || 'הספר'}
+          customerId={customer?.id || ''}
+          customerName={customer?.fullname || cancelBlockedModal.reservation.customer_name}
+          serviceName={cancelBlockedModal.reservation.services?.name_he || 'שירות'}
+          appointmentTime={cancelBlockedModal.reservation.time_timestamp}
+          hoursUntil={cancelBlockedModal.hoursUntil}
+          minCancelHours={cancelBlockedModal.minCancelHours}
+        />
+      )}
     </>
   )
 }

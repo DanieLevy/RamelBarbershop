@@ -159,6 +159,7 @@ export type Database = {
           broadcast_enabled: boolean
           created_at: string | null
           id: string
+          min_cancel_hours: number
           notify_on_customer_cancel: boolean
           notify_on_new_booking: boolean
           reminder_hours_before: number
@@ -169,6 +170,7 @@ export type Database = {
           broadcast_enabled?: boolean
           created_at?: string | null
           id?: string
+          min_cancel_hours?: number
           notify_on_customer_cancel?: boolean
           notify_on_new_booking?: boolean
           reminder_hours_before?: number
@@ -179,6 +181,7 @@ export type Database = {
           broadcast_enabled?: boolean
           created_at?: string | null
           id?: string
+          min_cancel_hours?: number
           notify_on_customer_cancel?: boolean
           notify_on_new_booking?: boolean
           reminder_hours_before?: number
