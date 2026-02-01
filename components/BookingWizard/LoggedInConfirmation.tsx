@@ -9,6 +9,7 @@ import { Check, Calendar, Clock, Scissors, User, Phone } from 'lucide-react'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { useHaptics } from '@/hooks/useHaptics'
 import { BlockedUserModal } from './BlockedUserModal'
+import { Confetti } from '@/components/ui/Confetti'
 import { createReservation as createReservationService, checkCustomerEligibility } from '@/lib/services/booking.service'
 
 interface LoggedInConfirmationProps {
@@ -170,6 +171,9 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Confetti celebration */}
+      <Confetti />
+      
       {/* Success Icon */}
       <div className="flex justify-center">
         <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center">

@@ -5,6 +5,7 @@ import { useBookingStore } from '@/store/useBookingStore'
 import { formatTime, formatDateHebrew } from '@/lib/utils'
 import type { User } from '@/types/database'
 import { CheckCircle, Calendar, Clock, Scissors, User as UserIcon, Phone } from 'lucide-react'
+import { Confetti } from '@/components/ui/Confetti'
 
 // Custom WhatsApp icon
 const WhatsAppIcon = () => (
@@ -46,6 +47,9 @@ export function Confirmation({ barber: _barber }: ConfirmationProps) {
 
   return (
     <div className="flex flex-col items-center gap-6 text-center">
+      {/* Confetti celebration */}
+      <Confetti />
+      
       {/* Success Icon */}
       <div className="relative">
         <div className="absolute inset-0 bg-green-500/20 rounded-full blur-xl" />
