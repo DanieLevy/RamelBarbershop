@@ -102,6 +102,7 @@ export default function ProfilePage() {
         setBarber({ ...barber, img_url: result.url })
       }
     } else {
+      await report(new Error(result.error || 'Avatar upload failed'), 'Uploading barber avatar')
       toast.error(result.error || 'שגיאה בהעלאת התמונה')
     }
     
@@ -184,6 +185,7 @@ export default function ProfilePage() {
       toast.success('הפרופיל עודכן בהצלחה!')
       setBarber({ ...barber, fullname, email, phone, img_url: imgUrl, username, name_en: nameEn.trim() || null, instagram_url: cleanedInstagramUrl || null } as typeof barber)
     } else {
+      await report(new Error(result.error || 'Profile update failed'), 'Saving barber profile')
       toast.error(result.error || 'שגיאה בעדכון')
     }
     
@@ -217,6 +219,7 @@ export default function ProfilePage() {
       setNewPassword('')
       setConfirmPassword('')
     } else {
+      await report(new Error(result.error || 'Password change failed'), 'Changing barber password')
       toast.error(result.error || 'שגיאה בעדכון הסיסמה')
     }
     
@@ -243,6 +246,7 @@ export default function ProfilePage() {
       
       if (error || !data || data.length === 0) {
         console.error('Error updating message:', error)
+        await report(new Error(error?.message || 'Message update failed'), 'Updating barber message')
         toast.error('שגיאה בעדכון ההודעה')
       } else {
         toast.success('ההודעה עודכנה!')
@@ -261,6 +265,7 @@ export default function ProfilePage() {
       
       if (error || !data || data.length === 0) {
         console.error('Error creating message:', error)
+        await report(new Error(error?.message || 'Message creation failed'), 'Creating barber message')
         toast.error('שגיאה ביצירת ההודעה')
       } else {
         toast.success('ההודעה נוספה!')
@@ -283,6 +288,7 @@ export default function ProfilePage() {
     
     if (error || !data || data.length === 0) {
       console.error('Error toggling message:', error)
+      await report(new Error(error?.message || 'Message toggle failed'), 'Toggling barber message visibility')
       toast.error('שגיאה בעדכון')
     } else {
       fetchMessages()
@@ -301,6 +307,7 @@ export default function ProfilePage() {
     
     if (error) {
       console.error('Error deleting message:', error)
+      await report(new Error(error.message), 'Deleting barber message')
       toast.error('שגיאה במחיקה')
     } else {
       toast.success('ההודעה נמחקה')
@@ -456,7 +463,7 @@ export default function ProfilePage() {
                 const value = e.target.value.replace(/[^a-zA-Z\s]/g, '')
                 setNameEn(value)
               }}
-              placeholder="Tamir Shabo"
+              placeholder="Your Name"
               className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-left"
             />
             {nameEn && (
@@ -465,7 +472,7 @@ export default function ProfilePage() {
               </p>
             )}
             <p className="text-foreground-muted/60 text-xs">
-              הזן את שמך באנגלית (למשל: Tamir Shabo) ליצירת קישור נקי ומקצועי
+              הזן את שמך באנגלית (למשל: David Cohen) ליצירת קישור נקי ומקצועי
             </p>
           </div>
 
@@ -592,7 +599,7 @@ export default function ProfilePage() {
                         טיפ: הוסף שם באנגלית לקישור יפה יותר!
                       </p>
                       <p className="text-amber-300/70 text-xs mt-1">
-                        במקום <span className="font-mono">{username}</span> יהיה לך קישור כמו <span className="font-mono">tamir.shabo</span>
+                        במקום <span className="font-mono">{username}</span> יהיה לך קישור כמו <span className="font-mono">david.cohen</span>
                       </p>
                     </div>
                   )}

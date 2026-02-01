@@ -311,9 +311,9 @@ export function MobileBottomNav() {
         <nav
           className={cn(
             'pointer-events-auto',
-            // Mobile: Floating pill shape with labels - compact
+            // Mobile: Floating pill shape with labels
             'inline-flex items-center gap-0',
-            'px-1.5 py-1',
+            'px-2 py-1.5',
             'rounded-full',
             // Desktop: Full width bar
             'md:w-full md:rounded-none md:px-0 md:py-0',
@@ -339,10 +339,10 @@ export function MobileBottomNav() {
                 onClick={() => handleClick(item)}
                 className={cn(
                   // Base styles - vertical stack
-                  'relative flex flex-col items-center justify-center gap-0',
+                  'relative flex flex-col items-center justify-center gap-0.5',
                   'transition-all duration-200 ease-out',
-                  // Mobile: compact padding for each item
-                  'px-3 py-1',
+                  // Mobile: padding for each item
+                  'px-3.5 py-1.5',
                   'rounded-full',
                   // Desktop: Square items in row
                   'md:rounded-none md:flex-1 md:max-w-[200px]',
@@ -362,7 +362,7 @@ export function MobileBottomNav() {
                 {/* Icon container with optional badge */}
                 <div className="relative flex-shrink-0">
                   <Icon
-                    size={18}
+                    size={20}
                     strokeWidth={isActive ? 2 : 1.5}
                   />
                   
@@ -399,9 +399,9 @@ export function MobileBottomNav() {
                   )}
                 </div>
                 
-                {/* Label - Always visible, tiny */}
+                {/* Label - Always visible, small */}
                 <span className={cn(
-                  'text-[9px] font-medium whitespace-nowrap leading-tight',
+                  'text-[10px] font-medium whitespace-nowrap leading-tight',
                   isActive ? 'opacity-100' : 'opacity-60'
                 )}>
                   {displayLabel}

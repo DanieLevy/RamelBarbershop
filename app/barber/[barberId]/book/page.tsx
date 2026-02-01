@@ -15,7 +15,7 @@ interface BookPageProps {
  * Booking wizard page - supports UUID, username, and English name slugs
  * 
  * URL patterns supported (in priority order):
- * - /barber/tamir.shabo/book (English name slug - preferred)
+ * - /barber/david.cohen/book (English name slug - preferred)
  * - /barber/ndava/book (legacy username - redirects to English name if available)
  * - /barber/abc123-uuid/book (UUID - redirects to preferred slug)
  */

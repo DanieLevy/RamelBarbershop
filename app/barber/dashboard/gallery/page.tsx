@@ -9,10 +9,12 @@ import { cn } from '@/lib/utils'
 import { Images, Upload, Trash2, GripVertical, Plus, Info, Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import type { BarberGalleryImage } from '@/types/database'
+import { useBugReporter } from '@/hooks/useBugReporter'
 
 const MAX_GALLERY_IMAGES = 10
 
 export default function GalleryPage() {
+  const { report } = useBugReporter('GalleryPage')
   const { barber } = useBarberAuthStore()
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -39,6 +41,7 @@ export default function GalleryPage() {
     
     if (error) {
       console.error('Error fetching gallery:', error)
+      await report(new Error(error.message), 'Fetching gallery images')
       toast.error('שגיאה בטעינת הגלריה')
     } else {
       setImages(data || [])
@@ -92,6 +95,7 @@ export default function GalleryPage() {
         
         if (error) {
           console.error('Error saving gallery image:', error)
+          await report(new Error(error.message), 'Saving gallery image to database')
           toast.error('שגיאה בשמירת התמונה')
         } else if (data) {
           newImages.push(data)
@@ -131,6 +135,7 @@ export default function GalleryPage() {
     
     if (error) {
       console.error('Error deleting image:', error)
+      await report(new Error(error.message), 'Deleting gallery image from database')
       toast.error('שגיאה במחיקת התמונה')
       return
     }
@@ -147,6 +152,7 @@ export default function GalleryPage() {
     } catch (storageError) {
       // Log but don't fail - DB record is already deleted
       console.error('Error deleting from storage:', storageError)
+      await report(storageError, 'Deleting gallery image from storage')
     }
     
     setImages(images.filter(img => img.id !== imageId))

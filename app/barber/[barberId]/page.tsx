@@ -88,7 +88,7 @@ export async function generateMetadata({ params }: BarberPageProps): Promise<Met
  * Barber profile page - supports UUID, username, and English name slugs
  * 
  * URL patterns supported (in priority order):
- * - /barber/tamir.shabo (English name slug - preferred, cleanest)
+ * - /barber/david.cohen (English name slug - preferred, cleanest)
  * - /barber/ndava (legacy username - redirects to English name if available)
  * - /barber/abc123-uuid-456 (UUID - redirects to preferred slug)
  * 
