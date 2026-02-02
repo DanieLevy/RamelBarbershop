@@ -188,15 +188,15 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
       // Check permission (synchronous)
       const permission = Notification.permission
 
-      // Check if already subscribed (async)
+      // Check if already subscribed in browser (async)
       const subscription = await getCurrentSubscription()
-      const isSubscribed = Boolean(subscription)
+      const hasBrowserSubscription = Boolean(subscription)
 
       setState(prev => ({
         ...prev,
         isSupported: true,
         permission,
-        isSubscribed,
+        isSubscribed: hasBrowserSubscription,
         pwaInstalled: isStandalone,
         isLoading: false
       }))
@@ -204,7 +204,62 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
       // Update shared store for cross-component sync using stable setter refs
       setStoreSupported(true)
       setStorePermission(permission)
-      setStoreSubscribed(isSubscribed)
+      setStoreSubscribed(hasBrowserSubscription)
+
+      // Auto-resubscribe logic: If user is logged in, has granted permission,
+      // and has a browser subscription but no server subscription, auto-subscribe
+      if ((isCustomerLoggedIn || isBarberLoggedIn) && permission === 'granted' && subscription) {
+        const authState = useAuthStore.getState()
+        const barberAuthState = useBarberAuthStore.getState()
+        
+        const isCustomer = authState.isLoggedIn && authState.customer?.id
+        const isBarber = barberAuthState.isLoggedIn && barberAuthState.barber?.id
+        
+        if (isCustomer || isBarber) {
+          try {
+            // Check if this endpoint is already registered on server
+            const param = isCustomer ? 'customerId' : 'barberId'
+            const userId = isCustomer ? authState.customer?.id : barberAuthState.barber?.id
+            const statusResponse = await fetch(`/api/push/status?${param}=${userId}`)
+            const statusData = await statusResponse.json()
+            
+            // If no active subscription on server but browser has one, auto-resubscribe
+            if (statusData.success && !statusData.isSubscribed) {
+              console.log('[Push] Auto-resubscribing: Browser subscription exists but server record missing')
+              
+              const subscriptionJSON = subscription.toJSON()
+              
+              const saveResponse = await fetch('/api/push/subscribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  subscription: {
+                    endpoint: subscriptionJSON.endpoint,
+                    keys: subscriptionJSON.keys
+                  },
+                  customerId: isCustomer ? authState.customer?.id : undefined,
+                  barberId: isBarber ? barberAuthState.barber?.id : undefined
+                })
+              })
+              
+              const saveData = await saveResponse.json()
+              
+              if (saveData.success) {
+                console.log('[Push] Auto-resubscribe successful!')
+                setState(prev => ({
+                  ...prev,
+                  isSubscribed: true,
+                  notificationsEnabled: true
+                }))
+                setStoreSubscribed(true)
+              }
+            }
+          } catch (err) {
+            console.error('[Push] Auto-resubscribe error:', err)
+            // Don't fail silently - user can still manually enable
+          }
+        }
+      }
 
       // Fetch server status if logged in (uses store.getState() internally, so safe to call)
       if (isCustomerLoggedIn || isBarberLoggedIn) {

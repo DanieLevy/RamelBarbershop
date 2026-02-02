@@ -184,25 +184,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     const { authMethod, customer } = get()
     
-    // Deactivate push subscription for current device before logout
-    // This ensures this device won't receive notifications for the logged-out user
+    // Deactivate push subscription on server (but keep browser subscription intact)
+    // This ensures:
+    // 1. This device won't receive notifications for the logged-out user
+    // 2. When user logs back in, we can auto-resubscribe (browser subscription still exists)
     if (customer?.id && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
       try {
         const registration = await navigator.serviceWorker.ready
         const subscription = await registration.pushManager.getSubscription()
         
         if (subscription) {
-          // Unsubscribe from browser's push manager
-          await subscription.unsubscribe()
-          
-          // Deactivate on server (by endpoint)
+          // Only deactivate on server - DO NOT unsubscribe from browser
+          // This allows auto-resubscribe on next login if permission is still granted
           await fetch('/api/push/subscribe', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ endpoint: subscription.endpoint })
           })
           
-          console.log('[Auth] Push subscription deactivated on logout')
+          console.log('[Auth] Push subscription deactivated on server (browser subscription kept for auto-resubscribe)')
         }
       } catch (err) {
         // Don't block logout if push cleanup fails
