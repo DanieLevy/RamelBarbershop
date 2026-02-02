@@ -5,7 +5,7 @@ import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { usePushNotifications, getDeviceIcon } from '@/hooks/usePushNotifications'
 import { usePWA } from '@/hooks/usePWA'
 import { GlassCard } from '@/components/ui/GlassCard'
-import { cn } from '@/lib/utils'
+import { cn, formatHebrewMinutes, formatHebrewHours, formatHebrewDays } from '@/lib/utils'
 import { toast } from 'sonner'
 import {
   Bell,
@@ -126,9 +126,9 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
       const diffDays = Math.floor(diffMs / 86400000)
 
       if (diffMins < 1) return 'הרגע'
-      if (diffMins < 60) return `לפני ${diffMins} דקות`
-      if (diffHours < 24) return `לפני ${diffHours} שעות`
-      if (diffDays < 7) return `לפני ${diffDays} ימים`
+      if (diffMins < 60) return `לפני ${formatHebrewMinutes(diffMins)}`
+      if (diffHours < 24) return `לפני ${formatHebrewHours(diffHours)}`
+      if (diffDays < 7) return `לפני ${formatHebrewDays(diffDays)}`
       return date.toLocaleDateString('he-IL')
     } catch {
       return 'לא ידוע'

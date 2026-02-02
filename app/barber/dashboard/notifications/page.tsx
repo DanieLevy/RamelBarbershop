@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
-import { cn, timestampToIsraelDate } from '@/lib/utils'
+import { cn, timestampToIsraelDate, formatHebrewMinutes, formatHebrewHours, formatHebrewDays } from '@/lib/utils'
 import { Bell, Calendar, X, Clock, ChevronLeft, Check, RefreshCw } from 'lucide-react'
 import type { NotificationLogRecord, NotificationType } from '@/lib/push/types'
 import { useBugReporter } from '@/hooks/useBugReporter'
@@ -174,9 +174,9 @@ export default function BarberNotificationsPage() {
     const diffDays = Math.floor(diffMs / 86400000)
     
     if (diffMins < 1) return 'עכשיו'
-    if (diffMins < 60) return `לפני ${diffMins} דקות`
-    if (diffHours < 24) return `לפני ${diffHours} שעות`
-    if (diffDays < 7) return `לפני ${diffDays} ימים`
+    if (diffMins < 60) return `לפני ${formatHebrewMinutes(diffMins)}`
+    if (diffHours < 24) return `לפני ${formatHebrewHours(diffHours)}`
+    if (diffDays < 7) return `לפני ${formatHebrewDays(diffDays)}`
     
     const israelDate = timestampToIsraelDate(date.getTime())
     return format(israelDate, 'd בMMMM', { locale: he })

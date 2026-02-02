@@ -447,6 +447,95 @@ export function formatPrice(price: number): string {
   return `₪${price.toLocaleString('he-IL')}`
 }
 
+// ============================================================
+// HEBREW NUMBER FORMATTING
+// Proper Hebrew grammar for numbers with time units
+// ============================================================
+
+/**
+ * Format minutes with proper Hebrew grammar
+ * 1 → דקה / דקה אחת
+ * 2 → שתי דקות
+ * 3-10 → X דקות
+ * 11+ → X דקות
+ */
+export function formatHebrewMinutes(minutes: number, includeNumber = true): string {
+  if (minutes === 1) return includeNumber ? 'דקה אחת' : 'דקה'
+  if (minutes === 2) return 'שתי דקות'
+  return `${minutes} דקות`
+}
+
+/**
+ * Format hours with proper Hebrew grammar
+ * 1 → שעה / שעה אחת
+ * 2 → שעתיים
+ * 3-10 → X שעות
+ * 11 → אחת עשרה שעות
+ * 12 → שתים עשרה שעות
+ * 13+ → X שעות
+ */
+export function formatHebrewHours(hours: number, includeNumber = true): string {
+  if (hours === 1) return includeNumber ? 'שעה אחת' : 'שעה'
+  if (hours === 2) return 'שעתיים'
+  if (hours === 11) return 'אחת עשרה שעות'
+  if (hours === 12) return 'שתים עשרה שעות'
+  return `${hours} שעות`
+}
+
+/**
+ * Format days with proper Hebrew grammar
+ * 1 → יום / יום אחד
+ * 2 → יומיים
+ * 3-10 → X ימים
+ */
+export function formatHebrewDays(days: number, includeNumber = true): string {
+  if (days === 1) return includeNumber ? 'יום אחד' : 'יום'
+  if (days === 2) return 'יומיים'
+  return `${days} ימים`
+}
+
+/**
+ * Format a duration intelligently (auto-selects best unit)
+ * @param minutes Total minutes
+ * @param style 'full' = "בעוד שעתיים", 'ago' = "לפני שעתיים", 'bare' = "שעתיים"
+ */
+export function formatHebrewDuration(minutes: number, style: 'full' | 'ago' | 'bare' = 'bare'): string {
+  let result: string
+  
+  if (minutes < 1) {
+    result = 'פחות מדקה'
+  } else if (minutes < 60) {
+    // Use minutes
+    result = formatHebrewMinutes(Math.round(minutes))
+  } else if (minutes < 60 * 24) {
+    // Use hours
+    const hours = Math.round(minutes / 60)
+    result = formatHebrewHours(hours)
+  } else {
+    // Use days
+    const days = Math.round(minutes / (60 * 24))
+    result = formatHebrewDays(days)
+  }
+  
+  if (style === 'full') return `בעוד ${result}`
+  if (style === 'ago') return `לפני ${result}`
+  return result
+}
+
+/**
+ * Format relative time (like "2 hours ago" or "in 3 minutes")
+ * @param diffMinutes Difference in minutes (positive = past, negative = future)
+ */
+export function formatHebrewRelativeTime(diffMinutes: number): string {
+  const absDiff = Math.abs(diffMinutes)
+  const isPast = diffMinutes > 0
+  
+  if (absDiff < 1) return 'עכשיו'
+  
+  const formatted = formatHebrewDuration(absDiff)
+  return isPast ? `לפני ${formatted}` : `בעוד ${formatted}`
+}
+
 /**
  * Hebrew day letter mapping
  */

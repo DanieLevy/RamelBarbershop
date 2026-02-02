@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { X, AlertTriangle, Send, Loader2, Clock } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, formatHebrewMinutes, formatHebrewHours, formatHebrewDays } from '@/lib/utils'
 import { toast } from 'sonner'
 import { useBugReporter } from '@/hooks/useBugReporter'
 
@@ -81,16 +81,17 @@ export function CancelBlockedModal({
 
   if (!isOpen) return null
 
-  // Format hours for display
+  // Format hours for display with proper Hebrew grammar
   const formatHours = (hours: number): string => {
     if (hours < 1) {
       const minutes = Math.round(hours * 60)
-      return `${minutes} דקות`
+      return formatHebrewMinutes(minutes)
     }
-    if (hours === 1) return 'שעה'
-    if (hours === 24) return 'יום'
-    if (hours === 48) return 'יומיים'
-    return `${Math.round(hours)} שעות`
+    if (hours >= 24) {
+      const days = Math.round(hours / 24)
+      return formatHebrewDays(days)
+    }
+    return formatHebrewHours(Math.round(hours))
   }
 
   // Format appointment time

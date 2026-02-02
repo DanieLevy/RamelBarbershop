@@ -6,7 +6,7 @@ import { useAuthStore } from '@/store/useAuthStore'
 import { AppHeader } from '@/components/AppHeader'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { GlassCard } from '@/components/ui/GlassCard'
-import { cn, timestampToIsraelDate } from '@/lib/utils'
+import { cn, timestampToIsraelDate, formatHebrewMinutes, formatHebrewHours, formatHebrewDays } from '@/lib/utils'
 import { Bell, Calendar, X, Clock, ChevronRight, LogIn, Check, RefreshCw } from 'lucide-react'
 import type { NotificationLogRecord, NotificationType } from '@/lib/push/types'
 import { LoginModal } from '@/components/LoginModal'
@@ -188,9 +188,9 @@ function NotificationsContent() {
     const diffDays = Math.floor(diffMs / 86400000)
     
     if (diffMins < 1) return 'עכשיו'
-    if (diffMins < 60) return `לפני ${diffMins} דקות`
-    if (diffHours < 24) return `לפני ${diffHours} שעות`
-    if (diffDays < 7) return `לפני ${diffDays} ימים`
+    if (diffMins < 60) return `לפני ${formatHebrewMinutes(diffMins)}`
+    if (diffHours < 24) return `לפני ${formatHebrewHours(diffHours)}`
+    if (diffDays < 7) return `לפני ${formatHebrewDays(diffDays)}`
     
     const israelDate = timestampToIsraelDate(date.getTime())
     return format(israelDate, 'd בMMMM', { locale: he })

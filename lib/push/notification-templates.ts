@@ -7,7 +7,7 @@
 
 import { format } from 'date-fns'
 import { he } from 'date-fns/locale'
-import { timestampToIsraelDate } from '@/lib/utils'
+import { timestampToIsraelDate, formatHebrewDuration as formatDuration } from '@/lib/utils'
 import type { 
   NotificationPayload, 
   NotificationType,
@@ -43,27 +43,10 @@ function formatUrlDate(timestamp: number): string {
 
 /**
  * Format time duration in proper Hebrew grammar
- * Handles special cases for 1, 2, and 3+ units
+ * Uses centralized utility from @/lib/utils
  */
 function formatHebrewDuration(minutes: number): string {
-  if (minutes < 60) {
-    // Minutes
-    if (minutes === 1) return 'דקה אחת'
-    if (minutes === 2) return 'שתי דקות'
-    if (minutes <= 10) return `${minutes} דקות`
-    if (minutes <= 20) return `${minutes} דקות`
-    return `${minutes} דקות`
-  }
-  
-  const hours = Math.round(minutes / 60)
-  
-  // Hours - proper Hebrew grammar
-  if (hours === 1) return 'שעה'
-  if (hours === 2) return 'שעתיים'
-  if (hours <= 10) return `${hours} שעות`
-  if (hours === 11) return 'אחת עשרה שעות'
-  if (hours === 12) return 'שתים עשרה שעות'
-  return `${hours} שעות`
+  return formatDuration(minutes)
 }
 
 /**

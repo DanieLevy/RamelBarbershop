@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
+import { cn, formatHebrewHours, formatHebrewDays } from '@/lib/utils'
 import { Clock, BellRing, CalendarPlus, XCircle, Loader2, ShieldAlert } from 'lucide-react'
 import type { BarberNotificationSettings } from '@/lib/push/types'
 import { useBugReporter } from '@/hooks/useBugReporter'
@@ -154,7 +154,7 @@ export default function PreferencesPage() {
               >
                 {[1, 2, 3, 4, 5, 6, 8, 12, 24].map((hours) => (
                   <option key={hours} value={hours}>
-                    {hours === 1 ? 'שעה אחת' : hours === 24 ? 'יום לפני' : `${hours} שעות`} לפני התור
+                    {hours >= 24 ? formatHebrewDays(hours / 24) : formatHebrewHours(hours)} לפני התור
                   </option>
                 ))}
               </select>
@@ -249,19 +249,19 @@ export default function PreferencesPage() {
                 className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold"
               >
                 <option value={0}>ללא הגבלה - לקוחות יכולים לבטל תמיד</option>
-                <option value={1}>שעה אחת לפני התור</option>
-                <option value={2}>שעתיים לפני התור</option>
-                <option value={3}>3 שעות לפני התור</option>
-                <option value={4}>4 שעות לפני התור</option>
-                <option value={6}>6 שעות לפני התור</option>
-                <option value={12}>12 שעות לפני התור</option>
-                <option value={24}>יום לפני התור</option>
-                <option value={48}>יומיים לפני התור</option>
+                <option value={1}>{formatHebrewHours(1)} לפני התור</option>
+                <option value={2}>{formatHebrewHours(2)} לפני התור</option>
+                <option value={3}>{formatHebrewHours(3)} לפני התור</option>
+                <option value={4}>{formatHebrewHours(4)} לפני התור</option>
+                <option value={6}>{formatHebrewHours(6)} לפני התור</option>
+                <option value={12}>{formatHebrewHours(12)} לפני התור</option>
+                <option value={24}>{formatHebrewDays(1)} לפני התור</option>
+                <option value={48}>{formatHebrewDays(2)} לפני התור</option>
               </select>
               <p className="text-foreground-muted/60 text-xs">
                 {minCancelHours === 0 
                   ? 'לקוחות יכולים לבטל תורים בכל זמן'
-                  : `לקוחות לא יוכלו לבטל תורים ${minCancelHours === 1 ? 'שעה' : minCancelHours === 24 ? 'יום' : minCancelHours === 48 ? 'יומיים' : `${minCancelHours} שעות`} לפני. במקום, הם יוכלו לבקש ממך לבטל.`
+                  : `לקוחות לא יוכלו לבטל תורים ${minCancelHours >= 24 ? formatHebrewDays(minCancelHours / 24) : formatHebrewHours(minCancelHours)} לפני. במקום, הם יוכלו לבקש ממך לבטל.`
                 }
               </p>
             </div>
