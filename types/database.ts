@@ -373,6 +373,9 @@ export type Database = {
           notifications_enabled: boolean | null
           pwa_installed: boolean | null
           reminder_enabled: boolean | null
+          sms_reminder_enabled: boolean | null
+          push_reminder_enabled: boolean | null
+          reminder_method: 'sms' | 'push' | 'both' | 'none' | null
           updated_at: string | null
         }
         Insert: {
@@ -383,6 +386,9 @@ export type Database = {
           notifications_enabled?: boolean | null
           pwa_installed?: boolean | null
           reminder_enabled?: boolean | null
+          sms_reminder_enabled?: boolean | null
+          push_reminder_enabled?: boolean | null
+          reminder_method?: 'sms' | 'push' | 'both' | 'none' | null
           updated_at?: string | null
         }
         Update: {
@@ -393,6 +399,9 @@ export type Database = {
           notifications_enabled?: boolean | null
           pwa_installed?: boolean | null
           reminder_enabled?: boolean | null
+          sms_reminder_enabled?: boolean | null
+          push_reminder_enabled?: boolean | null
+          reminder_method?: 'sms' | 'push' | 'both' | 'none' | null
           updated_at?: string | null
         }
         Relationships: [
@@ -404,6 +413,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      reminder_batch_logs: {
+        Row: {
+          id: string
+          executed_at: string | null
+          duration_ms: number | null
+          total_reservations: number | null
+          sms_sent: number
+          sms_failed: number
+          push_sent: number
+          push_failed: number
+          skipped_already_sent: number
+          skipped_disabled: number
+          skipped_no_phone: number
+          details: Json | null
+          trigger_source: string | null
+        }
+        Insert: {
+          id?: string
+          executed_at?: string | null
+          duration_ms?: number | null
+          total_reservations?: number | null
+          sms_sent?: number
+          sms_failed?: number
+          push_sent?: number
+          push_failed?: number
+          skipped_already_sent?: number
+          skipped_disabled?: number
+          skipped_no_phone?: number
+          details?: Json | null
+          trigger_source?: string | null
+        }
+        Update: {
+          id?: string
+          executed_at?: string | null
+          duration_ms?: number | null
+          total_reservations?: number | null
+          sms_sent?: number
+          sms_failed?: number
+          push_sent?: number
+          push_failed?: number
+          skipped_already_sent?: number
+          skipped_disabled?: number
+          skipped_no_phone?: number
+          details?: Json | null
+          trigger_source?: string | null
+        }
+        Relationships: []
       }
       customers: {
         Row: {
@@ -1109,6 +1166,10 @@ export type CustomerNotificationSettingsRow = Tables<'customer_notification_sett
 export type TrustedDevice = Tables<'trusted_devices'>
 export type TrustedDeviceInsert = TablesInsert<'trusted_devices'>
 export type TrustedDeviceUpdate = TablesUpdate<'trusted_devices'>
+
+// Reminder batch log types
+export type ReminderBatchLog = Tables<'reminder_batch_logs'>
+export type ReminderBatchLogInsert = TablesInsert<'reminder_batch_logs'>
 
 // =============================================================================
 // EXTENDED TYPES (with relations)

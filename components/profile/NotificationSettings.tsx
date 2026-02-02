@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePushNotifications, getDeviceIcon } from '@/hooks/usePushNotifications'
 import { usePWA } from '@/hooks/usePWA'
+import { useAuthStore } from '@/store/useAuthStore'
+import { createClient } from '@/lib/supabase/client'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -19,22 +21,108 @@ import {
   ChevronUp,
   X,
   HelpCircle,
-  RefreshCw
+  RefreshCw,
+  MessageSquare
 } from 'lucide-react'
 
 interface NotificationSettingsProps {
   className?: string
 }
 
+interface ReminderSettings {
+  sms_reminder_enabled: boolean
+  push_reminder_enabled: boolean
+  reminder_method: 'sms' | 'push' | 'both' | 'none'
+}
+
 export function NotificationSettings({ className }: NotificationSettingsProps) {
   const pwa = usePWA()
   const push = usePushNotifications()
+  const { customer } = useAuthStore()
   const [isEnabling, setIsEnabling] = useState(false)
   const [isRecheckingPermission, setIsRecheckingPermission] = useState(false)
   const [showDevices, setShowDevices] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
   const [deviceToRemove, setDeviceToRemove] = useState<{ id: string; name: string } | null>(null)
   const [removingDeviceId, setRemovingDeviceId] = useState<string | null>(null)
+  
+  // SMS Reminder Settings
+  const [reminderSettings, setReminderSettings] = useState<ReminderSettings>({
+    sms_reminder_enabled: true,
+    push_reminder_enabled: true,
+    reminder_method: 'both'
+  })
+  const [loadingSettings, setLoadingSettings] = useState(true)
+  const [savingSettings, setSavingSettings] = useState(false)
+
+  // Fetch reminder settings on mount
+  useEffect(() => {
+    if (customer?.id) {
+      fetchReminderSettings()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customer?.id])
+
+  const fetchReminderSettings = async () => {
+    if (!customer?.id) return
+    
+    setLoadingSettings(true)
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('customer_notification_settings')
+        .select('sms_reminder_enabled, push_reminder_enabled, reminder_method')
+        .eq('customer_id', customer.id)
+        .single()
+
+      if (data) {
+        setReminderSettings({
+          sms_reminder_enabled: data.sms_reminder_enabled ?? true,
+          push_reminder_enabled: data.push_reminder_enabled ?? true,
+          reminder_method: data.reminder_method ?? 'both'
+        })
+      }
+    } catch (err) {
+      console.error('Error fetching reminder settings:', err)
+    } finally {
+      setLoadingSettings(false)
+    }
+  }
+
+  const updateReminderSettings = async (updates: Partial<ReminderSettings>) => {
+    if (!customer?.id) return
+    
+    setSavingSettings(true)
+    try {
+      const supabase = createClient()
+      const newSettings = { ...reminderSettings, ...updates }
+      
+      // Upsert the settings
+      const { error } = await supabase
+        .from('customer_notification_settings')
+        .upsert({
+          customer_id: customer.id,
+          sms_reminder_enabled: newSettings.sms_reminder_enabled,
+          push_reminder_enabled: newSettings.push_reminder_enabled,
+          reminder_method: newSettings.reminder_method,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'customer_id' })
+
+      if (error) throw error
+
+      setReminderSettings(newSettings)
+      toast.success('ההגדרות נשמרו')
+    } catch (err) {
+      console.error('Error updating reminder settings:', err)
+      toast.error('שגיאה בשמירת ההגדרות')
+    } finally {
+      setSavingSettings(false)
+    }
+  }
+
+  const handleSmsToggle = () => {
+    updateReminderSettings({ sms_reminder_enabled: !reminderSettings.sms_reminder_enabled })
+  }
 
   const handleEnableNotifications = async () => {
     setIsEnabling(true)
@@ -308,6 +396,60 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
           </div>
         )}
       </GlassCard>
+
+      {/* SMS Reminder Settings */}
+      {customer?.phone && (
+        <GlassCard padding="md">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                'w-10 h-10 rounded-full flex items-center justify-center',
+                reminderSettings.sms_reminder_enabled ? 'bg-emerald-500/20' : 'bg-white/10'
+              )}>
+                <MessageSquare 
+                  size={20} 
+                  className={reminderSettings.sms_reminder_enabled ? 'text-emerald-400' : 'text-foreground-muted'} 
+                />
+              </div>
+              <div>
+                <h3 className="font-medium text-foreground-light">תזכורות SMS</h3>
+                <p className={cn(
+                  'text-sm',
+                  reminderSettings.sms_reminder_enabled ? 'text-emerald-400' : 'text-foreground-muted'
+                )}>
+                  {reminderSettings.sms_reminder_enabled ? 'פעיל' : 'כבוי'}
+                </p>
+              </div>
+            </div>
+            
+            {/* SMS Toggle */}
+            <button
+              onClick={handleSmsToggle}
+              disabled={savingSettings || loadingSettings}
+              className={cn(
+                'w-12 h-7 rounded-full transition-colors relative flex-shrink-0',
+                reminderSettings.sms_reminder_enabled ? 'bg-emerald-500' : 'bg-white/10',
+                (savingSettings || loadingSettings) && 'opacity-50 cursor-not-allowed'
+              )}
+              aria-checked={reminderSettings.sms_reminder_enabled}
+              role="switch"
+            >
+              <div className={cn(
+                'absolute top-1 w-5 h-5 rounded-full bg-white transition-all',
+                reminderSettings.sms_reminder_enabled ? 'right-1' : 'left-1'
+              )}>
+                {(savingSettings || loadingSettings) && (
+                  <Loader2 size={12} className="animate-spin absolute top-0.5 left-0.5 text-background-dark" />
+                )}
+              </div>
+            </button>
+          </div>
+          
+          <p className="text-xs text-foreground-muted mt-3 mr-13">
+            קבלת תזכורת SMS לפני כל תור שקבעת
+          </p>
+        </GlassCard>
+      )}
 
       {/* Connected Devices (Collapsible) */}
       {push.devices.length > 0 && (
