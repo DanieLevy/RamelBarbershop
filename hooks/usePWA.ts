@@ -16,8 +16,10 @@ interface PWAState {
   isInstallable: boolean
   isUpdateAvailable: boolean
   isServiceWorkerReady: boolean
+  isUpdating: boolean
   deviceOS: DeviceOS
   currentVersion: string | null
+  newVersion: string | null
 }
 
 interface UsePWAReturn extends PWAState {
@@ -26,6 +28,8 @@ interface UsePWAReturn extends PWAState {
   checkForUpdate: () => Promise<void>
   dismissInstallPrompt: () => void
   getInstallInstructions: () => { title: string; steps: string[] }
+  clearCache: () => Promise<boolean>
+  cleanupDevAssets: () => Promise<number>
 }
 
 // Detect device OS
@@ -69,6 +73,9 @@ const getDismissDuration = (dismissCount: number): number => {
   }
 }
 
+// BroadcastChannel for cross-tab update coordination
+const UPDATE_CHANNEL_NAME = 'pwa-update-channel'
+
 export const usePWA = (): UsePWAReturn => {
   const [state, setState] = useState<PWAState>({
     isInstalled: false,
@@ -76,12 +83,15 @@ export const usePWA = (): UsePWAReturn => {
     isInstallable: false,
     isUpdateAvailable: false,
     isServiceWorkerReady: false,
+    isUpdating: false,
     deviceOS: 'unknown',
     currentVersion: null,
+    newVersion: null,
   })
 
   const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null)
   const swRegistrationRef = useRef<ServiceWorkerRegistration | null>(null)
+  const broadcastChannelRef = useRef<BroadcastChannel | null>(null)
   
   // Track statechange listeners for cleanup to prevent memory leaks
   const stateChangeCleanupRef = useRef<Array<{ worker: ServiceWorker; handler: () => void }>>([])
@@ -109,6 +119,44 @@ export const usePWA = (): UsePWAReturn => {
 
     let updateInterval: NodeJS.Timeout | null = null
 
+    // Initialize BroadcastChannel for cross-tab coordination
+    if ('BroadcastChannel' in window) {
+      broadcastChannelRef.current = new BroadcastChannel(UPDATE_CHANNEL_NAME)
+      broadcastChannelRef.current.onmessage = (event) => {
+        if (event.data?.type === 'UPDATE_TRIGGERED') {
+          console.log('[PWA] Update triggered from another tab')
+          setState((prev) => ({ ...prev, isUpdating: true }))
+        }
+        if (event.data?.type === 'UPDATE_AVAILABLE') {
+          console.log('[PWA] Update available notification from another tab')
+          setState((prev) => ({ 
+            ...prev, 
+            isUpdateAvailable: true,
+            newVersion: event.data.version || prev.newVersion
+          }))
+        }
+      }
+    }
+
+    // Get current version from active service worker
+    const getCurrentVersion = async () => {
+      try {
+        const reg = await navigator.serviceWorker.getRegistration('/')
+        if (reg?.active) {
+          const messageChannel = new MessageChannel()
+          messageChannel.port1.onmessage = (event) => {
+            if (event.data?.version) {
+              console.log('[PWA] Current version:', event.data.version)
+              setState((prev) => ({ ...prev, currentVersion: event.data.version }))
+            }
+          }
+          reg.active.postMessage({ type: 'GET_VERSION' }, [messageChannel.port2])
+        }
+      } catch (error) {
+        console.warn('[PWA] Could not get current version:', error)
+      }
+    }
+
     const registerSW = async () => {
       try {
         // Check for existing registration first
@@ -127,6 +175,9 @@ export const usePWA = (): UsePWAReturn => {
         console.log('[PWA] Service Worker registered')
 
         setState((prev) => ({ ...prev, isServiceWorkerReady: true }))
+        
+        // Get current version after registration
+        getCurrentVersion()
 
         // Check if there's already a waiting worker (user closed app before updating)
         if (registration.waiting) {
@@ -158,6 +209,14 @@ export const usePWA = (): UsePWAReturn => {
                 // New SW installed while old one is still controlling
                 console.log('[PWA] New version installed and waiting!')
                 setState((prev) => ({ ...prev, isUpdateAvailable: true }))
+                
+                // Notify other tabs about the update
+                if (broadcastChannelRef.current) {
+                  broadcastChannelRef.current.postMessage({ 
+                    type: 'UPDATE_AVAILABLE',
+                    version: state.newVersion 
+                  })
+                }
               } else {
                 // First install - no update needed, just fresh install
                 console.log('[PWA] First install complete')
@@ -186,7 +245,8 @@ export const usePWA = (): UsePWAReturn => {
         console.log('[PWA] Received update notification, version:', event.data.version)
         setState((prev) => ({
           ...prev,
-          isUpdateAvailable: true,
+          isUpdateAvailable: false, // No longer waiting, it's now active
+          isUpdating: false,
           currentVersion: event.data.version,
         }))
       }
@@ -195,8 +255,12 @@ export const usePWA = (): UsePWAReturn => {
 
     // Handle controller change (new SW took over)
     const handleControllerChange = () => {
-      console.log('[PWA] Controller changed, reloading...')
-      window.location.reload()
+      console.log('[PWA] Controller changed, reloading page...')
+      
+      // Small delay to ensure all state is saved
+      setTimeout(() => {
+        window.location.reload()
+      }, 100)
     }
     navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange)
 
@@ -204,6 +268,12 @@ export const usePWA = (): UsePWAReturn => {
       if (updateInterval) clearInterval(updateInterval)
       navigator.serviceWorker.removeEventListener('message', handleMessage)
       navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange)
+      
+      // Close BroadcastChannel
+      if (broadcastChannelRef.current) {
+        broadcastChannelRef.current.close()
+        broadcastChannelRef.current = null
+      }
       
       // Clean up all tracked statechange listeners to prevent memory leaks
       stateChangeCleanupRef.current.forEach(({ worker, handler }) => {
@@ -271,6 +341,14 @@ export const usePWA = (): UsePWAReturn => {
   const updateApp = useCallback(() => {
     const registration = swRegistrationRef.current
     
+    // Mark as updating
+    setState((prev) => ({ ...prev, isUpdating: true }))
+    
+    // Notify other tabs that update is being triggered
+    if (broadcastChannelRef.current) {
+      broadcastChannelRef.current.postMessage({ type: 'UPDATE_TRIGGERED' })
+    }
+    
     if (!registration) {
       console.log('[PWA] No registration found, reloading...')
       window.location.reload()
@@ -307,9 +385,21 @@ export const usePWA = (): UsePWAReturn => {
       return
     }
 
-    // Fallback: just reload
-    console.log('[PWA] No worker to update, reloading...')
-    window.location.reload()
+    // Fallback: check for update then reload
+    console.log('[PWA] No worker to update, forcing update check...')
+    registration.update().then(() => {
+      // Give it a moment to find the update
+      setTimeout(() => {
+        if (registration.waiting) {
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' })
+        } else {
+          // Last resort: just reload
+          window.location.reload()
+        }
+      }, 1000)
+    }).catch(() => {
+      window.location.reload()
+    })
   }, [])
 
   // Check for updates manually
@@ -372,6 +462,81 @@ export const usePWA = (): UsePWAReturn => {
     }
   }, [state.deviceOS])
 
+  // Clear all caches - useful for troubleshooting
+  const clearCache = useCallback(async (): Promise<boolean> => {
+    try {
+      // First try via service worker message
+      const registration = swRegistrationRef.current
+      const activeWorker = registration?.active
+      
+      if (activeWorker) {
+        return new Promise((resolve) => {
+          const handleMessage = (event: MessageEvent) => {
+            if (event.data?.type === 'CACHE_CLEARED') {
+              navigator.serviceWorker.removeEventListener('message', handleMessage)
+              resolve(event.data.success)
+            }
+          }
+          
+          navigator.serviceWorker.addEventListener('message', handleMessage)
+          activeWorker.postMessage({ type: 'CLEAR_CACHE' })
+          
+          // Timeout after 5 seconds
+          setTimeout(() => {
+            navigator.serviceWorker.removeEventListener('message', handleMessage)
+            resolve(false)
+          }, 5000)
+        })
+      }
+      
+      // Fallback: clear caches directly
+      if ('caches' in window) {
+        const cacheNames = await caches.keys()
+        await Promise.all(cacheNames.map(name => caches.delete(name)))
+        console.log('[PWA] Cleared all caches directly')
+        return true
+      }
+      
+      return false
+    } catch (error) {
+      console.error('[PWA] Failed to clear cache:', error)
+      return false
+    }
+  }, [])
+
+  // Cleanup development assets from cache
+  const cleanupDevAssets = useCallback(async (): Promise<number> => {
+    try {
+      const registration = swRegistrationRef.current
+      const activeWorker = registration?.active
+      
+      if (activeWorker) {
+        return new Promise((resolve) => {
+          const handleMessage = (event: MessageEvent) => {
+            if (event.data?.type === 'DEV_ASSETS_CLEANED') {
+              navigator.serviceWorker.removeEventListener('message', handleMessage)
+              resolve(event.data.count || 0)
+            }
+          }
+          
+          navigator.serviceWorker.addEventListener('message', handleMessage)
+          activeWorker.postMessage({ type: 'CLEANUP_DEV_ASSETS' })
+          
+          // Timeout after 5 seconds
+          setTimeout(() => {
+            navigator.serviceWorker.removeEventListener('message', handleMessage)
+            resolve(0)
+          }, 5000)
+        })
+      }
+      
+      return 0
+    } catch (error) {
+      console.error('[PWA] Failed to cleanup dev assets:', error)
+      return 0
+    }
+  }, [])
+
   return {
     ...state,
     installApp,
@@ -379,6 +544,8 @@ export const usePWA = (): UsePWAReturn => {
     checkForUpdate,
     dismissInstallPrompt,
     getInstallInstructions,
+    clearCache,
+    cleanupDevAssets,
   }
 }
 

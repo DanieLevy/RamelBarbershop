@@ -1,41 +1,262 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { RefreshCw, Sparkles, Scissors } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { RefreshCw, Sparkles, Scissors, Check, AlertTriangle, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/store/useAuthStore'
+import { useBarberAuthStore } from '@/store/useBarberAuthStore'
+
+// Update stages for progress indication
+type UpdateStage = 
+  | 'ready'           // Update available, waiting for user action
+  | 'saving'          // Saving user state
+  | 'activating'      // Sending skipWaiting to SW
+  | 'waiting'         // Waiting for new SW to take control
+  | 'reloading'       // About to reload the page
+  | 'error'           // Something went wrong
 
 interface UpdateModalProps {
   onUpdate: () => void
   version?: string | null
 }
 
+// Key for storing user state during update
+const UPDATE_STATE_KEY = 'pwa_update_state'
+const UPDATE_REDIRECT_KEY = 'pwa_update_redirect'
+
+// Parse version to extract major/minor for comparison
+function parseVersion(version: string): { major: number; minor: number; patch: number } {
+  const match = version.match(/^(\d+)\.(\d+)\.(\d+)/)
+  if (!match) return { major: 0, minor: 0, patch: 0 }
+  return {
+    major: parseInt(match[1], 10),
+    minor: parseInt(match[2], 10),
+    patch: parseInt(match[3], 10)
+  }
+}
+
+// Check if this is a critical update (major version bump)
+function isCriticalUpdate(currentVersion: string, newVersion: string): boolean {
+  const current = parseVersion(currentVersion)
+  const next = parseVersion(newVersion)
+  return next.major > current.major
+}
+
 export function UpdateModal({ onUpdate, version }: UpdateModalProps) {
-  const [isUpdating, setIsUpdating] = useState(false)
-  const [showFallback, setShowFallback] = useState(false)
+  const [stage, setStage] = useState<UpdateStage>('ready')
+  const [progress, setProgress] = useState(0)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isCritical, setIsCritical] = useState(false)
+  
+  const { customer } = useAuthStore()
+  const { barber } = useBarberAuthStore()
+  
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Fallback: if update doesn't happen within 5 seconds, show reload option
+  // Check if update is critical on mount
   useEffect(() => {
-    if (isUpdating) {
-      const timeout = setTimeout(() => {
-        setShowFallback(true)
-      }, 5000)
-      return () => clearTimeout(timeout)
+    const checkCritical = async () => {
+      if (!version) return
+      
+      try {
+        // Get current SW version via message
+        const reg = await navigator.serviceWorker.getRegistration('/')
+        if (reg?.active) {
+          const messageChannel = new MessageChannel()
+          messageChannel.port1.onmessage = (event) => {
+            if (event.data?.version) {
+              setIsCritical(isCriticalUpdate(event.data.version, version))
+            }
+          }
+          reg.active.postMessage({ type: 'GET_VERSION' }, [messageChannel.port2])
+        }
+      } catch {
+        // Ignore errors, just proceed normally
+      }
     }
-  }, [isUpdating])
-
-  const handleUpdate = () => {
-    setIsUpdating(true)
     
-    // Trigger update after a brief moment for UX
-    setTimeout(() => {
+    checkCritical()
+  }, [version])
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current)
+    }
+  }, [])
+
+  // Save user state before update
+  const saveUserState = useCallback(() => {
+    try {
+      const state = {
+        currentPath: window.location.pathname + window.location.search,
+        customerId: customer?.id || null,
+        barberId: barber?.id || null,
+        scrollPosition: window.scrollY,
+        timestamp: Date.now()
+      }
+      sessionStorage.setItem(UPDATE_STATE_KEY, JSON.stringify(state))
+      
+      // Save redirect URL separately for immediate access after reload
+      sessionStorage.setItem(UPDATE_REDIRECT_KEY, state.currentPath)
+      
+      console.log('[UpdateModal] User state saved:', state.currentPath)
+      return true
+    } catch (error) {
+      console.error('[UpdateModal] Failed to save state:', error)
+      return false
+    }
+  }, [customer?.id, barber?.id])
+
+  // Animate progress bar
+  const animateProgress = useCallback((targetProgress: number, duration: number) => {
+    const startProgress = progress
+    const startTime = Date.now()
+    
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current)
+    }
+    
+    progressIntervalRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime
+      const progressPercent = Math.min(elapsed / duration, 1)
+      const easedProgress = 1 - Math.pow(1 - progressPercent, 3) // Ease out cubic
+      
+      setProgress(startProgress + (targetProgress - startProgress) * easedProgress)
+      
+      if (progressPercent >= 1) {
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current)
+        }
+      }
+    }, 16) // ~60fps
+  }, [progress])
+
+  // Main update handler with stages
+  const handleUpdate = useCallback(async () => {
+    try {
+      // Stage 1: Save user state
+      setStage('saving')
+      animateProgress(20, 300)
+      
+      await new Promise(resolve => setTimeout(resolve, 200))
+      saveUserState()
+      
+      // Stage 2: Activate new service worker
+      setStage('activating')
+      animateProgress(50, 400)
+      
+      // Trigger the update (this sends SKIP_WAITING to SW)
       onUpdate()
-    }, 300)
+      
+      // Stage 3: Wait for controller change
+      setStage('waiting')
+      animateProgress(80, 500)
+      
+      // The controllerchange event in usePWA will trigger reload
+      // Set a fallback timeout in case it doesn't happen
+      timeoutRef.current = setTimeout(() => {
+        // If we're still here after 8 seconds, something went wrong
+        setStage('reloading')
+        animateProgress(100, 200)
+        
+        // Give a brief moment to show 100% then force reload
+        setTimeout(() => {
+          window.location.reload()
+        }, 300)
+      }, 8000)
+      
+    } catch (error) {
+      console.error('[UpdateModal] Update failed:', error)
+      setStage('error')
+      setErrorMessage('העדכון נכשל. אנא נסה שוב.')
+    }
+  }, [onUpdate, saveUserState, animateProgress])
+
+  // Handle force reload
+  const handleForceReload = useCallback(() => {
+    saveUserState()
+    
+    const doReload = () => window.location.reload()
+    
+    // Clear all caches before reload for clean slate
+    if (typeof window !== 'undefined' && 'caches' in window) {
+      caches.keys()
+        .then(names => Promise.all(names.map(name => caches.delete(name))))
+        .then(doReload)
+        .catch(doReload)
+    } else {
+      doReload()
+    }
+  }, [saveUserState])
+
+  // Retry after error
+  const handleRetry = useCallback(() => {
+    setStage('ready')
+    setProgress(0)
+    setErrorMessage(null)
+  }, [])
+
+  // Get stage-specific content
+  const getStageContent = () => {
+    switch (stage) {
+      case 'ready':
+        return {
+          icon: <Sparkles size={40} className="text-background-dark" />,
+          title: isCritical ? 'עדכון חשוב! ⚡' : 'עדכון זמין! ✨',
+          description: isCritical 
+            ? 'גרסה חדשה עם שיפורים משמעותיים. נדרש עדכון כדי להמשיך להשתמש באפליקציה.'
+            : 'גרסה חדשה של האפליקציה זמינה עם שיפורים ותכונות חדשות.',
+          buttonText: 'עדכן עכשיו',
+          showProgress: false
+        }
+      case 'saving':
+        return {
+          icon: <Check size={40} className="text-background-dark animate-pulse" />,
+          title: 'שומר נתונים...',
+          description: 'שומר את המצב הנוכחי שלך',
+          buttonText: null,
+          showProgress: true
+        }
+      case 'activating':
+        return {
+          icon: <Zap size={40} className="text-background-dark animate-pulse" />,
+          title: 'מפעיל עדכון...',
+          description: 'מתקין את הגרסה החדשה',
+          buttonText: null,
+          showProgress: true
+        }
+      case 'waiting':
+        return {
+          icon: <Scissors size={40} className="text-background-dark animate-spin" />,
+          title: 'מחכה לעדכון...',
+          description: 'האפליקציה מתעדכנת, נא להמתין',
+          buttonText: null,
+          showProgress: true
+        }
+      case 'reloading':
+        return {
+          icon: <RefreshCw size={40} className="text-background-dark animate-spin" />,
+          title: 'מרענן...',
+          description: 'האפליקציה תיטען מחדש עוד רגע',
+          buttonText: null,
+          showProgress: true
+        }
+      case 'error':
+        return {
+          icon: <AlertTriangle size={40} className="text-background-dark" />,
+          title: 'שגיאה בעדכון',
+          description: errorMessage || 'משהו השתבש. אנא נסה שוב.',
+          buttonText: 'נסה שוב',
+          showProgress: false
+        }
+    }
   }
 
-  const handleForceReload = () => {
-    // Force hard reload to get the new version
-    window.location.reload()
-  }
+  const content = getStageContent()
+  const isProcessing = ['saving', 'activating', 'waiting', 'reloading'].includes(stage)
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background-dark/95 backdrop-blur-md">
@@ -57,78 +278,97 @@ export function UpdateModal({ onUpdate, version }: UpdateModalProps) {
         {/* Update Icon with Animation */}
         <div className="relative mx-auto w-24 h-24 mb-6">
           {/* Glow ring */}
-          <div className="absolute inset-0 rounded-full bg-accent-gold/20 animate-pulse-gold" />
+          <div className={cn(
+            'absolute inset-0 rounded-full animate-pulse-gold',
+            isCritical && stage === 'ready' ? 'bg-orange-500/30' : 'bg-accent-gold/20',
+            stage === 'error' && 'bg-red-500/20'
+          )} />
           
           {/* Icon container */}
-          <div className="relative w-full h-full rounded-full bg-gradient-to-br from-accent-gold to-accent-gold-dark flex items-center justify-center shadow-gold-lg">
-            {isUpdating ? (
-              <Scissors size={40} className="text-background-dark animate-spin" />
-            ) : (
-              <Sparkles size={40} className="text-background-dark" />
-            )}
+          <div className={cn(
+            'relative w-full h-full rounded-full flex items-center justify-center shadow-gold-lg',
+            stage === 'error' 
+              ? 'bg-gradient-to-br from-red-500 to-red-600'
+              : isCritical && stage === 'ready'
+              ? 'bg-gradient-to-br from-orange-400 to-orange-500'
+              : 'bg-gradient-to-br from-accent-gold to-accent-gold-dark'
+          )}>
+            {content.icon}
           </div>
         </div>
 
         {/* Title */}
         <h2 className="text-2xl font-bold text-foreground-light mb-2">
-          {isUpdating ? 'מעדכן...' : 'עדכון זמין! ✨'}
+          {content.title}
         </h2>
 
         {/* Description */}
         <p className="text-foreground-muted text-sm mb-6 leading-relaxed">
-          {isUpdating ? (
-            'אנא המתן, האפליקציה מתעדכנת...'
-          ) : (
+          {content.description}
+          {stage === 'ready' && (
             <>
-              גרסה חדשה של האפליקציה זמינה עם שיפורים ותכונות חדשות.
               <br />
-              <span className="text-accent-gold font-medium">נא לעדכן כדי להמשיך.</span>
+              <span className={cn(
+                'font-medium',
+                isCritical ? 'text-orange-400' : 'text-accent-gold'
+              )}>
+                {isCritical ? 'העדכון הכרחי להמשך שימוש.' : 'נא לעדכן כדי להמשיך.'}
+              </span>
             </>
           )}
         </p>
 
+        {/* Progress bar */}
+        {content.showProgress && (
+          <div className="mb-6">
+            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-accent-gold to-accent-orange rounded-full transition-all duration-100"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-foreground-muted text-xs mt-2">
+              {Math.round(progress)}%
+            </p>
+          </div>
+        )}
+
         {/* Version badge */}
-        {version && (
-          <div className="inline-block px-3 py-1 rounded-full bg-white/5 border border-white/10 text-foreground-muted text-xs mb-6 font-mono">
+        {version && !isProcessing && (
+          <div className={cn(
+            'inline-block px-3 py-1 rounded-full border text-xs mb-6 font-mono',
+            isCritical 
+              ? 'bg-orange-500/10 border-orange-500/30 text-orange-300'
+              : 'bg-white/5 border-white/10 text-foreground-muted'
+          )}>
             גרסה {version}
           </div>
         )}
 
-        {/* Update Button */}
-        {!showFallback ? (
+        {/* Action Buttons */}
+        {stage === 'ready' && (
           <button
             onClick={handleUpdate}
-            disabled={isUpdating}
             className={cn(
               'w-full py-4 px-6 rounded-2xl',
-              'bg-accent-gold text-background-dark',
               'font-bold text-lg',
-              'shadow-gold hover:shadow-gold-lg',
               'transition-all duration-300',
               'flex items-center justify-center gap-3',
-              'disabled:opacity-70 disabled:cursor-not-allowed',
-              !isUpdating && 'hover:scale-[1.02] active:scale-[0.98]'
+              'hover:scale-[1.02] active:scale-[0.98]',
+              isCritical 
+                ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
+                : 'bg-accent-gold text-background-dark shadow-gold hover:shadow-gold-lg'
             )}
           >
-            {isUpdating ? (
-              <>
-                <RefreshCw size={22} className="animate-spin" />
-                מעדכן...
-              </>
-            ) : (
-              <>
-                <RefreshCw size={22} />
-                עדכן עכשיו
-              </>
-            )}
+            <RefreshCw size={22} />
+            {content.buttonText}
           </button>
-        ) : (
+        )}
+
+        {stage === 'error' && (
           <div className="space-y-3">
-            <p className="text-amber-400 text-sm mb-3">
-              העדכון לוקח יותר זמן מהצפוי
-            </p>
             <button
-              onClick={handleForceReload}
+              onClick={handleRetry}
               className={cn(
                 'w-full py-4 px-6 rounded-2xl',
                 'bg-accent-gold text-background-dark',
@@ -140,19 +380,70 @@ export function UpdateModal({ onUpdate, version }: UpdateModalProps) {
               )}
             >
               <RefreshCw size={22} />
-              רענן את הדף
+              נסה שוב
+            </button>
+            <button
+              onClick={handleForceReload}
+              className={cn(
+                'w-full py-3 px-6 rounded-xl',
+                'bg-white/10 text-foreground-light',
+                'font-medium text-sm',
+                'transition-all duration-300',
+                'flex items-center justify-center gap-2',
+                'hover:bg-white/20'
+              )}
+            >
+              רענן את הדף ידנית
             </button>
           </div>
         )}
 
-        {/* Footer note */}
-        {!showFallback && (
+        {/* Processing indicator */}
+        {isProcessing && (
+          <div className="flex items-center justify-center gap-2 text-foreground-muted text-sm">
+            <div className="w-2 h-2 rounded-full bg-accent-gold animate-pulse" />
+            <span>אנא אל תסגור את האפליקציה</span>
+          </div>
+        )}
+
+        {/* Footer note for ready state */}
+        {stage === 'ready' && !isCritical && (
           <p className="text-foreground-muted text-xs mt-4 opacity-70">
-            העדכון ייקח מספר שניות בלבד
+            העדכון ישמור את המיקום הנוכחי שלך
           </p>
         )}
       </div>
     </div>
   )
+}
+
+// Export helper to restore user state after update
+export function restoreUpdateState(): { path: string; scrollY: number } | null {
+  if (typeof window === 'undefined') return null
+  
+  try {
+    const stateJson = sessionStorage.getItem(UPDATE_STATE_KEY)
+    if (!stateJson) return null
+    
+    const state = JSON.parse(stateJson)
+    
+    // Check if state is recent (within last 30 seconds)
+    if (Date.now() - state.timestamp > 30000) {
+      sessionStorage.removeItem(UPDATE_STATE_KEY)
+      sessionStorage.removeItem(UPDATE_REDIRECT_KEY)
+      return null
+    }
+    
+    // Clear the state after reading
+    sessionStorage.removeItem(UPDATE_STATE_KEY)
+    sessionStorage.removeItem(UPDATE_REDIRECT_KEY)
+    
+    return {
+      path: state.currentPath,
+      scrollY: state.scrollPosition || 0
+    }
+  } catch {
+    return null
+  }
 }
 

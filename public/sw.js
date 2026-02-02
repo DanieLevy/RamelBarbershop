@@ -1,6 +1,6 @@
 // Service Worker for Ramel Barbershop PWA
 // Version is updated automatically during build
-const APP_VERSION = '2.0.0-2026.02.02.1155';
+const APP_VERSION = '2.0.0-2026.02.02.1217';
 const CACHE_NAME = `ramel-pwa-${APP_VERSION}`;
 
 // Icon version - increment when icons change to bust cache
@@ -33,8 +33,23 @@ const STATIC_ASSETS = [
   '/favicon.ico'
 ];
 
-// Next.js static assets pattern - cached with stale-while-revalidate
+// Next.js static assets pattern - only production chunks should be cached
 const NEXT_STATIC_PATTERN = /^\/_next\/static\//;
+
+// Development-only patterns that should NEVER be cached
+// These are only present in development mode but we exclude them for safety
+const DEV_PATTERNS = [
+  /turbopack/i,           // Turbopack dev chunks
+  /hmr-client/i,          // Hot Module Replacement
+  /webpack-hmr/i,         // Webpack HMR
+  /_devtools/i,           // Dev tools
+  /\.hot-update\./i,      // Hot updates
+];
+
+// Check if a URL is a development-only asset
+function isDevAsset(pathname) {
+  return DEV_PATTERNS.some(pattern => pattern.test(pathname));
+}
 
 // Install event - cache static assets
 // IMPORTANT: Do NOT call skipWaiting() here - we want the SW to enter "waiting" state
@@ -62,7 +77,7 @@ self.addEventListener('activate', (event) => {
   
   event.waitUntil(
     Promise.all([
-      // Clean up old caches
+      // Clean up old version caches completely
       caches.keys().then((cacheNames) => {
         return Promise.all(
           cacheNames
@@ -72,6 +87,25 @@ self.addEventListener('activate', (event) => {
               return caches.delete(name);
             })
         );
+      }),
+      // Clean up any dev assets from current cache
+      caches.open(CACHE_NAME).then(async (cache) => {
+        const requests = await cache.keys();
+        const deletePromises = [];
+        
+        for (const request of requests) {
+          const url = new URL(request.url);
+          if (isDevAsset(url.pathname)) {
+            console.log(`[SW] Removing dev asset from cache: ${url.pathname}`);
+            deletePromises.push(cache.delete(request));
+          }
+        }
+        
+        if (deletePromises.length > 0) {
+          console.log(`[SW] Cleaned ${deletePromises.length} dev assets from cache`);
+        }
+        
+        return Promise.all(deletePromises);
       }),
       // Take control of all clients immediately
       self.clients.claim()
@@ -134,6 +168,13 @@ self.addEventListener('fetch', (event) => {
   // Skip optimized images - let browser cache headers handle these
   // User-uploaded images (barber photos, products) should be fresh
   if (url.pathname.startsWith('/_next/image')) return;
+
+  // Skip development-only assets - NEVER cache these
+  // This prevents dev chunks from being cached if SW is used in dev mode
+  if (isDevAsset(url.pathname)) {
+    console.log('[SW] Skipping dev asset:', url.pathname);
+    return;
+  }
 
   // ========================================
   // Navigation - Network first with offline fallback
@@ -302,7 +343,7 @@ function getOfflinePage() {
 </html>`;
 }
 
-// Message handler for skip waiting
+// Message handler for skip waiting and cache management
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     console.log('[SW] Skip waiting requested');
@@ -311,6 +352,52 @@ self.addEventListener('message', (event) => {
   
   if (event.data && event.data.type === 'GET_VERSION') {
     event.ports[0].postMessage({ version: APP_VERSION });
+  }
+  
+  // Handle cache clear request - useful for troubleshooting
+  if (event.data && event.data.type === 'CLEAR_CACHE') {
+    console.log('[SW] Clear cache requested');
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((name) => {
+          console.log(`[SW] Deleting cache: ${name}`);
+          return caches.delete(name);
+        })
+      );
+    }).then(() => {
+      console.log('[SW] All caches cleared');
+      // Notify the requesting client
+      if (event.source) {
+        event.source.postMessage({ type: 'CACHE_CLEARED', success: true });
+      }
+    }).catch((error) => {
+      console.error('[SW] Failed to clear caches:', error);
+      if (event.source) {
+        event.source.postMessage({ type: 'CACHE_CLEARED', success: false, error: error.message });
+      }
+    });
+  }
+  
+  // Handle cleanup of dev assets from cache
+  if (event.data && event.data.type === 'CLEANUP_DEV_ASSETS') {
+    console.log('[SW] Cleanup dev assets requested');
+    caches.open(CACHE_NAME).then(async (cache) => {
+      const requests = await cache.keys();
+      let cleaned = 0;
+      
+      for (const request of requests) {
+        const url = new URL(request.url);
+        if (isDevAsset(url.pathname)) {
+          await cache.delete(request);
+          cleaned++;
+        }
+      }
+      
+      console.log(`[SW] Cleaned ${cleaned} dev assets`);
+      if (event.source) {
+        event.source.postMessage({ type: 'DEV_ASSETS_CLEANED', count: cleaned });
+      }
+    });
   }
 });
 
