@@ -9,6 +9,7 @@ import { PWAHead } from '@/components/pwa/PWAHead'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { CookieNotice } from '@/components/legal/CookieNotice'
 import { SkipLink } from '@/components/a11y/SkipLink'
+import { NotificationManagerProvider } from '@/components/NotificationManager'
 
 export const metadata: Metadata = {
   title: 'רם אל ברברשופ - Ramel Barbershop',
@@ -62,15 +63,17 @@ export default function RootLayout({
       <body className="min-h-screen bg-background-dark" suppressHydrationWarning>
         <SkipLink />
         <Providers>
-          <AuthProvider>
-            <PWAProvider>
-              <ErrorBoundary component="RootLayout">
-                {children}
-              </ErrorBoundary>
-              <MobileBottomNav />
-              <CookieNotice />
-            </PWAProvider>
-          </AuthProvider>
+          <NotificationManagerProvider>
+            <AuthProvider>
+              <PWAProvider>
+                <ErrorBoundary component="RootLayout">
+                  {children}
+                </ErrorBoundary>
+                <MobileBottomNav />
+                <CookieNotice />
+              </PWAProvider>
+            </AuthProvider>
+          </NotificationManagerProvider>
           <Toaster
             position="top-center"
             dir="rtl"

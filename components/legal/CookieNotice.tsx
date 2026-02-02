@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { Cookie, X, Shield } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useNotificationManager, useNotificationTiming } from '@/components/NotificationManager'
 
 const COOKIE_CONSENT_KEY = 'cookie-consent-v2'
 
@@ -18,11 +19,15 @@ type ConsentLevel = 'all' | 'essential' | null
  * - Link to privacy policy with full cookie details
  * 
  * Persists user choice in localStorage.
+ * Uses NotificationManager to coordinate with other notifications.
  */
 export function CookieNotice() {
   const [isVisible, setIsVisible] = useState(false)
   const [isAnimating, setIsAnimating] = useState(false)
   const [isReady, setIsReady] = useState(false)
+  
+  const { requestNotification, dismissNotification, canShowNotification } = useNotificationManager()
+  const delay = useNotificationTiming('cookie')
 
   useEffect(() => {
     setIsReady(true)
@@ -30,23 +35,34 @@ export function CookieNotice() {
     // Check if user has already made a choice
     const consent = localStorage.getItem(COOKIE_CONSENT_KEY)
     if (!consent) {
-      // Show banner after page is interactive
+      // Request to show cookie notice after delay (coordinated with other notifications)
       const timer = setTimeout(() => {
-        setIsVisible(true)
-      }, 2000)
+        requestNotification('cookie')
+      }, delay)
       return () => clearTimeout(timer)
     }
-  }, [])
+  }, [delay, requestNotification])
+  
+  // Show/hide based on notification manager
+  useEffect(() => {
+    if (canShowNotification('cookie')) {
+      const consent = localStorage.getItem(COOKIE_CONSENT_KEY)
+      if (!consent && isReady) {
+        setIsVisible(true)
+      }
+    }
+  }, [canShowNotification, isReady])
 
   const handleConsent = useCallback((level: ConsentLevel) => {
     setIsAnimating(true)
     localStorage.setItem(COOKIE_CONSENT_KEY, level || 'essential')
     
-    // Animate out
+    // Animate out and notify manager
     setTimeout(() => {
       setIsVisible(false)
+      dismissNotification('cookie')
     }, 300)
-  }, [])
+  }, [dismissNotification])
 
   const handleDismiss = useCallback(() => {
     // Dismissing = accepting essential only (per Amendment 13 - no implicit consent)

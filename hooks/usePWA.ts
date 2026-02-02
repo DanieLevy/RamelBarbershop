@@ -185,13 +185,16 @@ export const usePWA = (): UsePWAReturn => {
           setState((prev) => ({ ...prev, isUpdateAvailable: true }))
         }
 
-        // Check for updates immediately
-        registration.update()
+        // Delay first update check to prevent reload on fresh page load
+        // This gives the user time to interact with the page first
+        setTimeout(() => {
+          registration.update()
+        }, 10000) // 10 seconds delay for first check
         
-        // Check for updates every 1 minute for faster update detection
+        // Check for updates every 5 minutes (reduced from 1 minute to be less aggressive)
         updateInterval = setInterval(() => {
           registration.update()
-        }, 1 * 60 * 1000)
+        }, 5 * 60 * 1000)
 
         // Listen for new service worker
         registration.addEventListener('updatefound', () => {

@@ -369,8 +369,25 @@ export function OTPVerification() {
     setOtp(newOtp)
     
     if (error) setError(null)
+    
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus()
+    }
+    
+    // Auto-verify when all 6 digits are entered
+    // Check if this was the last digit and all fields are filled
+    if (value && index === 5) {
+      const allFilled = newOtp.every(digit => digit !== '')
+      if (allFilled && !verifying) {
+        // Small delay to allow state to update and show the complete code
+        setTimeout(() => {
+          if (mode === 'email') {
+            handleVerifyEmailOtp()
+          } else if (otpConfirmation) {
+            handleVerifySmsOtp()
+          }
+        }, 150)
+      }
     }
   }
 
@@ -401,6 +418,17 @@ export function OTPVerification() {
       setOtp(newOtp)
       const focusIndex = Math.min(pastedData.length, 5)
       inputRefs.current[focusIndex]?.focus()
+      
+      // Auto-verify if full 6-digit code was pasted
+      if (pastedData.length === 6 && !verifying) {
+        setTimeout(() => {
+          if (mode === 'email') {
+            handleVerifyEmailOtp()
+          } else if (otpConfirmation) {
+            handleVerifySmsOtp()
+          }
+        }, 150)
+      }
     }
   }
 

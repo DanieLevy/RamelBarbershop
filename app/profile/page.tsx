@@ -231,52 +231,45 @@ export default function ProfilePage() {
               </p>
             </div>
             
-            {/* Info Cards */}
-            <div className="space-y-3 mb-8">
-              {/* Phone */}
-              <GlassCard padding="md" className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-accent-gold/10 flex items-center justify-center flex-shrink-0">
-                  <Phone size={18} strokeWidth={1.5} className="text-accent-gold" />
+            {/* Compact Info Card */}
+            <GlassCard padding="lg" className="mb-8">
+              <div className="grid grid-cols-3 gap-4 text-center">
+                {/* Phone */}
+                <div className="flex flex-col items-center">
+                  <div className="w-10 h-10 rounded-full bg-accent-gold/10 flex items-center justify-center mb-2">
+                    <Phone size={18} strokeWidth={1.5} className="text-accent-gold" />
+                  </div>
+                  <p className="text-foreground-muted text-[10px] mb-0.5">מספר טלפון</p>
+                  <p className="text-foreground-light font-medium text-sm" dir="ltr">{customer.phone}</p>
                 </div>
-                <div className="flex-1 text-right">
-                  <p className="text-foreground-muted text-xs mb-0.5">מספר טלפון</p>
-                  <p className="text-foreground-light font-medium">{customer.phone}</p>
-                </div>
-              </GlassCard>
-              
-              {/* Registration Date */}
-              <GlassCard padding="md" className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-accent-gold/10 flex items-center justify-center flex-shrink-0">
-                  <Calendar size={18} strokeWidth={1.5} className="text-accent-gold" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-foreground-muted text-xs mb-0.5">תאריך הרשמה</p>
-                  <p className="text-foreground-light font-medium">
+                
+                {/* Registration Date */}
+                <div className="flex flex-col items-center">
+                  <div className="w-10 h-10 rounded-full bg-accent-gold/10 flex items-center justify-center mb-2">
+                    <Calendar size={18} strokeWidth={1.5} className="text-accent-gold" />
+                  </div>
+                  <p className="text-foreground-muted text-[10px] mb-0.5">תאריך הרשמה</p>
+                  <p className="text-foreground-light font-medium text-sm">
                     {customer.created_at ? formatDate(customer.created_at) : '-'}
                   </p>
                 </div>
-              </GlassCard>
-              
-              {/* Appointment Count */}
-              <GlassCard padding="md" className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-accent-gold/10 flex items-center justify-center flex-shrink-0">
-                  <History size={18} strokeWidth={1.5} className="text-accent-gold" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-foreground-muted text-xs mb-0.5">היסטוריית תורים</p>
-                  <p className="text-foreground-light font-medium">
-                    {loadingStats ? '...' : `${appointmentCount} תורים`}
-                  </p>
-                </div>
+                
+                {/* Appointment Count */}
                 <button
                   onClick={() => router.push('/my-appointments')}
-                  className="p-2 rounded-lg text-foreground-muted hover:text-accent-gold hover:bg-white/5 transition-colors flex items-center justify-center"
+                  className="flex flex-col items-center group"
                   aria-label="צפה בתורים"
                 >
-                  <ChevronRight size={18} strokeWidth={1.5} className="rotate-180" />
+                  <div className="w-10 h-10 rounded-full bg-accent-gold/10 flex items-center justify-center mb-2 group-hover:bg-accent-gold/20 transition-colors">
+                    <History size={18} strokeWidth={1.5} className="text-accent-gold" />
+                  </div>
+                  <p className="text-foreground-muted text-[10px] mb-0.5">היסטוריית תורים</p>
+                  <p className="text-foreground-light font-medium text-sm group-hover:text-accent-gold transition-colors">
+                    {loadingStats ? '...' : `${appointmentCount} תורים`}
+                  </p>
                 </button>
-              </GlassCard>
-            </div>
+              </div>
+            </GlassCard>
             
             {/* Notification Settings */}
             <NotificationSettings className="mt-6" />

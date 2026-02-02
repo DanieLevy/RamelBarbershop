@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { X, Download, Share, Smartphone, Monitor, ChevronDown, AlertTriangle, Bell, Heart } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getDismissCount } from '@/hooks/usePWA'
+import { useNotificationManager, useNotificationTiming } from '@/components/NotificationManager'
 
 interface InstallBannerProps {
   isModal: boolean
@@ -75,6 +76,10 @@ export function InstallBanner({
   const [isClosing, setIsClosing] = useState(false)
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [dismissCount, setDismissCount] = useState(0)
+  const [hasRequested, setHasRequested] = useState(false)
+  
+  const { requestNotification, dismissNotification, canShowNotification } = useNotificationManager()
+  const delay = useNotificationTiming('pwa-install')
   
   // Get dismiss count and urgent message on mount
   useEffect(() => {
@@ -83,14 +88,24 @@ export function InstallBanner({
   
   const urgentMessage = getUrgentMessage(dismissCount)
 
-  // Delay appearance for better UX
+  // Request to show via notification manager (coordinated with other notifications)
   useEffect(() => {
+    if (hasRequested) return
+    
     const timer = setTimeout(() => {
-      setIsVisible(true)
-    }, isModal ? 2000 : 3000) // Modal shows faster
+      setHasRequested(true)
+      requestNotification('pwa-install')
+    }, delay)
 
     return () => clearTimeout(timer)
-  }, [isModal])
+  }, [delay, hasRequested, requestNotification])
+  
+  // Show only when notification manager allows
+  useEffect(() => {
+    if (hasRequested && canShowNotification('pwa-install')) {
+      setIsVisible(true)
+    }
+  }, [hasRequested, canShowNotification])
 
   const handleClose = () => {
     // Check if we need confirmation before dismissing
@@ -101,6 +116,7 @@ export function InstallBanner({
     
     setIsClosing(true)
     setTimeout(() => {
+      dismissNotification('pwa-install')
       onDismiss()
     }, 300)
   }
@@ -110,6 +126,7 @@ export function InstallBanner({
     if (success) {
       setIsClosing(true)
       setTimeout(() => {
+        dismissNotification('pwa-install')
         onDismiss()
       }, 300)
     }
@@ -184,6 +201,7 @@ export function InstallBanner({
               onClick={() => {
                 setIsClosing(true)
                 setTimeout(() => {
+                  dismissNotification('pwa-install')
                   onDismiss()
                 }, 300)
               }}

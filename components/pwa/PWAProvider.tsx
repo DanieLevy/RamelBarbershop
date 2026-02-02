@@ -42,6 +42,8 @@ export function PWAProvider({ children }: PWAProviderProps) {
   
   // Track if auto-update was already triggered to prevent multiple calls
   const autoUpdateTriggeredRef = useRef(false)
+  // Track mount time to delay updates on fresh page loads
+  const mountTimeRef = useRef(Date.now())
   
   // Badge manager handles clearing badges when app is opened
   useBadgeManager()
@@ -55,16 +57,35 @@ export function PWAProvider({ children }: PWAProviderProps) {
   }, [])
   
   // Auto-update silently when new version is available
-  // No modal, no user interaction required - just update and reload
+  // Delayed to prevent annoying reload on fresh page load
+  // Only auto-update if user has been on the page for at least 5 seconds
   useEffect(() => {
     if (pwa.isUpdateAvailable && !autoUpdateTriggeredRef.current) {
-      autoUpdateTriggeredRef.current = true
-      console.log('[PWA] Auto-updating to new version silently...')
+      const timeSinceMount = Date.now() - mountTimeRef.current
+      const MIN_DELAY_BEFORE_UPDATE = 5000 // 5 seconds minimum
       
-      // Small delay to ensure the app is stable before updating
+      // Check if we already updated in this session to prevent loops
+      const sessionKey = 'pwa_auto_updated_session'
+      const alreadyUpdatedThisSession = sessionStorage.getItem(sessionKey)
+      
+      if (alreadyUpdatedThisSession) {
+        console.log('[PWA] Already updated this session, skipping auto-update')
+        return
+      }
+      
+      autoUpdateTriggeredRef.current = true
+      
+      // Calculate remaining delay (ensure at least 5 seconds since page load)
+      const remainingDelay = Math.max(0, MIN_DELAY_BEFORE_UPDATE - timeSinceMount)
+      
+      console.log(`[PWA] Update available, will apply in ${remainingDelay}ms...`)
+      
       const timer = setTimeout(() => {
+        // Mark that we're updating in this session
+        sessionStorage.setItem(sessionKey, 'true')
+        console.log('[PWA] Auto-updating to new version silently...')
         pwa.updateApp()
-      }, 1000)
+      }, remainingDelay + 1000) // Add 1 second buffer
       
       return () => clearTimeout(timer)
     }
