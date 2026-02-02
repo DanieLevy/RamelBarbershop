@@ -19,8 +19,7 @@
   included_files = ["netlify/functions/**"]
 
 # Scheduled function for reminders (runs every 30 minutes)
-[functions."send-reminders"]
-  schedule = "*/30 * * * *"
+# Schedule is defined in the function itself using @netlify/functions schedule()
 
 # Use the official Netlify Next.js plugin for full support
 [[plugins]]
