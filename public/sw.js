@@ -1,7 +1,10 @@
 // Service Worker for Ramel Barbershop PWA
 // Version is updated automatically during build
-const APP_VERSION = '2.0.0-2026.02.02.1121';
+const APP_VERSION = '2.0.0-2026.02.02.1135';
 const CACHE_NAME = `ramel-pwa-${APP_VERSION}`;
+
+// Icon version - increment when icons change to bust cache
+const ICON_VERSION = 2;
 
 // Assets to cache - critical for app shell and fast loading
 // These are pre-cached on install for offline app shell
@@ -11,19 +14,19 @@ const STATIC_ASSETS = [
   '/fonts/ploni-regular-aaa.otf',
   '/fonts/ploni-light-aaa.otf',
   '/fonts/ploni-ultralight-aaa.otf',
-  // PWA Icons (all sizes for home screen and splash)
-  '/icons/icon-72x72.png',
-  '/icons/icon-96x96.png',
-  '/icons/icon-128x128.png',
-  '/icons/icon-144x144.png',
-  '/icons/icon-152x152.png',
-  '/icons/icon-192x192.png',
-  '/icons/icon-384x384.png',
-  '/icons/icon-512x512.png',
+  // PWA Icons (versioned for cache busting)
+  `/icons/icon-72x72.png?v=${ICON_VERSION}`,
+  `/icons/icon-96x96.png?v=${ICON_VERSION}`,
+  `/icons/icon-128x128.png?v=${ICON_VERSION}`,
+  `/icons/icon-144x144.png?v=${ICON_VERSION}`,
+  `/icons/icon-152x152.png?v=${ICON_VERSION}`,
+  `/icons/icon-192x192.png?v=${ICON_VERSION}`,
+  `/icons/icon-384x384.png?v=${ICON_VERSION}`,
+  `/icons/icon-512x512.png?v=${ICON_VERSION}`,
   // Apple Touch Icons
   '/apple-touch-icon.png',
-  '/icons/apple-touch-icon-180x180.png',
-  '/icons/apple-touch-icon-152x152.png',
+  `/icons/apple-touch-icon-180x180.png?v=${ICON_VERSION}`,
+  `/icons/apple-touch-icon-152x152.png?v=${ICON_VERSION}`,
   // Main branding
   '/icon.png',
   '/logo.png',

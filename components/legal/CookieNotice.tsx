@@ -123,7 +123,7 @@ export function CookieNotice() {
             <button
               onClick={() => handleConsent('all')}
               onTouchEnd={() => handleConsent('all')}
-              className="flex-1 px-4 py-2.5 bg-accent-gold text-background-dark text-sm font-medium rounded-xl hover:bg-accent-gold/90 transition-colors pointer-events-auto touch-manipulation cursor-pointer"
+              className="flex-1 flex justify-center items-center px-4 py-2.5 bg-accent-gold text-background-dark text-sm font-medium rounded-xl hover:bg-accent-gold/90 transition-colors pointer-events-auto touch-manipulation cursor-pointer text-center"
               type="button"
             >
               אישור כל העוגיות
@@ -131,7 +131,7 @@ export function CookieNotice() {
             <button
               onClick={() => handleConsent('essential')}
               onTouchEnd={() => handleConsent('essential')}
-              className="flex-1 px-4 py-2.5 bg-white/5 text-foreground-light text-sm font-medium rounded-xl hover:bg-white/10 transition-colors border border-white/10 pointer-events-auto touch-manipulation cursor-pointer"
+              className="flex-1 flex justify-center items-center px-4 py-2.5 bg-white/5 text-foreground-light text-sm font-medium rounded-xl hover:bg-white/10 transition-colors border border-white/10 pointer-events-auto touch-manipulation cursor-pointer text-center"
               type="button"
             >
               חיוניות בלבד
