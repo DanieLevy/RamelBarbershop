@@ -5,10 +5,15 @@
  * to process and send reminders. All heavy processing happens
  * in the main application to avoid Netlify function limitations.
  * 
- * Schedule: Every 30 minutes (*/30 * * * *)
+ * Schedule: Runs every 30 minutes (at :00 and :30)
  */
 
-import { schedule } from '@netlify/functions'
+import type { Config, Context } from '@netlify/functions'
+
+// Schedule configuration - runs every 30 minutes
+export const config: Config = {
+  schedule: '0,30 * * * *'
+}
 
 /**
  * Get the base URL for API calls
@@ -21,7 +26,7 @@ function getBaseUrl(): string {
 /**
  * Main handler - triggers the process-reminders API
  */
-const handler = schedule('*/30 * * * *', async () => {
+export default async function handler(_req: Request, _context: Context) {
   const startTime = Date.now()
   
   console.log('[Netlify Trigger] Starting reminder job trigger')
@@ -32,10 +37,13 @@ const handler = schedule('*/30 * * * *', async () => {
     
     if (!cronSecret) {
       console.error('[Netlify Trigger] CRON_SECRET not configured')
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ success: false, error: 'CRON_SECRET not configured' })
-      }
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'CRON_SECRET not configured' 
+      }), { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      })
     }
 
     const apiUrl = `${baseUrl}/api/cron/process-reminders`
@@ -55,15 +63,15 @@ const handler = schedule('*/30 * * * *', async () => {
 
     if (!response.ok) {
       console.error('[Netlify Trigger] API returned error:', data)
-      return {
-        statusCode: response.status,
-        body: JSON.stringify({
-          success: false,
-          error: data.error || 'API error',
-          triggerDuration: duration,
-          apiResponse: data
-        })
-      }
+      return new Response(JSON.stringify({
+        success: false,
+        error: data.error || 'API error',
+        triggerDuration: duration,
+        apiResponse: data
+      }), { 
+        status: response.status,
+        headers: { 'Content-Type': 'application/json' }
+      })
     }
 
     console.log('[Netlify Trigger] Completed successfully:', {
@@ -72,30 +80,28 @@ const handler = schedule('*/30 * * * *', async () => {
       results: data.results
     })
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        success: true,
-        source: 'netlify',
-        triggerDuration: duration,
-        ...data
-      })
-    }
+    return new Response(JSON.stringify({
+      success: true,
+      source: 'netlify',
+      triggerDuration: duration,
+      ...data
+    }), { 
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })
 
   } catch (error) {
     const duration = Date.now() - startTime
     console.error('[Netlify Trigger] Error:', error)
 
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        success: false,
-        source: 'netlify',
-        error: error instanceof Error ? error.message : 'Unknown error',
-        triggerDuration: duration
-      })
-    }
+    return new Response(JSON.stringify({
+      success: false,
+      source: 'netlify',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      triggerDuration: duration
+    }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    })
   }
-})
-
-export { handler }
+}

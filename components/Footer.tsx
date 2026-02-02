@@ -9,6 +9,9 @@ import { cn } from '@/lib/utils'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import type { BarbershopSettings } from '@/types/database'
 
+// App version from build - updated by prebuild script
+import { APP_VERSION } from '@/lib/version'
+
 // Hidden dev access - tap copyright 5 times within 3 seconds
 const DEV_TAP_COUNT = 5
 const DEV_TAP_TIMEOUT_MS = 3000
@@ -188,13 +191,18 @@ export function Footer({ settings }: FooterProps) {
       <div className="border-t border-white/5">
         <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-foreground-muted">
           {/* Hidden dev access: tap 5 times quickly to access /dev/login */}
-          <button
-            onClick={handleCopyrightTap}
-            className="order-3 sm:order-1 cursor-default select-none"
-            aria-label="Copyright"
-          >
-            © {currentYear} {shopName}. כל הזכויות שמורות.
-          </button>
+          <div className="order-3 sm:order-1 flex flex-col items-center sm:items-start gap-1">
+            <button
+              onClick={handleCopyrightTap}
+              className="cursor-default select-none"
+              aria-label="Copyright"
+            >
+              © {currentYear} {shopName}. כל הזכויות שמורות.
+            </button>
+            <span className="text-[10px] text-foreground-muted/50 font-mono">
+              v{APP_VERSION}
+            </span>
+          </div>
           
           {/* Legal Links - nowrap to prevent breaking */}
           <div className="order-1 sm:order-2 flex items-start justify-start whitespace-nowrap h-[22px]">

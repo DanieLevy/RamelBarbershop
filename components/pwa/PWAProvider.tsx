@@ -1,10 +1,9 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { usePWA, wasInstallDismissed, getVisitCount } from '@/hooks/usePWA'
 import { useBadgeManager } from '@/hooks/useBadgeManager'
 import { InstallBanner } from './InstallBanner'
-import { UpdateModal } from './UpdateModal'
 import { AutoPushSubscriber } from './AutoPushSubscriber'
 import { PushDeniedBanner } from './PushDeniedBanner'
 
@@ -41,6 +40,9 @@ export function PWAProvider({ children }: PWAProviderProps) {
   // Track if install banner is dismissed - this state triggers re-render to unmount the modal
   const [isInstallDismissed, setIsInstallDismissed] = useState(false)
   
+  // Track if auto-update was already triggered to prevent multiple calls
+  const autoUpdateTriggeredRef = useRef(false)
+  
   // Badge manager handles clearing badges when app is opened
   useBadgeManager()
   
@@ -51,6 +53,22 @@ export function PWAProvider({ children }: PWAProviderProps) {
     // Check localStorage on mount
     setIsInstallDismissed(wasInstallDismissed())
   }, [])
+  
+  // Auto-update silently when new version is available
+  // No modal, no user interaction required - just update and reload
+  useEffect(() => {
+    if (pwa.isUpdateAvailable && !autoUpdateTriggeredRef.current) {
+      autoUpdateTriggeredRef.current = true
+      console.log('[PWA] Auto-updating to new version silently...')
+      
+      // Small delay to ensure the app is stable before updating
+      const timer = setTimeout(() => {
+        pwa.updateApp()
+      }, 1000)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [pwa])
   
   // Handle install banner dismiss - updates state to trigger re-render
   const handleInstallDismiss = useCallback(() => {
@@ -83,14 +101,9 @@ export function PWAProvider({ children }: PWAProviderProps) {
     <PWAContext.Provider value={contextValue}>
       {children}
       
-      {/* Only render PWA-related modals after client mount to prevent SSR issues */}
+      {/* Only render PWA-related components after client mount to prevent SSR issues */}
       {isMounted && (
         <>
-          {/* Force Update Modal - Non-dismissible */}
-          {pwa.isUpdateAvailable && (
-            <UpdateModal onUpdate={pwa.updateApp} version={pwa.currentVersion} />
-          )}
-          
           {/* Install Banner - Smart behavior based on visit count */}
           {shouldShowInstallBanner && (
             <InstallBanner
