@@ -10,13 +10,12 @@ export type AuthMethod = 'phone' | 'email' | 'both'
  * Define commonly needed customer columns for optimized queries
  * 
  * DATABASE COLUMN NOTES:
- * - `firebase_uid`: Legacy column name - stores SMS provider user ID
- *   Originally used for Firebase Auth, now used for any SMS provider
- *   New SMS providers should continue using this column for backward compatibility
+ * - `provider_uid`: SMS provider user ID (e.g., "o19-0501234567" for 019 SMS provider)
+ *   Format: {provider_prefix}-{phone_number}
  * - `supabase_uid`: Stores Supabase Auth user ID (used for email authentication)
  * - `auth_method`: Tracks which auth methods the customer has used ('phone', 'email', or 'both')
  */
-const CUSTOMER_COLUMNS = 'id, phone, fullname, email, auth_method, firebase_uid, supabase_uid, is_blocked, blocked_reason, last_login_at, created_at, updated_at'
+const CUSTOMER_COLUMNS = 'id, phone, fullname, email, auth_method, provider_uid, supabase_uid, is_blocked, blocked_reason, last_login_at, created_at, updated_at'
 
 /**
  * Find a customer by phone number
@@ -47,12 +46,12 @@ export async function findCustomerByPhone(phone: string): Promise<Customer | nul
  * 
  * @param phone - Customer phone number
  * @param fullname - Customer full name
- * @param smsProviderUid - SMS provider user ID (stored in `firebase_uid` column for backward compatibility)
+ * @param providerUid - SMS provider user ID (e.g., "o19-0501234567")
  */
 export async function createCustomer(
   phone: string,
   fullname: string,
-  smsProviderUid?: string
+  providerUid?: string
 ): Promise<Customer | null> {
   const supabase = createClient()
   
@@ -62,7 +61,7 @@ export async function createCustomer(
     .insert({
       phone: normalizedPhone,
       fullname,
-      firebase_uid: smsProviderUid || null, // Column name kept for backward compatibility
+      provider_uid: providerUid || null,
     })
     .select()
     .single()
@@ -86,16 +85,12 @@ export async function createCustomer(
  * 
  * @param phone - Customer phone number
  * @param fullname - Customer full name
- * @param smsProviderUid - SMS provider user ID (stored in `firebase_uid` column for backward compatibility)
- * 
- * Note: The third parameter is stored in the `firebase_uid` database column.
- * This column name is kept for backward compatibility with existing data.
- * New SMS providers should continue using this column.
+ * @param providerUid - SMS provider user ID (e.g., "o19-0501234567")
  */
 export async function getOrCreateCustomer(
   phone: string,
   fullname: string,
-  smsProviderUid?: string
+  providerUid?: string
 ): Promise<Customer | null> {
   const supabase = createClient()
   const normalizedPhone = phone.replace(/\D/g, '')
@@ -114,21 +109,21 @@ export async function getOrCreateCustomer(
       updated_at: new Date().toISOString(),
     }
     
-    // Handle SMS provider UID (stored in firebase_uid for backward compatibility)
-    // Update firebase_uid in these cases:
+    // Handle SMS provider UID
+    // Update provider_uid in these cases:
     // 1. No existing UID (first SMS login)
-    // 2. Migrating from Firebase to 019 (existing UID doesn't start with 'o19-')
+    // 2. Migrating from old format to new (existing UID doesn't start with current provider prefix)
     // 3. UID matches current provider (deterministic - should be same value)
-    if (smsProviderUid) {
-      const existingUid = existing.firebase_uid
+    if (providerUid) {
+      const existingUid = existing.provider_uid
       const shouldUpdateUid = 
         !existingUid || // No existing UID
-        (smsProviderUid.startsWith('o19-') && !existingUid.startsWith('o19-')) || // Migrating from Firebase
-        existingUid === smsProviderUid // Same deterministic UID (no-op but safe)
+        (providerUid.startsWith('o19-') && !existingUid.startsWith('o19-')) || // Migrating to 019
+        existingUid === providerUid // Same deterministic UID (no-op but safe)
       
       if (shouldUpdateUid) {
-        updateData.firebase_uid = smsProviderUid
-        console.log(`[CustomerService] Updating firebase_uid from '${existingUid}' to '${smsProviderUid}'`)
+        updateData.provider_uid = providerUid
+        console.log(`[CustomerService] Updating provider_uid from '${existingUid}' to '${providerUid}'`)
       }
     }
     
@@ -157,7 +152,7 @@ export async function getOrCreateCustomer(
     .insert({
       phone: normalizedPhone,
       fullname,
-      firebase_uid: smsProviderUid || null, // Column name kept for backward compatibility
+      provider_uid: providerUid || null,
       auth_method: 'phone',
       last_login_at: new Date().toISOString(),
     })
@@ -178,22 +173,22 @@ export async function getOrCreateCustomer(
  * Update customer's last login timestamp
  * 
  * @param customerId - Customer ID
- * @param smsProviderUid - SMS provider user ID (stored in `firebase_uid` column for backward compatibility)
+ * @param providerUid - SMS provider user ID (e.g., "o19-0501234567")
  * @param supabaseUid - Supabase Auth user ID (for email authentication)
  */
 export async function updateLastLogin(
   customerId: string,
-  smsProviderUid?: string,
+  providerUid?: string,
   supabaseUid?: string
 ): Promise<void> {
   const supabase = createClient()
   
-  const updateData: { last_login_at: string; firebase_uid?: string; supabase_uid?: string } = {
+  const updateData: { last_login_at: string; provider_uid?: string; supabase_uid?: string } = {
     last_login_at: new Date().toISOString(),
   }
   
-  if (smsProviderUid) {
-    updateData.firebase_uid = smsProviderUid // Column name kept for backward compatibility
+  if (providerUid) {
+    updateData.provider_uid = providerUid
   }
   
   if (supabaseUid) {
@@ -501,8 +496,8 @@ export async function getOrCreateCustomerWithEmail(
  * Used when a phone-registered user adds email as fallback
  * 
  * Auth method logic:
- * - If user has firebase_uid (previously used SMS) → set to 'both'
- * - If user has no firebase_uid (never used SMS) → set to 'email'
+ * - If user has provider_uid (previously used SMS) → set to 'both'
+ * - If user has no provider_uid (never used SMS) → set to 'email'
  */
 export async function linkEmailToCustomer(
   customerId: string,
@@ -519,17 +514,17 @@ export async function linkEmailToCustomer(
     return null
   }
   
-  // First, fetch the current customer to check their firebase_uid
+  // First, fetch the current customer to check their provider_uid
   const { data: currentCustomer } = await supabase
     .from('customers')
-    .select('firebase_uid, auth_method')
+    .select('provider_uid, auth_method')
     .eq('id', customerId)
     .single()
   
   // Determine the correct auth_method:
-  // - If user has firebase_uid → they've used SMS before → 'both'
-  // - If user has no firebase_uid → never used SMS → 'email'
-  const hasUsedSms = currentCustomer?.firebase_uid !== null && currentCustomer?.firebase_uid !== undefined
+  // - If user has provider_uid → they've used SMS before → 'both'
+  // - If user has no provider_uid → never used SMS → 'email'
+  const hasUsedSms = currentCustomer?.provider_uid !== null && currentCustomer?.provider_uid !== undefined
   const newAuthMethod: AuthMethod = hasUsedSms ? 'both' : 'email'
   
   const updateData: Record<string, unknown> = {

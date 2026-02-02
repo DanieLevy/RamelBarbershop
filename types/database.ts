@@ -412,7 +412,8 @@ export type Database = {
           blocked_reason: string | null
           created_at: string | null
           email: string | null
-          firebase_uid: string | null
+          firebase_uid: string | null // Legacy - kept for backward compatibility during migration
+          provider_uid: string | null // New column - SMS provider UID (e.g., "o19-0501234567")
           fullname: string
           id: string
           is_blocked: boolean | null
@@ -427,7 +428,8 @@ export type Database = {
           blocked_reason?: string | null
           created_at?: string | null
           email?: string | null
-          firebase_uid?: string | null
+          firebase_uid?: string | null // Legacy - kept for backward compatibility during migration
+          provider_uid?: string | null // New column - SMS provider UID
           fullname: string
           id?: string
           is_blocked?: boolean | null
@@ -442,7 +444,8 @@ export type Database = {
           blocked_reason?: string | null
           created_at?: string | null
           email?: string | null
-          firebase_uid?: string | null
+          firebase_uid?: string | null // Legacy - kept for backward compatibility during migration
+          provider_uid?: string | null // New column - SMS provider UID
           fullname?: string
           id?: string
           is_blocked?: boolean | null
@@ -452,6 +455,53 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      trusted_devices: {
+        Row: {
+          id: string
+          customer_id: string
+          phone: string
+          device_token: string
+          device_fingerprint: string | null
+          user_agent: string | null
+          created_at: string | null
+          expires_at: string
+          last_used_at: string | null
+          is_active: boolean | null
+        }
+        Insert: {
+          id?: string
+          customer_id: string
+          phone: string
+          device_token: string
+          device_fingerprint?: string | null
+          user_agent?: string | null
+          created_at?: string | null
+          expires_at: string
+          last_used_at?: string | null
+          is_active?: boolean | null
+        }
+        Update: {
+          id?: string
+          customer_id?: string
+          phone?: string
+          device_token?: string
+          device_fingerprint?: string | null
+          user_agent?: string | null
+          created_at?: string | null
+          expires_at?: string
+          last_used_at?: string | null
+          is_active?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trusted_devices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       notification_logs: {
         Row: {
@@ -1054,6 +1104,11 @@ export type NotificationLog = Tables<'notification_logs'>
 export type NotificationLogInsert = TablesInsert<'notification_logs'>
 export type BarberNotificationSettingsRow = Tables<'barber_notification_settings'>
 export type CustomerNotificationSettingsRow = Tables<'customer_notification_settings'>
+
+// Trusted device types
+export type TrustedDevice = Tables<'trusted_devices'>
+export type TrustedDeviceInsert = TablesInsert<'trusted_devices'>
+export type TrustedDeviceUpdate = TablesUpdate<'trusted_devices'>
 
 // =============================================================================
 // EXTENDED TYPES (with relations)

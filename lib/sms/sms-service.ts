@@ -12,8 +12,8 @@
  * - Proper phone number formatting for Israeli numbers
  * 
  * DATABASE NOTES:
- * - The `customers` table has a `firebase_uid` column for legacy data
- * - New SMS provider stores its UID in the same column for compatibility
+ * - The `customers` table has a `provider_uid` column for SMS provider UIDs
+ * - Format: "{provider}-{phone}" (e.g., "o19-0501234567" for 019 SMS)
  * - The `auth_method` column tracks: 'phone', 'email', or 'both'
  * 
  * @author Ram El Barbershop

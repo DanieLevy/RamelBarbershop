@@ -10,6 +10,10 @@ import {
   isTestUser, 
   TEST_USER 
 } from '@/lib/sms/sms-service'
+import { 
+  getStoredDeviceToken, 
+  saveDeviceToken 
+} from '@/lib/services/trusted-device.service'
 import { sendEmailOtp, verifyEmailOtp, isValidEmail } from '@/lib/auth/email-auth'
 import { getOrCreateCustomer, getOrCreateCustomerWithEmail, checkEmailDuplicate, findCustomerByPhone, getCustomerAuthMethod } from '@/lib/services/customer.service'
 import { createReservation as createReservationService } from '@/lib/services/booking.service'
@@ -80,12 +84,54 @@ export function OTPVerification() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Check customer's auth method on mount
+  // Check for trusted device first, then auth method on mount
   useEffect(() => {
     const checkAuthMethod = async () => {
       if (!customer?.phone) return
+      const phoneClean = customer.phone.replace(/\D/g, '')
       
       try {
+        // Check for trusted device first (skip OTP if valid)
+        const storedToken = getStoredDeviceToken()
+        if (storedToken) {
+          try {
+            const deviceResponse = await fetch('/api/auth/validate-device', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ phone: phoneClean, deviceToken: storedToken }),
+            })
+            
+            const deviceData = await deviceResponse.json()
+            
+            if (deviceData.success && deviceData.customer) {
+              // Device is trusted - login and create reservation directly
+              console.log('[OTPVerification] Trusted device found, skipping OTP')
+              toast.info('מכשיר מוכר - מתחבר...')
+              
+              // Login the user
+              await login(deviceData.customer.phone, deviceData.customer.fullname)
+              
+              // Create reservation
+              const reservationResult = await handleCreateReservation(deviceData.customer.id)
+              
+              if (!isMountedRef.current) return
+              
+              if (reservationResult.success) {
+                haptics.success()
+                toast.success('התור נקבע בהצלחה!')
+                nextStep()
+              } else {
+                toast.error(reservationResult.message || 'שגיאה ביצירת התור')
+                // Proceed with normal OTP if reservation fails
+              }
+              return
+            }
+            console.log('[OTPVerification] Device validation failed, proceeding with OTP')
+          } catch (deviceErr) {
+            console.log('[OTPVerification] Device validation error:', deviceErr)
+          }
+        }
+        
         const authMethod = await getCustomerAuthMethod(customer.phone)
         setCustomerAuthMethod(authMethod)
         
@@ -383,7 +429,7 @@ export function OTPVerification() {
         toast.info('מאמת ויוצר תור...')
         
         // Get or create customer and log them in
-        // Note: providerUid is stored in firebase_uid column for backward compatibility
+        // providerUid is stored in provider_uid column (e.g., "o19-0501234567")
         const customerRecord = await getOrCreateCustomer(
           customer.phone.replace(/\D/g, ''),
           customer.fullname,
@@ -397,8 +443,29 @@ export function OTPVerification() {
         }
         
         // Log the user in (saves to localStorage)
-        // Note: providerUid parameter is stored as firebase_uid in DB for backward compatibility
+        // providerUid is stored in provider_uid column
         await login(customer.phone.replace(/\D/g, ''), customer.fullname, result.providerUid)
+        
+        // Create trusted device for future logins (30-day expiration, auto)
+        try {
+          const trustResponse = await fetch('/api/auth/trust-device', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              customerId: customerRecord.id,
+              phone: customerRecord.phone,
+            }),
+          })
+          
+          const trustData = await trustResponse.json()
+          if (trustData.success && trustData.deviceToken) {
+            saveDeviceToken(trustData.deviceToken)
+            console.log('[OTPVerification] Trusted device created for future logins')
+          }
+        } catch (trustErr) {
+          // Don't fail if trusted device creation fails
+          console.error('[OTPVerification] Failed to create trusted device:', trustErr)
+        }
         
         // Create reservation using the centralized booking service
         const reservationResult = await handleCreateReservation(customerRecord.id)

@@ -13,6 +13,10 @@ import {
   setSkipDebugMode,
   type OtpSession 
 } from '@/lib/sms/sms-service'
+import { 
+  getStoredDeviceToken, 
+  saveDeviceToken 
+} from '@/lib/services/trusted-device.service'
 import { sendEmailOtp, verifyEmailOtp, isValidEmail } from '@/lib/auth/email-auth'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -124,6 +128,41 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setError(null)
     
     try {
+      // Check for trusted device token first (skip OTP if valid)
+      const storedToken = getStoredDeviceToken()
+      if (storedToken) {
+        try {
+          const deviceResponse = await fetch('/api/auth/validate-device', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: phoneClean, deviceToken: storedToken }),
+          })
+          
+          const deviceData = await deviceResponse.json()
+          
+          if (deviceData.success && deviceData.customer) {
+            // Device is trusted - login directly without OTP
+            console.log('[LoginModal] Trusted device found, logging in directly')
+            const customer = await login(
+              deviceData.customer.phone,
+              deviceData.customer.fullname
+            )
+            
+            if (customer) {
+              haptics.success()
+              toast.success(`שלום ${customer.fullname}!`)
+              onClose()
+              return
+            }
+          }
+          // If device validation failed, continue with normal flow
+          console.log('[LoginModal] Device validation failed, proceeding with OTP')
+        } catch (deviceErr) {
+          // Device validation error - continue with normal flow
+          console.log('[LoginModal] Device validation error, proceeding with OTP:', deviceErr)
+        }
+      }
+      
       // Check if customer exists and their auth method
       const existingCustomer = await findCustomerByPhone(phoneClean)
       const authMethod = await getCustomerAuthMethod(phoneClean)
@@ -372,10 +411,31 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       
       if (result.success) {
         // Login successful - save to store
-        // Note: providerUid is stored in firebase_uid column for backward compatibility
+        // providerUid is stored in provider_uid column (e.g., "o19-0501234567")
         const customer = await login(phone.replace(/\D/g, ''), fullname, result.providerUid)
         
         if (customer) {
+          // Create trusted device for future logins (30-day expiration)
+          try {
+            const trustResponse = await fetch('/api/auth/trust-device', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                customerId: customer.id,
+                phone: customer.phone,
+              }),
+            })
+            
+            const trustData = await trustResponse.json()
+            if (trustData.success && trustData.deviceToken) {
+              saveDeviceToken(trustData.deviceToken)
+              console.log('[LoginModal] Trusted device created for future logins')
+            }
+          } catch (trustErr) {
+            // Don't fail login if trusted device creation fails
+            console.error('[LoginModal] Failed to create trusted device:', trustErr)
+          }
+          
           haptics.success()
           toast.success(`שלום ${customer.fullname}!`)
           onClose()
