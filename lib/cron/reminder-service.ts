@@ -10,7 +10,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { pushService } from '@/lib/push/push-service'
 import type { ReminderContext } from '@/lib/push/types'
-import { nowInIsraelMs } from '@/lib/utils'
+import { nowInIsraelMs, getIsraelDayStart, getIsraelDayEnd } from '@/lib/utils'
 
 // Type for reservation with joined data from the reminder query
 interface ReservationWithJoins {
@@ -24,7 +24,6 @@ interface ReservationWithJoins {
 }
 
 // Constants
-const MAX_REMINDER_HOURS = 24
 const HOUR_MS = 3600000
 
 // Types
@@ -70,7 +69,15 @@ function getSupabaseClient(): SupabaseClient {
 
 /**
  * Get appointments that need reminders sent right now
- * Uses smart time-window query to minimize data scanned
+ * 
+ * OPTIMIZED QUERY:
+ * - Only TODAY's reservations (Israel timezone)
+ * - Only UPCOMING (time_timestamp > now)
+ * - Only CONFIRMED status
+ * - Only with customer_id (registered customers)
+ * 
+ * This minimizes data transfer and processing time,
+ * making it scalable for SMS reminders alongside push notifications.
  */
 export async function getAppointmentsForReminders(
   supabase?: SupabaseClient
@@ -78,7 +85,12 @@ export async function getAppointmentsForReminders(
   const client = supabase || getSupabaseClient()
   // Use Israel timezone-aware timestamp for accurate reminder window calculation
   const now = nowInIsraelMs()
-  const maxWindowEnd = now + (MAX_REMINDER_HOURS * HOUR_MS)
+  
+  // Get today's boundaries in Israel timezone
+  const todayStart = getIsraelDayStart(now)
+  const todayEnd = getIsraelDayEnd(now)
+  
+  console.log(`[ReminderService] Querying: now=${now}, todayStart=${todayStart}, todayEnd=${todayEnd}`)
 
   const { data, error } = await client
     .from('reservations')
@@ -95,10 +107,12 @@ export async function getAppointmentsForReminders(
         name_he
       )
     `)
-    .eq('status', 'confirmed')
-    .gt('time_timestamp', now)
-    .lte('time_timestamp', maxWindowEnd)
-    .not('customer_id', 'is', null)
+    .eq('status', 'confirmed')           // Only confirmed (not cancelled)
+    .gte('time_timestamp', todayStart)   // Today or later (Israel time)
+    .lte('time_timestamp', todayEnd)     // Today only (Israel time)
+    .gt('time_timestamp', now)           // Only upcoming (not passed)
+    .not('customer_id', 'is', null)      // Only registered customers
+    .order('time_timestamp', { ascending: true }) // Earliest first
 
   if (error) {
     console.error('[ReminderService] Error fetching appointments:', error)
@@ -106,8 +120,11 @@ export async function getAppointmentsForReminders(
   }
 
   if (!data || data.length === 0) {
+    console.log('[ReminderService] No appointments found for today')
     return []
   }
+  
+  console.log(`[ReminderService] Found ${data.length} confirmed upcoming appointments for today`)
 
   // Get all unique barber IDs
   const barberIds = [...new Set(data.map(r => r.barber_id).filter(Boolean))]

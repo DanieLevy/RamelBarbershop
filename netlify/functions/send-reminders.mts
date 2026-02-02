@@ -1,11 +1,23 @@
 /**
  * Netlify Scheduled Function: Send Appointment Reminders
  * 
- * This function runs every hour to send push notification reminders
+ * This function runs every 30 minutes to send push notification reminders
  * for upcoming appointments. Netlify's free tier supports scheduled
  * functions without the limitations of Vercel's hobby plan.
  * 
- * Schedule: Every hour at minute 0 (0 * * * *)
+ * Schedule: Every 30 minutes (*/30 * * * *)
+ * 
+ * Flow:
+ * 1. Fetch all confirmed reservations within the next 24 hours
+ * 2. Filter to only those within each barber's reminder window
+ * 3. Check notification_logs to skip already-sent reminders
+ * 4. Send push to customers with active subscriptions
+ * 5. Log result in notification_logs (prevents duplicate sends)
+ * 
+ * Edge Cases Handled:
+ * - Late bookings: If someone books 1:45h before their appointment
+ *   and the barber's reminder is 3h, they still get a reminder
+ *   because the wasReminderSent check will be false.
  * 
  * Uses the same core logic as Vercel cron for consistency.
  */
@@ -15,8 +27,46 @@ import webpush from 'web-push'
 import type { Config } from '@netlify/functions'
 
 // Constants
-const MAX_REMINDER_HOURS = 24
 const HOUR_MS = 3600000
+const ISRAEL_TIMEZONE = 'Asia/Jerusalem'
+
+/**
+ * Get start of today (00:00:00.000) in Israel timezone as UTC timestamp
+ */
+function getIsraelDayStart(date: Date | number): number {
+  const d = typeof date === 'number' ? new Date(date) : date
+  // Convert to Israel timezone string, parse parts
+  const israelStr = d.toLocaleString('en-US', { timeZone: ISRAEL_TIMEZONE })
+  const israelDate = new Date(israelStr)
+  
+  // Get just the date parts in Israel time
+  const year = israelDate.getFullYear()
+  const month = israelDate.getMonth()
+  const day = israelDate.getDate()
+  
+  // Create midnight in Israel, get UTC timestamp
+  const midnight = new Date(Date.UTC(year, month, day))
+  // Adjust for Israel timezone offset (Israel is UTC+2 or UTC+3)
+  const israelOffset = getIsraelOffsetMs(midnight)
+  return midnight.getTime() - israelOffset
+}
+
+/**
+ * Get end of today (23:59:59.999) in Israel timezone as UTC timestamp
+ */
+function getIsraelDayEnd(date: Date | number): number {
+  return getIsraelDayStart(date) + (24 * 60 * 60 * 1000) - 1
+}
+
+/**
+ * Get Israel timezone offset in milliseconds
+ * Israel observes DST: UTC+2 in winter, UTC+3 in summer
+ */
+function getIsraelOffsetMs(date: Date): number {
+  const utcDate = new Date(date.toLocaleString('en-US', { timeZone: 'UTC' }))
+  const israelDate = new Date(date.toLocaleString('en-US', { timeZone: ISRAEL_TIMEZONE }))
+  return (israelDate.getTime() - utcDate.getTime())
+}
 
 // Types
 interface AppointmentForReminder {
@@ -64,11 +114,25 @@ function initWebPush() {
 
 /**
  * Get appointments that need reminders sent right now
+ * 
+ * OPTIMIZED QUERY:
+ * - Only TODAY's reservations (Israel timezone)
+ * - Only UPCOMING (time_timestamp > now)
+ * - Only CONFIRMED status
+ * - Only with customer_id (registered customers)
+ * 
+ * This minimizes data transfer and processing time,
+ * making it scalable for SMS reminders.
  */
 async function getAppointmentsForReminders(): Promise<AppointmentForReminder[]> {
   const supabase = getSupabase()
   const now = Date.now()
-  const maxWindowEnd = now + (MAX_REMINDER_HOURS * HOUR_MS)
+  
+  // Get today's boundaries in Israel timezone
+  const todayStart = getIsraelDayStart(now)
+  const todayEnd = getIsraelDayEnd(now)
+  
+  console.log(`[Netlify] Querying reservations: now=${now}, todayStart=${todayStart}, todayEnd=${todayEnd}`)
 
   const { data, error } = await supabase
     .from('reservations')
@@ -85,15 +149,20 @@ async function getAppointmentsForReminders(): Promise<AppointmentForReminder[]> 
         name_he
       )
     `)
-    .eq('status', 'confirmed')
-    .gt('time_timestamp', now)
-    .lte('time_timestamp', maxWindowEnd)
-    .not('customer_id', 'is', null)
+    .eq('status', 'confirmed')           // Only confirmed (not cancelled)
+    .gte('time_timestamp', todayStart)   // Today or later (Israel time)
+    .lte('time_timestamp', todayEnd)     // Today only (Israel time)
+    .gt('time_timestamp', now)           // Only upcoming (not passed)
+    .not('customer_id', 'is', null)      // Only registered customers
+    .order('time_timestamp', { ascending: true }) // Earliest first
 
   if (error || !data?.length) {
     if (error) console.error('[Netlify] Error fetching appointments:', error)
+    console.log(`[Netlify] No appointments found for today`)
     return []
   }
+  
+  console.log(`[Netlify] Found ${data.length} confirmed upcoming appointments for today`)
 
   // Get barber settings
   const barberIds = [...new Set(data.map(r => r.barber_id).filter(Boolean))]
@@ -453,11 +522,12 @@ const handler = async (_req: Request) => {
 }
 
 /**
- * Schedule: Run every hour at minute 0
- * This provides much more frequent execution than Vercel's free tier (2/day)
+ * Schedule: Run every 30 minutes
+ * This provides frequent execution for timely reminders
+ * and better coverage for late-booked appointments.
  */
 export const config: Config = {
-  schedule: '0 * * * *'
+  schedule: '*/30 * * * *'
 }
 
 export default handler

@@ -18,9 +18,9 @@
   external_node_modules = ["@supabase/supabase-js", "web-push"]
   included_files = ["netlify/functions/**"]
 
-# Scheduled function for reminders (runs every hour)
+# Scheduled function for reminders (runs every 30 minutes)
 [functions."send-reminders"]
-  schedule = "0 * * * *"
+  schedule = "*/30 * * * *"
 
 # Use the official Netlify Next.js plugin for full support
 [[plugins]]
