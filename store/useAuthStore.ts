@@ -23,7 +23,16 @@ interface AuthState {
   authMethod: SessionAuthMethod | null // Track how user logged in this session
   
   // Actions
-  login: (phone: string, fullname: string, firebaseUid?: string) => Promise<Customer | null>
+  /**
+   * Login via SMS OTP
+   * @param phone - Customer phone number
+   * @param fullname - Customer full name
+   * @param providerUid - SMS provider user ID (stored in firebase_uid column for backward compatibility)
+   * 
+   * Note: The third parameter is named `providerUid` in the signature but stored in `firebase_uid` 
+   * column in the database for backward compatibility with existing data.
+   */
+  login: (phone: string, fullname: string, providerUid?: string) => Promise<Customer | null>
   loginWithEmail: (phone: string, fullname: string, email: string, supabaseUid?: string) => Promise<Customer | null>
   linkEmail: (email: string, supabaseUid?: string) => Promise<boolean>
   logout: () => void
@@ -103,11 +112,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isInitialized: false,
   authMethod: null,
 
-  login: async (phone: string, fullname: string, firebaseUid?: string) => {
+  // Note: firebaseUid parameter name kept for backward compatibility
+  // It represents the SMS provider's user ID and is stored in firebase_uid column
+  login: async (phone: string, fullname: string, providerUid?: string) => {
     set({ isLoading: true })
     
     try {
-      const customer = await getOrCreateCustomer(phone, fullname, firebaseUid)
+      // providerUid is stored in firebase_uid column for backward compatibility
+      const customer = await getOrCreateCustomer(phone, fullname, providerUid)
       
       if (customer) {
         saveSession(customer, 'phone')

@@ -957,7 +957,7 @@ class PushNotificationService {
       .eq('is_barber', true)
       .single()
 
-    let allSubs = (customerSubs as PushSubscriptionRecord[]) || []
+    const allSubs = (customerSubs as PushSubscriptionRecord[]) || []
 
     // If they're also a barber, include barber subscriptions too
     if (barberCheck) {
@@ -1002,7 +1002,7 @@ class PushNotificationService {
       .eq('id', barberId)
       .single()
 
-    let allSubs = (barberSubs as PushSubscriptionRecord[]) || []
+    const allSubs = (barberSubs as PushSubscriptionRecord[]) || []
 
     // If they're also a customer, include customer subscriptions too
     if (customerCheck) {

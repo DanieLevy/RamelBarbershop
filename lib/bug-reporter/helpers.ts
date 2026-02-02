@@ -277,10 +277,13 @@ export async function reportSupabaseError(
 }
 
 /**
- * Firebase error handler
- * Specifically for handling Firebase auth errors
+ * SMS Provider error handler
+ * For handling SMS OTP authentication errors from any provider
+ * 
+ * Note: Previously named reportFirebaseError, renamed for clarity
+ * as Firebase has been removed and replaced with a generic SMS provider.
  */
-export async function reportFirebaseError(
+export async function reportSmsAuthError(
   error: { code?: string; message: string },
   action: string,
   options: {
@@ -296,7 +299,7 @@ export async function reportFirebaseError(
       user: options.user,
       environment: getEnvironmentInfo(),
       additionalData: {
-        firebaseError: {
+        smsError: {
           code: error.code,
           message: error.message,
         },
@@ -306,4 +309,9 @@ export async function reportFirebaseError(
     }
   )
 }
+
+/**
+ * @deprecated Use reportSmsAuthError instead
+ */
+export const reportFirebaseError = reportSmsAuthError
 

@@ -95,7 +95,8 @@ export function determineSeverity(error: { name: string; message: string }): Bug
     /fetch/i,
     /api/i,
     /supabase/i,
-    /firebase/i,
+    /sms/i,
+    /otp/i,
   ]
 
   const lowPatterns = [

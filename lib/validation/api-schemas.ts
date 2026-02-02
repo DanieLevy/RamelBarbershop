@@ -165,11 +165,14 @@ export type BugReportInput = z.infer<typeof BugReportSchema>
 
 /**
  * Customer login/create schema
+ * 
+ * Note: `smsProviderUid` is the unique user ID from the SMS OTP provider.
+ * This is stored in the `firebase_uid` database column for backward compatibility.
  */
 export const CustomerAuthSchema = z.object({
   phone: PhoneSchema,
   fullname: z.string().min(2).max(100),
-  firebaseUid: z.string().min(1).optional(),
+  smsProviderUid: z.string().min(1).optional(),
 })
 
 export type CustomerAuthInput = z.infer<typeof CustomerAuthSchema>

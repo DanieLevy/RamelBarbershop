@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useBookingStore } from '@/store/useBookingStore'
 import { cn } from '@/lib/utils'
-import { TEST_USER } from '@/lib/firebase/config'
+import { TEST_USER } from '@/lib/sms/sms-service'
 import { findCustomerByPhone } from '@/lib/services/customer.service'
 import { Loader2, User, CheckCircle, Check } from 'lucide-react'
 

@@ -5,8 +5,9 @@ import { createClient } from '@/lib/supabase/client'
 /**
  * Email OTP Authentication Service
  * 
- * Uses Supabase Auth for email-based OTP authentication as a fallback
- * when Firebase SMS OTP fails or is unavailable.
+ * Uses Supabase Auth for email-based OTP authentication.
+ * This serves as a fallback when SMS OTP fails or is unavailable,
+ * and as a primary auth method for users who prefer email.
  */
 
 // Error messages in Hebrew for user-friendly display

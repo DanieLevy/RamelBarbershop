@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { Service, Customer } from '@/types/database'
-import type { ConfirmationResult } from 'firebase/auth'
+import type { OtpSession } from '@/lib/sms/sms-service'
 
 export interface DateSelection {
   dayName: string
@@ -36,8 +36,8 @@ interface BookingState {
   timeTimestamp: number | null
   customer: CustomerInfo
   
-  // OTP confirmation reference
-  otpConfirmation: ConfirmationResult | null
+  // OTP session reference (from SMS provider)
+  otpConfirmation: OtpSession | null
   
   // Actions
   setStep: (step: number) => void
@@ -48,7 +48,7 @@ interface BookingState {
   setDate: (date: DateSelection) => void
   setTime: (timestamp: number) => void
   setCustomer: (customer: Partial<CustomerInfo>) => void
-  setOtpConfirmation: (confirmation: ConfirmationResult | null) => void
+  setOtpConfirmation: (confirmation: OtpSession | null) => void
   setLoggedInUser: (customer: Customer | null, force?: boolean) => void
   lockFlow: () => void
   unlockFlow: () => void

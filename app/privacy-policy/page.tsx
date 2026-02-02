@@ -156,8 +156,8 @@ export default function PrivacyPolicyPage() {
                 <p className="text-foreground-muted text-sm">אחסון מאובטח של נתוני משתמשים והזמנות בשרתים באירופה</p>
               </div>
               <div className="p-3 bg-white/5 rounded-lg">
-                <p className="text-foreground-light font-medium">Firebase (אימות)</p>
-                <p className="text-foreground-muted text-sm">שירותי אימות טלפוני (SMS OTP)</p>
+                <p className="text-foreground-light font-medium">שירותי SMS (אימות)</p>
+                <p className="text-foreground-muted text-sm">אימות טלפוני באמצעות קוד חד-פעמי (OTP)</p>
               </div>
               <div className="p-3 bg-white/5 rounded-lg">
                 <p className="text-foreground-light font-medium">Web Push</p>

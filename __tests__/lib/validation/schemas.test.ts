@@ -564,11 +564,11 @@ describe('API Validation Schemas', () => {
       expect(result.success).toBe(true)
     })
 
-    it('should accept optional firebaseUid', () => {
+    it('should accept optional smsProviderUid', () => {
       const data = {
         phone: TEST_CUSTOMERS.daniel.phone,
         fullname: TEST_CUSTOMERS.daniel.fullname,
-        firebaseUid: 'firebase-uid-123',
+        smsProviderUid: 'sms-provider-uid-123',
       }
       const result = validateInput(CustomerAuthSchema, data)
       expect(result.success).toBe(true)

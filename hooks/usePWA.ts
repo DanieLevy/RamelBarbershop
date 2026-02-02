@@ -211,10 +211,11 @@ export const usePWA = (): UsePWAReturn => {
                 setState((prev) => ({ ...prev, isUpdateAvailable: true }))
                 
                 // Notify other tabs about the update
+                // Note: We don't include the version here since we don't have it yet
+                // Other tabs will detect the update via their own service worker registration
                 if (broadcastChannelRef.current) {
                   broadcastChannelRef.current.postMessage({ 
-                    type: 'UPDATE_AVAILABLE',
-                    version: state.newVersion 
+                    type: 'UPDATE_AVAILABLE'
                   })
                 }
               } else {

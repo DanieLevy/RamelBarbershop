@@ -3,7 +3,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { useAuthStore } from '@/store/useAuthStore'
-import { sendPhoneOtp, verifyOtp, clearRecaptchaVerifier, isTestUser, TEST_USER } from '@/lib/firebase/config'
+import { 
+  sendSmsOtp, 
+  verifySmsOtp, 
+  cleanupSmsSession, 
+  isTestUser, 
+  TEST_USER 
+} from '@/lib/sms/sms-service'
 import { sendEmailOtp, verifyEmailOtp, isValidEmail } from '@/lib/auth/email-auth'
 import { getOrCreateCustomer, getOrCreateCustomerWithEmail, checkEmailDuplicate, findCustomerByPhone, getCustomerAuthMethod } from '@/lib/services/customer.service'
 import { createReservation as createReservationService } from '@/lib/services/booking.service'
@@ -13,7 +19,9 @@ import { useBugReporter } from '@/hooks/useBugReporter'
 import { useHaptics } from '@/hooks/useHaptics'
 import { Mail, Phone, AlertTriangle } from 'lucide-react'
 
-const RECAPTCHA_CONTAINER_ID = 'recaptcha-container'
+// SMS provider widget container ID - will be used if new provider requires a UI element
+// Currently unused but kept for future provider integration
+const SMS_WIDGET_CONTAINER_ID = 'sms-widget-container'
 const RESEND_COOLDOWN_SECONDS = 60
 const MAX_RETRY_ATTEMPTS = 3
 
@@ -67,7 +75,7 @@ export function OTPVerification() {
     lockFlow()
     return () => {
       isMountedRef.current = false
-      clearRecaptchaVerifier()
+      cleanupSmsSession()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -158,12 +166,12 @@ export function OTPVerification() {
     const phoneNumber = formatPhoneNumber(customer.phone)
     
     try {
-      const result = await sendPhoneOtp(phoneNumber, RECAPTCHA_CONTAINER_ID)
+      const result = await sendSmsOtp(phoneNumber, SMS_WIDGET_CONTAINER_ID)
       
       if (!isMountedRef.current) return
       
-      if (result.success && result.confirmation) {
-        setOtpConfirmation(result.confirmation)
+      if (result.success && result.session) {
+        setOtpConfirmation(result.session)
         setSent(true)
         setCountdown(RESEND_COOLDOWN_SECONDS)
         setRetryCount(0)
@@ -367,7 +375,7 @@ export function OTPVerification() {
     setError(null)
     
     try {
-      const result = await verifyOtp(otpConfirmation, code)
+      const result = await verifySmsOtp(otpConfirmation, code)
       
       if (!isMountedRef.current) return
       
@@ -375,10 +383,11 @@ export function OTPVerification() {
         toast.info('מאמת ויוצר תור...')
         
         // Get or create customer and log them in
+        // Note: providerUid is stored in firebase_uid column for backward compatibility
         const customerRecord = await getOrCreateCustomer(
           customer.phone.replace(/\D/g, ''),
           customer.fullname,
-          result.firebaseUid
+          result.providerUid
         )
         
         if (!customerRecord) {
@@ -388,7 +397,8 @@ export function OTPVerification() {
         }
         
         // Log the user in (saves to localStorage)
-        await login(customer.phone.replace(/\D/g, ''), customer.fullname, result.firebaseUid)
+        // Note: providerUid parameter is stored as firebase_uid in DB for backward compatibility
+        await login(customer.phone.replace(/\D/g, ''), customer.fullname, result.providerUid)
         
         // Create reservation using the centralized booking service
         const reservationResult = await handleCreateReservation(customerRecord.id)
@@ -636,7 +646,7 @@ export function OTPVerification() {
         
         <button
           onClick={() => {
-            clearRecaptchaVerifier()
+            cleanupSmsSession()
             unlockFlow()
             prevStep()
           }}
@@ -719,7 +729,7 @@ export function OTPVerification() {
         
         <button
           onClick={() => {
-            clearRecaptchaVerifier()
+            cleanupSmsSession()
             unlockFlow()
             prevStep()
           }}
@@ -762,7 +772,8 @@ export function OTPVerification() {
         )}
       </div>
       
-      <div id={RECAPTCHA_CONTAINER_ID} className="flex justify-center" />
+      {/* SMS provider widget container - hidden by default, used if provider needs UI element */}
+      <div id={SMS_WIDGET_CONTAINER_ID} className="hidden" />
       
       {sending && !sent && (
         <div className="flex flex-col items-center gap-3 py-6">
@@ -899,7 +910,7 @@ export function OTPVerification() {
       
       <button
         onClick={() => {
-          clearRecaptchaVerifier()
+          cleanupSmsSession()
           unlockFlow() // Allow auth sync again when going back
           prevStep()
         }}

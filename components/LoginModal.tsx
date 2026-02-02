@@ -4,13 +4,20 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { findCustomerByPhone, getCustomerAuthMethod, checkEmailDuplicate, findCustomerByEmail } from '@/lib/services/customer.service'
-import { sendPhoneOtp, verifyOtp, clearRecaptchaVerifier, isTestUser, TEST_USER, setSkipDebugMode } from '@/lib/firebase/config'
+import { 
+  sendSmsOtp, 
+  verifySmsOtp, 
+  cleanupSmsSession, 
+  isTestUser, 
+  TEST_USER, 
+  setSkipDebugMode,
+  type OtpSession 
+} from '@/lib/sms/sms-service'
 import { sendEmailOtp, verifyEmailOtp, isValidEmail } from '@/lib/auth/email-auth'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { X, Scissors, AlertTriangle, Mail, Phone, ArrowRight, MessageSquare } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import type { ConfirmationResult } from 'firebase/auth'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { useHaptics } from '@/hooks/useHaptics'
 
@@ -30,7 +37,8 @@ type Step =
   | 'email-signup'    // New user email signup (name + email)
   | 'auth-choice'     // User with both methods - choose SMS or Email
 
-const RECAPTCHA_CONTAINER_ID = 'login-recaptcha-container'
+// SMS provider widget container ID - will be used if new provider requires a UI element
+const SMS_WIDGET_CONTAINER_ID = 'login-sms-widget-container'
 
 export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const router = useRouter()
@@ -48,7 +56,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [isNewUser, setIsNewUser] = useState(false)
-  const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null)
+  const [confirmation, setConfirmation] = useState<OtpSession | null>(null)
   const [countdown, setCountdown] = useState(0)
   
   // Email fallback state
@@ -81,7 +89,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       setSmsError(null)
       setExistingEmail(null)
       setCustomerAuthMethod(null)
-      clearRecaptchaVerifier()
+      cleanupSmsSession()
     }
   }, [isOpen])
 
@@ -204,15 +212,15 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const sendOtpToPhone = async (phoneClean: string, forceRealOtp: boolean = false) => {
     try {
       const formattedPhone = formatPhoneNumber(phoneClean)
-      const result = await sendPhoneOtp(formattedPhone, RECAPTCHA_CONTAINER_ID, forceRealOtp)
+      const result = await sendSmsOtp(formattedPhone, SMS_WIDGET_CONTAINER_ID, forceRealOtp)
       
-      if (result.success && result.confirmation) {
-        setConfirmation(result.confirmation)
+      if (result.success && result.session) {
+        setConfirmation(result.session)
         setStep('otp')
         setCountdown(60)
         setSmsError(null)
         haptics.light()
-        if (process.env.NODE_ENV === 'development' && result.isDebugUser) {
+        if (process.env.NODE_ENV === 'development' && result.isTestMode) {
           toast.success('מצב בדיקה - קוד: ' + TEST_USER.otpCode)
         } else {
           toast.success('קוד אימות נשלח!')
@@ -360,11 +368,12 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setError(null)
     
     try {
-      const result = await verifyOtp(confirmation, code)
+      const result = await verifySmsOtp(confirmation, code)
       
       if (result.success) {
         // Login successful - save to store
-        const customer = await login(phone.replace(/\D/g, ''), fullname, result.firebaseUid)
+        // Note: providerUid is stored in firebase_uid column for backward compatibility
+        const customer = await login(phone.replace(/\D/g, ''), fullname, result.providerUid)
         
         if (customer) {
           haptics.success()
@@ -486,8 +495,8 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           <X size={20} strokeWidth={1.5} />
         </button>
         
-        {/* reCAPTCHA container */}
-        <div id={RECAPTCHA_CONTAINER_ID} />
+        {/* SMS provider widget container - hidden by default */}
+        <div id={SMS_WIDGET_CONTAINER_ID} className="hidden" />
         
         {/* Title */}
         <h2 className="text-xl font-medium text-foreground-light text-center mb-6">
