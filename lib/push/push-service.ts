@@ -706,6 +706,9 @@ class PushNotificationService {
    * Send a custom notification to a specific user (all their devices)
    * Used by debug page and barber customer messaging
    * Supports both customer and barber recipients
+   * 
+   * When a barber sends to a customer, the title is prefixed with the barber's name
+   * to clearly indicate who the message is from.
    */
   async sendCustomNotification(params: {
     recipientType: RecipientType
@@ -718,8 +721,18 @@ class PushNotificationService {
   }): Promise<SendNotificationResult> {
     const { recipientType, recipientId, title, body, url, senderId, senderName } = params
 
+    // Format title to include sender name when barber sends to customer
+    // This helps customers know exactly who the message is from
+    let formattedTitle = title
+    if (senderName && recipientType === 'customer') {
+      // Only add prefix if not already starting with the sender name pattern
+      if (!title.startsWith('הודעה מ') && !title.includes(senderName)) {
+        formattedTitle = `💬 ${senderName}: ${title}`
+      }
+    }
+
     const payload: NotificationPayload = {
-      title,
+      title: formattedTitle,
       body,
       url: url || (recipientType === 'barber' ? '/barber/dashboard' : '/my-appointments'),
       tag: `custom-${Date.now()}`,

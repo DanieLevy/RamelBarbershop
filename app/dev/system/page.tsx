@@ -112,7 +112,7 @@ export default function DevSystemPage() {
         </div>
         <button
           onClick={fetchData}
-          className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+          className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors flex items-center justify-center"
           aria-label="Refresh"
         >
           <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />

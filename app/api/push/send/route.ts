@@ -25,7 +25,8 @@ export async function POST(request: NextRequest) {
       body: messageBody, 
       url, 
       barberName,
-      senderName 
+      senderName,
+      senderId
     } = body
 
     // Validate input - need either subscriptionId, customerId, or barberId
@@ -47,13 +48,14 @@ export async function POST(request: NextRequest) {
 
     if (customerId) {
       // Send to all customer's devices using pushService
-      console.log('[API push/send] Sending to customer:', customerId)
+      console.log('[API push/send] Sending to customer:', customerId, 'from:', senderName || barberName)
       result = await pushService.sendCustomNotification({
         recipientType: 'customer',
         recipientId: customerId,
         title,
         body: messageBody,
         url,
+        senderId,
         senderName: senderName || barberName
       })
     } else if (barberId) {

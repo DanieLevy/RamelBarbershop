@@ -68,7 +68,7 @@ export default function DevLayout({ children }: { children: React.ReactNode }) {
           </div>
           <button
             onClick={handleLogout}
-            className="p-2 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+            className="p-2 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors flex items-center justify-center"
             aria-label="Logout"
           >
             <LogOut size={18} />

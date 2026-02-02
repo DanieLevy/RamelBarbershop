@@ -111,7 +111,7 @@ export const HeroSection = ({
               <div className="absolute inset-0 rounded-full bg-accent-gold/10 blur-2xl scale-125" />
               
               {/* Logo container - sized for new branded icon */}
-              <div className="relative w-32 h-32 sm:w-40 sm:h-40 lg:w-48 lg:h-48 mx-auto rounded-full overflow-hidden border-2 border-accent-gold/30 shadow-lg bg-[#1a0a10]">
+              <div className="relative w-32 h-32 sm:w-40 sm:h-40 lg:w-48 lg:h-48 mx-auto rounded-full overflow-hidden border-2 border-white/20 shadow-lg bg-[#1a0a10]">
                 <Image
                   src="/icon.png"
                   alt="רם אל ברברשופ"

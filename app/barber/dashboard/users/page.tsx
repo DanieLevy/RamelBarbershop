@@ -508,7 +508,7 @@ export default function UsersManagementPage() {
           <div className="relative w-full max-w-sm bg-background-card border border-white/10 rounded-2xl p-6 animate-fade-in-up">
             <button
               onClick={() => setConfirmModal({ isOpen: false, type: 'block', customer: null })}
-              className="absolute top-4 left-4 p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+              className="absolute top-4 left-4 p-1.5 rounded-lg hover:bg-white/10 transition-colors flex items-center justify-center"
             >
               <X size={18} className="text-foreground-muted" />
             </button>

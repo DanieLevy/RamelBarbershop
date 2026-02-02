@@ -597,7 +597,7 @@ export default function MySchedulePage() {
                 </div>
                 <button
                   onClick={() => handleDeleteClosure(closure.id)}
-                  className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                  className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors flex items-center justify-center"
                 >
                   <Trash size={12} strokeWidth={1.5} />
                 </button>

@@ -495,7 +495,7 @@ export function ManualBookingModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-white/5 transition-colors"
+            className="p-2 rounded-full hover:bg-white/5 transition-colors flex items-center justify-center"
             aria-label="סגור"
           >
             <X size={20} className="text-foreground-muted" />
@@ -604,7 +604,7 @@ export function ManualBookingModal({
                   </div>
                   <button
                     onClick={() => setSelectedCustomer(null)}
-                    className="p-1 rounded-full hover:bg-white/10 transition-colors"
+                    className="p-1 rounded-full hover:bg-white/10 transition-colors flex items-center justify-center"
                   >
                     <X size={14} className="text-foreground-muted" />
                   </button>

@@ -73,7 +73,7 @@ export function CookieNotice() {
           {/* Close Button */}
           <button
             onClick={handleDismiss}
-            className="absolute top-3 left-3 text-foreground-muted hover:text-foreground-light transition-colors p-1.5 rounded-full hover:bg-white/10 pointer-events-auto touch-manipulation"
+            className="absolute top-3 left-3 text-foreground-muted hover:text-foreground-light transition-colors p-1.5 rounded-full hover:bg-white/10 pointer-events-auto touch-manipulation flex items-center justify-center"
             aria-label="סגור (יאשר עוגיות חיוניות בלבד)"
             type="button"
           >

@@ -195,7 +195,7 @@ export default function BarberProfilePage() {
                 </div>
                 <button
                   onClick={() => router.push('/barber/dashboard/reservations')}
-                  className="p-2 rounded-lg text-foreground-muted hover:text-accent-gold hover:bg-white/5 transition-colors"
+                  className="p-2 rounded-lg text-foreground-muted hover:text-accent-gold hover:bg-white/5 transition-colors flex items-center justify-center"
                   aria-label="צפה בתורים"
                 >
                   <ChevronRight size={18} strokeWidth={1.5} className="rotate-180" />

@@ -601,7 +601,7 @@ export default function BarbersPage() {
             {/* Close button */}
             <button
               onClick={() => setDeleteModal({ isOpen: false, step: 1, barber: null, confirmName: '' })}
-              className="absolute top-4 left-4 p-2 rounded-full hover:bg-white/5 transition-colors"
+              className="absolute top-4 left-4 p-2 rounded-full hover:bg-white/5 transition-colors flex items-center justify-center"
             >
               <X size={18} className="text-foreground-muted" />
             </button>
@@ -723,7 +723,7 @@ export default function BarbersPage() {
             {/* Close button */}
             <button
               onClick={() => setSelfPauseModal({ isOpen: false, action: 'pause' })}
-              className="absolute top-4 left-4 p-2 rounded-full hover:bg-white/5 transition-colors"
+              className="absolute top-4 left-4 p-2 rounded-full hover:bg-white/5 transition-colors flex items-center justify-center"
             >
               <X size={18} className="text-foreground-muted" />
             </button>

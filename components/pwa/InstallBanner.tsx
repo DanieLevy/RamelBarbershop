@@ -315,7 +315,7 @@ export function InstallBanner({
         {/* Close Button */}
         <button
           onClick={handleClose}
-          className="absolute top-4 left-4 p-2 text-foreground-muted hover:text-foreground-light transition-colors rounded-full hover:bg-white/10"
+          className="absolute top-4 left-4 p-2 text-foreground-muted hover:text-foreground-light transition-colors rounded-full hover:bg-white/10 flex items-center justify-center"
           aria-label="סגור"
         >
           <X size={20} />

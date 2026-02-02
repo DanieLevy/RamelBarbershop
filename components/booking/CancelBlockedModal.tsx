@@ -117,7 +117,7 @@ export function CancelBlockedModal({
           </div>
           <button
             onClick={handleClose}
-            className="p-2 rounded-full hover:bg-white/5 transition-colors"
+            className="p-2 rounded-full hover:bg-white/5 transition-colors flex items-center justify-center"
             aria-label="סגור"
           >
             <X size={20} className="text-foreground-muted" />

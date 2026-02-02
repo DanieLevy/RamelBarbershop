@@ -276,7 +276,8 @@ export default function MyCustomersPage() {
           title: pushTitle.trim(),
           body: pushBody.trim(),
           url: '/my-appointments',
-          barberName: barber?.fullname
+          barberName: barber?.fullname,
+          senderId: barber?.id
         })
       })
       
@@ -386,7 +387,7 @@ export default function MyCustomersPage() {
           </select>
           <button
             onClick={() => setSortDesc(!sortDesc)}
-            className="p-2 rounded-xl bg-background-card border border-white/10 text-foreground-muted hover:text-foreground-light transition-colors"
+            className="p-2 rounded-xl bg-background-card border border-white/10 text-foreground-muted hover:text-foreground-light transition-colors flex items-center justify-center"
             aria-label={sortDesc ? 'סדר עולה' : 'סדר יורד'}
           >
             {sortDesc ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
@@ -483,7 +484,7 @@ export default function MyCustomersPage() {
                       href={`https://wa.me/${formatPhoneForWhatsApp(customer.phone)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-2 rounded-lg hover:bg-green-500/10 transition-colors"
+                      className="p-2 rounded-lg hover:bg-green-500/10 transition-colors flex items-center justify-center"
                       aria-label="שלח הודעה בוואטסאפ"
                       title="וואטסאפ"
                     >
@@ -495,7 +496,7 @@ export default function MyCustomersPage() {
                   {customer.hasPushEnabled && (
                     <button
                       onClick={() => openPushModal(customer)}
-                      className="p-2 rounded-lg hover:bg-accent-gold/10 transition-colors"
+                      className="p-2 rounded-lg hover:bg-accent-gold/10 transition-colors flex items-center justify-center"
                       aria-label="שלח התראה"
                       title="שלח התראה"
                     >
@@ -537,7 +538,7 @@ export default function MyCustomersPage() {
               </div>
               <button
                 onClick={closePushModal}
-                className="p-2 rounded-full hover:bg-white/5 transition-colors"
+                className="p-2 rounded-full hover:bg-white/5 transition-colors flex items-center justify-center"
                 aria-label="סגור"
               >
                 <X size={20} className="text-foreground-muted" />
@@ -587,14 +588,14 @@ export default function MyCustomersPage() {
               {/* Preview */}
               {(pushTitle || pushBody) && (
                 <div className="bg-background-card border border-white/10 rounded-xl p-3">
-                  <p className="text-foreground-muted text-xs mb-2">תצוגה מקדימה:</p>
+                  <p className="text-foreground-muted text-xs mb-2">תצוגה מקדימה (כפי שיראה הלקוח):</p>
                   <div className="flex gap-3">
                     <div className="w-10 h-10 rounded-xl bg-accent-gold/20 flex items-center justify-center flex-shrink-0">
                       <Bell size={18} className="text-accent-gold" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-foreground-light font-medium text-sm truncate">
-                        {pushTitle || 'כותרת ההודעה'}
+                        {pushTitle ? `💬 ${barber?.fullname}: ${pushTitle}` : 'כותרת ההודעה'}
                       </p>
                       <p className="text-foreground-muted text-xs line-clamp-2">
                         {pushBody || 'תוכן ההודעה יופיע כאן...'}

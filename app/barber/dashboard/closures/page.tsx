@@ -247,7 +247,7 @@ export default function ClosuresPage() {
                 </div>
                 <button
                   onClick={() => handleDelete(closure.id)}
-                  className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                  className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors flex items-center justify-center"
                   title="מחק"
                 >
                   <Trash size={16} strokeWidth={1.5} />

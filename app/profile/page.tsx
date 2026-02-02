@@ -206,7 +206,7 @@ export default function ProfilePage() {
                   <button
                     onClick={handleCancelEdit}
                     disabled={savingName}
-                    className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                    className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors flex items-center justify-center"
                   >
                     <X size={18} strokeWidth={2} />
                   </button>
@@ -218,7 +218,7 @@ export default function ProfilePage() {
                   </h1>
                   <button
                     onClick={handleEditName}
-                    className="p-2 rounded-lg text-foreground-muted hover:text-accent-gold hover:bg-white/5 transition-colors"
+                    className="p-2 rounded-lg text-foreground-muted hover:text-accent-gold hover:bg-white/5 transition-colors flex items-center justify-center"
                     aria-label="ערוך שם"
                   >
                     <Edit2 size={16} strokeWidth={1.5} />
@@ -270,7 +270,7 @@ export default function ProfilePage() {
                 </div>
                 <button
                   onClick={() => router.push('/my-appointments')}
-                  className="p-2 rounded-lg text-foreground-muted hover:text-accent-gold hover:bg-white/5 transition-colors"
+                  className="p-2 rounded-lg text-foreground-muted hover:text-accent-gold hover:bg-white/5 transition-colors flex items-center justify-center"
                   aria-label="צפה בתורים"
                 >
                   <ChevronRight size={18} strokeWidth={1.5} className="rotate-180" />

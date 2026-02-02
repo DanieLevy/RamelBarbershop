@@ -129,7 +129,7 @@ export default function DevUsersPage() {
         <h1 className="text-xl font-bold text-white">Users</h1>
         <button
           onClick={() => tab === 'customers' ? fetchCustomers() : fetchBarbers()}
-          className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+          className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors flex items-center justify-center"
           aria-label="Refresh"
         >
           <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
