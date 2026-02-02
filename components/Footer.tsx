@@ -50,7 +50,7 @@ export function Footer({ settings }: FooterProps) {
   const router = useRouter()
   const { isAdmin, isLoggedIn: isBarberLoggedIn } = useBarberAuthStore()
   const currentYear = new Date().getFullYear()
-  const shopName = settings?.name || 'רמאל ברברשופ'
+  const shopName = settings?.name || 'רם אל ברברשופ'
   
   // Hidden dev access: tap copyright 5 times within 3 seconds
   const [tapCount, setTapCount] = useState(0)

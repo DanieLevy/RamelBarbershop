@@ -94,7 +94,7 @@ describe('Push Notification Types', () => {
         customerId: 'test-customer-id',
         barberId: 'test-barber-id',
         customerName: 'דניאל',
-        barberName: 'רמאל',
+        barberName: 'רם אל',
         serviceName: 'תספורת',
         appointmentTime: Date.now(),
       }
@@ -116,7 +116,7 @@ describe('Push Notification Types', () => {
         customerId: 'test-customer-id',
         barberId: 'test-barber-id',
         customerName: 'דניאל',
-        barberName: 'רמאל',
+        barberName: 'רם אל',
         serviceName: 'תספורת',
         appointmentTime: Date.now(),
         cancelledBy: 'customer',
@@ -131,7 +131,7 @@ describe('Push Notification Types', () => {
         customerId: 'test-customer-id',
         barberId: 'test-barber-id',
         customerName: 'דניאל',
-        barberName: 'רמאל',
+        barberName: 'רם אל',
         serviceName: 'תספורת',
         appointmentTime: Date.now(),
         cancelledBy: 'barber',
@@ -146,7 +146,7 @@ describe('Push Notification Types', () => {
     it('should have required fields', () => {
       const context: BroadcastContext = {
         senderId: 'test-sender-id',
-        senderName: 'רמאל',
+        senderName: 'רם אל',
         message: 'הודעה לכל הלקוחות',
       }
       
@@ -158,7 +158,7 @@ describe('Push Notification Types', () => {
     it('should accept optional targetCustomerIds', () => {
       const context: BroadcastContext = {
         senderId: 'test-sender-id',
-        senderName: 'רמאל',
+        senderName: 'רם אל',
         message: 'הודעה',
         targetCustomerIds: ['id1', 'id2', 'id3'],
       }

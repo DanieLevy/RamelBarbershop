@@ -39,7 +39,7 @@ export function Confirmation({ barber: _barber }: ConfirmationProps) {
       `💇 שירות: ${service?.name_he}\n` +
       `💰 מחיר: ₪${service?.price}\n\n` +
       `אנחנו ממתינים לך!\n` +
-      `רמאל ברברשופ 💈`
+      `רם אל ברברשופ 💈`
     )
     
     window.open(`https://wa.me/972${customer.phone.slice(1)}?text=${message}`, '_blank')

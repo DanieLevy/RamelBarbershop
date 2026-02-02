@@ -79,7 +79,7 @@ export function LocationSection({ settings }: LocationSectionProps) {
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
               className="border-0 w-full h-full rounded-2xl"
-              title="מפת מיקום רמאל ברברשופ"
+              title="מפת מיקום רם אל ברברשופ"
               style={{
                 filter: 'grayscale(100%) invert(92%) contrast(90%) brightness(95%)',
               }}

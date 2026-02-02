@@ -544,7 +544,7 @@ class PushNotificationService {
 
   /**
    * Get unread notification count for a recipient
-   * Only counts notifications where shouldBadge would be true
+   * Counts high-priority notifications that should show badges
    */
   async getUnreadCount(recipientType: RecipientType, recipientId: string): Promise<number> {
     const { count, error } = await supabase
@@ -553,9 +553,9 @@ class PushNotificationService {
       .eq('recipient_type', recipientType)
       .eq('recipient_id', recipientId)
       .eq('is_read', false)
-      .eq('status', 'sent')
-      // Only count high-priority notification types that show badges
-      .in('notification_type', ['reminder', 'cancellation', 'booking_confirmed'])
+      .in('status', ['sent', 'partial']) // Include partial successes
+      // Count all actionable notification types
+      .in('notification_type', ['reminder', 'cancellation', 'booking_confirmed', 'cancel_request'])
 
     if (error) {
       console.error('[PushService] Failed to get unread count:', error)
@@ -703,6 +703,98 @@ class PushNotificationService {
   }
 
   /**
+   * Send a custom notification to a specific user (all their devices)
+   * Used by debug page and barber customer messaging
+   * Supports both customer and barber recipients
+   */
+  async sendCustomNotification(params: {
+    recipientType: RecipientType
+    recipientId: string
+    title: string
+    body: string
+    url?: string
+    senderId?: string
+    senderName?: string
+  }): Promise<SendNotificationResult> {
+    const { recipientType, recipientId, title, body, url, senderId, senderName } = params
+
+    const payload: NotificationPayload = {
+      title,
+      body,
+      url: url || (recipientType === 'barber' ? '/barber/dashboard' : '/my-appointments'),
+      tag: `custom-${Date.now()}`,
+      requireInteraction: true,
+      shouldBadge: false, // Custom messages don't show badge
+      data: {
+        type: 'barber_broadcast', // Use existing type for SW routing
+        recipientType,
+        senderName,
+        timestamp: Date.now()
+      }
+    }
+
+    return this.sendTypedNotification({
+      type: 'barber_broadcast', // Use existing type for logging
+      recipientType,
+      recipientId,
+      senderId,
+      payload
+    })
+  }
+
+  /**
+   * Send a cancel request notification to a barber
+   * When customer is blocked from cancelling and wants to ask barber
+   */
+  async sendCancelRequest(params: {
+    reservationId: string
+    barberId: string
+    customerId: string
+    customerName: string
+    serviceName: string
+    appointmentTime: number
+  }): Promise<SendNotificationResult> {
+    const { reservationId, barberId, customerId, customerName, serviceName, appointmentTime } = params
+
+    // Format appointment time for the notification
+    const appointmentDate = new Date(appointmentTime)
+    const formattedDate = appointmentDate.toLocaleDateString('he-IL', { 
+      weekday: 'long', 
+      day: 'numeric', 
+      month: 'long' 
+    })
+    const formattedTime = appointmentDate.toLocaleTimeString('he-IL', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    })
+
+    const payload: NotificationPayload = {
+      title: `🙏 בקשת ביטול מ${customerName}`,
+      body: `${customerName} מבקש/ת לבטל את התור ל${serviceName} ב${formattedDate} בשעה ${formattedTime}`,
+      url: `/barber/dashboard/reservations?highlight=${reservationId}`,
+      tag: `cancel-request-${reservationId}`,
+      requireInteraction: true,
+      shouldBadge: true,
+      data: {
+        type: 'cancel_request',
+        recipientType: 'barber',
+        reservationId,
+        customerId,
+        customerName
+      }
+    }
+
+    return this.sendTypedNotification({
+      type: 'cancel_request' as NotificationType, // Will be logged properly
+      recipientType: 'barber',
+      recipientId: barberId,
+      reservationId,
+      senderId: customerId,
+      payload
+    })
+  }
+
+  /**
    * Get customer IDs with future appointments for a barber
    */
   private async getBarberCustomerIds(barberId: string): Promise<string[]> {
@@ -832,30 +924,93 @@ class PushNotificationService {
 
   /**
    * Get all subscriptions for a customer
+   * Also checks if the customer is a barber and includes those subscriptions
+   * This handles dual-role users (someone who is both customer and barber)
    */
   async getCustomerSubscriptions(customerId: string): Promise<PushSubscriptionRecord[]> {
-    const { data } = await supabase
+    // Get subscriptions linked to customer_id
+    const { data: customerSubs } = await supabase
       .from('push_subscriptions')
       .select('*')
       .eq('customer_id', customerId)
       .eq('is_active', true)
       .order('last_used', { ascending: false })
 
-    return (data as PushSubscriptionRecord[]) || []
+    // Check if this customer is also a barber (dual-role)
+    const { data: barberCheck } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', customerId)
+      .eq('is_barber', true)
+      .single()
+
+    let allSubs = (customerSubs as PushSubscriptionRecord[]) || []
+
+    // If they're also a barber, include barber subscriptions too
+    if (barberCheck) {
+      const { data: barberSubs } = await supabase
+        .from('push_subscriptions')
+        .select('*')
+        .eq('barber_id', customerId)
+        .eq('is_active', true)
+
+      if (barberSubs) {
+        // Merge, avoiding duplicates by endpoint
+        const existingEndpoints = new Set(allSubs.map(s => s.endpoint))
+        for (const sub of barberSubs as PushSubscriptionRecord[]) {
+          if (!existingEndpoints.has(sub.endpoint)) {
+            allSubs.push(sub)
+          }
+        }
+      }
+    }
+
+    return allSubs
   }
 
   /**
    * Get all subscriptions for a barber
+   * Also checks if the barber is registered as a customer and includes those subscriptions
+   * This handles dual-role users
    */
   async getBarberSubscriptions(barberId: string): Promise<PushSubscriptionRecord[]> {
-    const { data } = await supabase
+    // Get subscriptions linked to barber_id
+    const { data: barberSubs } = await supabase
       .from('push_subscriptions')
       .select('*')
       .eq('barber_id', barberId)
       .eq('is_active', true)
       .order('last_used', { ascending: false })
 
-    return (data as PushSubscriptionRecord[]) || []
+    // Check if this barber also has a customer record
+    const { data: customerCheck } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('id', barberId)
+      .single()
+
+    let allSubs = (barberSubs as PushSubscriptionRecord[]) || []
+
+    // If they're also a customer, include customer subscriptions too
+    if (customerCheck) {
+      const { data: customerSubs } = await supabase
+        .from('push_subscriptions')
+        .select('*')
+        .eq('customer_id', barberId)
+        .eq('is_active', true)
+
+      if (customerSubs) {
+        // Merge, avoiding duplicates by endpoint
+        const existingEndpoints = new Set(allSubs.map(s => s.endpoint))
+        for (const sub of customerSubs as PushSubscriptionRecord[]) {
+          if (!existingEndpoints.has(sub.endpoint)) {
+            allSubs.push(sub)
+          }
+        }
+      }
+    }
+
+    return allSubs
   }
 
   /**

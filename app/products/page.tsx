@@ -7,8 +7,8 @@ import { ChevronRight } from 'lucide-react'
 import type { Product } from '@/types/database'
 
 export const metadata = {
-  title: 'המוצרים שלנו | רמאל ברברשופ',
-  description: 'קטלוג המוצרים של רמאל ברברשופ - מוצרי טיפוח וסטיילינג לגבר המודרני',
+  title: 'המוצרים שלנו | רם אל ברברשופ',
+  description: 'קטלוג המוצרים של רם אל ברברשופ - מוצרי טיפוח וסטיילינג לגבר המודרני',
 }
 
 export default async function ProductsPage() {

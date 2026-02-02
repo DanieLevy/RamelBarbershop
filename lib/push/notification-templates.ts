@@ -338,7 +338,7 @@ function getAdminBroadcastTemplate(context: BroadcastContext & { recipientType?:
   }
   
   return {
-    title: '📣 רמאל ברברשופ',
+    title: '📣 רם אל ברברשופ',
     body: context.message,
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-72x72.png',
@@ -365,7 +365,7 @@ function getDefaultTemplate(): NotificationPayload {
   }
   
   return {
-    title: 'רמאל ברברשופ',
+    title: 'רם אל ברברשופ',
     body: 'יש לך הודעה חדשה',
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-72x72.png',

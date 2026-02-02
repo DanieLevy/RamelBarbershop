@@ -1,6 +1,6 @@
 {
-  "name": "רמאל ברברשופ - Ramel Barbershop",
-  "short_name": "רמאל",
+  "name": "רם אל ברברשופ - Ramel Barbershop",
+  "short_name": "רם אל",
   "description": "מספרה מקצועית בירושלים - קביעת תורים אונליין",
   "lang": "he",
   "dir": "rtl",
@@ -90,14 +90,14 @@
       "short_name": "תור חדש",
       "description": "קביעת תור אצל הספר",
       "url": "/?action=book&source=pwa",
-      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
+      "icons": [{ "src": "/icons/shortcut-book.png", "sizes": "96x96", "type": "image/png" }]
     },
     {
       "name": "התורים שלי",
       "short_name": "תורים",
       "description": "צפייה בתורים הקיימים",
       "url": "/my-appointments?source=pwa",
-      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
+      "icons": [{ "src": "/icons/shortcut-appointments.png", "sizes": "96x96", "type": "image/png" }]
     }
   ],
   "protocol_handlers": [

@@ -21,7 +21,7 @@ describe('Notification Templates', () => {
         customerId: CUSTOMER_UUID,
         barberId: VALID_UUID,
         customerName: 'דניאל לוי',
-        barberName: 'רמאל לאוסאני',
+        barberName: 'רם אל לאוסאני',
         serviceName: 'תספורת גבר',
         appointmentTime: Date.now() + 3600000,
       }
@@ -84,7 +84,7 @@ describe('Notification Templates', () => {
         barberId: VALID_UUID,
         cancelledBy: 'customer',
         customerName: 'דניאל לוי',
-        barberName: 'רמאל לאוסאני',
+        barberName: 'רם אל לאוסאני',
         serviceName: 'תספורת גבר',
         appointmentTime: Date.now() + 3600000,
         reason: 'שינוי תכניות',
@@ -118,7 +118,7 @@ describe('Notification Templates', () => {
         barberId: VALID_UUID,
         cancelledBy: 'barber',
         customerName: 'דניאל לוי',
-        barberName: 'רמאל לאוסאני',
+        barberName: 'רם אל לאוסאני',
         serviceName: 'תספורת גבר',
         appointmentTime: Date.now() + 3600000,
       }
@@ -156,7 +156,7 @@ describe('Notification Templates', () => {
         customerId: CUSTOMER_UUID,
         barberId: VALID_UUID,
         customerName: 'דניאל לוי',
-        barberName: 'רמאל לאוסאני',
+        barberName: 'רם אל לאוסאני',
         serviceName: 'תספורת גבר',
         appointmentTime: Date.now() + 86400000,
       }
@@ -184,7 +184,7 @@ describe('Notification Templates', () => {
 
     describe('chat_message notification', () => {
       const chatContext = {
-        senderName: 'רמאל לאוסאני',
+        senderName: 'רם אל לאוסאני',
         message: 'היי, האם אתה זמין לתספורת מחר?',
       }
 
@@ -212,7 +212,7 @@ describe('Notification Templates', () => {
     describe('barber_broadcast notification', () => {
       const broadcastContext: BroadcastContext = {
         senderId: VALID_UUID,
-        senderName: 'רמאל לאוסאני',
+        senderName: 'רם אל לאוסאני',
         message: 'שינוי בשעות הפעילות השבוע',
       }
 
@@ -243,7 +243,7 @@ describe('Notification Templates', () => {
 
       it('should generate admin broadcast template', () => {
         const template = getNotificationTemplate('admin_broadcast', adminBroadcastContext)
-        expect(template.title).toContain('רמאל')
+        expect(template.title).toContain('רם אל')
       })
 
       it('should include message in body', () => {

@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pushService } from '@/lib/push/push-service'
 import { createClient } from '@/lib/supabase/server'
+import { reportServerError } from '@/lib/bug-reporter/helpers'
 
 export async function POST(request: NextRequest) {
   try {
@@ -100,6 +101,9 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('[API] Error marking notifications as read:', error)
+    await reportServerError(error, 'POST /api/push/mark-read', {
+      route: '/api/push/mark-read'
+    })
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -142,6 +146,9 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('[API] Error getting unread count:', error)
+    await reportServerError(error, 'GET /api/push/mark-read', {
+      route: '/api/push/mark-read'
+    })
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

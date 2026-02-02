@@ -34,7 +34,7 @@ const validPayloadByCustomer = {
   barberId: VALID_UUID,
   cancelledBy: 'customer' as const,
   customerName: 'דניאל לוי',
-  barberName: 'רמאל לאוסאני',
+  barberName: 'רם אל לאוסאני',
   serviceName: 'תספורת גבר',
   appointmentTime: Date.now() + 86400000,
 }
@@ -45,7 +45,7 @@ const validPayloadByBarber = {
   barberId: VALID_UUID,
   cancelledBy: 'barber' as const,
   customerName: 'דניאל לוי',
-  barberName: 'רמאל לאוסאני',
+  barberName: 'רם אל לאוסאני',
   serviceName: 'תספורת גבר',
   appointmentTime: Date.now() + 86400000,
   reason: 'בעיה טכנית',

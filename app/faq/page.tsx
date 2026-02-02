@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 
 // Metadata would need to be exported from a separate file for client components
 // export const metadata: Metadata = {
-//   title: 'שאלות נפוצות | רמאל ברברשופ',
+//   title: 'שאלות נפוצות | רם אל ברברשופ',
 //   description: 'תשובות לשאלות נפוצות על קביעת תורים, ביטולים, התקנת האפליקציה ועוד',
 // }
 
@@ -152,7 +152,7 @@ const faqCategories: FAQCategory[] = [
               <li>התקינו את האפליקציה (ראו שאלה קודמת)</li>
               <li>פתחו את האפליקציה מהמסך הראשי</li>
               <li>אשרו התראות כשתתבקשו</li>
-              <li>היכנסו להגדרות הטלפון → התראות → רמאל ברברשופ</li>
+              <li>היכנסו להגדרות הטלפון → התראות → רם אל ברברשופ</li>
               <li>וודאו שהכל מופעל</li>
             </ol>
           </div>

@@ -24,6 +24,7 @@ const notificationTypeInfo: Record<NotificationType, { icon: typeof Bell; label:
   reminder: { icon: Clock, label: 'תזכורת', color: 'text-blue-400' },
   cancellation: { icon: X, label: 'ביטול', color: 'text-red-400' },
   booking_confirmed: { icon: Calendar, label: 'תור חדש', color: 'text-green-400' },
+  cancel_request: { icon: Bell, label: 'בקשת ביטול', color: 'text-orange-400' },
   chat_message: { icon: Bell, label: 'הודעה', color: 'text-purple-400' },
   barber_broadcast: { icon: Bell, label: 'הודעה מהספר', color: 'text-accent-gold' },
   admin_broadcast: { icon: Bell, label: 'הודעה מהמערכת', color: 'text-accent-gold' }

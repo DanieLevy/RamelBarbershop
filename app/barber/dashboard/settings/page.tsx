@@ -286,7 +286,7 @@ export default function SettingsPage() {
                       label="כותרת ראשית" 
                       value={heroTitle} 
                       onChange={setHeroTitle} 
-                      placeholder="רמאל ברברשופ"
+                      placeholder="רם אל ברברשופ"
                     />
                     <InputField 
                       label="תת-כותרת" 
@@ -299,7 +299,7 @@ export default function SettingsPage() {
                       value={heroDescription} 
                       onChange={setHeroDescription}
                       rows={4}
-                      placeholder="רמאל ברברשופ הוא מקום ייחודי במינו..."
+                      placeholder="רם אל ברברשופ הוא מקום ייחודי במינו..."
                     />
                   </div>
                 )}

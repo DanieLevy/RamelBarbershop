@@ -13,7 +13,7 @@ export const TEST_BARBERS = {
   admin: {
     id: '550e8400-e29b-41d4-a716-446655440001',
     username: 'ramel',
-    fullname: 'רמאל לאוסאני',
+    fullname: 'רם אל לאוסאני',
     role: 'admin' as const,
     is_active: true,
   },
@@ -57,7 +57,7 @@ export const TEST_CUSTOMERS = {
 // ============================================================
 
 export const TEST_SERVICES = {
-  // Services for admin barber (רמאל לאוסאני)
+  // Services for admin barber (רם אל לאוסאני)
   classic: {
     id: 'd3149338-1a32-4734-ba9d-ccef864aed95',
     name_he: 'תספורת קלאסית + זקן חדש!',

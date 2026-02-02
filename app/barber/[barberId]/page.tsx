@@ -63,20 +63,20 @@ export async function generateMetadata({ params }: BarberPageProps): Promise<Met
   const canonicalUrl = `https://ramel-barbershop.netlify.app/barber/${preferredSlug}`
   
   return {
-    title: `${barberName} | רמאל ברברשופ`,
-    description: `קבע תור אצל ${barberName} ברמאל ברברשופ. שירות מקצועי, תספורות איכותיות.`,
+    title: `${barberName} | רם אל ברברשופ`,
+    description: `קבע תור אצל ${barberName} ברם אל ברברשופ. שירות מקצועי, תספורות איכותיות.`,
     openGraph: {
-      title: `${barberName} | רמאל ברברשופ`,
-      description: `קבע תור אצל ${barberName} ברמאל ברברשופ`,
+      title: `${barberName} | רם אל ברברשופ`,
+      description: `קבע תור אצל ${barberName} ברם אל ברברשופ`,
       url: canonicalUrl,
-      siteName: 'רמאל ברברשופ',
+      siteName: 'רם אל ברברשופ',
       locale: 'he_IL',
       type: 'profile',
     },
     twitter: {
       card: 'summary_large_image',
-      title: `${barberName} | רמאל ברברשופ`,
-      description: `קבע תור אצל ${barberName} ברמאל ברברשופ`,
+      title: `${barberName} | רם אל ברברשופ`,
+      description: `קבע תור אצל ${barberName} ברם אל ברברשופ`,
     },
     alternates: {
       canonical: canonicalUrl,

@@ -204,7 +204,7 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
             
             <p className="text-foreground-muted text-xs mb-3">
               {push.isIOS 
-                ? 'יש לפתוח הגדרות המכשיר → התראות → רמאל ברברשופ → הפעל'
+                ? 'יש לפתוח הגדרות המכשיר → התראות → רם אל ברברשופ → הפעל'
                 : 'יש ללחוץ על 🔒 ליד שורת הכתובת → התראות → אפשר'
               }
             </p>

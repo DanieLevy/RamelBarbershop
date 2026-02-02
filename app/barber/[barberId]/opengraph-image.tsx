@@ -11,7 +11,7 @@ export const size = {
 export const contentType = 'image/png'
 
 // Alt text for accessibility
-export const alt = 'רמאל ברברשופ - קביעת תור'
+export const alt = 'רם אל ברברשופ - קביעת תור'
 
 interface Props {
   params: Promise<{ barberId: string }>
@@ -67,7 +67,7 @@ export default async function Image({ params }: Props) {
   }
   
   // Default values if barber not found
-  const barberName = barber?.fullname || 'רמאל ברברשופ'
+  const barberName = barber?.fullname || 'רם אל ברברשופ'
   const barberImage = barber?.img_url || null
   
   return new ImageResponse(
@@ -215,7 +215,7 @@ export default async function Image({ params }: Props) {
             fontSize: 20,
           }}
         >
-          רמאל ברברשופ • Ramel Barbershop
+          רם אל ברברשופ • Ramel Barbershop
         </div>
         
         {/* Corner accents */}

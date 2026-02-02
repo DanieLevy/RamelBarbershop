@@ -25,7 +25,7 @@ interface HeroSectionProps {
  * - Full notch integration for PWA
  */
 export const HeroSection = ({
-  title = 'רמאל ברברשופ',
+  title = 'רם אל ברברשופ',
   subtitle = 'חווית טיפוח ייחודית לגבר המודרני',
   description = 'מספרה מקצועית בירושלים עם צוות מנוסה ואווירה נעימה. אנו מציעים שירותי תספורת, עיצוב זקן וטיפוח מקצועי.',
   ctaText = 'קבע תור עכשיו',

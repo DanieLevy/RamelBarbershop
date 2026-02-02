@@ -42,7 +42,7 @@ export default function Loading() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/icon.png"
-              alt="רמאל ברברשופ"
+              alt="רם אל ברברשופ"
               className="w-full h-full object-cover"
             />
           </div>
@@ -51,7 +51,7 @@ export default function Loading() {
         {/* Brand name */}
         <div className="text-center">
           <h1 className="text-xl font-semibold text-foreground-light">
-            רמאל <span className="text-accent-gold">ברברשופ</span>
+            רם אל <span className="text-accent-gold">ברברשופ</span>
           </h1>
         </div>
 

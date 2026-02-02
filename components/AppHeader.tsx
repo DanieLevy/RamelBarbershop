@@ -488,7 +488,7 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
                     'font-medium text-foreground-light block transition-all duration-300',
                     isScrolled ? 'text-sm sm:text-base' : 'text-base sm:text-lg'
                   )}>
-                    רמאל <span className="text-accent-gold">ברברשופ</span>
+                    רם אל <span className="text-accent-gold">ברברשופ</span>
                   </span>
                 </button>
               </div>
@@ -571,7 +571,7 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
                   />
                 </div>
                 <div>
-                  <span className="font-semibold text-foreground-light block">רמאל ברברשופ</span>
+                  <span className="font-semibold text-foreground-light block">רם אל ברברשופ</span>
                   <span className="text-xs text-accent-gold">חווית טיפוח לגבר</span>
                 </div>
               </div>
@@ -669,7 +669,7 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
             
             <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10 bg-background-darker">
               <p className="text-center text-foreground-muted text-xs">
-                © 2025 רמאל ברברשופ
+                © 2025 רם אל ברברשופ
               </p>
             </div>
           </div>

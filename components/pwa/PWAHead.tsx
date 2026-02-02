@@ -11,8 +11,8 @@ export function PWAHead() {
       {/* Standard PWA Meta Tags */}
       <meta name="mobile-web-app-capable" content="yes" />
       <meta name="apple-touch-fullscreen" content="yes" />
-      <meta name="apple-mobile-web-app-title" content="רמאל ברברשופ" />
-      <meta name="application-name" content="רמאל ברברשופ" />
+      <meta name="apple-mobile-web-app-title" content="רם אל ברברשופ" />
+      <meta name="application-name" content="רם אל ברברשופ" />
       <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       <meta name="msapplication-TileColor" content="#080b0d" />
       <meta name="msapplication-TileImage" content="/icons/icon-144x144.png" />

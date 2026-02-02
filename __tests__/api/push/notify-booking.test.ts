@@ -33,7 +33,7 @@ const validPayload = {
   customerId: CUSTOMER_UUID,
   barberId: VALID_UUID,
   customerName: 'דניאל לוי',
-  barberName: 'רמאל לאוסאני',
+  barberName: 'רם אל לאוסאני',
   serviceName: 'תספורת גבר',
   appointmentTime: Date.now() + 86400000,
 }

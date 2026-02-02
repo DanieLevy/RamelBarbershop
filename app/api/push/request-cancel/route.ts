@@ -1,24 +1,26 @@
+/**
+ * API Route: Request Cancellation from Barber
+ * 
+ * Called when a customer is blocked from cancelling (within cancel policy window)
+ * and wants to request the barber to cancel on their behalf.
+ * 
+ * - Sends push notification to barber
+ * - Logs the request in reservation notes
+ * - Tracks the request in notification logs
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import webpush from 'web-push'
-import { format } from 'date-fns'
-import { he } from 'date-fns/locale'
+import { pushService } from '@/lib/push/push-service'
+import { reportServerError } from '@/lib/bug-reporter/helpers'
+
+export const dynamic = 'force-dynamic'
 
 // Initialize Supabase client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
-
-// VAPID configuration
-const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
-const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || ''
-const vapidEmail = process.env.VAPID_EMAIL || 'mailto:admin@ramel-barbershop.co.il'
-
-// Initialize web-push
-if (vapidPublicKey && vapidPrivateKey) {
-  webpush.setVapidDetails(vapidEmail, vapidPublicKey, vapidPrivateKey)
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,154 +30,71 @@ export async function POST(request: NextRequest) {
       barberId, 
       customerId, 
       customerName, 
-      barberName, 
       serviceName, 
       appointmentTime 
     } = body
 
     // Validate required fields
     if (!reservationId || !barberId || !customerName || !appointmentTime) {
+      console.error('[Request Cancel] Missing required fields:', { reservationId, barberId, customerName, appointmentTime })
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
         { status: 400 }
       )
     }
 
-    // Format appointment time for the notification
-    const appointmentDate = new Date(appointmentTime)
-    const formattedDate = format(appointmentDate, 'EEEE, d בMMMM', { locale: he })
-    const formattedTime = format(appointmentDate, 'HH:mm')
+    console.log('[Request Cancel] Processing request:', {
+      reservationId,
+      barberId,
+      customerName,
+      serviceName
+    })
 
-    // Get barber's push subscriptions
-    const { data: subscriptions, error: subError } = await supabase
-      .from('push_subscriptions')
-      .select('id, endpoint, p256dh, auth')
-      .eq('barber_id', barberId)
-      .eq('is_active', true)
+    // Send notification using pushService (includes retry logic, logging, error handling)
+    const result = await pushService.sendCancelRequest({
+      reservationId,
+      barberId,
+      customerId: customerId || '',
+      customerName,
+      serviceName: serviceName || 'התור',
+      appointmentTime
+    })
 
-    if (subError) {
-      console.error('[Request Cancel] Error fetching subscriptions:', subError)
-      return NextResponse.json(
-        { success: false, error: 'Failed to fetch barber subscriptions' },
-        { status: 500 }
-      )
-    }
+    console.log('[Request Cancel] Push result:', result)
 
-    if (!subscriptions || subscriptions.length === 0) {
-      // Log the request even if barber has no push subscriptions
-      await logCancelRequest(reservationId, customerId, barberId, customerName, 'no_subscription')
+    // Log the cancel request to reservation notes (for barber visibility)
+    await logCancelRequestToReservation(reservationId, customerName, result.success)
+
+    // Return result
+    if (!result.success && result.sent === 0) {
+      // No subscriptions or all failed
+      const noSubs = result.errors.some(e => e.includes('No active subscriptions'))
       
       return NextResponse.json({
-        success: true,
-        message: 'Request logged, but barber has no push subscriptions',
-        notificationSent: false
+        success: true, // Request was logged even if notification failed
+        message: noSubs 
+          ? 'Request logged, but barber has no push notifications enabled'
+          : 'Request logged, but notification delivery failed',
+        notificationSent: false,
+        logId: result.logId
       })
     }
 
-    // Build notification payload - MUST wrap in 'notification' object for service worker
-    const payload = JSON.stringify({
-      notification: {
-        title: `🙏 בקשת ביטול מ${customerName}`,
-        body: `${customerName} מבקש/ת לבטל את התור ל${serviceName} ב${formattedDate} בשעה ${formattedTime}`,
-        icon: '/icons/icon-192x192.png',
-        badge: '/icons/icon-72x72.png',
-        tag: `cancel-request-${reservationId}`,
-        requireInteraction: true,
-        data: {
-          url: `/barber/dashboard/reservations?highlight=${reservationId}`,
-          timestamp: Date.now(),
-          type: 'cancel_request',
-          recipientType: 'barber',
-          reservationId,
-          customerId,
-          customerName
-        },
-        actions: [
-          { action: 'view', title: 'צפה בפרטים' },
-          { action: 'dismiss', title: 'סגור' }
-        ]
-      },
-      badgeCount: 1
-    })
-
-    // Send to all barber's devices
-    let succeeded = 0
-    let failed = 0
-
-    for (const sub of subscriptions) {
-      try {
-        const pushSubscription = {
-          endpoint: sub.endpoint,
-          keys: {
-            p256dh: sub.p256dh,
-            auth: sub.auth,
-          },
-        }
-
-        await webpush.sendNotification(pushSubscription, payload)
-        
-        // Update success status
-        await supabase
-          .from('push_subscriptions')
-          .update({
-            last_used: new Date().toISOString(),
-            last_delivery_status: 'success',
-            consecutive_failures: 0,
-          })
-          .eq('id', sub.id)
-        
-        succeeded++
-      } catch (pushError) {
-        console.error('[Request Cancel] Push error:', pushError)
-        failed++
-        
-        // Handle permanent errors
-        if (pushError instanceof webpush.WebPushError && [404, 410, 401].includes(pushError.statusCode)) {
-          await supabase
-            .from('push_subscriptions')
-            .update({ is_active: false, last_delivery_status: 'failed' })
-            .eq('id', sub.id)
-        }
-      }
-    }
-
-    // Log the notification
-    await supabase.from('notification_logs').insert({
-      notification_type: 'cancel_request',
-      recipient_type: 'barber',
-      recipient_id: barberId,
-      reservation_id: reservationId,
-      sender_id: customerId,
-      title: `🙏 בקשת ביטול מ${customerName}`,
-      body: `${customerName} מבקש/ת לבטל את התור ל${serviceName}`,
-      payload: { 
-        reservationId, 
-        customerId, 
-        customerName, 
-        serviceName, 
-        appointmentTime,
-        barberName 
-      },
-      devices_targeted: subscriptions.length,
-      devices_succeeded: succeeded,
-      devices_failed: failed,
-      status: succeeded > 0 ? 'sent' : 'failed',
-      sent_at: new Date().toISOString(),
-    })
-
-    // Also log the cancel request itself
-    await logCancelRequest(reservationId, customerId, barberId, customerName, succeeded > 0 ? 'notified' : 'failed')
-
     return NextResponse.json({
       success: true,
-      message: `Cancel request sent to ${succeeded} device(s)`,
-      notificationSent: succeeded > 0,
-      devicesTargeted: subscriptions.length,
-      devicesSucceeded: succeeded,
-      devicesFailed: failed
+      message: `Cancel request sent to ${result.sent} device(s)`,
+      notificationSent: result.sent > 0,
+      devicesTargeted: result.sent + result.failed,
+      devicesSucceeded: result.sent,
+      devicesFailed: result.failed,
+      logId: result.logId
     })
   } catch (error) {
     console.error('[Request Cancel] Error:', error)
+    await reportServerError(error, 'POST /api/push/request-cancel', {
+      route: '/api/push/request-cancel',
+      severity: 'high'
+    })
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
@@ -183,34 +102,47 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Log cancel request for tracking (even if notification fails)
-async function logCancelRequest(
+/**
+ * Log cancel request to reservation notes for barber visibility
+ * This provides an audit trail even if push fails
+ */
+async function logCancelRequestToReservation(
   reservationId: string,
-  _customerId: string,
-  _barberId: string,
   customerName: string,
-  _status: 'notified' | 'no_subscription' | 'failed'
-) {
+  notificationSent: boolean
+): Promise<void> {
   try {
     // Get current notes
-    const { data: reservation } = await supabase
+    const { data: reservation, error: fetchError } = await supabase
       .from('reservations')
       .select('barber_notes')
       .eq('id', reservationId)
       .single()
+
+    if (fetchError) {
+      console.error('[Request Cancel] Error fetching reservation:', fetchError)
+      return
+    }
     
     const existingNotes = reservation?.barber_notes || ''
-    const newNote = `[${new Date().toLocaleString('he-IL')}] בקשת ביטול מ${customerName}`
+    const timestamp = new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' })
+    const status = notificationSent ? '✓' : '⚠️ (ללא התראה)'
+    const newNote = `[${timestamp}] ${status} בקשת ביטול מ${customerName}`
     const updatedNotes = existingNotes ? `${existingNotes}\n${newNote}` : newNote
     
     // Update with the new note appended
-    await supabase
+    const { error: updateError } = await supabase
       .from('reservations')
       .update({ barber_notes: updatedNotes })
       .eq('id', reservationId)
-    
-    console.log('[Request Cancel] Logged cancel request to reservation notes')
+
+    if (updateError) {
+      console.error('[Request Cancel] Error updating reservation notes:', updateError)
+    } else {
+      console.log('[Request Cancel] Logged cancel request to reservation notes')
+    }
   } catch (err) {
     console.error('[Request Cancel] Error logging cancel request:', err)
+    // Don't throw - this is non-critical
   }
 }

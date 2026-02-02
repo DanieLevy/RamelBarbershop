@@ -20,13 +20,18 @@ import os
 
 # Configuration
 INPUT = "NewIcon.png"
-PROJECT_ROOT = Path(__file__).parent.parent.parent  # Go up to project root
+SCRIPT_DIR = Path(__file__).parent
+PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent  # Go up to project root
 ICONS_DIR = PROJECT_ROOT / "public" / "icons"
 PUBLIC_DIR = PROJECT_ROOT / "public"
 APP_DIR = PROJECT_ROOT / "app"
+BRANDING_DIR = PUBLIC_DIR / "assets" / "branding"
 
 def save_icon(img, size, output_path):
     """Resize and save icon to specified path, replacing if exists"""
+    # Ensure parent directory exists
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
     # Remove existing file first
     if output_path.exists():
         output_path.unlink()
@@ -37,6 +42,8 @@ def save_icon(img, size, output_path):
 
 def save_ico(img, output_path, sizes):
     """Generate multi-size ICO file, replacing if exists"""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
     if output_path.exists():
         output_path.unlink()
     
@@ -57,19 +64,20 @@ def save_ico(img, output_path, sizes):
 
 def copy_file(src, dst):
     """Copy file, replacing if exists"""
+    dst.parent.mkdir(parents=True, exist_ok=True)
     if dst.exists():
         dst.unlink()
     shutil.copy(src, dst)
-    print(f"  ✓ Copied {src.name} → {dst}")
+    print(f"  ✓ Copied {src.name} → {dst.relative_to(PROJECT_ROOT)}")
 
 def main():
     print("🎨 Ramel Barbershop Icon Generator")
     print("=" * 50)
     
     # Check if input file exists
-    input_path = Path(__file__).parent / INPUT
+    input_path = SCRIPT_DIR / INPUT
     if not input_path.exists():
-        print(f"\n❌ Error: '{INPUT}' not found in {Path(__file__).parent}")
+        print(f"\n❌ Error: '{INPUT}' not found in {SCRIPT_DIR}")
         print("   Please place your source logo image as 'NewIcon.png'")
         return
     
@@ -84,6 +92,7 @@ def main():
     
     # Ensure output directories exist
     ICONS_DIR.mkdir(parents=True, exist_ok=True)
+    BRANDING_DIR.mkdir(parents=True, exist_ok=True)
     
     generated_count = 0
     
@@ -105,6 +114,9 @@ def main():
         (152, "apple-touch-icon-152x152.png"),
         (167, "apple-touch-icon-167x167.png"),
         (180, "apple-touch-icon-180x180.png"),
+        # Additional iOS home screen sizes
+        (120, "apple-touch-icon-120x120.png"),
+        (76, "apple-touch-icon-76x76.png"),
     ]
     for size, name in apple_icons:
         save_icon(img, size, ICONS_DIR / name)
@@ -133,11 +145,26 @@ def main():
     generated_count += 1
     
     # ============================================
-    # Main logo for app use (high-res)
+    # Main logo and branding (high-res)
     # ============================================
-    print("\n✨ Generating main logo...")
+    print("\n✨ Generating main logo and branding...")
     save_icon(img, 512, PUBLIC_DIR / "logo.png")
-    generated_count += 1
+    save_icon(img, 512, PUBLIC_DIR / "icon.png")
+    generated_count += 2
+    
+    # High-res version for branding
+    save_icon(img, 1024, BRANDING_DIR / "logo-1024.png")
+    save_icon(img, 512, BRANDING_DIR / "logo-512.png")
+    save_icon(img, 256, BRANDING_DIR / "logo-256.png")
+    generated_count += 3
+    
+    # ============================================
+    # Shortcut icons for PWA (using main icon)
+    # ============================================
+    print("\n🔗 Generating shortcut icons...")
+    save_icon(img, 96, ICONS_DIR / "shortcut-book.png")
+    save_icon(img, 96, ICONS_DIR / "shortcut-appointments.png")
+    generated_count += 2
     
     # ============================================
     # Summary
@@ -145,17 +172,21 @@ def main():
     print("\n" + "=" * 50)
     print(f"✅ All {generated_count} icons generated successfully!")
     print("\n📍 Files placed in:")
-    print(f"   • {ICONS_DIR}")
+    print(f"   • {ICONS_DIR.relative_to(PROJECT_ROOT)}")
     print(f"     └─ PWA icons (72-512px)")
     print(f"     └─ Apple Touch icons")
-    print(f"   • {PUBLIC_DIR}")
+    print(f"     └─ Shortcut icons")
+    print(f"   • {PUBLIC_DIR.relative_to(PROJECT_ROOT)}")
     print(f"     └─ favicon.ico, favicon-*.png")
     print(f"     └─ apple-touch-icon.png")
-    print(f"     └─ logo.png (512x512)")
-    print(f"   • {APP_DIR}")
+    print(f"     └─ logo.png, icon.png (512x512)")
+    print(f"   • {BRANDING_DIR.relative_to(PROJECT_ROOT)}")
+    print(f"     └─ High-res logos (256-1024px)")
+    print(f"   • {APP_DIR.relative_to(PROJECT_ROOT)}")
     print(f"     └─ favicon.ico")
     print("\n💡 Tip: Run again anytime to regenerate all icons!")
     print("   Just replace 'NewIcon.png' with your new design.")
+    print("\n⚠️  Remember to update the SW version to push new icons!")
 
 if __name__ == "__main__":
     main()

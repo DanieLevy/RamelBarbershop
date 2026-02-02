@@ -11,13 +11,13 @@ import { CookieNotice } from '@/components/legal/CookieNotice'
 import { SkipLink } from '@/components/a11y/SkipLink'
 
 export const metadata: Metadata = {
-  title: 'רמאל ברברשופ - Ramel Barbershop',
-  description: 'מספרה מקצועית בירושלים - רמאל ברברשופ | קביעת תורים אונליין',
+  title: 'רם אל ברברשופ - Ramel Barbershop',
+  description: 'מספרה מקצועית בירושלים - רם אל ברברשופ | קביעת תורים אונליין',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'רמאל ברברשופ',
+    title: 'רם אל ברברשופ',
   },
   formatDetection: {
     telephone: false,
@@ -26,9 +26,15 @@ export const metadata: Metadata = {
     icon: [
       { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
       { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
     ],
     apple: [
       { url: '/icons/apple-touch-icon-180x180.png', sizes: '180x180', type: 'image/png' },
+      { url: '/icons/apple-touch-icon-167x167.png', sizes: '167x167', type: 'image/png' },
+      { url: '/icons/apple-touch-icon-152x152.png', sizes: '152x152', type: 'image/png' },
+      { url: '/icons/apple-touch-icon-120x120.png', sizes: '120x120', type: 'image/png' },
+      { url: '/icons/apple-touch-icon-76x76.png', sizes: '76x76', type: 'image/png' },
     ],
     shortcut: '/favicon.ico',
   },

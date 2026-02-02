@@ -87,7 +87,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <main id="main-content" tabIndex={-1} className="relative outline-none">
         {/* Hero Section - Full viewport with animated reveal */}
         <HeroSection 
-          title={settings?.hero_title || 'רמאל ברברשופ'}
+          title={settings?.hero_title || 'רם אל ברברשופ'}
           subtitle={settings?.hero_subtitle || 'חווית טיפוח ייחודית לגבר המודרני'}
           description={settings?.hero_description || 'מספרה מקצועית בירושלים עם צוות מנוסה ואווירה נעימה. אנו מציעים שירותי תספורת, עיצוב זקן וטיפוח מקצועי.'}
           ctaText="קבע תור עכשיו"

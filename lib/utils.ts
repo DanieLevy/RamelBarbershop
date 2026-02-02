@@ -618,7 +618,7 @@ const hebrewToLatinMap: Record<string, string> = {
 
 /**
  * Generate a URL-safe slug from a name (supports Hebrew and English)
- * @param name The name to convert (e.g., "רמאל" or "Ramel")
+ * @param name The name to convert (e.g., "רם אל" or "Ramel")
  * @returns URL-safe slug (e.g., "ramal" or "ramel")
  */
 export function generateSlugFromName(name: string): string {

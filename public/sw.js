@@ -1,19 +1,33 @@
 // Service Worker for Ramel Barbershop PWA
 // Version is updated automatically during build
-const APP_VERSION = '2.0.0-2026.02.02.0041';
+const APP_VERSION = '2.0.0-2026.02.02.1121';
 const CACHE_NAME = `ramel-pwa-${APP_VERSION}`;
 
 // Assets to cache - critical for app shell and fast loading
+// These are pre-cached on install for offline app shell
 const STATIC_ASSETS = [
   '/manifest.json',
+  // Fonts
   '/fonts/ploni-regular-aaa.otf',
   '/fonts/ploni-light-aaa.otf',
   '/fonts/ploni-ultralight-aaa.otf',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
+  // PWA Icons (all sizes for home screen and splash)
   '/icons/icon-72x72.png',
+  '/icons/icon-96x96.png',
+  '/icons/icon-128x128.png',
+  '/icons/icon-144x144.png',
+  '/icons/icon-152x152.png',
+  '/icons/icon-192x192.png',
+  '/icons/icon-384x384.png',
+  '/icons/icon-512x512.png',
+  // Apple Touch Icons
   '/apple-touch-icon.png',
-  '/icon.png'
+  '/icons/apple-touch-icon-180x180.png',
+  '/icons/apple-touch-icon-152x152.png',
+  // Main branding
+  '/icon.png',
+  '/logo.png',
+  '/favicon.ico'
 ];
 
 // Next.js static assets pattern - cached with stale-while-revalidate
@@ -211,7 +225,7 @@ function getOfflinePage() {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#080b0d">
-  <title>אין חיבור לאינטרנט - רמאל ברברשופ</title>
+  <title>אין חיבור לאינטרנט - רם אל ברברשופ</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -277,7 +291,7 @@ function getOfflinePage() {
       <path d="M1 1l22 22M9 9v-3a3 3 0 0 1 5.12-2.12M15 15.53c-.28.17-.58.31-.88.43-1.46.6-3.24.6-4.7 0A7 7 0 0 1 5 9m14 0a7 7 0 0 1-.33 2.12M5 19a10.94 10.94 0 0 0 7 2.54c2.24 0 4.3-.63 6-1.7" stroke-linecap="round"/>
     </svg>
     <img src="/icon.png" alt="" class="logo">
-    <h1>רמאל <span class="gold">ברברשופ</span></h1>
+    <h1>רם אל <span class="gold">ברברשופ</span></h1>
     <p>אין חיבור לאינטרנט.<br>אנא בדוק את החיבור ונסה שוב.</p>
     <button onclick="location.reload()">נסה שוב</button>
   </div>
@@ -317,7 +331,7 @@ self.addEventListener('push', (event) => {
 
   // Default notification data
   let notificationData = {
-    title: 'רמאל ברברשופ',
+    title: 'רם אל ברברשופ',
     body: 'יש לך התראה חדשה',
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-72x72.png',
