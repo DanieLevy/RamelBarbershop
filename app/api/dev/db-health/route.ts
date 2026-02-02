@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
       supabase.from('barbershop_settings').select('id', { count: 'exact', head: true }),
       supabase.from('customer_notification_settings').select('id', { count: 'exact', head: true }),
       supabase.from('barber_notification_settings').select('id', { count: 'exact', head: true }),
+      supabase.from('barber_booking_settings').select('id', { count: 'exact', head: true }),
     ])
 
     const tables = [
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest) {
       { name: 'barbershop_settings', rows: tableCounts[12].count || 0 },
       { name: 'customer_notification_settings', rows: tableCounts[13].count || 0 },
       { name: 'barber_notification_settings', rows: tableCounts[14].count || 0 },
+      { name: 'barber_booking_settings', rows: tableCounts[15].count || 0 },
     ]
 
     // Check database connectivity with timing

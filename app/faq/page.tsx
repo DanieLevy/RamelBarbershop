@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, ChevronDown, HelpCircle, Calendar, Smartphone, User, MapPin, CreditCard, MessageCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getExternalLinkProps } from '@/lib/utils/external-link'
 
 // Metadata would need to be exported from a separate file for client components
 // export const metadata: Metadata = {
@@ -416,9 +417,7 @@ export default function FAQPage() {
               <span>התקשרו אלינו</span>
             </a>
             <a
-              href="https://wa.me/972523840981"
-              target="_blank"
-              rel="noopener noreferrer"
+              {...getExternalLinkProps("https://wa.me/972523840981")}
               className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white/5 text-foreground-light font-medium rounded-xl hover:bg-white/10 transition-colors border border-white/10"
             >
               <span>שלחו וואטסאפ</span>

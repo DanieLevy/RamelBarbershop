@@ -348,7 +348,7 @@ export async function createBarber(data: {
     // Don't fail the barber creation, just log the error
   }
   
-  // Create default barber_notification_settings entry
+  // Create default barber_notification_settings entry (notification preferences only)
   const { error: notificationSettingsError } = await supabase.from('barber_notification_settings')
     .insert({
       barber_id: createdUser.id,
@@ -362,6 +362,24 @@ export async function createBarber(data: {
     console.error('Error creating default barber_notification_settings:', notificationSettingsError)
     await reportSupabaseError(notificationSettingsError, 'Creating Default Notification Settings for New Barber', {
       table: 'barber_notification_settings',
+      operation: 'insert',
+    })
+    // Don't fail the barber creation, just log the error
+  }
+  
+  // Create default barber_booking_settings entry (booking/cancellation policies)
+  const { error: bookingSettingsError } = await supabase.from('barber_booking_settings')
+    .insert({
+      barber_id: createdUser.id,
+      max_booking_days_ahead: 15,    // מספר ימים שניתן לקבוע תור מראש
+      min_hours_before_booking: 1,   // ניתן להירשם לתור עד X שעות לפני
+      min_cancel_hours: 2,           // ניתן לבטל תור עד X שעות לפני
+    })
+  
+  if (bookingSettingsError) {
+    console.error('Error creating default barber_booking_settings:', bookingSettingsError)
+    await reportSupabaseError(bookingSettingsError, 'Creating Default Booking Settings for New Barber', {
+      table: 'barber_booking_settings',
       operation: 'insert',
     })
     // Don't fail the barber creation, just log the error

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import type { BarberWithWorkDays } from '@/types/database'
 import { Calendar, Loader2, ChevronLeft, Instagram } from 'lucide-react'
 import { cn, getPreferredBarberSlug } from '@/lib/utils'
+import { getExternalLinkProps } from '@/lib/utils/external-link'
 
 interface BarberCardProps {
   barber: BarberWithWorkDays
@@ -148,10 +149,12 @@ export function BarberCard({ barber, index = 0 }: BarberCardProps) {
           {/* Instagram Link - Top Left */}
           {(barber as { instagram_url?: string | null }).instagram_url && (
             <a
-              href={(barber as { instagram_url?: string }).instagram_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
+              {...getExternalLinkProps((barber as { instagram_url?: string }).instagram_url || '')}
+              onClick={(e) => {
+                e.stopPropagation()
+                const linkProps = getExternalLinkProps((barber as { instagram_url?: string }).instagram_url || '')
+                if (linkProps.onClick) linkProps.onClick(e)
+              }}
               className="absolute top-4 left-4 z-20 w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-transform"
               aria-label={`עקוב אחרי ${barber.fullname} באינסטגרם`}
             >

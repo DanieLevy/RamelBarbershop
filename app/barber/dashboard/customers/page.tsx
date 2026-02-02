@@ -5,6 +5,7 @@ import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { getExternalLinkProps } from '@/lib/utils/external-link'
 import { 
   Users, 
   Search, 
@@ -481,9 +482,7 @@ export default function MyCustomersPage() {
                   {/* WhatsApp */}
                   {customer.phone && !customer.phone.startsWith('walkin-') && (
                     <a
-                      href={`https://wa.me/${formatPhoneForWhatsApp(customer.phone)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      {...getExternalLinkProps(`https://wa.me/${formatPhoneForWhatsApp(customer.phone)}`)}
                       className="p-2 rounded-lg hover:bg-green-500/10 transition-colors flex items-center justify-center"
                       aria-label="שלח הודעה בוואטסאפ"
                       title="וואטסאפ"

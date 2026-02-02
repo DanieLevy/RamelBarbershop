@@ -3,7 +3,8 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBookingStore } from '@/store/useBookingStore'
-import type { WorkDay, BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure } from '@/types/database'
+import { createClient } from '@/lib/supabase/client'
+import type { WorkDay, BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure, BarberBookingSettings } from '@/types/database'
 import { cn, nowInIsrael, getIsraelDayStart, getDayIndexInIsrael } from '@/lib/utils'
 import { ChevronRight, ChevronLeft, X } from 'lucide-react'
 
@@ -77,8 +78,29 @@ export function DateSelection({
   const [currentMonth, setCurrentMonth] = useState(() => new Date())
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null)
   const [unavailableInfo, setUnavailableInfo] = useState<UnavailableInfo>({ show: false, reason: '' })
+  const [barberBookingSettings, setBarberBookingSettings] = useState<BarberBookingSettings | null>(null)
   const gridRef = useRef<HTMLDivElement>(null)
   const cellRefs = useRef<(HTMLButtonElement | null)[]>([])
+
+  // Fetch barber booking settings
+  useEffect(() => {
+    if (!barberId) return
+    
+    const fetchBookingSettings = async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('barber_booking_settings')
+        .select('*')
+        .eq('barber_id', barberId)
+        .single()
+      
+      if (data) {
+        setBarberBookingSettings(data as BarberBookingSettings)
+      }
+    }
+    
+    fetchBookingSettings()
+  }, [barberId])
 
   // Generate calendar days for the current month view
   const calendarDays = useMemo(() => {
@@ -126,14 +148,15 @@ export function DateSelection({
     return days
   }, [currentMonth])
 
-  // Calculate max booking date based on settings
+  // Calculate max booking date based on barber settings (priority) or shop settings (fallback)
   const maxBookingDate = useMemo(() => {
-    const maxDays = shopSettings?.max_booking_days_ahead || 21
+    // Use barber-specific setting if available, otherwise fall back to shop setting
+    const maxDays = barberBookingSettings?.max_booking_days_ahead ?? shopSettings?.max_booking_days_ahead ?? 15
     const today = nowInIsrael()
     const maxDate = new Date(today)
     maxDate.setDate(maxDate.getDate() + maxDays)
     return getIsraelDayStart(maxDate)
-  }, [shopSettings?.max_booking_days_ahead])
+  }, [barberBookingSettings?.max_booking_days_ahead, shopSettings?.max_booking_days_ahead])
 
   // Check if a date is available with structured response
   const checkAvailability = useCallback((day: CalendarDay): AvailabilityResult => {
@@ -161,7 +184,7 @@ export function DateSelection({
     
     // 3. Check if out of booking range
     if (day.dateTimestamp > maxBookingDate) {
-      const maxDays = shopSettings?.max_booking_days_ahead || 21
+      const maxDays = barberBookingSettings?.max_booking_days_ahead ?? shopSettings?.max_booking_days_ahead ?? 15
       return { 
         available: false, 
         reason: `ניתן לקבוע תור עד ${maxDays} ימים מראש`, 
@@ -216,7 +239,7 @@ export function DateSelection({
     }
     
     return { available: true }
-  }, [shopSettings, shopClosures, barberSchedule, barberClosures, workDays, maxBookingDate])
+  }, [shopSettings, shopClosures, barberSchedule, barberClosures, workDays, maxBookingDate, barberBookingSettings])
 
   // Handle date selection - allows clicking outside-month days if they're available
   const handleSelect = useCallback((day: CalendarDay, index: number) => {

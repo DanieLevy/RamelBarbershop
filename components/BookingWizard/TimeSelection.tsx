@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { createClient } from '@/lib/supabase/client'
-import { formatTime, cn, parseTimeString, generateTimeSlots, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael } from '@/lib/utils'
-import type { TimeSlot, BarbershopSettings, BarberSchedule, WorkDay } from '@/types/database'
-import { ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
+import { formatTime, cn, parseTimeString, generateTimeSlots, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael, nowInIsrael } from '@/lib/utils'
+import type { TimeSlot, BarbershopSettings, BarberSchedule, WorkDay, BarberBookingSettings } from '@/types/database'
+import { ChevronRight, ChevronDown, ChevronUp, Clock } from 'lucide-react'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { getWorkHours as getWorkHoursFromService, workDaysToMap } from '@/lib/services/availability.service'
@@ -19,17 +19,39 @@ interface TimeSelectionProps {
 
 interface EnrichedTimeSlot extends TimeSlot {
   reservedBy?: string
+  tooSoon?: boolean // True if slot is within min_hours_before_booking
 }
 
 export function TimeSelection({ barberId, shopSettings, barberSchedule, barberWorkDays }: TimeSelectionProps) {
   const { date, timeTimestamp, setTime, nextStep, prevStep } = useBookingStore()
   const [availableSlots, setAvailableSlots] = useState<EnrichedTimeSlot[]>([])
   const [reservedSlots, setReservedSlots] = useState<EnrichedTimeSlot[]>([])
+  const [tooSoonSlots, setTooSoonSlots] = useState<EnrichedTimeSlot[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showReserved, setShowReserved] = useState(false)
+  const [showTooSoon, setShowTooSoon] = useState(false)
   const [workDays, setWorkDays] = useState<WorkDay[]>(barberWorkDays || [])
+  const [barberBookingSettings, setBarberBookingSettings] = useState<BarberBookingSettings | null>(null)
   const { report } = useBugReporter('TimeSelection')
+
+  // Fetch barber booking settings
+  useEffect(() => {
+    const fetchBookingSettings = async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('barber_booking_settings')
+        .select('*')
+        .eq('barber_id', barberId)
+        .single()
+      
+      if (data) {
+        setBarberBookingSettings(data as BarberBookingSettings)
+      }
+    }
+    
+    fetchBookingSettings()
+  }, [barberId])
 
   // Fetch work days if not provided as prop
   useEffect(() => {
@@ -123,9 +145,16 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule, barberWo
           }
         }
         
-        // Split slots into available and reserved - simple timestamp check
+        // Calculate minimum booking time threshold
+        // min_hours_before_booking: how many hours before the slot must you book
+        const minHoursBefore = barberBookingSettings?.min_hours_before_booking ?? 1
+        const nowMs = nowInIsrael().getTime()
+        const minBookingTimeMs = nowMs + (minHoursBefore * 60 * 60 * 1000)
+        
+        // Split slots into available, reserved, and too soon
         const available: EnrichedTimeSlot[] = []
         const reserved: EnrichedTimeSlot[] = []
+        const tooSoon: EnrichedTimeSlot[] = []
         
         for (const slot of allSlots) {
           if (reservedTimestamps.has(slot.timestamp)) {
@@ -133,6 +162,13 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule, barberWo
               time_timestamp: slot.timestamp,
               is_available: false,
               reservedBy: reservedMap.get(slot.timestamp),
+            })
+          } else if (slot.timestamp < minBookingTimeMs) {
+            // Slot is within min_hours_before_booking window - can't book
+            tooSoon.push({
+              time_timestamp: slot.timestamp,
+              is_available: false,
+              tooSoon: true,
             })
           } else {
             available.push({
@@ -144,6 +180,7 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule, barberWo
         
         setAvailableSlots(available)
         setReservedSlots(reserved)
+        setTooSoonSlots(tooSoon)
       } catch (err) {
         console.error('Error fetching time slots:', err)
         await report(err, 'Fetching time slots (exception)')
@@ -155,7 +192,7 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule, barberWo
 
     fetchTimeSlots()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [barberId, date, workDays])
+  }, [barberId, date, workDays, barberBookingSettings])
 
   const handleSelect = (timestamp: number) => {
     setTime(timestamp)
@@ -227,6 +264,40 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule, barberWo
             </div>
           )}
           
+          {/* Too Soon Slots (expandable) - within min booking window */}
+          {tooSoonSlots.length > 0 && (
+            <div className="mt-2">
+              <button
+                onClick={() => setShowTooSoon(!showTooSoon)}
+                className="flex items-center gap-2 text-sm text-foreground-muted hover:text-foreground-light transition-colors py-2"
+              >
+                {showTooSoon ? (
+                  <ChevronUp size={12} strokeWidth={1.5} />
+                ) : (
+                  <ChevronDown size={12} strokeWidth={1.5} />
+                )}
+                <Clock size={12} strokeWidth={1.5} className="text-orange-400" />
+                <span className="text-orange-400/80">
+                  ניתן להירשם עד {barberBookingSettings?.min_hours_before_booking ?? 1} שעות לפני ({tooSoonSlots.length})
+                </span>
+              </button>
+              
+              {showTooSoon && (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 mt-2 animate-fade-in">
+                  {tooSoonSlots.map((slot) => (
+                    <div
+                      key={slot.time_timestamp}
+                      className="py-3 px-2 rounded-xl text-sm font-medium bg-orange-500/10 border border-orange-500/20 text-orange-400/60 cursor-not-allowed text-center"
+                      title={`ניתן להירשם עד ${barberBookingSettings?.min_hours_before_booking ?? 1} שעות לפני התור`}
+                    >
+                      {formatTime(slot.time_timestamp)}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Reserved Slots (expandable) */}
           {reservedSlots.length > 0 && (
             <div className="mt-2">

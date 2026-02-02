@@ -196,14 +196,13 @@ describe('Push Notification Types', () => {
         notifications_enabled: true,
         reminder_enabled: true,
         cancellation_alerts_enabled: true,
-        marketing_enabled: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
       
       expect(settings.notifications_enabled).toBe(true)
       expect(settings.reminder_enabled).toBe(true)
-      expect(settings.marketing_enabled).toBe(false)
+      expect(settings.cancellation_alerts_enabled).toBe(true)
     })
   })
 

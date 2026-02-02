@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useBookingStore } from '@/store/useBookingStore'
 import { formatTime, formatDateHebrew } from '@/lib/utils'
+import { openExternalLink } from '@/lib/utils/external-link'
 import type { User } from '@/types/database'
 import { CheckCircle, Calendar, Clock, Scissors, User as UserIcon, Phone } from 'lucide-react'
 import { Confetti } from '@/components/ui/Confetti'
@@ -42,7 +43,7 @@ export function Confirmation({ barber: _barber }: ConfirmationProps) {
       `רם אל ברברשופ 💈`
     )
     
-    window.open(`https://wa.me/972${customer.phone.slice(1)}?text=${message}`, '_blank')
+    openExternalLink(`https://wa.me/972${customer.phone.slice(1)}?text=${message}`)
   }
 
   return (

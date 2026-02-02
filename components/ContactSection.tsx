@@ -3,6 +3,7 @@
 import { Phone, Mail, Clock } from 'lucide-react'
 import { SectionContainer, SectionHeader, SectionContent } from './home/SectionContainer'
 import { cn, formatOpeningHours, isTimeWithinBusinessHours } from '@/lib/utils'
+import { openExternalLink } from '@/lib/utils/external-link'
 import type { BarbershopSettings } from '@/types/database'
 
 // Social media icons
@@ -79,7 +80,7 @@ export function ContactSection({ settings }: ContactSectionProps) {
   }
 
   const openWhatsApp = () => {
-    window.open(`https://wa.me/${whatsappNumber}`, '_blank')
+    openExternalLink(`https://wa.me/${whatsappNumber}`)
   }
 
   const openEmail = () => {
@@ -155,7 +156,7 @@ export function ContactSection({ settings }: ContactSectionProps) {
 
           {showInstagram && instagramUrl && (
             <button
-              onClick={() => window.open(instagramUrl, '_blank')}
+              onClick={() => openExternalLink(instagramUrl)}
               className={cn(
                 'flex flex-col items-center justify-center gap-2 p-4',
                 'glass-subtle rounded-xl',
@@ -170,7 +171,7 @@ export function ContactSection({ settings }: ContactSectionProps) {
 
           {showFacebook && facebookUrl && (
             <button
-              onClick={() => window.open(facebookUrl, '_blank')}
+              onClick={() => openExternalLink(facebookUrl)}
               className={cn(
                 'flex flex-col items-center justify-center gap-2 p-4',
                 'glass-subtle rounded-xl',
@@ -185,7 +186,7 @@ export function ContactSection({ settings }: ContactSectionProps) {
 
           {showTiktok && tiktokUrl && (
             <button
-              onClick={() => window.open(tiktokUrl, '_blank')}
+              onClick={() => openExternalLink(tiktokUrl)}
               className={cn(
                 'flex flex-col items-center justify-center gap-2 p-4',
                 'glass-subtle rounded-xl',

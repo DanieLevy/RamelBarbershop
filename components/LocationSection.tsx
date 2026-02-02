@@ -3,6 +3,7 @@
 import { MapPin, Navigation, Car, Clock } from 'lucide-react'
 import { SectionContainer, SectionHeader, SectionContent } from './home/SectionContainer'
 import { cn, isTimeWithinBusinessHours } from '@/lib/utils'
+import { openExternalLink } from '@/lib/utils/external-link'
 import type { BarbershopSettings } from '@/types/database'
 
 // Waze icon
@@ -45,8 +46,8 @@ export function LocationSection({ settings }: LocationSectionProps) {
   const currentTime = israelDate.toTimeString().slice(0, 5)
   const isOpen = openDays.includes(currentDay) && isTimeWithinBusinessHours(currentTime, workStart, workEnd)
 
-  const openWaze = () => window.open(wazeLink, '_blank')
-  const openGoogleMaps = () => window.open(googleMapsLink, '_blank')
+  const openWaze = () => openExternalLink(wazeLink)
+  const openGoogleMaps = () => openExternalLink(googleMapsLink)
 
   // Map embed URL
   const mapEmbedUrl = `https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d13566.520697368585!2d${addressLng}!3d${addressLat}!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x1502d74338829eb5%3A0x9a52d98b2c4f2c86!2sRAMEL%20BARBER%20SHOP!5e0!3m2!1siw!2sil!4v1700732215681!5m2!1siw!2sil`

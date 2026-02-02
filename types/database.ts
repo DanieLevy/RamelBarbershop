@@ -159,7 +159,6 @@ export type Database = {
           broadcast_enabled: boolean
           created_at: string | null
           id: string
-          min_cancel_hours: number
           notify_on_customer_cancel: boolean
           notify_on_new_booking: boolean
           reminder_hours_before: number
@@ -170,7 +169,6 @@ export type Database = {
           broadcast_enabled?: boolean
           created_at?: string | null
           id?: string
-          min_cancel_hours?: number
           notify_on_customer_cancel?: boolean
           notify_on_new_booking?: boolean
           reminder_hours_before?: number
@@ -181,7 +179,6 @@ export type Database = {
           broadcast_enabled?: boolean
           created_at?: string | null
           id?: string
-          min_cancel_hours?: number
           notify_on_customer_cancel?: boolean
           notify_on_new_booking?: boolean
           reminder_hours_before?: number
@@ -190,6 +187,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "barber_notification_settings_barber_id_fkey"
+            columns: ["barber_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      barber_booking_settings: {
+        Row: {
+          id: string
+          barber_id: string
+          max_booking_days_ahead: number
+          min_hours_before_booking: number
+          min_cancel_hours: number
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          barber_id: string
+          max_booking_days_ahead?: number
+          min_hours_before_booking?: number
+          min_cancel_hours?: number
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          barber_id?: string
+          max_booking_days_ahead?: number
+          min_hours_before_booking?: number
+          min_cancel_hours?: number
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "barber_booking_settings_barber_id_fkey"
             columns: ["barber_id"]
             isOneToOne: true
             referencedRelation: "users"
@@ -1160,6 +1195,7 @@ export type PushSubscriptionInsert = TablesInsert<'push_subscriptions'>
 export type NotificationLog = Tables<'notification_logs'>
 export type NotificationLogInsert = TablesInsert<'notification_logs'>
 export type BarberNotificationSettingsRow = Tables<'barber_notification_settings'>
+export type BarberBookingSettingsRow = Tables<'barber_booking_settings'>
 export type CustomerNotificationSettingsRow = Tables<'customer_notification_settings'>
 
 // Trusted device types
@@ -1273,4 +1309,25 @@ export interface PushDeviceInfo {
   deviceName: string | null
   lastUsed: string | null
   createdAt: string | null
+}
+
+// =============================================================================
+// BARBER BOOKING SETTINGS
+// =============================================================================
+
+/**
+ * Barber booking settings - controls booking and cancellation policies
+ * Separate from notification settings for clean separation of concerns
+ */
+export interface BarberBookingSettings {
+  id: string
+  barber_id: string
+  /** מספר ימים שניתן לקבוע תור מראש (default: 15) */
+  max_booking_days_ahead: number
+  /** ניתן להירשם לתור עד X שעות לפני (default: 1) */
+  min_hours_before_booking: number
+  /** ניתן לבטל תור עד X שעות לפני (default: 2) */
+  min_cancel_hours: number
+  created_at: string | null
+  updated_at: string | null
 }

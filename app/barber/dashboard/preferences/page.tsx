@@ -4,9 +4,10 @@ import { useEffect, useState, useCallback } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { cn, formatHebrewHours, formatHebrewDays } from '@/lib/utils'
-import { Clock, BellRing, CalendarPlus, XCircle, Loader2, ShieldAlert } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Calendar, Clock, BellRing, XCircle, CalendarPlus, Loader2, Save } from 'lucide-react'
 import type { BarberNotificationSettings } from '@/lib/push/types'
+import type { BarberBookingSettings } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
 
 export default function PreferencesPage() {
@@ -14,96 +15,143 @@ export default function PreferencesPage() {
   const { report } = useBugReporter('PreferencesPage')
   
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  
+  // Notification settings
   const [notifSettings, setNotifSettings] = useState<BarberNotificationSettings | null>(null)
   const [reminderHours, setReminderHours] = useState(3)
   const [notifyOnCancel, setNotifyOnCancel] = useState(true)
   const [notifyOnNewBooking, setNotifyOnNewBooking] = useState(true)
-  const [minCancelHours, setMinCancelHours] = useState(3)
-  const [savingNotifSettings, setSavingNotifSettings] = useState(false)
+  
+  // Booking settings
+  const [bookingSettings, setBookingSettings] = useState<BarberBookingSettings | null>(null)
+  const [maxBookingDaysAhead, setMaxBookingDaysAhead] = useState(15)
+  const [minHoursBeforeBooking, setMinHoursBeforeBooking] = useState(1)
+  const [minCancelHours, setMinCancelHours] = useState(2)
 
-  const fetchNotificationSettings = useCallback(async () => {
+  const fetchSettings = useCallback(async () => {
     if (!barber?.id) return
     
     setLoading(true)
     const supabase = createClient()
     
-    const { data, error } = await supabase.from('barber_notification_settings')
-      .select('*')
-      .eq('barber_id', barber.id)
-      .single()
+    // Fetch both settings in parallel
+    const [notifResult, bookingResult] = await Promise.all([
+      supabase.from('barber_notification_settings')
+        .select('*')
+        .eq('barber_id', barber.id)
+        .single(),
+      supabase.from('barber_booking_settings')
+        .select('*')
+        .eq('barber_id', barber.id)
+        .single()
+    ])
     
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching notification settings:', error)
-      setLoading(false)
-      return
-    }
-    
-    if (data) {
-      const settings = data as BarberNotificationSettings & { min_cancel_hours?: number }
+    // Handle notification settings
+    if (notifResult.data) {
+      const settings = notifResult.data as BarberNotificationSettings
       setNotifSettings(settings)
       setReminderHours(settings.reminder_hours_before)
       setNotifyOnCancel(settings.notify_on_customer_cancel)
       setNotifyOnNewBooking(settings.notify_on_new_booking)
-      setMinCancelHours(settings.min_cancel_hours ?? 3)
-    } else {
-      // Create default settings for this barber
-      const { data: newSettings, error: insertError } = await supabase.from('barber_notification_settings')
-        .insert({ barber_id: barber.id })
+    } else if (!notifResult.error || notifResult.error.code === 'PGRST116') {
+      // Create default notification settings
+      const { data: newSettings } = await supabase.from('barber_notification_settings')
+        .insert({ 
+          barber_id: barber.id,
+          reminder_hours_before: 3,
+          notify_on_customer_cancel: true,
+          notify_on_new_booking: true,
+          broadcast_enabled: true
+        })
         .select()
         .single()
       
-      if (insertError) {
-        console.error('Error creating notification settings:', insertError)
-      } else if (newSettings) {
-        const settings = newSettings as BarberNotificationSettings & { min_cancel_hours?: number }
-        setNotifSettings(settings)
-        setReminderHours(settings.reminder_hours_before)
-        setNotifyOnCancel(settings.notify_on_customer_cancel)
-        setNotifyOnNewBooking(settings.notify_on_new_booking)
-        setMinCancelHours(settings.min_cancel_hours ?? 3)
+      if (newSettings) {
+        setNotifSettings(newSettings as BarberNotificationSettings)
       }
     }
+    
+    // Handle booking settings
+    if (bookingResult.data) {
+      const settings = bookingResult.data as BarberBookingSettings
+      setBookingSettings(settings)
+      setMaxBookingDaysAhead(settings.max_booking_days_ahead)
+      setMinHoursBeforeBooking(settings.min_hours_before_booking)
+      setMinCancelHours(settings.min_cancel_hours)
+    } else if (!bookingResult.error || bookingResult.error.code === 'PGRST116') {
+      // Create default booking settings
+      const { data: newSettings } = await supabase.from('barber_booking_settings')
+        .insert({ 
+          barber_id: barber.id,
+          max_booking_days_ahead: 15,
+          min_hours_before_booking: 1,
+          min_cancel_hours: 2
+        })
+        .select()
+        .single()
+      
+      if (newSettings) {
+        setBookingSettings(newSettings as BarberBookingSettings)
+      }
+    }
+    
     setLoading(false)
   }, [barber?.id])
 
   useEffect(() => {
     if (barber?.id) {
-      fetchNotificationSettings()
+      fetchSettings()
     }
-  }, [barber?.id, fetchNotificationSettings])
+  }, [barber?.id, fetchSettings])
 
-  const handleSaveNotifSettings = async () => {
-    if (!barber?.id || !notifSettings) return
+  const handleSave = async () => {
+    if (!barber?.id) return
     
-    setSavingNotifSettings(true)
+    setSaving(true)
     
     try {
       const supabase = createClient()
+      const now = new Date().toISOString()
       
-      const { error } = await supabase.from('barber_notification_settings')
-        .update({
-          reminder_hours_before: reminderHours,
-          notify_on_customer_cancel: notifyOnCancel,
-          notify_on_new_booking: notifyOnNewBooking,
-          min_cancel_hours: minCancelHours,
-          updated_at: new Date().toISOString()
-        })
-        .eq('barber_id', barber.id)
+      // Save both settings in parallel
+      const [notifError, bookingError] = await Promise.all([
+        // Update notification settings
+        supabase.from('barber_notification_settings')
+          .update({
+            reminder_hours_before: reminderHours,
+            notify_on_customer_cancel: notifyOnCancel,
+            notify_on_new_booking: notifyOnNewBooking,
+            updated_at: now
+          })
+          .eq('barber_id', barber.id)
+          .then(r => r.error),
+        // Update booking settings
+        supabase.from('barber_booking_settings')
+          .update({
+            max_booking_days_ahead: maxBookingDaysAhead,
+            min_hours_before_booking: minHoursBeforeBooking,
+            min_cancel_hours: minCancelHours,
+            updated_at: now
+          })
+          .eq('barber_id', barber.id)
+          .then(r => r.error)
+      ])
       
-      if (error) {
-        console.error('Error saving notification settings:', error)
-        await report(new Error(error.message), 'Saving notification settings')
-        toast.error('שגיאה בשמירת הגדרות ההתראות')
+      if (notifError || bookingError) {
+        console.error('Error saving settings:', notifError || bookingError)
+        await report(new Error((notifError || bookingError)?.message || 'Unknown error'), 'Saving preferences')
+        toast.error('שגיאה בשמירת ההגדרות')
         return
       }
       
-      toast.success('הגדרות ההתראות נשמרו בהצלחה')
+      toast.success('ההגדרות נשמרו בהצלחה')
     } catch (err) {
-      console.error('Error saving notification settings:', err)
-      await report(err, 'Saving notification settings (exception)')
-      toast.error('שגיאה בשמירת הגדרות ההתראות')
+      console.error('Error saving settings:', err)
+      await report(err, 'Saving preferences (exception)')
+      toast.error('שגיאה בשמירת ההגדרות')
     } finally {
-      setSavingNotifSettings(false)
+      setSaving(false)
     }
   }
 
@@ -111,10 +159,9 @@ export default function PreferencesPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8 lg:pt-8">
-        <div className="max-w-2xl">
-          <h1 className="text-2xl font-bold text-foreground-light mb-2">העדפות</h1>
-          <p className="text-foreground-muted mb-8">הגדרות התראות והעדפות אישיות</p>
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="max-w-xl mx-auto">
+          <h1 className="text-xl font-bold text-foreground-light mb-6">העדפות</h1>
           <div className="flex items-center justify-center py-12">
             <Loader2 size={32} className="animate-spin text-accent-gold" />
           </div>
@@ -124,180 +171,174 @@ export default function PreferencesPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 lg:pt-8">
-      <div className="max-w-2xl">
-        <h1 className="text-2xl font-bold text-foreground-light mb-2">העדפות</h1>
-        <p className="text-foreground-muted mb-8">הגדרות התראות והעדפות אישיות</p>
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="max-w-xl mx-auto">
+        <h1 className="text-xl font-bold text-foreground-light mb-6">העדפות</h1>
 
-        {/* Notification Settings Section */}
-        <div className="bg-background-card border border-white/10 rounded-2xl p-6 mb-6">
-          <h3 className="text-lg font-medium text-foreground-light mb-4 flex items-center gap-2">
-            <BellRing size={20} strokeWidth={1.5} className="text-accent-gold" />
-            הגדרות התראות
-          </h3>
+        {/* Compact Settings Card */}
+        <div className="bg-background-card border border-white/10 rounded-2xl overflow-hidden">
           
-          <p className="text-foreground-muted text-sm mb-6">
-            הגדר מתי ואיך לקוחות יקבלו תזכורות על תורים
-          </p>
-
-          <div className="space-y-5">
-            {/* Reminder Hours */}
-            <div className="flex flex-col gap-2">
-              <label className="text-foreground-light text-sm flex items-center gap-2">
-                <Clock size={14} className="text-foreground-muted" />
-                זמן תזכורת לפני התור
-              </label>
-              <select
-                value={reminderHours}
-                onChange={(e) => setReminderHours(parseInt(e.target.value))}
-                className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold"
-              >
-                {[1, 2, 3, 4, 5, 6, 8, 12, 24].map((hours) => (
-                  <option key={hours} value={hours}>
-                    {hours >= 24 ? formatHebrewDays(hours / 24) : formatHebrewHours(hours)} לפני התור
-                  </option>
-                ))}
-              </select>
-              <p className="text-foreground-muted/60 text-xs">
-                הלקוחות שלך יקבלו תזכורת push כמה זמן שבחרת לפני התור
-              </p>
-            </div>
-
-            {/* Notify on Cancel Toggle */}
-            <div className="flex items-center justify-between p-4 bg-background-dark rounded-xl border border-white/5">
-              <div className="flex items-center gap-3">
-                <div className={cn(
-                  'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0',
-                  notifyOnCancel ? 'bg-red-500/20' : 'bg-white/5'
-                )}>
-                  <XCircle size={20} className={notifyOnCancel ? 'text-red-400' : 'text-foreground-muted'} />
-                </div>
-                <div>
-                  <p className="text-foreground-light text-sm font-medium">ביטול תור ע&quot;י לקוח</p>
-                  <p className="text-foreground-muted text-xs">קבל התראה כשלקוח מבטל תור</p>
+          {/* Section 1: Booking Settings */}
+          <div className="p-5 border-b border-white/10">
+            <h2 className="text-sm font-medium text-accent-gold mb-4 flex items-center gap-2">
+              <Calendar size={16} strokeWidth={1.5} />
+              הגדרות תורים
+            </h2>
+            
+            <div className="space-y-4">
+              {/* Max Booking Days Ahead */}
+              <div className="flex items-center justify-between gap-4">
+                <label className="text-foreground-light text-sm flex-1">
+                  מספר ימים שניתן לקבוע תור מראש
+                </label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={maxBookingDaysAhead}
+                    onChange={(e) => setMaxBookingDaysAhead(parseInt(e.target.value))}
+                    className="w-20 px-3 py-2 rounded-lg bg-background-dark border border-white/10 text-foreground-light text-sm outline-none focus:ring-1 focus:ring-accent-gold"
+                  >
+                    {[7, 10, 14, 15, 21, 30, 45, 60].map((days) => (
+                      <option key={days} value={days}>{days}</option>
+                    ))}
+                  </select>
+                  <span className="text-foreground-muted text-sm">ימים</span>
                 </div>
               </div>
-              <button
-                onClick={() => setNotifyOnCancel(!notifyOnCancel)}
-                className={cn(
-                  'w-12 h-7 rounded-full transition-colors relative flex-shrink-0',
-                  notifyOnCancel ? 'bg-accent-gold' : 'bg-white/10'
-                )}
-                aria-checked={notifyOnCancel}
-                role="switch"
-              >
-                <div className={cn(
-                  'absolute top-1 w-5 h-5 rounded-full bg-white transition-all',
-                  notifyOnCancel ? 'right-1' : 'left-1'
-                )} />
-              </button>
-            </div>
 
-            {/* Notify on New Booking Toggle */}
-            <div className="flex items-center justify-between p-4 bg-background-dark rounded-xl border border-white/5">
-              <div className="flex items-center gap-3">
-                <div className={cn(
-                  'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0',
-                  notifyOnNewBooking ? 'bg-green-500/20' : 'bg-white/5'
-                )}>
-                  <CalendarPlus size={20} className={notifyOnNewBooking ? 'text-green-400' : 'text-foreground-muted'} />
-                </div>
-                <div>
-                  <p className="text-foreground-light text-sm font-medium">תור חדש</p>
-                  <p className="text-foreground-muted text-xs">קבל התראה כשלקוח קובע תור אצלך</p>
+              {/* Min Hours Before Booking */}
+              <div className="flex items-center justify-between gap-4">
+                <label className="text-foreground-light text-sm flex-1">
+                  ניתן להירשם לתור עד
+                </label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={minHoursBeforeBooking}
+                    onChange={(e) => setMinHoursBeforeBooking(parseInt(e.target.value))}
+                    className="w-20 px-3 py-2 rounded-lg bg-background-dark border border-white/10 text-foreground-light text-sm outline-none focus:ring-1 focus:ring-accent-gold"
+                  >
+                    {[0, 1, 2, 3, 4, 6, 12, 24].map((hours) => (
+                      <option key={hours} value={hours}>{hours}</option>
+                    ))}
+                  </select>
+                  <span className="text-foreground-muted text-sm">שעות לפני</span>
                 </div>
               </div>
-              <button
-                onClick={() => setNotifyOnNewBooking(!notifyOnNewBooking)}
-                className={cn(
-                  'w-12 h-7 rounded-full transition-colors relative flex-shrink-0',
-                  notifyOnNewBooking ? 'bg-accent-gold' : 'bg-white/10'
-                )}
-                aria-checked={notifyOnNewBooking}
-                role="switch"
-              >
-                <div className={cn(
-                  'absolute top-1 w-5 h-5 rounded-full bg-white transition-all',
-                  notifyOnNewBooking ? 'right-1' : 'left-1'
-                )} />
-              </button>
+
+              {/* Min Cancel Hours */}
+              <div className="flex items-center justify-between gap-4">
+                <label className="text-foreground-light text-sm flex-1">
+                  ניתן לבטל תור עד
+                </label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={minCancelHours}
+                    onChange={(e) => setMinCancelHours(parseInt(e.target.value))}
+                    className="w-20 px-3 py-2 rounded-lg bg-background-dark border border-white/10 text-foreground-light text-sm outline-none focus:ring-1 focus:ring-accent-gold"
+                  >
+                    {[0, 1, 2, 3, 4, 6, 12, 24, 48].map((hours) => (
+                      <option key={hours} value={hours}>{hours}</option>
+                    ))}
+                  </select>
+                  <span className="text-foreground-muted text-sm">שעות לפני</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Notification Settings */}
+          <div className="p-5">
+            <h2 className="text-sm font-medium text-accent-gold mb-4 flex items-center gap-2">
+              <BellRing size={16} strokeWidth={1.5} />
+              הגדרות התראות
+            </h2>
+            
+            <div className="space-y-4">
+              {/* Reminder Hours */}
+              <div className="flex items-center justify-between gap-4">
+                <label className="text-foreground-light text-sm flex-1 flex items-center gap-2">
+                  <Clock size={14} className="text-foreground-muted" />
+                  שליחת הודעת תזכורת
+                </label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={reminderHours}
+                    onChange={(e) => setReminderHours(parseInt(e.target.value))}
+                    className="w-20 px-3 py-2 rounded-lg bg-background-dark border border-white/10 text-foreground-light text-sm outline-none focus:ring-1 focus:ring-accent-gold"
+                  >
+                    {[1, 2, 3, 4, 6, 8, 12, 24].map((hours) => (
+                      <option key={hours} value={hours}>{hours}</option>
+                    ))}
+                  </select>
+                  <span className="text-foreground-muted text-sm">שעות לפני</span>
+                </div>
+              </div>
+
+              {/* Notify on New Booking - Compact Toggle */}
+              <div className="flex items-center justify-between gap-4">
+                <label className="text-foreground-light text-sm flex-1 flex items-center gap-2">
+                  <CalendarPlus size={14} className="text-green-400" />
+                  קבלת התראה על תור חדש
+                </label>
+                <button
+                  onClick={() => setNotifyOnNewBooking(!notifyOnNewBooking)}
+                  className={cn(
+                    'w-11 h-6 rounded-full transition-colors relative flex-shrink-0',
+                    notifyOnNewBooking ? 'bg-accent-gold' : 'bg-white/10'
+                  )}
+                  aria-checked={notifyOnNewBooking}
+                  role="switch"
+                >
+                  <div className={cn(
+                    'absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all',
+                    notifyOnNewBooking ? 'right-0.5' : 'left-0.5'
+                  )} />
+                </button>
+              </div>
+
+              {/* Notify on Cancel - Compact Toggle */}
+              <div className="flex items-center justify-between gap-4">
+                <label className="text-foreground-light text-sm flex-1 flex items-center gap-2">
+                  <XCircle size={14} className="text-red-400" />
+                  קבלת התראה על ביטול לקוח
+                </label>
+                <button
+                  onClick={() => setNotifyOnCancel(!notifyOnCancel)}
+                  className={cn(
+                    'w-11 h-6 rounded-full transition-colors relative flex-shrink-0',
+                    notifyOnCancel ? 'bg-accent-gold' : 'bg-white/10'
+                  )}
+                  aria-checked={notifyOnCancel}
+                  role="switch"
+                >
+                  <div className={cn(
+                    'absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all',
+                    notifyOnCancel ? 'right-0.5' : 'left-0.5'
+                  )} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Cancellation Policy Section */}
-        <div className="bg-background-card border border-white/10 rounded-2xl p-6 mb-6">
-          <h3 className="text-lg font-medium text-foreground-light mb-4 flex items-center gap-2">
-            <ShieldAlert size={20} strokeWidth={1.5} className="text-orange-400" />
-            מדיניות ביטולים
-          </h3>
-          
-          <p className="text-foreground-muted text-sm mb-6">
-            הגדר כמה זמן לפני התור לקוחות לא יוכלו לבטל בעצמם
-          </p>
-
-          <div className="space-y-4">
-            {/* Minimum Cancel Hours */}
-            <div className="flex flex-col gap-2">
-              <label className="text-foreground-light text-sm flex items-center gap-2">
-                <Clock size={14} className="text-foreground-muted" />
-                זמן מינימום לביטול
-              </label>
-              <select
-                value={minCancelHours}
-                onChange={(e) => setMinCancelHours(parseInt(e.target.value))}
-                className="w-full p-3 rounded-xl bg-background-dark border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold"
-              >
-                <option value={0}>ללא הגבלה - לקוחות יכולים לבטל תמיד</option>
-                <option value={1}>{formatHebrewHours(1)} לפני התור</option>
-                <option value={2}>{formatHebrewHours(2)} לפני התור</option>
-                <option value={3}>{formatHebrewHours(3)} לפני התור</option>
-                <option value={4}>{formatHebrewHours(4)} לפני התור</option>
-                <option value={6}>{formatHebrewHours(6)} לפני התור</option>
-                <option value={12}>{formatHebrewHours(12)} לפני התור</option>
-                <option value={24}>{formatHebrewDays(1)} לפני התור</option>
-                <option value={48}>{formatHebrewDays(2)} לפני התור</option>
-              </select>
-              <p className="text-foreground-muted/60 text-xs">
-                {minCancelHours === 0 
-                  ? 'לקוחות יכולים לבטל תורים בכל זמן'
-                  : `לקוחות לא יוכלו לבטל תורים ${minCancelHours >= 24 ? formatHebrewDays(minCancelHours / 24) : formatHebrewHours(minCancelHours)} לפני. במקום, הם יוכלו לבקש ממך לבטל.`
-                }
-              </p>
-            </div>
-
-            {/* Info Box */}
-            <div className="p-3 bg-orange-500/10 border border-orange-500/20 rounded-xl">
-              <div className="flex gap-2">
-                <ShieldAlert size={16} className="text-orange-400 shrink-0 mt-0.5" />
-                <div className="text-xs text-orange-300/80">
-                  <p className="font-medium text-orange-300 mb-1">איך זה עובד?</p>
-                  <ul className="space-y-1 list-disc list-inside">
-                    <li>לקוח שמנסה לבטל בחלון הזמן הזה יראה הודעה שהוא לא יכול</li>
-                    <li>הוא יוכל לבקש ממך לבטל, ותקבל התראה</li>
-                    <li>אתה תמיד יכול לבטל תורים בכל זמן</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={handleSaveNotifSettings}
-              disabled={savingNotifSettings || !notifSettings}
-              className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2',
-                savingNotifSettings || !notifSettings
-                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
-                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
-              )}
-            >
-              {savingNotifSettings && <Loader2 size={18} className="animate-spin" />}
-              {savingNotifSettings ? 'שומר...' : 'שמור הגדרות'}
-            </button>
-          </div>
-        </div>
+        {/* Save Button */}
+        <button
+          onClick={handleSave}
+          disabled={saving || (!notifSettings && !bookingSettings)}
+          className={cn(
+            'w-full mt-6 py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2',
+            saving || (!notifSettings && !bookingSettings)
+              ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
+              : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90 active:scale-[0.98]'
+          )}
+        >
+          {saving ? (
+            <Loader2 size={18} className="animate-spin" />
+          ) : (
+            <Save size={18} strokeWidth={1.5} />
+          )}
+          {saving ? 'שומר...' : 'שמור הגדרות'}
+        </button>
       </div>
     </div>
   )
 }
-

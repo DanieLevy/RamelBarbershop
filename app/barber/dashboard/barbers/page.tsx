@@ -126,6 +126,9 @@ export default function BarbersPage() {
       // 2. Delete barber_notification_settings
       await supabase.from('barber_notification_settings').delete().eq('barber_id', barberId)
       
+      // 2b. Delete barber_booking_settings
+      await supabase.from('barber_booking_settings').delete().eq('barber_id', barberId)
+      
       // 3. Delete barber_schedules
       await supabase.from('barber_schedules').delete().eq('barber_id', barberId)
       

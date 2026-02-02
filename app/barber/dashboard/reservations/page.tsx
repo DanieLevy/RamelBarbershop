@@ -6,6 +6,7 @@ import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn, formatTime as formatTimeUtil, nowInIsrael, generateTimeSlots, parseTimeString, getIsraelDayStart, getIsraelDayEnd, timestampToIsraelDate, isSameDayInIsrael, getDayKeyInIsrael } from '@/lib/utils'
+import { getExternalLinkProps } from '@/lib/utils/external-link'
 import { addDays, format, startOfWeek, endOfWeek, isSameDay, parse } from 'date-fns'
 import { he } from 'date-fns/locale'
 import { Calendar, Phone, X, Plus, ChevronDown, MessageCircle } from 'lucide-react'
@@ -1135,10 +1136,12 @@ function ReservationsContent() {
                     {/* WhatsApp */}
                     {res.customer_phone && (
                       <a
-                        href={`https://wa.me/${formatPhoneForWhatsApp(res.customer_phone)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
+                        {...getExternalLinkProps(`https://wa.me/${formatPhoneForWhatsApp(res.customer_phone)}`)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const linkProps = getExternalLinkProps(`https://wa.me/${formatPhoneForWhatsApp(res.customer_phone)}`)
+                          if (linkProps.onClick) linkProps.onClick(e)
+                        }}
                         className="icon-btn p-2 rounded-lg hover:bg-green-500/10 transition-colors"
                         aria-label="שלח הודעה בוואטסאפ"
                         title="וואטסאפ"

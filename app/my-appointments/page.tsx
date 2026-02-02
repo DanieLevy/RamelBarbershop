@@ -188,7 +188,7 @@ function MyAppointmentsContent() {
     }
   }
 
-  // Get barber's minimum cancel hours setting
+  // Get barber's minimum cancel hours setting from barber_booking_settings
   const getBarberMinCancelHours = async (barberId: string): Promise<number> => {
     // Check cache first
     if (barberCancelSettings.has(barberId)) {
@@ -198,17 +198,17 @@ function MyAppointmentsContent() {
     try {
       const supabase = createClient()
       const { data, error } = await supabase
-        .from('barber_notification_settings')
+        .from('barber_booking_settings')
         .select('min_cancel_hours')
         .eq('barber_id', barberId)
         .single()
       
       if (error || !data) {
-        // Default to 3 hours if no setting found
-        return 3
+        // Default to 2 hours if no setting found
+        return 2
       }
       
-      const minHours = data.min_cancel_hours ?? 3
+      const minHours = data.min_cancel_hours ?? 2
       
       // Cache the result
       setBarberCancelSettings(prev => new Map(prev).set(barberId, minHours))
@@ -216,7 +216,7 @@ function MyAppointmentsContent() {
       return minHours
     } catch (err) {
       console.error('Error fetching barber cancel settings:', err)
-      return 3 // Default fallback
+      return 2 // Default fallback
     }
   }
 

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { MapPin, Phone, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getExternalLinkProps } from '@/lib/utils/external-link'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import type { BarbershopSettings } from '@/types/database'
 
@@ -168,9 +169,7 @@ export function Footer({ settings }: FooterProps) {
               {socialLinks.map((social) => (
                 <a
                   key={social.name}
-                  href={social.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  {...getExternalLinkProps(social.url)}
                   className={cn(
                     'w-10 h-10 rounded-full bg-white/5 border border-white/10',
                     'flex items-center justify-center text-foreground-muted',

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
-import type { BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure, BarberMessage, WorkDay } from '@/types/database'
+import type { BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure, BarberMessage, WorkDay, BarberBookingSettings } from '@/types/database'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
 import { getTodayDateString, getIsraelDateString, getDayKeyInIsrael } from '@/lib/utils'
 
@@ -316,4 +316,48 @@ export function getDayWorkHours(
   }
   
   return { start: '09:00', end: '19:00', isWorking: false }
+}
+
+/**
+ * Get barber booking settings
+ * Contains booking and cancellation policies separate from notification settings
+ * 
+ * Settings include:
+ * - max_booking_days_ahead: Maximum days ahead for booking (default: 15)
+ * - min_hours_before_booking: Minimum hours before slot to allow booking (default: 1)
+ * - min_cancel_hours: Minimum hours before appointment to allow cancellation (default: 2)
+ */
+export async function getBarberBookingSettings(barberId: string): Promise<BarberBookingSettings | null> {
+  const supabase = createClient()
+  
+  const { data, error } = await supabase
+    .from('barber_booking_settings')
+    .select('*')
+    .eq('barber_id', barberId)
+    .single()
+  
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error fetching barber booking settings:', error)
+    await reportSupabaseError(error, 'Fetching barber booking settings', { table: 'barber_booking_settings', operation: 'select' })
+  }
+  
+  return data as BarberBookingSettings | null
+}
+
+/**
+ * Get barber booking settings with defaults
+ * Returns default values if no settings found for barber
+ */
+export async function getBarberBookingSettingsWithDefaults(barberId: string): Promise<{
+  max_booking_days_ahead: number
+  min_hours_before_booking: number
+  min_cancel_hours: number
+}> {
+  const settings = await getBarberBookingSettings(barberId)
+  
+  return {
+    max_booking_days_ahead: settings?.max_booking_days_ahead ?? 15,
+    min_hours_before_booking: settings?.min_hours_before_booking ?? 1,
+    min_cancel_hours: settings?.min_cancel_hours ?? 2,
+  }
 }
