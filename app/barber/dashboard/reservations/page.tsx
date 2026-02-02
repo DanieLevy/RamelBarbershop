@@ -670,6 +670,8 @@ function ReservationsContent() {
           workStart = barberDaySettings.start_time
           workEnd = barberDaySettings.end_time
         } else if (barberDaySettings && !barberDaySettings.is_working) {
+          // Barber not working, but may still have manual bookings (outside hours)
+          // Show all reservations chronologically (no empty slots for non-working days)
           upcomingReservations.forEach(res => {
             items.push({ type: 'reservation', data: res, isPast: false })
           })
@@ -691,6 +693,9 @@ function ReservationsContent() {
           30
         )
         
+        // Track which reservations have been added to avoid duplicates
+        const addedReservationIds = new Set<string>()
+        
         for (const slot of allSlots) {
           // Only show future slots
           if (slot.timestamp <= now) continue
@@ -701,8 +706,33 @@ function ReservationsContent() {
           
           if (reservation) {
             items.push({ type: 'reservation', data: reservation, isPast: false })
+            addedReservationIds.add(reservation.id)
           } else {
             items.push({ type: 'empty', timestamp: slot.timestamp, time: slot.time })
+          }
+        }
+        
+        // Add any reservations that fall OUTSIDE work hours (weren't matched to slots)
+        // These are typically manual bookings made by the barber
+        const orphanReservations = upcomingReservations.filter(res => !addedReservationIds.has(res.id))
+        if (orphanReservations.length > 0) {
+          // Insert orphan reservations at their correct chronological position
+          for (const orphan of orphanReservations) {
+            const orphanTs = normalizeTs(orphan.time_timestamp)
+            // Find the right position in items array
+            let insertIndex = items.length
+            for (let i = 0; i < items.length; i++) {
+              const item = items[i]
+              if (item.type === 'divider') continue
+              const itemTs = item.type === 'reservation' 
+                ? normalizeTs(item.data.time_timestamp) 
+                : item.timestamp
+              if (orphanTs < itemTs) {
+                insertIndex = i
+                break
+              }
+            }
+            items.splice(insertIndex, 0, { type: 'reservation', data: orphan, isPast: false })
           }
         }
       } else {
