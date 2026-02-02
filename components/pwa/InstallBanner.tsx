@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Download, Share, Smartphone, Monitor, ChevronDown, AlertTriangle, Bell, Heart } from 'lucide-react'
+import { X, Download, Share, Smartphone, Monitor, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { getDismissCount } from '@/hooks/usePWA'
 import { useNotificationManager, useNotificationTiming } from '@/components/NotificationManager'
 
 interface InstallBannerProps {
@@ -18,52 +17,15 @@ interface InstallBannerProps {
   }
 }
 
-// Messages that get more urgent based on dismiss count
-const getUrgentMessage = (dismissCount: number): { 
-  title: string
-  subtitle: string
-  icon: 'info' | 'warning' | 'heart'
-  confirmDismiss: boolean
-} => {
-  switch (dismissCount) {
-    case 0:
-      return {
-        title: 'התקינו את האפליקציה',
-        subtitle: 'גישה מהירה + התראות על תורים',
-        icon: 'info',
-        confirmDismiss: false,
-      }
-    case 1:
-      return {
-        title: 'ראינו שעדיין לא התקנת את האפליקציה',
-        subtitle: 'התקנה תאפשר לך לקבל תזכורות ועדכונים על התורים שלך',
-        icon: 'info',
-        confirmDismiss: false,
-      }
-    case 2:
-      return {
-        title: 'חשוב! האפליקציה עדיין לא מותקנת',
-        subtitle: 'בלי התקנה לא תקבלו התראות על תורים חדשים או שינויים',
-        icon: 'warning',
-        confirmDismiss: true,
-      }
-    case 3:
-      return {
-        title: 'אל תפספסו תורים!',
-        subtitle: 'לקוחות שהתקינו את האפליקציה מקבלים תזכורות ולא מפספסים תורים',
-        icon: 'warning',
-        confirmDismiss: true,
-      }
-    default:
-      return {
-        title: 'אנא התקינו את האפליקציה',
-        subtitle: 'זה באמת חשוב כדי לקבל התראות ועדכונים. זה לוקח רק שניות!',
-        icon: 'heart',
-        confirmDismiss: true,
-      }
-  }
-}
-
+/**
+ * PWA Install Banner
+ * 
+ * Design Philosophy: Peaceful and Non-Intrusive
+ * - Simple, friendly invitation to install
+ * - Easy dismiss with no guilt-tripping
+ * - No confirmation dialogs for dismissal
+ * - Respects user's choice
+ */
 export function InstallBanner({
   isModal,
   deviceOS,
@@ -74,19 +36,10 @@ export function InstallBanner({
 }: InstallBannerProps) {
   const [isVisible, setIsVisible] = useState(false)
   const [isClosing, setIsClosing] = useState(false)
-  const [showConfirmation, setShowConfirmation] = useState(false)
-  const [dismissCount, setDismissCount] = useState(0)
   const [hasRequested, setHasRequested] = useState(false)
   
   const { requestNotification, dismissNotification, canShowNotification } = useNotificationManager()
   const delay = useNotificationTiming('pwa-install')
-  
-  // Get dismiss count and urgent message on mount
-  useEffect(() => {
-    setDismissCount(getDismissCount())
-  }, [])
-  
-  const urgentMessage = getUrgentMessage(dismissCount)
 
   // Request to show via notification manager (coordinated with other notifications)
   useEffect(() => {
@@ -108,17 +61,12 @@ export function InstallBanner({
   }, [hasRequested, canShowNotification])
 
   const handleClose = () => {
-    // Check if we need confirmation before dismissing
-    if (urgentMessage.confirmDismiss && !showConfirmation) {
-      setShowConfirmation(true)
-      return
-    }
-    
+    // Simple dismiss - no confirmation needed
     setIsClosing(true)
     setTimeout(() => {
       dismissNotification('pwa-install')
       onDismiss()
-    }, 300)
+    }, 200)
   }
 
   const handleInstall = async () => {
@@ -128,7 +76,7 @@ export function InstallBanner({
       setTimeout(() => {
         dismissNotification('pwa-install')
         onDismiss()
-      }, 300)
+      }, 200)
     }
   }
 
@@ -136,136 +84,30 @@ export function InstallBanner({
 
   // Get device-specific icon
   const DeviceIcon = deviceOS === 'ios' ? Share : deviceOS === 'android' ? Download : Monitor
-  
-  // Get icon based on urgency
-  const UrgentIcon = urgentMessage.icon === 'warning' ? AlertTriangle : 
-                     urgentMessage.icon === 'heart' ? Heart : Bell
 
-  // Confirmation Modal (Are you sure?)
-  if (showConfirmation) {
-    return (
-      <div
-        className={cn(
-          'fixed inset-0 z-[60] flex items-center justify-center p-4',
-          'transition-all duration-300',
-          isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'
-        )}
-      >
-        {/* Backdrop */}
-        <div className={cn(
-          'absolute inset-0 bg-black/70 backdrop-blur-sm',
-          isClosing && 'pointer-events-none'
-        )} />
-
-        {/* Confirmation Modal */}
-        <div
-          className={cn(
-            'relative w-full max-w-sm',
-            'glass-elevated rounded-3xl',
-            'p-6 text-center',
-            'transform transition-all duration-300',
-            isClosing ? 'scale-95 opacity-0' : 'scale-100 opacity-100'
-          )}
-        >
-          {/* Warning Icon */}
-          <div className="mx-auto w-16 h-16 rounded-2xl bg-amber-500/20 flex items-center justify-center mb-4">
-            <AlertTriangle size={32} className="text-amber-400" />
-          </div>
-
-          <h2 className="text-lg font-bold text-foreground-light mb-2">
-            בטוח שאתה רוצה לדחות?
-          </h2>
-
-          <p className="text-foreground-muted text-sm mb-4">
-            בלי האפליקציה לא תוכל לקבל:
-          </p>
-          
-          <ul className="text-right text-foreground-light text-sm space-y-2 mb-6 px-4">
-            <li className="flex items-center gap-2">
-              <Bell size={16} className="text-accent-gold flex-shrink-0" />
-              <span>התראות על תורים חדשים</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <Bell size={16} className="text-accent-gold flex-shrink-0" />
-              <span>תזכורות לפני התור</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <Bell size={16} className="text-accent-gold flex-shrink-0" />
-              <span>עדכונים על שינויים או ביטולים</span>
-            </li>
-          </ul>
-
-          {/* Actions */}
-          <div className="flex gap-3">
-            <button
-              onClick={() => {
-                setIsClosing(true)
-                setTimeout(() => {
-                  dismissNotification('pwa-install')
-                  onDismiss()
-                }, 300)
-              }}
-              className="flex-1 py-3 px-4 rounded-xl bg-white/10 text-foreground-muted font-medium hover:bg-white/20 transition-colors text-sm"
-            >
-              דחה בכל זאת
-            </button>
-            
-            <button
-              onClick={() => {
-                setShowConfirmation(false)
-                handleInstall()
-              }}
-              className="flex-1 py-3 px-4 rounded-xl bg-accent-gold text-background-dark font-bold hover:bg-accent-gold/90 transition-colors flex items-center justify-center gap-2"
-            >
-              <Download size={18} />
-              התקן עכשיו
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Bottom Toast Banner
+  // Bottom Toast Banner (non-modal)
   if (!isModal) {
     return (
       <div
         className={cn(
           'fixed bottom-20 md:bottom-4 left-4 right-4 z-50',
-          'transition-all duration-300 ease-out',
+          'transition-all duration-200 ease-out',
           isClosing ? 'translate-y-full opacity-0' : 'translate-y-0 opacity-100'
         )}
       >
-        <div
-          className={cn(
-            'mx-auto max-w-md',
-            'glass-elevated rounded-2xl',
-            'p-4 flex items-center gap-4',
-            urgentMessage.icon === 'warning' ? 'border-2 border-amber-500/50' : 'border border-white/10'
-          )}
-        >
-          {/* App Icon - changes based on urgency */}
-          <div className={cn(
-            'flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center',
-            urgentMessage.icon === 'warning' ? 'bg-amber-500/20' : 'bg-accent-gold/20'
-          )}>
-            {urgentMessage.icon === 'warning' ? (
-              <AlertTriangle size={24} className="text-amber-400" />
-            ) : (
-              <Smartphone size={24} className="text-accent-gold" />
-            )}
+        <div className="mx-auto max-w-md glass-elevated rounded-2xl p-4 flex items-center gap-4 border border-white/10">
+          {/* App Icon */}
+          <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-accent-gold/20 flex items-center justify-center">
+            <Smartphone size={24} className="text-accent-gold" />
           </div>
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <h3 className={cn(
-              'text-sm font-medium truncate',
-              urgentMessage.icon === 'warning' ? 'text-amber-300' : 'text-foreground-light'
-            )}>
-              {urgentMessage.title}
+            <h3 className="text-sm font-medium text-foreground-light truncate">
+              הוסף למסך הבית
             </h3>
-            <p className="text-xs text-foreground-muted mt-0.5 line-clamp-2">
-              {urgentMessage.subtitle}
+            <p className="text-xs text-foreground-muted mt-0.5">
+              גישה מהירה + התראות על תורים
             </p>
           </div>
 
@@ -280,7 +122,7 @@ export function InstallBanner({
               </button>
             ) : (
               <button
-                onClick={() => {/* Will be replaced by modal logic */}}
+                onClick={() => {/* Will trigger modal */}}
                 className="px-3 py-2 bg-white/10 text-foreground-light rounded-xl text-sm font-medium hover:bg-white/20 transition-colors flex items-center gap-1"
               >
                 <ChevronDown size={16} />
@@ -291,7 +133,7 @@ export function InstallBanner({
             <button
               onClick={handleClose}
               className="p-2 text-foreground-muted hover:text-foreground-light transition-colors"
-              aria-label="סגור"
+              aria-label="לא עכשיו"
             >
               <X size={18} />
             </button>
@@ -301,12 +143,12 @@ export function InstallBanner({
     )
   }
 
-  // Full Modal with Instructions
+  // Full Modal with Instructions (iOS or when user clicks "How?")
   return (
     <div
       className={cn(
         'fixed inset-0 z-50 flex items-center justify-center p-4',
-        'transition-all duration-300',
+        'transition-all duration-200',
         isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'
       )}
     >
@@ -325,9 +167,8 @@ export function InstallBanner({
           'relative w-full max-w-sm',
           'glass-elevated rounded-3xl',
           'p-6 text-center',
-          'transform transition-all duration-300',
-          isClosing ? 'scale-95 opacity-0' : 'scale-100 opacity-100',
-          urgentMessage.icon === 'warning' && 'border-2 border-amber-500/50'
+          'transform transition-all duration-200',
+          isClosing ? 'scale-95 opacity-0' : 'scale-100 opacity-100'
         )}
       >
         {/* Close Button */}
@@ -339,37 +180,18 @@ export function InstallBanner({
           <X size={20} />
         </button>
 
-        {/* Urgent Badge for repeat dismissers */}
-        {dismissCount >= 2 && (
-          <div className="absolute -top-3 right-4 px-3 py-1 rounded-full bg-amber-500 text-background-dark text-xs font-bold">
-            חשוב!
-          </div>
-        )}
-
-        {/* App Icon - changes based on urgency */}
-        <div className={cn(
-          'mx-auto w-20 h-20 rounded-2xl flex items-center justify-center mb-4',
-          urgentMessage.icon === 'warning' ? 'bg-amber-500/20' : 'bg-accent-gold/20 shadow-gold'
-        )}>
-          {urgentMessage.icon === 'warning' ? (
-            <UrgentIcon size={36} className="text-amber-400" />
-          ) : urgentMessage.icon === 'heart' ? (
-            <Heart size={36} className="text-pink-400" />
-          ) : (
-            <DeviceIcon size={36} className="text-accent-gold" />
-          )}
+        {/* App Icon */}
+        <div className="mx-auto w-20 h-20 rounded-2xl bg-accent-gold/20 shadow-gold flex items-center justify-center mb-4">
+          <DeviceIcon size={36} className="text-accent-gold" />
         </div>
 
-        {/* Title - use urgent message for repeat visitors */}
-        <h2 className={cn(
-          'text-xl font-bold mb-2',
-          urgentMessage.icon === 'warning' ? 'text-amber-300' : 'text-foreground-light'
-        )}>
-          {dismissCount > 0 ? urgentMessage.title : instructions.title}
+        {/* Title */}
+        <h2 className="text-xl font-bold text-foreground-light mb-2">
+          {instructions.title}
         </h2>
 
         <p className="text-foreground-muted text-sm mb-6">
-          {dismissCount > 0 ? urgentMessage.subtitle : 'התקינו את האפליקציה למסך הבית לגישה מהירה, התראות על תורים ועוד'}
+          גישה מהירה מהמסך הראשי + קבלת התראות על תורים
         </p>
 
         {/* Installation Steps */}
@@ -388,14 +210,9 @@ export function InstallBanner({
         <div className="flex gap-3">
           <button
             onClick={handleClose}
-            className={cn(
-              'flex-1 py-3 px-4 rounded-xl font-medium transition-colors text-center',
-              dismissCount >= 3 
-                ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20 text-sm' 
-                : 'bg-white/10 text-foreground-light hover:bg-white/20'
-            )}
+            className="flex-1 py-3 px-4 rounded-xl bg-white/10 text-foreground-light font-medium hover:bg-white/20 transition-colors"
           >
-            {dismissCount >= 3 ? 'אני מבין שאפספס התראות' : 'אולי אח״כ'}
+            לא עכשיו
           </button>
           
           {isInstallable && (
@@ -412,4 +229,3 @@ export function InstallBanner({
     </div>
   )
 }
-

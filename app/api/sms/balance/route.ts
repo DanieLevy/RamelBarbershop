@@ -11,6 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { validateDevToken, unauthorizedResponse } from '@/lib/auth/dev-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,15 +31,9 @@ export async function GET(request: NextRequest) {
   const requestId = `sms-balance-${Date.now()}`
   
   try {
-    // Basic auth check - require dev token
-    const devToken = request.headers.get('X-Dev-Token')
-    const expectedToken = process.env.DEV_AUTH_TOKEN
-    
-    if (!devToken || devToken !== expectedToken) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      )
+    // Validate dev token using consistent auth method
+    if (!validateDevToken(request)) {
+      return unauthorizedResponse()
     }
     
     // Validate environment variables

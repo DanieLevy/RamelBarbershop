@@ -6,7 +6,7 @@ import Link from 'next/link'
 import type { BarberWithWorkDays } from '@/types/database'
 import { Calendar, Loader2, ChevronLeft, Instagram } from 'lucide-react'
 import { cn, getPreferredBarberSlug } from '@/lib/utils'
-import { getExternalLinkProps } from '@/lib/utils/external-link'
+import { openExternalLink } from '@/lib/utils/external-link'
 
 interface BarberCardProps {
   barber: BarberWithWorkDays
@@ -146,20 +146,20 @@ export function BarberCard({ barber, index = 0 }: BarberCardProps) {
           <div className="absolute inset-0 bg-gradient-to-t from-background-dark via-background-dark/30 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-b from-background-dark/20 via-transparent to-transparent" />
           
-          {/* Instagram Link - Top Left */}
+          {/* Instagram Button - Top Left (using button to avoid nested <a> tags) */}
           {(barber as { instagram_url?: string | null }).instagram_url && (
-            <a
-              {...getExternalLinkProps((barber as { instagram_url?: string }).instagram_url || '')}
+            <button
+              type="button"
               onClick={(e) => {
+                e.preventDefault()
                 e.stopPropagation()
-                const linkProps = getExternalLinkProps((barber as { instagram_url?: string }).instagram_url || '')
-                if (linkProps.onClick) linkProps.onClick(e)
+                openExternalLink((barber as { instagram_url?: string }).instagram_url || '')
               }}
-              className="absolute top-4 left-4 z-20 w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-transform"
+              className="absolute top-4 left-4 z-20 w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center hover:bg-white/20 hover:scale-110 active:scale-95 transition-all"
               aria-label={`עקוב אחרי ${barber.fullname} באינסטגרם`}
             >
-              <Instagram size={20} strokeWidth={1.5} className="text-white" />
-            </a>
+              <Instagram size={16} strokeWidth={1.5} className="text-white/90" />
+            </button>
           )}
           
           {/* Top Decorative Line */}

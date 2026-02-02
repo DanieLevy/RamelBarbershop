@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Cookie, X, Shield } from 'lucide-react'
+import { Cookie, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useNotificationManager, useNotificationTiming } from '@/components/NotificationManager'
 
 const COOKIE_CONSENT_KEY = 'cookie-consent-v2'
+// Delay before showing cookie banner (15 seconds)
+const COOKIE_BANNER_DELAY = 15000
 
 type ConsentLevel = 'all' | 'essential' | null
 
@@ -18,6 +20,11 @@ type ConsentLevel = 'all' | 'essential' | null
  * - Clear explanation of what cookies are used
  * - Link to privacy policy with full cookie details
  * 
+ * Design: Minimal bottom banner that doesn't interrupt UX
+ * - Shows after 15 seconds delay
+ * - Never shows if PWA install prompt is visible
+ * - Compact single-line design on mobile
+ * 
  * Persists user choice in localStorage.
  * Uses NotificationManager to coordinate with other notifications.
  */
@@ -26,7 +33,7 @@ export function CookieNotice() {
   const [isAnimating, setIsAnimating] = useState(false)
   const [isReady, setIsReady] = useState(false)
   
-  const { requestNotification, dismissNotification, canShowNotification } = useNotificationManager()
+  const { requestNotification, dismissNotification, canShowNotification, activeNotification } = useNotificationManager()
   const delay = useNotificationTiming('cookie')
 
   useEffect(() => {
@@ -35,23 +42,29 @@ export function CookieNotice() {
     // Check if user has already made a choice
     const consent = localStorage.getItem(COOKIE_CONSENT_KEY)
     if (!consent) {
-      // Request to show cookie notice after delay (coordinated with other notifications)
+      // Request to show cookie notice after extended delay (15s minimum, coordinated with manager)
+      const actualDelay = Math.max(delay, COOKIE_BANNER_DELAY)
       const timer = setTimeout(() => {
         requestNotification('cookie')
-      }, delay)
+      }, actualDelay)
       return () => clearTimeout(timer)
     }
   }, [delay, requestNotification])
   
   // Show/hide based on notification manager
+  // IMPORTANT: Never show if PWA install prompt is visible
   useEffect(() => {
-    if (canShowNotification('cookie')) {
-      const consent = localStorage.getItem(COOKIE_CONSENT_KEY)
-      if (!consent && isReady) {
-        setIsVisible(true)
-      }
+    const canShow = canShowNotification('cookie')
+    const pwaNotShowing = activeNotification !== 'pwa-install'
+    const consent = localStorage.getItem(COOKIE_CONSENT_KEY)
+    
+    if (canShow && pwaNotShowing && !consent && isReady) {
+      setIsVisible(true)
+    } else if (activeNotification === 'pwa-install') {
+      // Hide if PWA install becomes visible
+      setIsVisible(false)
     }
-  }, [canShowNotification, isReady])
+  }, [canShowNotification, activeNotification, isReady])
 
   const handleConsent = useCallback((level: ConsentLevel) => {
     setIsAnimating(true)
@@ -61,7 +74,7 @@ export function CookieNotice() {
     setTimeout(() => {
       setIsVisible(false)
       dismissNotification('cookie')
-    }, 300)
+    }, 200)
   }, [dismissNotification])
 
   const handleDismiss = useCallback(() => {
@@ -74,83 +87,50 @@ export function CookieNotice() {
   return (
     <div
       className={cn(
-        'fixed bottom-24 md:bottom-6 left-4 right-4 z-[999]',
-        'transition-all duration-300 ease-out',
+        'fixed bottom-0 left-0 right-0 z-[998]',
+        'transition-all duration-200 ease-out',
         'pointer-events-auto',
-        isAnimating ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'
+        'pb-safe', // Safe area for iOS home indicator
+        isAnimating ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'
       )}
-      style={{ touchAction: 'auto' }}
       role="dialog"
       aria-labelledby="cookie-title"
-      aria-describedby="cookie-description"
     >
-      <div className="max-w-lg mx-auto">
-        <div className="relative bg-background-card/95 backdrop-blur-xl p-5 rounded-2xl shadow-2xl border border-white/10 pointer-events-auto">
-          {/* Close Button */}
-          <button
-            onClick={handleDismiss}
-            className="absolute top-3 left-3 text-foreground-muted hover:text-foreground-light transition-colors p-1.5 rounded-full hover:bg-white/10 pointer-events-auto touch-manipulation flex items-center justify-center"
-            aria-label="סגור (יאשר עוגיות חיוניות בלבד)"
-            type="button"
-          >
-            <X size={16} />
-          </button>
-
-          {/* Content */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            {/* Icon & Text */}
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-full bg-accent-gold/20 flex items-center justify-center shrink-0">
-                  <Cookie size={20} className="text-accent-gold" />
-                </div>
-                <h3 id="cookie-title" className="text-foreground-light font-medium">
-                  הגדרות פרטיות ועוגיות
-                </h3>
-              </div>
-              
-              <p id="cookie-description" className="text-foreground-muted text-sm leading-relaxed mb-3">
-                אנו משתמשים בעוגיות חיוניות לתפעול האתר. באפשרותך לאשר עוגיות נוספות 
-                לשיפור חוויית השימוש, או להמשיך עם עוגיות חיוניות בלבד.
-                {' '}
-                <Link 
-                  href="/privacy-policy#cookies" 
-                  className="text-accent-gold hover:underline"
-                >
-                  מדיניות פרטיות מלאה
-                </Link>
-              </p>
-
-              {/* Cookie Types Info */}
-              <div className="flex flex-wrap gap-2 mb-4 text-xs">
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/10 text-green-400 rounded-full">
-                  <Shield size={12} />
-                  חיוניות (תמיד פעילות)
-                </span>
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-white/5 text-foreground-muted rounded-full">
-                  פונקציונליות (אופציונלי)
-                </span>
-              </div>
-            </div>
+      {/* Compact Banner */}
+      <div className="bg-background-darker/95 backdrop-blur-md border-t border-white/10 px-4 py-3">
+        <div className="max-w-xl mx-auto flex items-center gap-3">
+          {/* Icon */}
+          <div className="w-8 h-8 rounded-full bg-accent-gold/20 flex items-center justify-center shrink-0">
+            <Cookie size={16} className="text-accent-gold" />
           </div>
 
-          {/* Buttons - Amendment 13 requires both options */}
-          <div className="flex flex-col sm:flex-row gap-2">
+          {/* Text */}
+          <p id="cookie-title" className="flex-1 text-foreground-muted text-xs sm:text-sm leading-snug">
+            אנו משתמשים בעוגיות.{' '}
+            <Link 
+              href="/privacy-policy#cookies" 
+              className="text-accent-gold hover:underline"
+            >
+              מדיניות פרטיות
+            </Link>
+          </p>
+
+          {/* Buttons - Compact */}
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => handleConsent('all')}
-              onTouchEnd={() => handleConsent('all')}
-              className="flex-1 flex justify-center items-center px-4 py-2.5 bg-accent-gold text-background-dark text-sm font-medium rounded-xl hover:bg-accent-gold/90 transition-colors pointer-events-auto touch-manipulation cursor-pointer text-center"
+              className="px-3 py-1.5 bg-accent-gold text-background-dark text-xs font-medium rounded-lg hover:bg-accent-gold/90 transition-colors"
               type="button"
             >
-              אישור כל העוגיות
+              אישור
             </button>
             <button
-              onClick={() => handleConsent('essential')}
-              onTouchEnd={() => handleConsent('essential')}
-              className="flex-1 flex justify-center items-center px-4 py-2.5 bg-white/5 text-foreground-light text-sm font-medium rounded-xl hover:bg-white/10 transition-colors border border-white/10 pointer-events-auto touch-manipulation cursor-pointer text-center"
+              onClick={handleDismiss}
+              className="p-1.5 text-foreground-muted hover:text-foreground-light transition-colors rounded-lg hover:bg-white/10"
+              aria-label="סגור"
               type="button"
             >
-              חיוניות בלבד
+              <X size={16} />
             </button>
           </div>
         </div>
