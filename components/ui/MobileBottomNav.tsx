@@ -108,9 +108,10 @@ export function MobileBottomNav() {
     return () => clearInterval(interval)
   }, [fetchUpcomingCount])
 
-  // Don't show on dashboard pages or barber booking wizard
+  // Don't show on dashboard pages, barber booking wizard, or dev console
   const shouldHide = pathname.startsWith('/barber/dashboard') || 
                      pathname.includes('/book') ||
+                     pathname.startsWith('/dev') ||
                      (pathname.startsWith('/barber/') && pathname !== '/barber/login' && !pathname.match(/^\/barber\/[^/]+$/))
 
   

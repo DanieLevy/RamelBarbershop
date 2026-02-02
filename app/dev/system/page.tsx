@@ -12,7 +12,10 @@ import {
   CheckCircle,
   Info,
   Zap,
-  Layers
+  Layers,
+  MessageSquare,
+  CreditCard,
+  Globe
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
@@ -47,14 +50,24 @@ interface DbHealth {
   }
 }
 
+interface SmsBalance {
+  success: boolean
+  balance?: number
+  internationalBalance?: number
+  message?: string
+  lastChecked?: string
+  error?: string
+}
+
 export default function DevSystemPage() {
   const { devToken } = useDevAuthStore()
   const [dbHealth, setDbHealth] = useState<DbHealth | null>(null)
+  const [smsBalance, setSmsBalance] = useState<SmsBalance | null>(null)
   const [loading, setLoading] = useState(true)
+  const [smsLoading, setSmsLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
+  const fetchDbHealth = useCallback(async () => {
     try {
       const response = await fetch('/api/dev/db-health', {
         headers: { 'X-Dev-Token': devToken || '' },
@@ -63,14 +76,35 @@ export default function DevSystemPage() {
       if (response.ok) {
         const data = await response.json()
         setDbHealth(data)
-        setLastUpdated(new Date())
       }
     } catch (error) {
       console.error('Failed to fetch DB health:', error)
-    } finally {
-      setLoading(false)
     }
   }, [devToken])
+
+  const fetchSmsBalance = useCallback(async () => {
+    setSmsLoading(true)
+    try {
+      const response = await fetch('/api/sms/balance', {
+        headers: { 'X-Dev-Token': devToken || '' },
+      })
+      
+      const data = await response.json()
+      setSmsBalance(data)
+    } catch (error) {
+      console.error('Failed to fetch SMS balance:', error)
+      setSmsBalance({ success: false, error: 'Failed to fetch' })
+    } finally {
+      setSmsLoading(false)
+    }
+  }, [devToken])
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    await Promise.all([fetchDbHealth(), fetchSmsBalance()])
+    setLastUpdated(new Date())
+    setLoading(false)
+  }, [fetchDbHealth, fetchSmsBalance])
 
   useEffect(() => {
     fetchData()
@@ -121,13 +155,86 @@ export default function DevSystemPage() {
 
       {loading && !dbHealth ? (
         <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
+          {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-32 bg-zinc-900 rounded-xl animate-pulse" />
           ))}
         </div>
-      ) : dbHealth && (
+      ) : (
         <>
+          {/* SMS Provider Balance */}
+          <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-900/30 to-zinc-900 border border-emerald-500/20">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                  <MessageSquare size={16} className="text-emerald-400" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-medium text-white">019 SMS Provider</h2>
+                  <p className="text-[10px] text-zinc-500">OTP Authentication Service</p>
+                </div>
+              </div>
+              <button
+                onClick={fetchSmsBalance}
+                disabled={smsLoading}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                aria-label="Refresh SMS Balance"
+              >
+                <RefreshCw size={14} className={smsLoading ? 'animate-spin' : ''} />
+              </button>
+            </div>
+            
+            {smsLoading && !smsBalance ? (
+              <div className="h-20 bg-zinc-800/50 rounded-lg animate-pulse" />
+            ) : smsBalance?.success ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-zinc-800/50 rounded-xl">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CreditCard size={14} className="text-emerald-400" />
+                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider">SMS Credits</span>
+                  </div>
+                  <p className={cn(
+                    'text-2xl font-bold tabular-nums',
+                    (smsBalance.balance ?? 0) > 100 ? 'text-emerald-400' :
+                    (smsBalance.balance ?? 0) > 20 ? 'text-amber-400' : 'text-red-400'
+                  )}>
+                    {smsBalance.balance?.toLocaleString() ?? 'N/A'}
+                  </p>
+                  {(smsBalance.balance ?? 0) < 50 && (
+                    <p className="text-[10px] text-amber-400 mt-1 flex items-center gap-1">
+                      <AlertTriangle size={10} />
+                      Low balance - consider recharging
+                    </p>
+                  )}
+                </div>
+                <div className="p-3 bg-zinc-800/50 rounded-xl">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Globe size={14} className="text-blue-400" />
+                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider">International</span>
+                  </div>
+                  <p className="text-2xl font-bold text-zinc-300 tabular-nums">
+                    ₪{smsBalance.internationalBalance?.toFixed(2) ?? 'N/A'}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 bg-red-500/10 rounded-lg border border-red-500/20">
+                <p className="text-sm text-red-400 flex items-center gap-2">
+                  <AlertTriangle size={14} />
+                  {smsBalance?.error || 'Failed to load SMS balance'}
+                </p>
+              </div>
+            )}
+            
+            {smsBalance?.lastChecked && (
+              <p className="text-[10px] text-zinc-600 mt-3 text-right">
+                Last checked: {formatDistanceToNow(new Date(smsBalance.lastChecked), { addSuffix: true })}
+              </p>
+            )}
+          </div>
+
           {/* Database Health */}
+          {dbHealth && (
+          <>
           <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800">
             <div className="flex items-center gap-2 mb-4">
               <Database size={18} className="text-zinc-400" />
@@ -269,6 +376,8 @@ export default function DevSystemPage() {
               </div>
             </div>
           </div>
+          </>
+          )}
         </>
       )}
     </div>
