@@ -1,9 +1,16 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import type { BarberGalleryImage } from '@/types/database'
+
+interface DisplayImage {
+  id: string
+  image_url: string
+  position_x: number
+  position_y: number
+}
 
 interface GallerySlideshowProps {
   /** Gallery images to display */
@@ -39,15 +46,41 @@ export function GallerySlideshow({
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const sortedImages = [...images].sort((a, b) => a.display_order - b.display_order)
+  
+  // Memoize sorted and normalized images to ensure consistent rendering
+  // Use stable sort with fallback to id for deterministic order
+  const sortedImages = useMemo(() => 
+    [...images].sort((a, b) => {
+      const orderA = a.display_order ?? 0
+      const orderB = b.display_order ?? 0
+      if (orderA !== orderB) return orderA - orderB
+      return a.id.localeCompare(b.id) // Stable secondary sort
+    }),
+    [images]
+  )
   
   // If no gallery images, show fallback
+  // Normalize all images to consistent DisplayImage format for hydration safety
   const hasGallery = sortedImages.length > 0
-  const displayImages = hasGallery 
-    ? sortedImages 
-    : fallbackImage 
-      ? [{ id: 'fallback', image_url: fallbackImage, position_x: fallbackPositionX, position_y: fallbackPositionY }] 
-      : []
+  const displayImages: DisplayImage[] = useMemo(() => {
+    if (hasGallery) {
+      return sortedImages.map(img => ({
+        id: img.id,
+        image_url: img.image_url,
+        position_x: img.position_x ?? 50,
+        position_y: img.position_y ?? 50,
+      }))
+    }
+    if (fallbackImage) {
+      return [{
+        id: 'fallback',
+        image_url: fallbackImage,
+        position_x: fallbackPositionX,
+        position_y: fallbackPositionY,
+      }]
+    }
+    return []
+  }, [hasGallery, sortedImages, fallbackImage, fallbackPositionX, fallbackPositionY])
   
   const nextSlide = useCallback(() => {
     if (displayImages.length <= 1) return
@@ -117,30 +150,33 @@ export function GallerySlideshow({
       onMouseLeave={handleMouseLeave}
     >
       {/* Images Stack */}
-      {displayImages.map((image, index) => (
-        <div
-          key={image.id}
-          className={cn(
-            'absolute inset-0 transition-all duration-1000 ease-in-out',
-            index === currentIndex
-              ? 'opacity-100 scale-100'
-              : 'opacity-0 scale-105',
-            isTransitioning && index === currentIndex && 'opacity-50'
-          )}
-        >
-          <Image
-            src={image.image_url}
-            alt={hasGallery ? `${barberName} - עבודה ${index + 1}` : barberName}
-            fill
-            className="object-cover"
-            style={{ 
-              objectPosition: `${(image as { position_x?: number | null }).position_x ?? 50}% ${(image as { position_y?: number | null }).position_y ?? 50}%`
-            }}
-            sizes="(max-width: 640px) 100vw, 400px"
-            priority={index === 0}
-          />
-        </div>
-      ))}
+      {displayImages.map((image, index) => {
+        // Pre-compute position string to ensure consistency between server/client
+        const positionStr = `${image.position_x}% ${image.position_y}%`
+        
+        return (
+          <div
+            key={image.id}
+            className={cn(
+              'absolute inset-0 transition-all duration-1000 ease-in-out',
+              index === currentIndex
+                ? 'opacity-100 scale-100'
+                : 'opacity-0 scale-105',
+              isTransitioning && index === currentIndex && 'opacity-50'
+            )}
+          >
+            <Image
+              src={image.image_url}
+              alt={hasGallery ? `${barberName} - עבודה ${index + 1}` : barberName}
+              fill
+              className="object-cover"
+              style={{ objectPosition: positionStr }}
+              sizes="(max-width: 640px) 100vw, 400px"
+              priority={index === 0}
+            />
+          </div>
+        )
+      })}
       
       {/* Gradient Overlays */}
       <div className="absolute inset-0 bg-gradient-to-t from-background-dark via-background-dark/30 to-transparent pointer-events-none" />

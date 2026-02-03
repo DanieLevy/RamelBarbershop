@@ -1,15 +1,80 @@
+import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import { AppHeader } from '@/components/AppHeader'
 import { BookingWizardClient } from '@/components/BookingWizard/BookingWizardClient'
 import { BarberNotFoundClient } from '@/components/BarberProfile/BarberNotFoundClient'
 import { isValidUUID, generateSlugFromEnglishName, getPreferredBarberSlug } from '@/lib/utils'
-import type { BarberWithWorkDays, Service, BarbershopSettings, BarbershopClosure, BarberClosure, BarberMessage, BarberBookingSettings } from '@/types/database'
+import { getCachedShopSettings } from '@/lib/data/cached-queries'
+import type { User, BarberWithWorkDays, Service, BarbershopClosure, BarberClosure, BarberMessage, BarberBookingSettings, WorkDay } from '@/types/database'
 
 interface BookPageProps {
   params: Promise<{ barberId: string }>
   searchParams: Promise<{ service?: string }>
 }
+
+/**
+ * Extended barber type with nested relations for booking
+ * Note: barber_booking_settings is a single object due to unique constraint on barber_id
+ */
+interface BarberWithBookingData extends User {
+  work_days: WorkDay[]
+  services: Service[]
+  barber_messages: BarberMessage[]
+  barber_booking_settings: BarberBookingSettings | null
+}
+
+/**
+ * Fetch barber with booking-related data in ONE query
+ * Uses React cache() for per-request deduplication
+ */
+const getBarberWithBookingData = cache(async (slug: string): Promise<BarberWithBookingData | null> => {
+  const supabase = await createClient()
+  const slugLower = slug.toLowerCase()
+  const isUuidLookup = isValidUUID(slug)
+  
+  // Combined query with nested selects for booking-related data
+  const selectQuery = `
+    *,
+    work_days(*),
+    services(*),
+    barber_messages(*),
+    barber_booking_settings(*)
+  `
+  
+  if (isUuidLookup) {
+    const { data } = await supabase
+      .from('users')
+      .select(selectQuery)
+      .eq('is_barber', true)
+      .eq('id', slug)
+      .single()
+    return data as BarberWithBookingData | null
+  }
+  
+  // Slug/username lookup
+  const { data: allBarbers } = await supabase
+    .from('users')
+    .select(selectQuery)
+    .eq('is_barber', true)
+  
+  if (!allBarbers) return null
+  
+  // First try: Match by English name-based slug
+  for (const b of allBarbers) {
+    if (b.name_en) {
+      const expectedSlug = generateSlugFromEnglishName(b.name_en)
+      if (expectedSlug === slugLower) {
+        return b as BarberWithBookingData
+      }
+    }
+  }
+  
+  // Second try: Fall back to username lookup
+  return (allBarbers.find(
+    b => b.username?.toLowerCase() === slugLower
+  ) as BarberWithBookingData) || null
+})
 
 /**
  * Booking wizard page - supports UUID, username, and English name slugs
@@ -22,62 +87,21 @@ interface BookPageProps {
 export default async function BookPage({ params, searchParams }: BookPageProps) {
   const { barberId } = await params
   const { service: preSelectedServiceId } = await searchParams
-  const supabase = await createClient()
   const slugLower = barberId.toLowerCase()
   
-  // Determine lookup strategy
-  const isUuidLookup = isValidUUID(barberId)
-  
-  let barber: BarberWithWorkDays | null = null
-  
-  if (isUuidLookup) {
-    // UUID lookup
-    const { data } = await supabase
-      .from('users')
-      .select('*, work_days(*)')
-      .eq('is_barber', true)
-      .eq('id', barberId)
-      .single()
-    barber = data as BarberWithWorkDays | null
-  } else {
-    // First try: Match by English name-based slug
-    const { data: allBarbers } = await supabase
-      .from('users')
-      .select('*, work_days(*)')
-      .eq('is_barber', true)
-    
-    if (allBarbers) {
-      // Look for a barber whose name_en generates this slug
-      for (const b of allBarbers) {
-        if (b.name_en) {
-          const expectedSlug = generateSlugFromEnglishName(b.name_en)
-          if (expectedSlug === slugLower) {
-            barber = b as BarberWithWorkDays
-            break
-          }
-        }
-      }
-      
-      // Second try: Fall back to username lookup
-      if (!barber) {
-        barber = allBarbers.find(
-          b => b.username?.toLowerCase() === slugLower
-        ) as BarberWithWorkDays | null
-      }
-    }
-  }
+  // Get barber with all booking-related data in ONE query
+  const barberWithData = await getBarberWithBookingData(barberId)
   
   // Barber not found at all - return 404
-  if (!barber) {
+  if (!barberWithData) {
     notFound()
   }
   
   // Determine the preferred slug for this barber
-  const preferredSlug = getPreferredBarberSlug(barber.name_en, barber.username)
-  const currentSlugNormalized = slugLower
+  const preferredSlug = getPreferredBarberSlug(barberWithData.name_en ?? undefined, barberWithData.username || barberId)
   
   // Redirect to preferred slug if not already using it
-  if (currentSlugNormalized !== preferredSlug.toLowerCase()) {
+  if (slugLower !== preferredSlug.toLowerCase()) {
     const redirectUrl = preSelectedServiceId
       ? `/barber/${preferredSlug}/book?service=${encodeURIComponent(preSelectedServiceId)}`
       : `/barber/${preferredSlug}/book`
@@ -85,13 +109,13 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
   }
   
   // Barber exists but is disabled - show friendly message
-  if (!barber.is_active) {
+  if (!barberWithData.is_active) {
     return (
       <>
         <AppHeader />
         <main id="main-content" tabIndex={-1} className="min-h-screen bg-background-dark outline-none">
           <BarberNotFoundClient 
-            barberName={barber.fullname}
+            barberName={barberWithData.fullname}
             reason="disabled"
           />
         </main>
@@ -100,62 +124,42 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
   }
   
   // Format today's date in LOCAL timezone (not UTC!) for closure filtering
-  // toISOString() uses UTC which can cause off-by-one errors
   const now = new Date()
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   
-  // Fetch remaining data in parallel now that we have a valid barber
-  const [
-    servicesResult,
-    shopSettingsResult,
-    shopClosuresResult,
-    barberClosuresResult,
-    barberMessagesResult,
-    barberBookingSettingsResult
-  ] = await Promise.all([
-    // Barber-specific services
-    supabase
-      .from('services')
-      .select('*')
-      .eq('barber_id', barber.id)
-      .eq('is_active', true),
-    // Barbershop settings
-    supabase
-      .from('barbershop_settings')
-      .select('*')
-      .single(),
-    // Barbershop closures
+  // Fetch closures and cached shop settings in parallel
+  // Note: closures must be fresh (date-specific), shop settings can be cached
+  const supabase = await createClient()
+  const [shopSettings, shopClosuresResult, barberClosuresResult] = await Promise.all([
+    // Shop settings - cached for 10 minutes
+    getCachedShopSettings(),
+    // Barbershop closures - must be fresh (date-filtered)
     supabase
       .from('barbershop_closures')
       .select('*')
       .gte('end_date', todayStr),
-    // Barber closures
+    // Barber closures - must be fresh (date-filtered)
     supabase
       .from('barber_closures')
       .select('*')
-      .eq('barber_id', barber.id)
-      .gte('end_date', todayStr),
-    // Barber messages
-    supabase
-      .from('barber_messages')
-      .select('*')
-      .eq('barber_id', barber.id)
-      .eq('is_active', true),
-    // Barber booking settings (max booking days, min hours before, etc.)
-    supabase
-      .from('barber_booking_settings')
-      .select('*')
-      .eq('barber_id', barber.id)
-      .single()
+      .eq('barber_id', barberWithData.id)
+      .gte('end_date', todayStr)
   ])
   
-  const services = servicesResult.data as Service[] | null
-  const shopSettings = shopSettingsResult.data as BarbershopSettings | null
   const shopClosures = shopClosuresResult.data as BarbershopClosure[] | null
   const barberClosures = barberClosuresResult.data as BarberClosure[] | null
-  const barberMessages = barberMessagesResult.data as BarberMessage[] | null
-  // barberBookingSettings can be null if no custom settings exist (uses defaults)
-  const barberBookingSettings = barberBookingSettingsResult.data as BarberBookingSettings | null
+  
+  // Extract and filter nested data
+  const activeServices = (barberWithData.services || []).filter(s => s.is_active)
+  const activeMessages = (barberWithData.barber_messages || []).filter(m => m.is_active)
+  // barber_booking_settings is a single object (unique constraint on barber_id)
+  const barberBookingSettings = barberWithData.barber_booking_settings || null
+  
+  // Create BarberWithWorkDays for the client component
+  const barber: BarberWithWorkDays = {
+    ...barberWithData,
+    work_days: barberWithData.work_days || []
+  }
   
   return (
     <>
@@ -174,11 +178,11 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
         <BookingWizardClient
           barberId={barber.id}
           barber={barber}
-          services={services || []}
+          services={activeServices}
           shopSettings={shopSettings}
           shopClosures={shopClosures || []}
           barberClosures={barberClosures || []}
-          barberMessages={barberMessages || []}
+          barberMessages={activeMessages}
           barberBookingSettings={barberBookingSettings}
           preSelectedServiceId={preSelectedServiceId}
         />

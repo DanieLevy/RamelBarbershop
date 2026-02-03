@@ -9,10 +9,12 @@ import { ContactSection } from '@/components/ContactSection'
 import { Footer } from '@/components/Footer'
 import { UpcomingAppointmentBanner } from '@/components/UpcomingAppointmentBanner'
 import { buildBarberProfileUrl } from '@/lib/utils'
-import type { BarberWithWorkDays, BarbershopSettings, Product } from '@/types/database'
+import { getCachedShopSettings, getCachedProducts } from '@/lib/data/cached-queries'
+import type { BarberWithWorkDays } from '@/types/database'
 
 // Force dynamic rendering - barber availability (work_days, is_active) must be fresh
 // This ensures the homepage always shows current barber status
+// Note: Products and shop settings are cached separately for 10 minutes
 export const dynamic = 'force-dynamic'
 
 interface HomePageProps {
@@ -50,30 +52,25 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     // (don't redirect to error page from homepage link)
   }
   
-  // Fetch barbers, settings, and products in parallel for better performance
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any
-  const [barbersResult, settingsResult, productsResult] = await Promise.all([
+  // Fetch data in parallel for better performance
+  // - Barbers: ALWAYS fresh (real-time availability)
+  // - Settings: Cached for 10 minutes (rarely changes)
+  // - Products: Cached for 10 minutes (rarely changes)
+  const [barbersResult, settings, products] = await Promise.all([
+    // Barbers - always fresh from database
     supabase
       .from('users')
       .select('*, work_days(*)')
       .eq('is_barber', true)
       .eq('is_active', true)
       .order('display_order', { ascending: true }),
-    supabase
-      .from('barbershop_settings')
-      .select('*')
-      .single(),
-    db
-      .from('products')
-      .select('*')
-      .eq('is_active', true)
-      .order('display_order', { ascending: true })
+    // Settings - cached for 10 minutes
+    getCachedShopSettings(),
+    // Products - cached for 10 minutes
+    getCachedProducts()
   ])
   
   const barbers = barbersResult.data as BarberWithWorkDays[] | null
-  const settings = settingsResult.data as BarbershopSettings | null
-  const products = productsResult.data as Product[] | null
 
   return (
     <>
