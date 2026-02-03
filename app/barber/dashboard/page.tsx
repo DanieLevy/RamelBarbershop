@@ -5,16 +5,17 @@ import { useRouter } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { cn, formatTime as formatTimeUtil, nowInIsrael, getIsraelDayStart, getIsraelDayEnd, isSameDayInIsrael, timestampToIsraelDate } from '@/lib/utils'
+import { cn, formatTime as formatTimeUtil, nowInIsrael, getIsraelDayStart, getIsraelDayEnd, isSameDayInIsrael, timestampToIsraelDate, getDayKeyInIsrael, israelDateToTimestamp } from '@/lib/utils'
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import { 
   Calendar, Clock, TrendingDown, Users, 
   CalendarOff, Store,
-  ChevronLeft, Phone, Package
+  ChevronLeft, Phone, Package, Repeat
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import type { Reservation, Service } from '@/types/database'
+import type { Reservation, Service, DayOfWeek } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { getRecurringByBarber } from '@/lib/services/recurring.service'
 
 interface DashboardStats {
   todayAppointments: number
@@ -25,6 +26,7 @@ interface DashboardStats {
 
 interface UpcomingReservation extends Reservation {
   services?: Service
+  isRecurring?: boolean
 }
 
 export default function DashboardPage() {
@@ -111,14 +113,63 @@ export default function DashboardPage() {
         r => r.time_timestamp > now && r.status === 'confirmed'
       )
       
+      // Fetch today's recurring appointments
+      const todayDayKey = getDayKeyInIsrael(now) as DayOfWeek
+      const recurringData = await getRecurringByBarber(barber.id)
+      
+      // Filter recurring for today and convert to UpcomingReservation format
+      const todayRecurring = recurringData
+        .filter(rec => rec.day_of_week === todayDayKey)
+        .map(rec => {
+          // Parse time slot and create timestamp for today
+          const [hours, minutes] = rec.time_slot.split(':').map(Number)
+          const israelDate = timestampToIsraelDate(todayStartMs)
+          const appointmentTime = israelDateToTimestamp(
+            israelDate.getFullYear(),
+            israelDate.getMonth() + 1,
+            israelDate.getDate(),
+            hours,
+            minutes
+          )
+          
+          // Only include if not passed
+          if (appointmentTime <= now) return null
+          
+          const customer = rec.customers as { fullname: string; phone: string } | undefined
+          const service = rec.services as { name_he: string } | undefined
+          
+          return {
+            id: `recurring-${rec.id}`,
+            time_timestamp: appointmentTime,
+            customer_name: customer?.fullname || 'לקוח קבוע',
+            customer_phone: customer?.phone || '',
+            services: service ? { name_he: service.name_he } as Service : undefined,
+            isRecurring: true,
+            // Required fields with placeholder values
+            barber_id: barber.id,
+            service_id: rec.service_id,
+            customer_id: rec.customer_id,
+            date_timestamp: todayStartMs,
+            day_name: todayDayKey,
+            day_num: String(israelDate.getDate()),
+            status: 'confirmed',
+            version: 1,
+          } as UpcomingReservation
+        })
+        .filter((r): r is UpcomingReservation => r !== null)
+      
+      // Merge and sort all upcoming appointments
+      const allUpcoming = [...upcoming, ...todayRecurring]
+        .sort((a, b) => a.time_timestamp - b.time_timestamp)
+      
       setStats({
-        todayAppointments: todayRes.length,
+        todayAppointments: todayRes.length + todayRecurring.length,
         weekAppointments: weekRes.length,
         newCustomersMonth: uniquePhones.size,
         cancellationRate,
       })
       
-      setUpcomingList(upcoming.slice(0, 5))
+      setUpcomingList(allUpcoming.slice(0, 5))
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
       await report(error, 'Fetching barber dashboard data')
@@ -228,17 +279,20 @@ export default function DashboardPage() {
               return (
                 <div
                   key={res.id}
-                  onClick={() => router.push('/barber/dashboard/reservations')}
-                  className="flex items-center gap-3 px-3 sm:px-4 py-3 hover:bg-white/[0.03] transition-colors cursor-pointer"
+                  onClick={() => router.push(res.isRecurring ? '/barber/dashboard/recurring' : '/barber/dashboard/reservations')}
+                  className={cn(
+                    "flex items-center gap-3 px-3 sm:px-4 py-3 hover:bg-white/[0.03] transition-colors cursor-pointer",
+                    res.isRecurring && "bg-purple-500/5"
+                  )}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => e.key === 'Enter' && router.push('/barber/dashboard/reservations')}
+                  onKeyDown={(e) => e.key === 'Enter' && router.push(res.isRecurring ? '/barber/dashboard/recurring' : '/barber/dashboard/reservations')}
                 >
                   {/* Time Display - Before indicator */}
                   <div className="flex flex-col items-center shrink-0 w-12">
                     <span className={cn(
                       'text-lg font-medium tabular-nums',
-                      smartDate.isToday ? 'text-accent-gold' : 'text-foreground-muted'
+                      res.isRecurring ? 'text-purple-400' : smartDate.isToday ? 'text-accent-gold' : 'text-foreground-muted'
                     )}>
                       {smartDate.time}
                     </span>
@@ -250,28 +304,41 @@ export default function DashboardPage() {
                   {/* Status line */}
                   <div className={cn(
                     'w-1 h-10 rounded-full shrink-0',
-                    smartDate.isToday ? 'bg-accent-gold' : 'bg-foreground-muted/30'
+                    res.isRecurring ? 'bg-purple-400' : smartDate.isToday ? 'bg-accent-gold' : 'bg-foreground-muted/30'
                   )} />
                   
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-foreground-light font-medium text-sm truncate">
-                      {res.customer_name}
-                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-foreground-light font-medium text-sm truncate">
+                        {res.customer_name}
+                      </p>
+                      {res.isRecurring && (
+                        <span className="flex items-center gap-0.5 text-[10px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded-full shrink-0">
+                          <Repeat size={10} />
+                          קבוע
+                        </span>
+                      )}
+                    </div>
                     <p className="text-foreground-muted text-xs truncate">
                       {res.services?.name_he || 'שירות'}
                     </p>
                   </div>
                   
                   {/* Phone */}
-                  <a
-                    href={`tel:${res.customer_phone}`}
-                    onClick={(e) => e.stopPropagation()}
-                    className="icon-btn p-2 rounded-lg hover:bg-accent-gold/10 transition-colors shrink-0"
-                    aria-label="התקשר"
-                  >
-                    <Phone size={16} strokeWidth={1.5} className="text-accent-gold" />
-                  </a>
+                  {res.customer_phone && (
+                    <a
+                      href={`tel:${res.customer_phone}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className={cn(
+                        "icon-btn p-2 rounded-lg transition-colors shrink-0",
+                        res.isRecurring ? "hover:bg-purple-500/10" : "hover:bg-accent-gold/10"
+                      )}
+                      aria-label="התקשר"
+                    >
+                      <Phone size={16} strokeWidth={1.5} className={res.isRecurring ? "text-purple-400" : "text-accent-gold"} />
+                    </a>
+                  )}
                 </div>
               )
             })}

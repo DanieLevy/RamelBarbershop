@@ -6,7 +6,6 @@ import { useAuthStore } from '@/store/useAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { AppHeader } from '@/components/AppHeader'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
-import { GlassCard } from '@/components/ui/GlassCard'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { 
@@ -158,7 +157,7 @@ export default function ProfilePage() {
     return (
       <>
         <AppHeader />
-        <main className="relative top-24 min-h-screen px-4 py-8">
+        <main className="relative top-24 min-h-screen px-4 py-8 pt-[env(safe-area-inset-top)]">
           <div className="flex flex-col items-center justify-center py-20">
             <ScissorsLoader size="lg" text="טוען..." />
           </div>
@@ -175,142 +174,128 @@ export default function ProfilePage() {
     <>
       <AppHeader />
       
-      <main id="main-content" tabIndex={-1} className="relative top-20 sm:top-24 min-h-screen bg-background-dark outline-none">
-        <div className="container-mobile py-6 sm:py-8 pb-24">
-          <div className="max-w-md mx-auto">
-            {/* Profile Header */}
-            <div className="text-center mb-8">
-              {/* Avatar */}
-              <div className="relative inline-block mb-4">
-                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-accent-gold/20 flex items-center justify-center border-2 border-accent-gold/40">
-                  <User size={48} strokeWidth={1} className="text-accent-gold" />
+      <main id="main-content" tabIndex={-1} className="relative top-20 sm:top-24 min-h-screen bg-background-dark outline-none pt-[env(safe-area-inset-top)]">
+        <div className="px-4 py-4 pb-24">
+          <div className="max-w-sm mx-auto">
+            {/* Compact Profile Card */}
+            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 mb-4">
+              <div className="flex items-center gap-3">
+                {/* Small Avatar */}
+                <div className="w-14 h-14 shrink-0 rounded-full bg-accent-gold/15 flex items-center justify-center border border-accent-gold/30">
+                  <User size={24} strokeWidth={1.5} className="text-accent-gold" />
+                </div>
+                
+                {/* Name & Info */}
+                <div className="flex-1 min-w-0">
+                  {editingName ? (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        className="flex-1 min-w-0 px-2.5 py-1.5 bg-background-card border border-white/20 rounded-lg text-foreground-light text-sm font-medium outline-none focus:border-accent-gold/50 transition-colors"
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleSaveName}
+                        disabled={savingName || !newName.trim()}
+                        className={cn(
+                          'p-1.5 rounded-lg transition-colors',
+                          savingName || !newName.trim()
+                            ? 'bg-foreground-muted/20 text-foreground-muted cursor-not-allowed'
+                            : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                        )}
+                      >
+                        <Check size={14} strokeWidth={2} />
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        disabled={savingName}
+                        className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                      >
+                        <X size={14} strokeWidth={2} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <h1 className="text-lg text-foreground-light font-medium truncate">
+                        {customer.fullname}
+                      </h1>
+                      <button
+                        onClick={handleEditName}
+                        className="p-1 rounded text-foreground-muted/50 hover:text-accent-gold transition-colors shrink-0"
+                        aria-label="ערוך שם"
+                      >
+                        <Edit2 size={12} strokeWidth={1.5} />
+                      </button>
+                    </div>
+                  )}
+                  <p className="text-foreground-muted text-xs flex items-center gap-1.5 mt-0.5">
+                    <Phone size={10} strokeWidth={1.5} />
+                    <span dir="ltr">{customer.phone}</span>
+                  </p>
                 </div>
               </div>
-              
-              {/* Name */}
-              {editingName ? (
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <input
-                    type="text"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    className="px-4 py-2 bg-background-card border border-white/20 rounded-xl text-foreground-light text-center text-lg font-medium outline-none focus:border-accent-gold/50 transition-colors"
-                    autoFocus
-                  />
-                  <button
-                    onClick={handleSaveName}
-                    disabled={savingName || !newName.trim()}
-                    className={cn(
-                      'p-2 rounded-lg transition-colors',
-                      savingName || !newName.trim()
-                        ? 'bg-foreground-muted/20 text-foreground-muted cursor-not-allowed'
-                        : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                    )}
-                  >
-                    <Check size={18} strokeWidth={2} />
-                  </button>
-                  <button
-                    onClick={handleCancelEdit}
-                    disabled={savingName}
-                    className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors flex items-center justify-center"
-                  >
-                    <X size={18} strokeWidth={2} />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <h1 className="text-2xl sm:text-3xl text-foreground-light font-medium">
-                    {customer.fullname}
-                  </h1>
-                  <button
-                    onClick={handleEditName}
-                    className="p-2 rounded-lg text-foreground-muted hover:text-accent-gold hover:bg-white/5 transition-colors flex items-center justify-center"
-                    aria-label="ערוך שם"
-                  >
-                    <Edit2 size={16} strokeWidth={1.5} />
-                  </button>
-                </div>
-              )}
-              
-              <p className="text-foreground-muted text-sm">
-                לקוח רשום
-              </p>
             </div>
             
-            {/* Compact Info Card */}
-            <GlassCard padding="lg" className="mb-8">
-              <div className="grid grid-cols-3 gap-4 text-center">
-                {/* Phone */}
-                <div className="flex flex-col items-center">
-                  <div className="w-10 h-10 rounded-full bg-accent-gold/10 flex items-center justify-center mb-2">
-                    <Phone size={18} strokeWidth={1.5} className="text-accent-gold" />
-                  </div>
-                  <p className="text-foreground-muted text-[10px] mb-0.5">מספר טלפון</p>
-                  <p className="text-foreground-light font-medium text-sm" dir="ltr">{customer.phone}</p>
+            {/* Stats Row */}
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 text-center">
+                <div className="flex items-center justify-center gap-1.5 text-foreground-muted text-[10px] mb-1">
+                  <Calendar size={10} strokeWidth={1.5} />
+                  <span>תאריך הרשמה</span>
                 </div>
-                
-                {/* Registration Date */}
-                <div className="flex flex-col items-center">
-                  <div className="w-10 h-10 rounded-full bg-accent-gold/10 flex items-center justify-center mb-2">
-                    <Calendar size={18} strokeWidth={1.5} className="text-accent-gold" />
-                  </div>
-                  <p className="text-foreground-muted text-[10px] mb-0.5">תאריך הרשמה</p>
-                  <p className="text-foreground-light font-medium text-sm">
-                    {customer.created_at ? formatDate(customer.created_at) : '-'}
-                  </p>
-                </div>
-                
-                {/* Appointment Count */}
-                <button
-                  onClick={() => router.push('/my-appointments')}
-                  className="flex flex-col items-center group"
-                  aria-label="צפה בתורים"
-                >
-                  <div className="w-10 h-10 rounded-full bg-accent-gold/10 flex items-center justify-center mb-2 group-hover:bg-accent-gold/20 transition-colors">
-                    <History size={18} strokeWidth={1.5} className="text-accent-gold" />
-                  </div>
-                  <p className="text-foreground-muted text-[10px] mb-0.5">היסטוריית תורים</p>
-                  <p className="text-foreground-light font-medium text-sm group-hover:text-accent-gold transition-colors">
-                    {loadingStats ? '...' : `${appointmentCount} תורים`}
-                  </p>
-                </button>
+                <p className="text-foreground-light font-medium text-sm">
+                  {customer.created_at ? formatDate(customer.created_at) : '-'}
+                </p>
               </div>
-            </GlassCard>
-            
-            {/* Notification Settings */}
-            <NotificationSettings className="mt-6" />
-            
-            {/* Actions */}
-            <div className="space-y-3 mt-6">
-              {/* View Appointments */}
+              
               <button
                 onClick={() => router.push('/my-appointments')}
-                className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-accent-gold/10 border border-accent-gold/30 text-accent-gold rounded-xl font-medium hover:bg-accent-gold/20 transition-all"
+                className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 text-center hover:bg-white/[0.04] transition-colors group"
+                aria-label="צפה בתורים"
               >
-                <Calendar size={20} strokeWidth={1.5} />
-                <span>צפה בתורים שלי</span>
+                <div className="flex items-center justify-center gap-1.5 text-foreground-muted text-[10px] mb-1">
+                  <History size={10} strokeWidth={1.5} />
+                  <span>תורים</span>
+                </div>
+                <p className="text-foreground-light font-medium text-sm group-hover:text-accent-gold transition-colors">
+                  {loadingStats ? '...' : appointmentCount}
+                </p>
+              </button>
+            </div>
+            
+            {/* Notification Settings - Compact */}
+            <NotificationSettings className="mb-4" />
+            
+            {/* Quick Actions */}
+            <div className="space-y-2">
+              <button
+                onClick={() => router.push('/my-appointments')}
+                className="w-full flex items-center gap-3 px-4 py-3 bg-accent-gold/10 border border-accent-gold/20 text-accent-gold rounded-xl text-sm font-medium hover:bg-accent-gold/15 transition-all"
+              >
+                <Calendar size={18} strokeWidth={1.5} />
+                <span>התורים שלי</span>
+                <ChevronRight size={14} strokeWidth={1.5} className="mr-auto rotate-180" />
               </button>
               
-              {/* Logout */}
               <button
                 onClick={() => setShowLogoutModal(true)}
-                className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl font-medium hover:bg-red-500/20 transition-all"
+                className="w-full flex items-center gap-3 px-4 py-3 bg-red-500/5 border border-red-500/10 text-red-400 rounded-xl text-sm font-medium hover:bg-red-500/10 transition-all"
               >
-                <LogOut size={20} strokeWidth={1.5} />
+                <LogOut size={18} strokeWidth={1.5} />
                 <span>התנתק</span>
               </button>
             </div>
             
-            {/* Back Button */}
-            <div className="mt-8 text-center">
-              <button
-                onClick={() => router.push('/')}
-                className="inline-flex items-center gap-2 text-foreground-muted hover:text-foreground-light text-sm transition-colors py-2"
-              >
-                <ChevronRight size={12} strokeWidth={1.5} />
-                <span>חזרה לדף הבית</span>
-              </button>
-            </div>
+            {/* Back to Home */}
+            <button
+              onClick={() => router.push('/')}
+              className="w-full mt-4 py-2 text-foreground-muted hover:text-foreground-light text-xs transition-colors flex items-center justify-center gap-1"
+            >
+              <ChevronRight size={10} strokeWidth={1.5} />
+              <span>חזרה לדף הבית</span>
+            </button>
           </div>
         </div>
       </main>

@@ -110,11 +110,11 @@ export function BarberProfileClient({
           
           {/* UI Controls Container - Stays BELOW the notch safe area */}
           {/* Uses hero-safe-content which adds safe-area padding at the top */}
-          <div className="hero-safe-content absolute top-0 left-0 right-0 z-10 flex justify-end">
-            {/* Back to Home Button - Properly positioned below notch */}
+          <div className="hero-safe-content absolute top-0 left-0 right-0 z-10 flex justify-end pt-2">
+            {/* Back to Home Button - Properly positioned below notch with extra padding */}
             <button
               onClick={() => router.push('/')}
-              className="m-2 p-3 rounded-full bg-black/30 backdrop-blur-sm text-white/90 hover:bg-black/50 active:scale-95 transition-all"
+              className="m-3 mt-4 p-3 rounded-full bg-black/40 backdrop-blur-md text-white/90 hover:bg-black/50 active:scale-95 transition-all shadow-lg"
               aria-label="חזרה לדף הבית"
               tabIndex={0}
             >

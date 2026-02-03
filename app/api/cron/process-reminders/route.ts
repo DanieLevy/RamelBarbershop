@@ -24,7 +24,7 @@ import {
   extractFirstName
 } from '@/lib/sms/sms-reminder-service'
 import { reportServerError } from '@/lib/bug-reporter/helpers'
-import { getIsraelDayStart, getIsraelDayEnd, nowInIsraelMs, getDayKeyInIsrael, parseTimeString } from '@/lib/utils'
+import { getIsraelDayStart, getIsraelDayEnd, nowInIsraelMs, getDayKeyInIsrael, parseTimeString, israelDateToTimestamp, timestampToIsraelDate } from '@/lib/utils'
 import type { DayOfWeek } from '@/types/database'
 
 export const dynamic = 'force-dynamic'
@@ -255,11 +255,17 @@ async function getTodaysUnsentRecurring(): Promise<ReservationForReminder[]> {
       continue
     }
 
-    // Parse time slot and create timestamp for today
+    // Parse time slot and create timestamp for today in Israel timezone
     const { hour, minute } = parseTimeString(rec.time_slot)
-    const appointmentDate = new Date(todayStart)
-    appointmentDate.setHours(hour, minute, 0, 0)
-    const appointmentTime = appointmentDate.getTime()
+    
+    // Get Israel date components from todayStart
+    const israelDate = timestampToIsraelDate(todayStart)
+    const year = israelDate.getFullYear()
+    const month = israelDate.getMonth() + 1
+    const day = israelDate.getDate()
+    
+    // Create proper timestamp for today's date + recurring time in Israel timezone
+    const appointmentTime = israelDateToTimestamp(year, month, day, hour, minute)
 
     // Skip if appointment time has passed
     if (appointmentTime <= now) {

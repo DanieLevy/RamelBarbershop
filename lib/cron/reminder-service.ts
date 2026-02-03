@@ -10,7 +10,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { pushService } from '@/lib/push/push-service'
 import type { ReminderContext } from '@/lib/push/types'
-import { nowInIsraelMs, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael, parseTimeString } from '@/lib/utils'
+import { nowInIsraelMs, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael, parseTimeString, israelDateToTimestamp, timestampToIsraelDate } from '@/lib/utils'
 import type { DayOfWeek } from '@/types/database'
 
 // Type for reservation with joined data from the reminder query
@@ -311,13 +311,17 @@ async function getRecurringAppointmentsForToday(
       continue
     }
     
-    // Parse time slot (HH:MM) and create timestamp for today
+    // Parse time slot (HH:MM) and create timestamp for today in Israel timezone
     const { hour, minute } = parseTimeString(recData.time_slot)
     
-    // Create timestamp for today's date + recurring time
-    const appointmentDate = new Date(todayStart)
-    appointmentDate.setHours(hour, minute, 0, 0)
-    const appointmentTime = appointmentDate.getTime()
+    // Get Israel date components from todayStart
+    const israelDate = timestampToIsraelDate(todayStart)
+    const year = israelDate.getFullYear()
+    const month = israelDate.getMonth() + 1
+    const day = israelDate.getDate()
+    
+    // Create proper timestamp for today's date + recurring time in Israel timezone
+    const appointmentTime = israelDateToTimestamp(year, month, day, hour, minute)
     
     // Skip if appointment time has already passed
     if (appointmentTime <= now) {
@@ -337,7 +341,7 @@ async function getRecurringAppointmentsForToday(
     
     // Create a synthetic ID for the recurring instance (date-based)
     // Format: recurring-{id}-{YYYYMMDD}
-    const dateStr = appointmentDate.toISOString().split('T')[0].replace(/-/g, '')
+    const dateStr = israelDate.toISOString().split('T')[0].replace(/-/g, '')
     const syntheticId = `recurring-${recData.id}-${dateStr}`
     
     recurringReminders.push({
