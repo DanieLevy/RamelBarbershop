@@ -499,7 +499,7 @@ function MyAppointmentsContent() {
                       >
                         <div className="flex items-center gap-3">
                           <div className="flex flex-col items-center w-12">
-                            <span className="text-sm font-medium text-purple-400">{rec.time_slot}</span>
+                            <span className="text-sm font-medium text-purple-400">{rec.time_slot.substring(0, 5)}</span>
                             <span className="text-xs text-foreground-muted">יום {rec.day_of_week_hebrew}</span>
                           </div>
                           <div className="border-l border-white/10 h-8" />

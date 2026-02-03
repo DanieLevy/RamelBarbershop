@@ -1002,6 +1002,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           deactivated_at: string | null
+          last_reminder_date: string | null
         }
         Insert: {
           id?: string
@@ -1015,6 +1016,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           deactivated_at?: string | null
+          last_reminder_date?: string | null
         }
         Update: {
           id?: string
@@ -1028,6 +1030,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           deactivated_at?: string | null
+          last_reminder_date?: string | null
         }
         Relationships: [
           {

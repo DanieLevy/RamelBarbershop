@@ -389,6 +389,192 @@ export const deleteRecurring = async (
 }
 
 // ============================================================
+// Conflict Detection Functions
+// ============================================================
+
+/**
+ * Conflicting reservation details for display
+ */
+export interface ConflictingReservation {
+  id: string
+  date: string // YYYY-MM-DD
+  dateFormatted: string // Localized display format
+  time: string // HH:MM
+  customer_name: string
+  customer_id: string
+}
+
+/**
+ * Check for conflicting existing reservations when creating a recurring appointment
+ * Returns list of regular reservations that conflict with the proposed recurring slot
+ * 
+ * The reservations table uses time_timestamp (bigint - milliseconds since epoch)
+ * representing the full date+time of the appointment
+ */
+export const checkReservationConflicts = async (
+  barberId: string,
+  dayOfWeek: DayOfWeek,
+  timeSlot: string,
+  maxDaysAhead: number = 21
+): Promise<ConflictingReservation[]> => {
+  if (!barberId || !isValidUUID(barberId) || !isValidDayOfWeek(dayOfWeek)) {
+    return []
+  }
+
+  try {
+    const supabase = createClient()
+    
+    // Calculate date range in milliseconds (today to maxDaysAhead)
+    // Using Israel timezone for consistency
+    const nowMs = Date.now()
+    const startOfTodayIsrael = getStartOfDayInIsrael(nowMs)
+    const endMs = startOfTodayIsrael + (maxDaysAhead * 24 * 60 * 60 * 1000)
+    
+    // Get target day number (0 = Sunday, etc.)
+    const targetDayIndex = VALID_DAYS.indexOf(dayOfWeek)
+    
+    // Parse time slot
+    const [hours, minutes] = timeSlot.split(':').map(Number)
+    const timeOfDayMs = (hours * 60 + minutes) * 60 * 1000
+    
+    // Calculate all matching timestamps within range
+    const matchingTimestamps: number[] = []
+    const currentDayMs = startOfTodayIsrael
+    
+    for (let dayOffset = 0; dayOffset <= maxDaysAhead; dayOffset++) {
+      const dayMs = currentDayMs + (dayOffset * 24 * 60 * 60 * 1000)
+      const dateAtDay = new Date(dayMs)
+      // Get day of week in Israel timezone
+      const israelDate = new Date(dateAtDay.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }))
+      
+      if (israelDate.getDay() === targetDayIndex) {
+        // This day matches our target day of week
+        // Calculate the exact timestamp for this day + time slot
+        const appointmentTimestamp = dayMs + timeOfDayMs
+        // Only include if it's in the future
+        if (appointmentTimestamp > nowMs) {
+          matchingTimestamps.push(appointmentTimestamp)
+        }
+      }
+    }
+    
+    if (matchingTimestamps.length === 0) {
+      return []
+    }
+    
+    // Query reservations within the date range that match our timestamps
+    // We query all active reservations and filter by matching timestamps
+    const { data, error } = await supabase
+      .from('reservations')
+      .select(`
+        id,
+        time_timestamp,
+        customer_id,
+        customers!reservations_customer_id_fkey (fullname)
+      `)
+      .eq('barber_id', barberId)
+      .eq('status', 'active')
+      .gte('time_timestamp', startOfTodayIsrael)
+      .lte('time_timestamp', endMs)
+    
+    if (error) {
+      console.error('[RecurringService] Error checking reservation conflicts:', error)
+      return []
+    }
+    
+    // Filter reservations that match our target timestamps (with 1 minute tolerance)
+    const TOLERANCE_MS = 60 * 1000 // 1 minute tolerance
+    const conflicts = (data || []).filter(r => {
+      return matchingTimestamps.some(ts => Math.abs(r.time_timestamp - ts) < TOLERANCE_MS)
+    })
+    
+    // Format for display
+    return conflicts.map(r => {
+      const date = new Date(r.time_timestamp)
+      const israelDate = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }))
+      const dateString = israelDate.toISOString().split('T')[0]
+      const timeString = israelDate.toTimeString().substring(0, 5)
+      
+      return {
+        id: r.id,
+        date: dateString,
+        dateFormatted: formatDateHebrew(dateString),
+        time: timeString,
+        customer_name: (r.customers as { fullname: string })?.fullname || 'לקוח',
+        customer_id: r.customer_id,
+      }
+    })
+  } catch (err) {
+    console.error('[RecurringService] Exception checking reservation conflicts:', err)
+    return []
+  }
+}
+
+/**
+ * Get start of day in Israel timezone (in milliseconds)
+ */
+const getStartOfDayInIsrael = (timestampMs: number): number => {
+  const date = new Date(timestampMs)
+  const israelDateStr = date.toLocaleString('en-US', { 
+    timeZone: 'Asia/Jerusalem',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  // Parse "MM/DD/YYYY" format
+  const [month, day, year] = israelDateStr.split('/')
+  const startOfDay = new Date(`${year}-${month}-${day}T00:00:00+02:00`) // Israel is UTC+2 or +3
+  return startOfDay.getTime()
+}
+
+/**
+ * Format date to Hebrew display format
+ */
+const formatDateHebrew = (dateString: string): string => {
+  const date = new Date(dateString + 'T00:00:00')
+  const dayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
+  const dayName = dayNames[date.getDay()]
+  const day = date.getDate()
+  const month = date.getMonth() + 1
+  return `יום ${dayName}, ${day}/${month}`
+}
+
+/**
+ * Cancel multiple reservations by their IDs
+ */
+export const cancelConflictingReservations = async (
+  reservationIds: string[],
+  barberId: string
+): Promise<{ success: boolean; error?: string }> => {
+  if (!reservationIds.length || !barberId || !isValidUUID(barberId)) {
+    return { success: false, error: 'Invalid parameters' }
+  }
+
+  try {
+    const response = await fetch('/api/recurring', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'cancel_conflicts',
+        reservationIds,
+        barberId,
+      }),
+    })
+
+    const result = await response.json()
+    
+    if (!response.ok || !result.success) {
+      return { success: false, error: result.error || 'Failed to cancel reservations' }
+    }
+
+    return { success: true }
+  } catch (err) {
+    console.error('[RecurringService] Exception canceling conflicts:', err)
+    return { success: false, error: 'שגיאה בביטול התורים המתנגשים' }
+  }
+}
+
+// ============================================================
 // Utility Functions
 // ============================================================
 

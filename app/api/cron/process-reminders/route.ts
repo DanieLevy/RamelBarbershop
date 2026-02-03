@@ -24,7 +24,8 @@ import {
   extractFirstName
 } from '@/lib/sms/sms-reminder-service'
 import { reportServerError } from '@/lib/bug-reporter/helpers'
-import { getIsraelDayStart, getIsraelDayEnd, nowInIsraelMs } from '@/lib/utils'
+import { getIsraelDayStart, getIsraelDayEnd, nowInIsraelMs, getDayKeyInIsrael, parseTimeString } from '@/lib/utils'
+import type { DayOfWeek } from '@/types/database'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60 // Allow up to 60 seconds
@@ -42,6 +43,8 @@ interface ReservationForReminder {
   barber_id: string
   barber_name: string
   service_name: string
+  isRecurring?: boolean // Flag to distinguish recurring from regular
+  recurringId?: string  // Original recurring_appointments.id for marking sent
 }
 
 interface CustomerSettings {
@@ -175,6 +178,125 @@ async function getTodaysUnsentReservations(): Promise<ReservationForReminder[]> 
 }
 
 /**
+ * Get recurring appointments for today that haven't received reminder yet
+ * 
+ * DEDUPLICATION: Uses `last_reminder_date` column on recurring_appointments table
+ * Only fetches recurring where last_reminder_date != today (or is null)
+ */
+async function getTodaysUnsentRecurring(): Promise<ReservationForReminder[]> {
+  const supabase = getSupabase()
+  const now = nowInIsraelMs()
+  const todayStart = getIsraelDayStart(now)
+  
+  // Get today's day of week and date string
+  const dayKey = getDayKeyInIsrael(now) as DayOfWeek
+  const todayDateStr = new Date(todayStart).toISOString().split('T')[0]
+
+  console.log(`[ProcessReminders] Querying recurring for day=${dayKey}, date=${todayDateStr}`)
+
+  // Query recurring appointments for today's day of week
+  // where last_reminder_date is not today (or is null)
+  const { data, error } = await supabase
+    .from('recurring_appointments')
+    .select(`
+      id,
+      barber_id,
+      customer_id,
+      time_slot,
+      last_reminder_date,
+      customers!recurring_appointments_customer_id_fkey (fullname, phone),
+      users!recurring_appointments_barber_id_fkey (fullname),
+      services!recurring_appointments_service_id_fkey (name_he)
+    `)
+    .eq('day_of_week', dayKey)
+    .eq('is_active', true)
+    .or(`last_reminder_date.is.null,last_reminder_date.neq.${todayDateStr}`)
+
+  if (error) {
+    console.error('[ProcessReminders] Error fetching recurring:', error)
+    return []
+  }
+
+  if (!data?.length) {
+    console.log('[ProcessReminders] No unsent recurring appointments for today')
+    return []
+  }
+
+  console.log(`[ProcessReminders] Found ${data.length} recurring appointments without reminder today`)
+
+  // Check for barber closures today
+  const barberIds = [...new Set(data.map(r => r.barber_id))]
+  
+  const { data: closuresData } = await supabase
+    .from('barber_closures')
+    .select('barber_id')
+    .in('barber_id', barberIds)
+    .lte('start_date', todayDateStr)
+    .gte('end_date', todayDateStr)
+
+  const barbersClosed = new Set<string>(closuresData?.map(c => c.barber_id) || [])
+
+  // Get barber reminder settings
+  const { data: settingsData } = await supabase
+    .from('barber_notification_settings')
+    .select('barber_id, reminder_hours_before')
+    .in('barber_id', barberIds)
+
+  const settingsMap = new Map<string, number>()
+  settingsData?.forEach(s => settingsMap.set(s.barber_id, s.reminder_hours_before))
+
+  // Convert to ReservationForReminder format
+  const recurringReminders: ReservationForReminder[] = []
+
+  for (const rec of data) {
+    // Skip if barber has closure today
+    if (barbersClosed.has(rec.barber_id)) {
+      console.log(`[ProcessReminders] Skipping recurring ${rec.id} - barber closed today`)
+      continue
+    }
+
+    // Parse time slot and create timestamp for today
+    const { hour, minute } = parseTimeString(rec.time_slot)
+    const appointmentDate = new Date(todayStart)
+    appointmentDate.setHours(hour, minute, 0, 0)
+    const appointmentTime = appointmentDate.getTime()
+
+    // Skip if appointment time has passed
+    if (appointmentTime <= now) {
+      continue
+    }
+
+    // Check if within reminder window
+    const reminderHours = settingsMap.get(rec.barber_id) || 3
+    const windowEnd = now + (reminderHours * HOUR_MS)
+
+    if (appointmentTime > windowEnd) {
+      continue // Not yet in reminder window
+    }
+
+    const customer = rec.customers as { fullname: string; phone: string } | null
+    const barber = rec.users as { fullname: string } | null
+    const service = rec.services as { name_he: string } | null
+
+    recurringReminders.push({
+      id: `recurring-${rec.id}`, // Synthetic ID for logging
+      time_timestamp: appointmentTime,
+      customer_id: rec.customer_id,
+      customer_name: customer?.fullname || 'לקוח קבוע',
+      customer_phone: customer?.phone || '',
+      barber_id: rec.barber_id,
+      barber_name: barber?.fullname || 'הספר',
+      service_name: service?.name_he || 'שירות',
+      isRecurring: true,
+      recurringId: rec.id // Store the original ID for marking
+    })
+  }
+
+  console.log(`[ProcessReminders] ${recurringReminders.length} recurring in reminder window`)
+  return recurringReminders
+}
+
+/**
  * Get customer notification settings
  */
 async function getCustomerSettings(customerIds: string[]): Promise<Map<string, CustomerSettings>> {
@@ -212,6 +334,29 @@ async function markSmsReminderSent(reservationId: string): Promise<boolean> {
 
   if (error) {
     console.error(`[ProcessReminders] Failed to mark SMS sent for ${reservationId}:`, error)
+    return false
+  }
+
+  return true
+}
+
+/**
+ * Mark recurring appointment as having received reminder today
+ * 
+ * Updates the last_reminder_date column to today's date
+ */
+async function markRecurringReminderSent(recurringId: string): Promise<boolean> {
+  const supabase = getSupabase()
+  const todayStart = getIsraelDayStart(nowInIsraelMs())
+  const todayDateStr = new Date(todayStart).toISOString().split('T')[0]
+  
+  const { error } = await supabase
+    .from('recurring_appointments')
+    .update({ last_reminder_date: todayDateStr })
+    .eq('id', recurringId)
+
+  if (error) {
+    console.error(`[ProcessReminders] Failed to mark recurring sent for ${recurringId}:`, error)
     return false
   }
 
@@ -331,10 +476,16 @@ export async function POST(request: NextRequest) {
 
   try {
     // Get today's reservations that haven't received SMS reminder yet
-    const reservations = await getTodaysUnsentReservations()
+    const regularReservations = await getTodaysUnsentReservations()
+    
+    // Also get today's recurring appointments that haven't received reminder today
+    const recurringReservations = await getTodaysUnsentRecurring()
+    
+    // Merge both lists
+    const reservations = [...regularReservations, ...recurringReservations]
     results.total_reservations = reservations.length
     
-    console.log(`[ProcessReminders] Processing ${reservations.length} reservations`)
+    console.log(`[ProcessReminders] Processing ${reservations.length} total (${regularReservations.length} regular + ${recurringReservations.length} recurring)`)
 
     if (reservations.length === 0) {
       const durationMs = Date.now() - startTime
@@ -398,11 +549,19 @@ export async function POST(request: NextRequest) {
           if (smsResult.success) {
             // CRITICAL: Mark reservation IMMEDIATELY after successful SMS
             // This prevents duplicate sends if cron runs again before we finish
-            const marked = await markSmsReminderSent(res.id)
+            let marked: boolean
+            
+            if (res.isRecurring && res.recurringId) {
+              // For recurring, update last_reminder_date
+              marked = await markRecurringReminderSent(res.recurringId)
+            } else {
+              // For regular reservations, update sms_reminder_sent_at
+              marked = await markSmsReminderSent(res.id)
+            }
             
             if (marked) {
               results.sms_sent++
-              console.log(`[ProcessReminders] ✅ SMS sent and marked for ${res.id}`)
+              console.log(`[ProcessReminders] ✅ SMS sent and marked for ${res.id}${res.isRecurring ? ' (recurring)' : ''}`)
             } else {
               // SMS sent but marking failed - log this as a warning
               // The SMS was sent, so we count it, but there's risk of duplicate

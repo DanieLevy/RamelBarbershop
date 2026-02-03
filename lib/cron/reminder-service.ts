@@ -30,6 +30,7 @@ interface RecurringWithJoins {
   barber_id: string
   customer_id: string
   time_slot: string
+  last_reminder_date: string | null
   customers: { fullname: string; phone: string } | null
   users: { fullname: string } | null
   services: { name_he: string } | null
@@ -48,6 +49,8 @@ export interface AppointmentForReminder {
   barber_name: string
   service_name: string
   reminder_hours_before: number
+  isRecurring?: boolean // Flag for recurring appointments
+  recurringId?: string  // Original recurring_appointments.id for marking
 }
 
 export interface ReminderJobResults {
@@ -215,8 +218,12 @@ async function getRecurringAppointmentsForToday(
   // Get today's day of week in Israel timezone
   const dayKey = getDayKeyInIsrael(now) as DayOfWeek
   
-  console.log(`[ReminderService] Fetching recurring appointments for ${dayKey}`)
+  // Calculate today's date string for deduplication
+  const todayDateStr = new Date(todayStart).toISOString().split('T')[0]
   
+  console.log(`[ReminderService] Fetching recurring appointments for ${dayKey}, date=${todayDateStr}`)
+  
+  // Query recurring appointments that haven't received reminder today
   const { data, error } = await client
     .from('recurring_appointments')
     .select(`
@@ -224,6 +231,7 @@ async function getRecurringAppointmentsForToday(
       barber_id,
       customer_id,
       time_slot,
+      last_reminder_date,
       customers!recurring_appointments_customer_id_fkey (
         fullname,
         phone
@@ -237,6 +245,7 @@ async function getRecurringAppointmentsForToday(
     `)
     .eq('day_of_week', dayKey)
     .eq('is_active', true)
+    .or(`last_reminder_date.is.null,last_reminder_date.neq.${todayDateStr}`)
   
   if (error) {
     console.error('[ReminderService] Error fetching recurring appointments:', error)
@@ -253,9 +262,7 @@ async function getRecurringAppointmentsForToday(
   // Get all unique barber IDs from recurring
   const barberIds = [...new Set(data.map(r => r.barber_id).filter(Boolean))]
   
-  // Check for barber closures today
-  const todayDateStr = new Date(todayStart).toISOString().split('T')[0]
-  
+  // Check for barber closures today (reusing todayDateStr from above)
   const { data: closuresData, error: closuresError } = await client
     .from('barber_closures')
     .select('barber_id')
@@ -341,7 +348,9 @@ async function getRecurringAppointmentsForToday(
       barber_id: recData.barber_id,
       barber_name: recData.users?.fullname || 'הספר',
       service_name: recData.services?.name_he || 'שירות',
-      reminder_hours_before: Math.max(1, hoursUntil)
+      reminder_hours_before: Math.max(1, hoursUntil),
+      isRecurring: true,
+      recurringId: recData.id // Original ID for marking
     })
   }
   
@@ -422,6 +431,31 @@ export async function hasActiveSubscription(
 }
 
 /**
+ * Mark recurring appointment as having received reminder today
+ */
+async function markRecurringReminderSent(
+  recurringId: string,
+  supabase?: SupabaseClient
+): Promise<boolean> {
+  const client = supabase || getSupabaseClient()
+  const now = nowInIsraelMs()
+  const todayStart = getIsraelDayStart(now)
+  const todayDateStr = new Date(todayStart).toISOString().split('T')[0]
+  
+  const { error } = await client
+    .from('recurring_appointments')
+    .update({ last_reminder_date: todayDateStr })
+    .eq('id', recurringId)
+
+  if (error) {
+    console.error(`[ReminderService] Failed to mark recurring sent for ${recurringId}:`, error)
+    return false
+  }
+
+  return true
+}
+
+/**
  * Main function to process and send all pending reminders
  */
 export async function processReminders(): Promise<ReminderJobResponse> {
@@ -485,7 +519,12 @@ export async function processReminders(): Promise<ReminderJobResponse> {
 
         if (result.success) {
           results.sent++
-          console.log(`[ReminderService] Reminder sent for reservation ${apt.id}`)
+          console.log(`[ReminderService] Reminder sent for reservation ${apt.id}${apt.isRecurring ? ' (recurring)' : ''}`)
+          
+          // For recurring, mark as sent today
+          if (apt.isRecurring && apt.recurringId) {
+            await markRecurringReminderSent(apt.recurringId, supabase)
+          }
         } else {
           results.failed++
           results.errors.push(`Reservation ${apt.id}: ${result.errors.join(', ')}`)

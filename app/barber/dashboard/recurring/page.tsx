@@ -89,8 +89,9 @@ export default function RecurringPage() {
     .filter(group => group.items.length > 0)
 
   const formatTimeSlot = (timeSlot: string): string => {
-    // Time slot is in HH:MM format, just return as-is
-    return timeSlot
+    // Strip seconds if present (HH:MM:SS -> HH:MM)
+    // PostgreSQL TIME type returns HH:MM:SS format
+    return timeSlot.substring(0, 5)
   }
 
   if (loading) {
@@ -126,21 +127,34 @@ export default function RecurringPage() {
         </button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <div className="bg-background-card rounded-xl p-4 border border-white/5">
-          <div className="text-2xl font-bold text-accent-gold">{recurring.length}</div>
-          <div className="text-sm text-foreground-muted">תורים קבועים פעילים</div>
-        </div>
-        <div className="bg-background-card rounded-xl p-4 border border-white/5">
-          <div className="text-2xl font-bold text-foreground-light">{groupedRecurring.length}</div>
-          <div className="text-sm text-foreground-muted">ימים עם תורים קבועים</div>
-        </div>
-        <div className="bg-background-card rounded-xl p-4 border border-white/5 col-span-2 sm:col-span-1">
-          <div className="text-2xl font-bold text-foreground-light">
-            {new Set(recurring.map(r => r.customer_id)).size}
+      {/* Stats - Horizontal Row */}
+      <div className="flex flex-wrap gap-3">
+        <div className="flex-1 min-w-[140px] bg-background-card rounded-xl px-4 py-3 border border-white/5">
+          <div className="flex items-center gap-2">
+            <Repeat size={16} className="text-accent-gold" />
+            <span className="text-xl font-bold text-accent-gold">{recurring.length}</span>
           </div>
-          <div className="text-sm text-foreground-muted">לקוחות קבועים</div>
+          <div className="text-xs text-foreground-muted mt-0.5">תורים פעילים</div>
+        </div>
+        <div className="flex-1 min-w-[140px] bg-background-card rounded-xl px-4 py-3 border border-white/5">
+          <div className="flex items-center gap-2">
+            <Calendar size={16} className="text-foreground-light" />
+            <span className="text-xl font-bold text-foreground-light">{groupedRecurring.length}</span>
+          </div>
+          <div className="text-xs text-foreground-muted mt-0.5">
+            {groupedRecurring.length > 0 
+              ? groupedRecurring.map(g => g.dayHebrew).join(', ')
+              : 'אין ימים'}
+          </div>
+        </div>
+        <div className="flex-1 min-w-[140px] bg-background-card rounded-xl px-4 py-3 border border-white/5">
+          <div className="flex items-center gap-2">
+            <User size={16} className="text-foreground-light" />
+            <span className="text-xl font-bold text-foreground-light">
+              {new Set(recurring.map(r => r.customer_id)).size}
+            </span>
+          </div>
+          <div className="text-xs text-foreground-muted mt-0.5">לקוחות קבועים</div>
         </div>
       </div>
 
@@ -165,74 +179,64 @@ export default function RecurringPage() {
           </button>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {groupedRecurring.map(group => (
-            <div key={group.day} className="bg-background-card rounded-2xl border border-white/5 overflow-hidden">
-              {/* Day Header */}
-              <div className="bg-white/5 px-4 py-3 flex items-center gap-2">
-                <Calendar size={18} className="text-accent-gold" />
-                <h2 className="font-medium text-foreground-light">
-                  יום {group.dayHebrew}
-                </h2>
-                <span className="text-sm text-foreground-muted">
-                  ({group.items.length} תורים)
-                </span>
+            <div key={group.day}>
+              {/* Day Header - Compact */}
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <Calendar size={14} className="text-accent-gold" />
+                <span className="text-sm font-medium text-foreground-light">יום {group.dayHebrew}</span>
+                <span className="text-xs text-foreground-muted">({group.items.length})</span>
               </div>
               
-              {/* Items */}
-              <div className="divide-y divide-white/5">
+              {/* Items - Compact Landscape Cards */}
+              <div className="space-y-2">
                 {group.items.map(item => (
                   <div
                     key={item.id}
-                    className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                    className="bg-background-card rounded-xl border border-white/5 px-4 py-2.5 flex items-center gap-4"
                   >
-                    <div className="flex-1 space-y-2">
-                      {/* Time */}
-                      <div className="flex items-center gap-2 text-accent-gold font-medium">
-                        <Clock size={16} />
-                        <span className="text-lg">{formatTimeSlot(item.time_slot)}</span>
+                    {/* Time Badge */}
+                    <div className="flex items-center gap-1.5 bg-accent-gold/10 text-accent-gold px-2.5 py-1 rounded-lg min-w-[70px] justify-center">
+                      <Clock size={12} />
+                      <span className="text-sm font-medium">{formatTimeSlot(item.time_slot)}</span>
+                    </div>
+                    
+                    {/* Customer & Service - Inline */}
+                    <div className="flex-1 flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-1.5 text-foreground-light truncate">
+                        <User size={14} className="text-foreground-muted flex-shrink-0" />
+                        <span className="text-sm truncate">{(item.customers as { fullname: string })?.fullname || 'לקוח'}</span>
                       </div>
-                      
-                      {/* Customer */}
-                      <div className="flex items-center gap-2 text-foreground-light">
-                        <User size={16} className="text-foreground-muted" />
-                        <span>{(item.customers as { fullname: string })?.fullname || 'לקוח לא ידוע'}</span>
+                      <div className="hidden sm:flex items-center gap-1.5 text-foreground-muted">
+                        <Scissors size={12} />
+                        <span className="text-xs">{(item.services as { name_he: string })?.name_he || 'שירות'}</span>
                       </div>
-                      
-                      {/* Service */}
-                      <div className="flex items-center gap-2 text-foreground-muted text-sm">
-                        <Scissors size={14} />
-                        <span>{(item.services as { name_he: string })?.name_he || 'שירות'}</span>
-                      </div>
-                      
-                      {/* Notes */}
                       {item.notes && (
-                        <p className="text-sm text-foreground-muted italic mt-1">
+                        <span className="hidden md:inline text-xs text-foreground-muted/70 italic truncate">
                           {item.notes}
-                        </p>
+                        </span>
                       )}
                     </div>
                     
-                    {/* Actions */}
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        disabled={deletingId === item.id}
-                        className={cn(
-                          'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors',
-                          deletingId === item.id
-                            ? 'bg-red-500/20 text-red-400 cursor-not-allowed'
-                            : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
-                        )}
-                      >
-                        {deletingId === item.id ? (
-                          <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Trash2 size={16} />
-                        )}
-                        <span>מחק</span>
-                      </button>
-                    </div>
+                    {/* Delete Button - Compact */}
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      disabled={deletingId === item.id}
+                      className={cn(
+                        'flex items-center justify-center p-2 rounded-lg transition-colors flex-shrink-0',
+                        deletingId === item.id
+                          ? 'bg-red-500/20 text-red-400 cursor-not-allowed'
+                          : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
+                      )}
+                      aria-label="מחק תור קבוע"
+                    >
+                      {deletingId === item.id ? (
+                        <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Trash2 size={16} />
+                      )}
+                    </button>
                   </div>
                 ))}
               </div>

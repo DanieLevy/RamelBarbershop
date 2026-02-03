@@ -44,9 +44,101 @@ interface CreateRecurringRequest {
   created_by: string
 }
 
+interface CancelConflictsRequest {
+  action: 'cancel_conflicts'
+  reservationIds: string[]
+  barberId: string
+}
+
 interface DeleteRecurringRequest {
   recurringId: string
   barberId: string
+}
+
+type PostRequestBody = CreateRecurringRequest | CancelConflictsRequest
+
+// ============================================================
+// Helper: Cancel conflicting reservations
+// ============================================================
+async function handleCancelConflicts(body: CancelConflictsRequest): Promise<NextResponse> {
+  const { reservationIds, barberId } = body
+  
+  // Validate inputs
+  if (!barberId || !UUID_REGEX.test(barberId)) {
+    return NextResponse.json(
+      { success: false, error: 'VALIDATION_ERROR', message: 'barberId is required' },
+      { status: 400 }
+    )
+  }
+  
+  if (!reservationIds || !Array.isArray(reservationIds) || reservationIds.length === 0) {
+    return NextResponse.json(
+      { success: false, error: 'VALIDATION_ERROR', message: 'reservationIds is required' },
+      { status: 400 }
+    )
+  }
+  
+  // Validate all UUIDs
+  const invalidIds = reservationIds.filter(id => !UUID_REGEX.test(id))
+  if (invalidIds.length > 0) {
+    return NextResponse.json(
+      { success: false, error: 'VALIDATION_ERROR', message: 'Invalid reservation IDs' },
+      { status: 400 }
+    )
+  }
+  
+  const supabase = createAdminClient()
+  
+  // Verify all reservations belong to this barber
+  const { data: reservations, error: fetchError } = await supabase
+    .from('reservations')
+    .select('id, barber_id, status')
+    .in('id', reservationIds)
+    .eq('status', 'active')
+  
+  if (fetchError) {
+    console.error('[API/Recurring] Fetch reservations error:', fetchError)
+    return NextResponse.json(
+      { success: false, error: 'DATABASE_ERROR', message: 'שגיאה בטעינת התורים' },
+      { status: 500 }
+    )
+  }
+  
+  // Check all belong to this barber
+  const unauthorized = reservations?.filter(r => r.barber_id !== barberId)
+  if (unauthorized && unauthorized.length > 0) {
+    return NextResponse.json(
+      { success: false, error: 'UNAUTHORIZED', message: 'חלק מהתורים לא שייכים לספר זה' },
+      { status: 403 }
+    )
+  }
+  
+  // Cancel all reservations
+  const { error: updateError } = await supabase
+    .from('reservations')
+    .update({
+      status: 'cancelled',
+      cancelled_at: new Date().toISOString(),
+      cancellation_reason: 'בוטל עקב יצירת תור קבוע',
+    })
+    .in('id', reservationIds)
+  
+  if (updateError) {
+    console.error('[API/Recurring] Cancel reservations error:', updateError)
+    await reportBug(
+      new Error(updateError.message),
+      'API: Cancel Conflicting Reservations - Database Error',
+      { additionalData: { barberId, reservationIds } }
+    )
+    return NextResponse.json(
+      { success: false, error: 'DATABASE_ERROR', message: 'שגיאה בביטול התורים' },
+      { status: 500 }
+    )
+  }
+  
+  console.log(`[API/Recurring] Cancelled ${reservationIds.length} conflicting reservations for barber ${barberId}`)
+  
+  return NextResponse.json({ success: true, cancelledCount: reservationIds.length })
 }
 
 // ============================================================
@@ -107,31 +199,39 @@ export async function GET(request: NextRequest) {
 }
 
 // ============================================================
-// POST: Create a new recurring appointment
+// POST: Create a new recurring appointment or cancel conflicts
 // ============================================================
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateRecurringRequest = await request.json()
+    const body: PostRequestBody = await request.json()
+    
+    // Handle cancel_conflicts action
+    if ('action' in body && body.action === 'cancel_conflicts') {
+      return handleCancelConflicts(body as CancelConflictsRequest)
+    }
+    
+    // Otherwise, handle create recurring
+    const createBody = body as CreateRecurringRequest
     
     // Validate required fields
     const validationErrors: string[] = []
     
-    if (!body.barber_id?.trim() || !UUID_REGEX.test(body.barber_id)) {
+    if (!createBody.barber_id?.trim() || !UUID_REGEX.test(createBody.barber_id)) {
       validationErrors.push('barber_id is required and must be a valid UUID')
     }
-    if (!body.customer_id?.trim() || !UUID_REGEX.test(body.customer_id)) {
+    if (!createBody.customer_id?.trim() || !UUID_REGEX.test(createBody.customer_id)) {
       validationErrors.push('customer_id is required and must be a valid UUID')
     }
-    if (!body.service_id?.trim() || !UUID_REGEX.test(body.service_id)) {
+    if (!createBody.service_id?.trim() || !UUID_REGEX.test(createBody.service_id)) {
       validationErrors.push('service_id is required and must be a valid UUID')
     }
-    if (!body.day_of_week || !VALID_DAYS.includes(body.day_of_week)) {
+    if (!createBody.day_of_week || !VALID_DAYS.includes(createBody.day_of_week)) {
       validationErrors.push('day_of_week is required and must be a valid day')
     }
-    if (!body.time_slot || !TIME_SLOT_REGEX.test(body.time_slot)) {
+    if (!createBody.time_slot || !TIME_SLOT_REGEX.test(createBody.time_slot)) {
       validationErrors.push('time_slot is required and must be in HH:MM format')
     }
-    if (!body.created_by?.trim() || !UUID_REGEX.test(body.created_by)) {
+    if (!createBody.created_by?.trim() || !UUID_REGEX.test(createBody.created_by)) {
       validationErrors.push('created_by is required and must be a valid UUID')
     }
     
@@ -154,7 +254,7 @@ export async function POST(request: NextRequest) {
     const { data: barber, error: barberError } = await supabase
       .from('users')
       .select('id, is_barber')
-      .eq('id', body.barber_id)
+      .eq('id', createBody.barber_id)
       .eq('is_barber', true)
       .maybeSingle()
     
@@ -169,7 +269,7 @@ export async function POST(request: NextRequest) {
     const { data: customer, error: customerError } = await supabase
       .from('customers')
       .select('id, is_blocked')
-      .eq('id', body.customer_id)
+      .eq('id', createBody.customer_id)
       .maybeSingle()
     
     if (customerError || !customer) {
@@ -190,7 +290,7 @@ export async function POST(request: NextRequest) {
     const { data: service, error: serviceError } = await supabase
       .from('services')
       .select('id, barber_id, is_active')
-      .eq('id', body.service_id)
+      .eq('id', createBody.service_id)
       .maybeSingle()
     
     if (serviceError || !service) {
@@ -200,7 +300,7 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    if (service.barber_id && service.barber_id !== body.barber_id) {
+    if (service.barber_id && service.barber_id !== createBody.barber_id) {
       return NextResponse.json(
         { success: false, error: 'SERVICE_NOT_FOUND', message: 'השירות לא שייך לספר זה' },
         { status: 400 }
@@ -220,7 +320,7 @@ export async function POST(request: NextRequest) {
     
     // Check if the shop is open on this day
     const shopOpenDays = shopSettings?.open_days as string[] || []
-    if (shopOpenDays.length > 0 && !shopOpenDays.includes(body.day_of_week)) {
+    if (shopOpenDays.length > 0 && !shopOpenDays.includes(createBody.day_of_week)) {
       return NextResponse.json(
         { success: false, error: 'BARBER_NOT_WORKING', message: 'המספרה סגורה ביום זה' },
         { status: 400 }
@@ -231,8 +331,8 @@ export async function POST(request: NextRequest) {
     const { data: workDay, error: workDayError } = await supabase
       .from('work_days')
       .select('is_working, start_time, end_time')
-      .eq('user_id', body.barber_id)
-      .eq('day_of_week', body.day_of_week)
+      .eq('user_id', createBody.barber_id)
+      .eq('day_of_week', createBody.day_of_week)
       .maybeSingle()
     
     if (workDayError) {
@@ -248,7 +348,7 @@ export async function POST(request: NextRequest) {
     
     // Check if time slot is within work hours
     if (workDay.start_time && workDay.end_time) {
-      const slotTime = body.time_slot
+      const slotTime = createBody.time_slot
       if (slotTime < workDay.start_time || slotTime >= workDay.end_time) {
         return NextResponse.json(
           { success: false, error: 'BARBER_NOT_WORKING', message: 'השעה מחוץ לשעות העבודה' },
@@ -257,13 +357,13 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // 5. Check for existing recurring at same slot (conflict)
+    // 6. Check for existing recurring at same slot (conflict)
     const { data: existingRecurring, error: conflictError } = await supabase
       .from('recurring_appointments')
       .select('id')
-      .eq('barber_id', body.barber_id)
-      .eq('day_of_week', body.day_of_week)
-      .eq('time_slot', body.time_slot)
+      .eq('barber_id', createBody.barber_id)
+      .eq('day_of_week', createBody.day_of_week)
+      .eq('time_slot', createBody.time_slot)
       .eq('is_active', true)
       .maybeSingle()
     
@@ -278,18 +378,18 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // 6. Create the recurring appointment
+    // 7. Create the recurring appointment
     const { data: recurring, error: createError } = await supabase
       .from('recurring_appointments')
       .insert({
-        barber_id: body.barber_id,
-        customer_id: body.customer_id,
-        service_id: body.service_id,
-        day_of_week: body.day_of_week,
-        time_slot: body.time_slot,
-        notes: body.notes?.trim() || null,
+        barber_id: createBody.barber_id,
+        customer_id: createBody.customer_id,
+        service_id: createBody.service_id,
+        day_of_week: createBody.day_of_week,
+        time_slot: createBody.time_slot,
+        notes: createBody.notes?.trim() || null,
         is_active: true,
-        created_by: body.created_by,
+        created_by: createBody.created_by,
       })
       .select()
       .single()
@@ -311,8 +411,8 @@ export async function POST(request: NextRequest) {
         {
           additionalData: {
             errorCode: createError.code,
-            barberId: body.barber_id,
-            customerId: body.customer_id,
+            barberId: createBody.barber_id,
+            customerId: createBody.customer_id,
           }
         }
       )

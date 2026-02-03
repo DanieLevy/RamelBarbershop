@@ -4,7 +4,14 @@ import { useState, useEffect, useMemo } from 'react'
 import { X, Loader2, Search, User, Clock, Scissors, Calendar, Repeat, AlertTriangle } from 'lucide-react'
 import { cn, parseTimeString } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { createRecurring, checkRecurringConflict } from '@/lib/services/recurring.service'
+import { 
+  createRecurring, 
+  checkRecurringConflict, 
+  checkReservationConflicts,
+  cancelConflictingReservations,
+  type ConflictingReservation,
+} from '@/lib/services/recurring.service'
+import { RecurringConflictModal } from '@/components/barber/RecurringConflictModal'
 import { toast } from 'sonner'
 import type { Customer, Service, WorkDay, DayOfWeek, BarbershopSettings } from '@/types/database'
 import { Portal } from '@/components/ui/Portal'
@@ -54,6 +61,10 @@ export function CreateRecurringModal({
   const [shopSettings, setShopSettings] = useState<BarbershopSettings | null>(null)
   const [existingRecurring, setExistingRecurring] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
+  
+  // Conflict modal state
+  const [conflictModalOpen, setConflictModalOpen] = useState(false)
+  const [conflictingReservations, setConflictingReservations] = useState<ConflictingReservation[]>([])
 
   // Reset state when modal opens
   useEffect(() => {
@@ -235,20 +246,85 @@ export function CreateRecurringModal({
     })
   }, [barberWorkDays, shopSettings])
 
-  // Handle save
+  // Handle save - checks for conflicts first
   const handleSave = async () => {
     if (!selectedCustomer || !selectedService || !selectedDay || !selectedTimeSlot) {
       toast.error('נא למלא את כל השדות')
       return
     }
     
-    // Check for conflict
-    const hasConflict = await checkRecurringConflict(barberId, selectedDay, selectedTimeSlot)
-    if (hasConflict) {
+    // Check for recurring conflict (another recurring at same slot)
+    const hasRecurringConflict = await checkRecurringConflict(barberId, selectedDay, selectedTimeSlot)
+    if (hasRecurringConflict) {
       toast.error('כבר קיים תור קבוע בשעה זו')
       return
     }
     
+    // Check for existing reservation conflicts
+    setSaving(true)
+    try {
+      const conflicts = await checkReservationConflicts(barberId, selectedDay, selectedTimeSlot)
+      
+      if (conflicts.length > 0) {
+        // Show conflict modal
+        setConflictingReservations(conflicts)
+        setConflictModalOpen(true)
+        setSaving(false)
+        return
+      }
+      
+      // No conflicts - proceed with creation
+      await createRecurringAppointment()
+    } catch (err) {
+      console.error('Save error:', err)
+      await report(err instanceof Error ? err : new Error(String(err)), 'Checking conflicts for recurring appointment')
+      toast.error('שגיאה בבדיקת התנגשויות')
+      setSaving(false)
+    }
+  }
+
+  // Handle conflict confirmation - cancel conflicts and create recurring
+  const handleConfirmConflicts = async () => {
+    if (!selectedCustomer || !selectedService || !selectedDay || !selectedTimeSlot) {
+      return
+    }
+
+    try {
+      // Cancel conflicting reservations
+      const reservationIds = conflictingReservations.map(c => c.id)
+      const cancelResult = await cancelConflictingReservations(reservationIds, barberId)
+      
+      if (!cancelResult.success) {
+        toast.error(cancelResult.error || 'שגיאה בביטול התורים המתנגשים')
+        return
+      }
+
+      // Verify no more conflicts
+      const remainingConflicts = await checkReservationConflicts(barberId, selectedDay, selectedTimeSlot)
+      if (remainingConflicts.length > 0) {
+        toast.error('נותרו תורים מתנגשים. נסה שוב.')
+        setConflictingReservations(remainingConflicts)
+        return
+      }
+
+      // Close conflict modal and create recurring
+      setConflictModalOpen(false)
+      setConflictingReservations([])
+      
+      await createRecurringAppointment()
+    } catch (err) {
+      console.error('Conflict handling error:', err)
+      await report(err instanceof Error ? err : new Error(String(err)), 'Handling conflicts for recurring appointment')
+      toast.error('שגיאה בטיפול בהתנגשויות')
+    }
+  }
+
+  // Actually create the recurring appointment
+  const createRecurringAppointment = async () => {
+    if (!selectedCustomer || !selectedService || !selectedDay || !selectedTimeSlot) {
+      return
+    }
+
     setSaving(true)
     
     try {
@@ -539,6 +615,19 @@ export function CreateRecurringModal({
           </div>
         </div>
       </div>
+
+      {/* Conflict Modal */}
+      <RecurringConflictModal
+        isOpen={conflictModalOpen}
+        onClose={() => {
+          setConflictModalOpen(false)
+          setConflictingReservations([])
+        }}
+        onConfirm={handleConfirmConflicts}
+        conflicts={conflictingReservations}
+        dayLabel={selectedDay ? DAY_OPTIONS.find(d => d.value === selectedDay)?.label || '' : ''}
+        timeSlot={selectedTimeSlot || ''}
+      />
     </Portal>
   )
 }
