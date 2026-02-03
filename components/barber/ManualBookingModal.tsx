@@ -352,8 +352,6 @@ export function ManualBookingModal({
     setSaving(true)
     
     try {
-      const supabase = createClient()
-      
       // Note: Slot availability is verified atomically by the createReservation function
       // No pre-check needed - the atomic database function handles race conditions
       
@@ -882,7 +880,7 @@ export function ManualBookingModal({
             onClick={handleSubmit}
             disabled={saving || loadingServices || services.length === 0}
             className={cn(
-              'flex-1 py-3 rounded-xl font-medium transition-all text-center',
+              'flex-1 py-3 rounded-xl font-medium transition-all flex items-center justify-center',
               saving || loadingServices || services.length === 0
                 ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                 : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
@@ -900,7 +898,7 @@ export function ManualBookingModal({
           <button
             onClick={onClose}
             disabled={saving}
-            className="px-6 py-3 rounded-xl font-medium border border-white/20 text-foreground-light hover:bg-white/5 transition-colors text-center"
+            className="px-6 py-3 rounded-xl font-medium border border-white/20 text-foreground-light hover:bg-white/5 transition-colors flex items-center justify-center"
           >
             ביטול
           </button>

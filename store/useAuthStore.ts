@@ -34,6 +34,7 @@ interface AuthState {
   linkEmail: (email: string, supabaseUid?: string) => Promise<boolean>
   logout: () => void
   checkSession: () => Promise<void>
+  refreshCustomer: () => Promise<void>
   setLoading: (loading: boolean) => void
 }
 
@@ -221,6 +222,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isLoggedIn: false,
       authMethod: null
     })
+  },
+
+  refreshCustomer: async () => {
+    const { customer, isLoggedIn } = get()
+    if (!isLoggedIn || !customer) return
+    
+    try {
+      const freshCustomer = await getCustomerById(customer.id)
+      if (freshCustomer) {
+        set({ customer: freshCustomer })
+        // Also update stored session
+        const { authMethod } = get()
+        saveSession(freshCustomer, authMethod || 'phone')
+      }
+    } catch (err) {
+      console.warn('[AuthStore] Failed to refresh customer data:', err)
+      // Don't update state on failure - keep existing data
+    }
   },
 
   checkSession: async () => {

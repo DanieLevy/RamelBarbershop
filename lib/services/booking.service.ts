@@ -8,7 +8,6 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
-import type { ReservationInsert } from '@/types/database'
 
 // ============================================================
 // Types
@@ -442,34 +441,6 @@ export async function getReservationById(reservationId: string) {
   }
 }
 
-// ============================================================
-// Helper Functions
-// ============================================================
-
-/**
- * Parse database error messages to determine booking error code
- */
-function parseBookingError(errorMessage: string): BookingErrorCode {
-  if (errorMessage.includes('SLOT_ALREADY_TAKEN')) {
-    return 'SLOT_ALREADY_TAKEN'
-  }
-  if (errorMessage.includes('CUSTOMER_BLOCKED')) {
-    return 'CUSTOMER_BLOCKED'
-  }
-  if (errorMessage.includes('CUSTOMER_DOUBLE_BOOKING')) {
-    return 'CUSTOMER_DOUBLE_BOOKING'
-  }
-  if (errorMessage.includes('MAX_BOOKINGS_REACHED')) {
-    return 'MAX_BOOKINGS_REACHED'
-  }
-  if (errorMessage.includes('DATE_OUT_OF_RANGE')) {
-    return 'DATE_OUT_OF_RANGE'
-  }
-  if (errorMessage.includes('BARBER_PAUSED')) {
-    return 'BARBER_PAUSED'
-  }
-  return 'DATABASE_ERROR'
-}
-
-// Note: createReservationLegacy was removed as it used direct database inserts
+// Note: parseBookingError was moved to app/api/reservations/create/route.ts
+// createReservationLegacy was removed as it used direct database inserts
 // which don't work with strict RLS policies. Use createReservation() instead.

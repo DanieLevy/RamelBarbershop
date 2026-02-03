@@ -259,7 +259,7 @@ export default function ServicesPage() {
               onClick={handleSubmit}
               disabled={saving}
               className={cn(
-                'flex-1 py-3 rounded-xl font-medium transition-all',
+                'flex-1 py-3 rounded-xl font-medium transition-all flex items-center justify-center',
                 saving
                   ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
                   : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
@@ -269,7 +269,7 @@ export default function ServicesPage() {
             </button>
             <button
               onClick={resetForm}
-              className="px-6 py-3 rounded-xl bg-background-dark border border-white/10 text-foreground-muted hover:text-foreground-light transition-colors"
+              className="px-6 py-3 rounded-xl bg-background-dark border border-white/10 text-foreground-muted hover:text-foreground-light transition-colors flex items-center justify-center"
             >
               ביטול
             </button>

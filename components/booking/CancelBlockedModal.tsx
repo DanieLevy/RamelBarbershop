@@ -194,7 +194,7 @@ export function CancelBlockedModal({
           {sent ? (
             <button
               onClick={handleClose}
-              className="flex-1 py-3 rounded-xl font-medium bg-accent-gold text-background-dark hover:bg-accent-gold/90 transition-all"
+              className="flex-1 py-3 rounded-xl font-medium bg-accent-gold text-background-dark hover:bg-accent-gold/90 transition-all flex items-center justify-center"
             >
               סגור
             </button>
@@ -225,7 +225,7 @@ export function CancelBlockedModal({
               <button
                 onClick={handleClose}
                 disabled={sending}
-                className="px-6 py-3 rounded-xl font-medium border border-white/20 text-foreground-light hover:bg-white/5 transition-colors"
+                className="px-6 py-3 rounded-xl font-medium border border-white/20 text-foreground-light hover:bg-white/5 transition-colors flex items-center justify-center"
               >
                 סגור
               </button>

@@ -10,6 +10,7 @@ import ErrorBoundary from '@/components/ErrorBoundary'
 import { CookieNotice } from '@/components/legal/CookieNotice'
 import { SkipLink } from '@/components/a11y/SkipLink'
 import { NotificationManagerProvider } from '@/components/NotificationManager'
+import { PhoneCollectionManager } from '@/components/profile/PhoneCollectionManager'
 
 export const metadata: Metadata = {
   title: 'רם אל ברברשופ - Ramel Barbershop',
@@ -71,6 +72,7 @@ export default function RootLayout({
                 </ErrorBoundary>
                 <MobileBottomNav />
                 <CookieNotice />
+                <PhoneCollectionManager />
               </PWAProvider>
             </AuthProvider>
           </NotificationManagerProvider>

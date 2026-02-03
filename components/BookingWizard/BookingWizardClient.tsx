@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { useAuthStore } from '@/store/useAuthStore'
 import type { BarberWithWorkDays, Service, BarbershopSettings, BarbershopClosure, BarberClosure, BarberMessage, BarberBookingSettings } from '@/types/database'
@@ -42,25 +42,11 @@ export function BookingWizardClient({
   const { step, setBarberId, setService, nextStep, setLoggedInUser, reset, getActualStep, isUserLoggedIn } = useBookingStore()
   const { customer: loggedInCustomer, isLoggedIn, isInitialized } = useAuthStore()
   
-  // Transition loading state for smoother step changes
-  const [isTransitioning, setIsTransitioning] = useState(false)
-  const prevStepRef = useRef(step)
-
   // Set barber ID on mount and reset on unmount
   useEffect(() => {
     setBarberId(barberId)
     return () => reset()
   }, [barberId, setBarberId, reset])
-  
-  // Show brief loader when step changes (particularly from service to date)
-  useEffect(() => {
-    if (prevStepRef.current !== step && prevStepRef.current === 1 && step === 2) {
-      setIsTransitioning(true)
-      const timer = setTimeout(() => setIsTransitioning(false), 400)
-      return () => clearTimeout(timer)
-    }
-    prevStepRef.current = step
-  }, [step])
 
   // Handle pre-selected service - auto-advance to date selection
   useEffect(() => {
@@ -87,15 +73,6 @@ export function BookingWizardClient({
   }, [isLoggedIn, loggedInCustomer, isInitialized, setLoggedInUser])
 
   const renderStep = () => {
-    // Show brief loading during step transitions
-    if (isTransitioning) {
-      return (
-        <div className="flex flex-col items-center justify-center py-12">
-          <ScissorsLoader size="md" text="טוען לוח שנה..." />
-        </div>
-      )
-    }
-    
     const actualStep = getActualStep()
     
     switch (actualStep) {

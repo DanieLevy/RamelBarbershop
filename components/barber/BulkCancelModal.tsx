@@ -153,7 +153,7 @@ export function BulkCancelModal({
           <button
             onClick={handleClose}
             disabled={isLoading}
-            className="flex-1 py-3 px-4 rounded-xl border border-white/10 text-foreground-light font-medium hover:bg-white/5 transition-colors disabled:opacity-50"
+            className="flex-1 py-3 px-4 rounded-xl border border-white/10 text-foreground-light font-medium hover:bg-white/5 transition-colors disabled:opacity-50 flex items-center justify-center"
           >
             ביטול
           </button>
@@ -161,7 +161,7 @@ export function BulkCancelModal({
             onClick={handleConfirm}
             disabled={isLoading}
             className={cn(
-              'flex-1 py-3 px-4 rounded-xl font-medium transition-all',
+              'flex-1 py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center',
               isLoading
                 ? 'bg-red-500/30 text-red-300 cursor-not-allowed'
                 : 'bg-red-500 text-white hover:bg-red-600'

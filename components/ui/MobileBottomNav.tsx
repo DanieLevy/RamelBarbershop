@@ -40,13 +40,20 @@ export function MobileBottomNav() {
   const isSupportedRealtime = pushStore.isSupported || push.isSupported
   const permissionRealtime = pushStore.permission !== 'unavailable' ? pushStore.permission : push.permission
   
+  // Get customer from auth store for fetching appointments and checking phone
+  const { customer } = useAuthStore()
+  
   // Show badge when: user is logged in (customer or barber), in PWA, push supported but not subscribed
   // This covers all cases where user should enable notifications
   const isLoggedInUser = userRole === 'customer' || userRole === 'barber'
+  const isCustomer = userRole === 'customer'
   
   // Check for various notification issues
   const hasPermissionIssue = permissionRealtime === 'denied'
   const needsSubscription = isSupportedRealtime && !isSubscribedRealtime
+  
+  // Check if customer is missing phone number
+  const isMissingPhone = isCustomer && customer && !customer.phone
   
   // Show notification badge for:
   // 1. PWA users who haven't enabled notifications
@@ -56,6 +63,10 @@ export function MobileBottomNav() {
     pwa.isStandalone && 
     (needsSubscription || hasPermissionIssue)
   
+  // Show phone badge when customer is logged in but has no phone number
+  // This encourages them to add phone for SMS reminders
+  const showPhoneBadge = isMissingPhone
+  
   // Different badge style for denied permission (more urgent)
   const isUrgentBadge = hasPermissionIssue
   
@@ -64,9 +75,6 @@ export function MobileBottomNav() {
   const [showLoginDropup, setShowLoginDropup] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [upcomingCount, setUpcomingCount] = useState(0)
-  
-  // Get customer from auth store for fetching appointments
-  const { customer } = useAuthStore()
   
   // Scroll tracking
   const lastScrollY = useRef(0)
@@ -367,19 +375,28 @@ export function MobileBottomNav() {
                     strokeWidth={isActive ? 2 : 1.5}
                   />
                   
-                  {/* Notification badge for profile tab */}
-                  {item.id === 'profile' && showNotificationBadge && (
+                  {/* Badge for profile tab: notification issues or missing phone */}
+                  {item.id === 'profile' && (showNotificationBadge || showPhoneBadge) && (
                     <div className="absolute -top-1 -right-1 flex items-center justify-center">
                       <span className="relative flex h-2 w-2">
-                        {isUrgentBadge ? (
-                          <>
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
-                          </>
+                        {showNotificationBadge ? (
+                          // Notification badge (red or amber based on urgency)
+                          isUrgentBadge ? (
+                            <>
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                            </>
+                          ) : (
+                            <>
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+                            </>
+                          )
                         ) : (
+                          // Phone missing badge (orange)
                           <>
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
                           </>
                         )}
                       </span>

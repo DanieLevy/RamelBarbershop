@@ -21,8 +21,10 @@ import {
   X,
   HelpCircle,
   RefreshCw,
-  MessageSquare
+  MessageSquare,
+  Phone
 } from 'lucide-react'
+import { PhoneCollectionModal } from '@/components/profile/PhoneCollectionModal'
 
 interface NotificationSettingsProps {
   className?: string
@@ -44,6 +46,7 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
   const [showHelp, setShowHelp] = useState(false)
   const [deviceToRemove, setDeviceToRemove] = useState<{ id: string; name: string } | null>(null)
   const [removingDeviceId, setRemovingDeviceId] = useState<string | null>(null)
+  const [showPhoneModal, setShowPhoneModal] = useState(false)
   
   // SMS Reminder Settings
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>({
@@ -398,57 +401,85 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
       </GlassCard>
 
       {/* SMS Reminder Settings */}
-      {customer?.phone && (
-        <GlassCard padding="md">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className={cn(
-                'w-10 h-10 rounded-full flex items-center justify-center',
-                reminderSettings.sms_reminder_enabled ? 'bg-emerald-500/20' : 'bg-white/10'
-              )}>
-                <MessageSquare 
-                  size={20} 
-                  className={reminderSettings.sms_reminder_enabled ? 'text-emerald-400' : 'text-foreground-muted'} 
-                />
-              </div>
-              <div>
-                <h3 className="font-medium text-foreground-light">תזכורות SMS</h3>
-                <p className={cn(
-                  'text-sm',
-                  reminderSettings.sms_reminder_enabled ? 'text-emerald-400' : 'text-foreground-muted'
-                )}>
-                  {reminderSettings.sms_reminder_enabled ? 'פעיל' : 'כבוי'}
-                </p>
-              </div>
+      <GlassCard padding="md">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              'w-10 h-10 rounded-full flex items-center justify-center',
+              customer?.phone && reminderSettings.sms_reminder_enabled ? 'bg-emerald-500/20' : 'bg-white/10'
+            )}>
+              <MessageSquare 
+                size={20} 
+                className={customer?.phone && reminderSettings.sms_reminder_enabled ? 'text-emerald-400' : 'text-foreground-muted'} 
+              />
             </div>
-            
-            {/* SMS Toggle */}
-            <button
-              onClick={handleSmsToggle}
-              disabled={savingSettings || loadingSettings}
-              className={cn(
-                'w-12 h-7 rounded-full transition-colors relative flex-shrink-0',
-                reminderSettings.sms_reminder_enabled ? 'bg-emerald-500' : 'bg-white/10',
-                (savingSettings || loadingSettings) && 'opacity-50 cursor-not-allowed'
-              )}
-              aria-checked={reminderSettings.sms_reminder_enabled}
-              role="switch"
-            >
-              <div className={cn(
-                'absolute top-1 w-5 h-5 rounded-full bg-white transition-all',
-                reminderSettings.sms_reminder_enabled ? 'right-1' : 'left-1'
+            <div>
+              <h3 className="font-medium text-foreground-light">תזכורות SMS</h3>
+              <p className={cn(
+                'text-sm',
+                !customer?.phone ? 'text-orange-400' :
+                reminderSettings.sms_reminder_enabled ? 'text-emerald-400' : 'text-foreground-muted'
               )}>
-                {(savingSettings || loadingSettings) && (
-                  <Loader2 size={12} className="animate-spin absolute top-0.5 left-0.5 text-background-dark" />
-                )}
-              </div>
-            </button>
+                {!customer?.phone ? 'חסר מספר טלפון' :
+                 reminderSettings.sms_reminder_enabled ? 'פעיל' : 'כבוי'}
+              </p>
+            </div>
           </div>
           
+          {/* SMS Toggle - Disabled if no phone */}
+          <button
+            onClick={customer?.phone ? handleSmsToggle : undefined}
+            disabled={!customer?.phone || savingSettings || loadingSettings}
+            className={cn(
+              'w-12 h-7 rounded-full transition-colors relative flex-shrink-0',
+              !customer?.phone ? 'bg-white/5 cursor-not-allowed opacity-50' :
+              reminderSettings.sms_reminder_enabled ? 'bg-emerald-500' : 'bg-white/10',
+              (savingSettings || loadingSettings) && 'opacity-50 cursor-not-allowed'
+            )}
+            aria-checked={customer?.phone ? reminderSettings.sms_reminder_enabled : false}
+            aria-disabled={!customer?.phone}
+            role="switch"
+            title={!customer?.phone ? 'יש להוסיף מספר טלפון' : undefined}
+          >
+            <div className={cn(
+              'absolute top-1 w-5 h-5 rounded-full bg-white transition-all',
+              customer?.phone && reminderSettings.sms_reminder_enabled ? 'right-1' : 'left-1'
+            )}>
+              {(savingSettings || loadingSettings) && (
+                <Loader2 size={12} className="animate-spin absolute top-0.5 left-0.5 text-background-dark" />
+              )}
+            </div>
+          </button>
+        </div>
+        
+        {customer?.phone ? (
           <p className="text-xs text-foreground-muted mt-3 mr-13">
             קבלת תזכורת SMS לפני כל תור שקבעת
           </p>
-        </GlassCard>
+        ) : (
+          <div className="mt-3 mr-13">
+            <p className="text-xs text-orange-400/80 mb-2">
+              כדי לקבל תזכורות SMS, יש להוסיף מספר טלפון
+            </p>
+            <button
+              onClick={() => setShowPhoneModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-medium hover:bg-orange-500/20 transition-colors"
+            >
+              <Phone size={12} />
+              הוסף מספר טלפון
+            </button>
+          </div>
+        )}
+      </GlassCard>
+      
+      {/* Phone Collection Modal */}
+      {showPhoneModal && customer && (
+        <PhoneCollectionModal
+          isOpen={showPhoneModal}
+          onClose={() => setShowPhoneModal(false)}
+          customerId={customer.id}
+          customerName={customer.fullname}
+        />
       )}
 
       {/* Connected Devices (Collapsible) */}
@@ -547,17 +578,17 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
             <div className="flex gap-3">
               <button
                 onClick={() => setDeviceToRemove(null)}
-                className="flex-1 py-3 rounded-xl bg-white/10 text-foreground-light font-medium hover:bg-white/15 transition-colors"
+                className="flex-1 py-3 rounded-xl bg-white/10 text-foreground-light font-medium hover:bg-white/15 transition-colors flex items-center justify-center"
               >
                 ביטול
               </button>
               <button
                 onClick={confirmRemoveDevice}
                 disabled={removingDeviceId === deviceToRemove.id}
-                className="flex-1 py-3 rounded-xl bg-red-500/20 text-red-400 font-medium border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                className="flex-1 py-3 rounded-xl bg-red-500/20 text-red-400 font-medium border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 flex items-center justify-center"
               >
                 {removingDeviceId === deviceToRemove.id ? (
-                  <Loader2 size={18} className="animate-spin mx-auto" />
+                  <Loader2 size={18} className="animate-spin" />
                 ) : (
                   'הסר מכשיר'
                 )}

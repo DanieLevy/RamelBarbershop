@@ -6,7 +6,7 @@ import { BarberProfileClient } from '@/components/BarberProfile/BarberProfileCli
 import { BarberNotFoundClient } from '@/components/BarberProfile/BarberNotFoundClient'
 import { isValidUUID, generateSlugFromEnglishName, getPreferredBarberSlug } from '@/lib/utils'
 import { getCachedShopSettings } from '@/lib/data/cached-queries'
-import type { User, Service, BarbershopSettings, BarberMessage, BarberGalleryImage, WorkDay, BarberWithWorkDays } from '@/types/database'
+import type { User, Service, BarbershopSettings, BarberMessage, BarberGalleryImage, WorkDay } from '@/types/database'
 import type { Metadata } from 'next'
 
 // Force dynamic rendering - barber data, services, and availability must always be fresh

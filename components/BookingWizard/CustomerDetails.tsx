@@ -161,7 +161,7 @@ export function CustomerDetails() {
           onClick={handlePhoneSubmit}
           disabled={loading}
           className={cn(
-            'w-full py-3 px-4 rounded-xl font-medium transition-all text-center',
+            'w-full py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center',
             loading
               ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
               : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
@@ -180,7 +180,7 @@ export function CustomerDetails() {
         <button
           onClick={prevStep}
           disabled={loading}
-          className="w-full text-foreground-muted hover:text-foreground-light transition-colors text-sm text-center"
+          className="w-full text-foreground-muted hover:text-foreground-light transition-colors text-sm flex items-center justify-center"
         >
           ← חזור לבחירת שעה
         </button>
@@ -286,7 +286,7 @@ export function CustomerDetails() {
       
       <button
         onClick={handleNameSubmit}
-        className="w-full py-3 px-4 rounded-xl bg-accent-gold text-background-dark font-medium hover:bg-accent-gold/90 transition-all text-center"
+        className="w-full py-3 px-4 rounded-xl bg-accent-gold text-background-dark font-medium hover:bg-accent-gold/90 transition-all flex items-center justify-center"
       >
         המשך לאימות
       </button>
@@ -296,7 +296,7 @@ export function CustomerDetails() {
           setStep('phone')
           setError(null)
         }}
-        className="w-full text-foreground-muted hover:text-foreground-light transition-colors text-sm text-center"
+        className="w-full text-foreground-muted hover:text-foreground-light transition-colors text-sm flex items-center justify-center"
       >
         ← חזור
       </button>

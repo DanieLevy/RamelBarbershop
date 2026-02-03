@@ -632,7 +632,7 @@ export default function MyCustomersPage() {
               <button
                 onClick={closePushModal}
                 disabled={sendingPush}
-                className="px-6 py-3 rounded-xl font-medium border border-white/20 text-foreground-light hover:bg-white/5 transition-colors"
+                className="px-6 py-3 rounded-xl font-medium border border-white/20 text-foreground-light hover:bg-white/5 transition-colors flex items-center justify-center"
               >
                 ביטול
               </button>
