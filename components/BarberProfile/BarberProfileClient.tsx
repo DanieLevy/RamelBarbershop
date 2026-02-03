@@ -50,6 +50,17 @@ export function BarberProfileClient({
     router.prefetch(buildBarberBookingUrl(barberSlug))
   }, [barberSlug, services, router])
 
+  // Edge-to-edge hero mode - add fallback class for browsers without :has() support
+  useEffect(() => {
+    // Add class to body for CSS fallback (browsers without :has() selector)
+    document.body.classList.add('hero-edge-to-edge-active')
+    
+    // Cleanup on unmount - remove the class when leaving this page
+    return () => {
+      document.body.classList.remove('hero-edge-to-edge-active')
+    }
+  }, [])
+
   const handleServiceSelect = (serviceId: string) => {
     setLoadingServiceId(serviceId)
     router.push(buildBarberBookingUrl(barberSlug, serviceId))
@@ -77,17 +88,16 @@ export function BarberProfileClient({
     : null
 
   return (
-    <div className="flex flex-col min-h-screen bg-background-dark">
+    <div 
+      className="flex flex-col min-h-screen bg-background-dark ios-scroll-container"
+      data-hero-edge-to-edge
+    >
       {/* Hero Section - Full-bleed immersive display extending into notch */}
       <div className="relative w-full">
         {/* Hero Image/Gallery Container - Extends into safe area for edge-to-edge display */}
+        {/* The hero-image-container class handles the negative margin in PWA mode via CSS */}
         <div 
-          className="relative w-full aspect-[3/4] sm:aspect-[4/3] max-h-[60vh] overflow-hidden"
-          style={{ 
-            // Extend into safe area (notch) on iPhone
-            marginTop: 'calc(-1 * env(safe-area-inset-top, 0px))',
-            paddingTop: 'env(safe-area-inset-top, 0px)',
-          }}
+          className="hero-image-container relative w-full aspect-[3/4] sm:aspect-[4/3] max-h-[60vh] overflow-hidden"
         >
           <GallerySlideshow
             images={galleryImages}
@@ -98,17 +108,19 @@ export function BarberProfileClient({
             interval={5000}
           />
           
-          {/* Back to Home Button - Floating overlay in safe area */}
-          <button
-            onClick={() => router.push('/')}
-            className="absolute top-0 right-0 z-10 p-3 m-2 rounded-full bg-black/30 backdrop-blur-sm text-white/90 hover:bg-black/50 active:scale-95 transition-all"
-            style={{ 
-              marginTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)',
-            }}
-            aria-label="חזרה לדף הבית"
-          >
-            <Home size={20} strokeWidth={2} />
-          </button>
+          {/* UI Controls Container - Stays BELOW the notch safe area */}
+          {/* Uses hero-safe-content which adds safe-area padding at the top */}
+          <div className="hero-safe-content absolute top-0 left-0 right-0 z-10">
+            {/* Back to Home Button - Properly positioned below notch */}
+            <button
+              onClick={() => router.push('/')}
+              className="absolute top-2 right-2 p-3 rounded-full bg-black/30 backdrop-blur-sm text-white/90 hover:bg-black/50 active:scale-95 transition-all"
+              aria-label="חזרה לדף הבית"
+              tabIndex={0}
+            >
+              <Home size={20} strokeWidth={2} />
+            </button>
+          </div>
           
           {/* Minimal Name Overlay - Only name, clean design */}
           <div className="absolute bottom-0 left-0 right-0 pb-6 pt-16 bg-gradient-to-t from-background-dark via-background-dark/80 to-transparent">
@@ -204,12 +216,11 @@ export function BarberProfileClient({
                     )}
                   >
                     {/* Use dir="ltr" to force left-to-right flex, then swap items visually */}
-                    <div className="py-4 flex items-center w-full" dir="ltr">
+                    <div className="py-6 flex items-center w-full" dir="ltr">
                       {/* Book Button - on LEFT side */}
                       <div 
                         className={cn(
                           'px-6 py-2 rounded-lg text-base font-bold',
-                          'border border-accent-gold/40 text-accent-gold bg-accent-gold/5',
                           'group-hover:border-accent-gold/60',
                           'flex items-center justify-center gap-1 flex-shrink-0',
                           'transition-all duration-150'

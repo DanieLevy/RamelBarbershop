@@ -769,6 +769,7 @@
 
   /* Notch area background - fills the safe area inset */
   /* z-index is BELOW header (50) but above content */
+  /* Default: show the dark notch overlay */
   body::before {
     content: '';
     position: fixed;
@@ -779,6 +780,35 @@
     background: #080b0d;
     z-index: 40; /* Below header z-50, above content */
     pointer-events: none;
+  }
+  
+  /* Hide the notch overlay when page uses edge-to-edge hero mode */
+  /* Fallback class set via JS - works in all browsers */
+  body.hero-edge-to-edge-active::before {
+    display: none !important;
+  }
+  
+  /* Edge-to-edge hero pages - allow content to flow into notch */
+  [data-hero-edge-to-edge] {
+    /* Ensure the container can extend above the normal flow */
+    position: relative;
+  }
+  
+  [data-hero-edge-to-edge] .hero-image-container {
+    /* Pull the container up into the safe area (notch) */
+    margin-top: calc(-1 * env(safe-area-inset-top, 0px));
+  }
+  
+  /* The image inside should fill the entire container including notch area */
+  [data-hero-edge-to-edge] .hero-image-container img,
+  [data-hero-edge-to-edge] .hero-image-container > div {
+    /* Ensure children fill the space */
+  }
+  
+  /* Elements that should stay BELOW the notch (buttons, text overlays) */
+  [data-hero-edge-to-edge] .hero-safe-content {
+    /* Push content down by the safe area amount */
+    padding-top: env(safe-area-inset-top, 0px);
   }
 
   /* Main content bottom padding for nav */
@@ -792,13 +822,67 @@
   }
 }
 
-/* iOS Scroll Optimizations */
+/* ============================================
+   Edge-to-Edge Hero Mode (All Browsers)
+   Allows hero images to extend into safe areas
+   ============================================ */
+
+/* Base styles for edge-to-edge hero - works in all browsers */
+[data-hero-edge-to-edge] {
+  position: relative;
+}
+
+/* In regular web mode (not standalone), just ensure smooth display */
+[data-hero-edge-to-edge] .hero-image-container {
+  position: relative;
+  width: 100%;
+}
+
+/* Hero safe content - elements that should respect safe area */
+[data-hero-edge-to-edge] .hero-safe-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* Safe area padding applied via PWA standalone styles above */
+}
+
+/* Safe area aware positioning for all modes */
+@supports (padding-top: env(safe-area-inset-top)) {
+  [data-hero-edge-to-edge] .hero-safe-content {
+    /* Add safe area padding in browsers that support it */
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* Ensure the GallerySlideshow container fills including notch */
+@media (display-mode: standalone) {
+  @supports (padding-top: env(safe-area-inset-top)) {
+    [data-hero-edge-to-edge] .hero-image-container {
+      /* The container extends into notch */
+      /* Images with absolute positioning will fill this space */
+    }
+    
+    /* Ensure images inside cover the notch area */
+    [data-hero-edge-to-edge] .hero-image-container [class*="absolute"][class*="inset-0"] {
+      /* Extend to cover the pulled-up area */
+      top: 0;
+    }
+  }
+}
+
+/* ============================================
+   iOS Scroll Optimizations (iOS 18+ / iOS 26)
+   Modern scroll APIs for PWA apps
+   ============================================ */
+
 html {
   scroll-behavior: smooth;
   /* Improve scroll performance */
   -webkit-font-smoothing: antialiased;
 }
 
+/* iOS-specific optimizations using feature detection */
 @supports (-webkit-touch-callout: none) {
   html, body {
     -webkit-overflow-scrolling: touch;
@@ -840,6 +924,93 @@ html {
   .touch-btn {
     touch-action: manipulation;
   }
+}
+
+/* ============================================
+   iOS Scroll Utility Classes
+   Use these for systematic iOS-optimized scrolling
+   ============================================ */
+
+/* Main scrollable container - use on page roots */
+.ios-scroll-container {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scroll-behavior: smooth;
+  /* GPU acceleration for smooth scrolling */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: scroll-position;
+}
+
+/* Horizontal scroll with snap points - for carousels/galleries */
+.ios-scroll-horizontal {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
+  /* Hide scrollbar for cleaner iOS look */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.ios-scroll-horizontal::-webkit-scrollbar {
+  display: none;
+}
+
+/* Snap points for children in horizontal scroll */
+.ios-scroll-horizontal > * {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+}
+
+/* Centered snap alignment */
+.ios-scroll-horizontal-center > * {
+  scroll-snap-align: center;
+}
+
+/* Vertical scroll with inertia - for long lists */
+.ios-scroll-vertical {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+  transform: translateZ(0);
+}
+
+/* Prevent overscroll bounce at edges */
+.ios-no-bounce {
+  overscroll-behavior: none;
+}
+
+/* Elastic/rubber-band effect (default iOS behavior) */
+.ios-elastic {
+  overscroll-behavior: auto;
+}
+
+/* Contain overscroll to element (no propagation to parent) */
+.ios-overscroll-contain {
+  overscroll-behavior: contain;
+}
+
+/* Modal/dialog scroll container - prevents background scroll */
+.ios-modal-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  max-height: 100%;
+  touch-action: pan-y;
+}
+
+/* Fixed positioned elements optimization */
+.ios-fixed {
+  position: fixed;
+  will-change: transform;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 @media (display-mode: standalone) {
