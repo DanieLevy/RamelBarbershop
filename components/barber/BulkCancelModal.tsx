@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { X, AlertTriangle, Calendar, Users } from 'lucide-react'
 import { cn, formatDateHebrew } from '@/lib/utils'
+import { Portal } from '@/components/ui/Portal'
 
 interface ReservationSummary {
   id: string
@@ -45,15 +46,16 @@ export function BulkCancelModal({
   const uniqueCustomers = [...new Set(reservations.map(r => r.customer_name))]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={handleClose}
-      />
-      
-      {/* Modal */}
-      <div className="relative w-full max-w-md bg-background-card border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-fade-in">
+    <Portal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        {/* Backdrop */}
+        <div 
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          onClick={handleClose}
+        />
+        
+        {/* Modal */}
+        <div className="relative w-full max-w-md bg-background-card border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-fade-in">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-white/10 bg-red-500/10">
           <div className="flex items-center gap-3">
@@ -175,8 +177,9 @@ export function BulkCancelModal({
             )}
           </button>
         </div>
+        </div>
       </div>
-    </div>
+    </Portal>
   )
 }
 

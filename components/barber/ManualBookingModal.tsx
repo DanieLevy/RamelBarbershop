@@ -9,6 +9,7 @@ import { getOrCreateCustomer } from '@/lib/services/customer.service'
 import { format, addDays, isSameDay } from 'date-fns'
 import { toast } from 'sonner'
 import type { Customer, BarbershopSettings, Service, WorkDay } from '@/types/database'
+import { Portal } from '@/components/ui/Portal'
 
 interface ManualBookingModalProps {
   isOpen: boolean
@@ -467,8 +468,9 @@ export function ManualBookingModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="relative w-full sm:max-w-lg sm:mx-4 bg-background-darker sm:bg-background-dark border-t sm:border border-white/10 sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[90vh] flex flex-col animate-slide-in-up sm:animate-fade-in">
+    <Portal>
+      <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="relative w-full sm:max-w-lg sm:mx-4 bg-background-darker sm:bg-background-dark border-t sm:border border-white/10 sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[90vh] flex flex-col animate-slide-in-up sm:animate-fade-in">
         {/* Header - Fixed */}
         <div className="flex items-center justify-between p-5 sm:p-6 pb-3 border-b border-white/5 flex-shrink-0">
           <div className="flex items-start gap-3">
@@ -903,7 +905,8 @@ export function ManualBookingModal({
             ביטול
           </button>
         </div>
+        </div>
       </div>
-    </div>
+    </Portal>
   )
 }

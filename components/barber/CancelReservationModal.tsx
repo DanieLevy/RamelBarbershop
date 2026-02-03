@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { X, AlertTriangle, Calendar, Clock } from 'lucide-react'
 import { cn, formatTime, formatDateHebrew } from '@/lib/utils'
+import { Portal } from '@/components/ui/Portal'
 
 interface ReservationInfo {
   id: string
@@ -50,12 +51,13 @@ export function CancelReservationModal({
   const timestamp = normalizeTs(reservation.time_timestamp)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={handleClose}
-      />
+    <Portal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        {/* Backdrop */}
+        <div 
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          onClick={handleClose}
+        />
       
       {/* Modal */}
       <div className="relative w-full max-w-md bg-background-card border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-fade-in">
@@ -153,7 +155,8 @@ export function CancelReservationModal({
           </button>
         </div>
       </div>
-    </div>
+      </div>
+    </Portal>
   )
 }
 

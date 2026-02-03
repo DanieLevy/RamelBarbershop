@@ -11,6 +11,7 @@ import { setAppBadge } from './usePushNotifications'
  * Manages the PWA app badge by:
  * 1. Clearing the badge when the user opens/focuses the app
  * 2. Marking all notifications as read on the server
+ * 3. Verifying the count after marking to handle race conditions
  * 
  * This ensures users don't see stale badge counts after viewing the app.
  */
@@ -22,7 +23,7 @@ export const useBadgeManager = () => {
   const lastClearTimeRef = useRef(0)
   
   // Minimum time between badge clears to prevent excessive API calls
-  const CLEAR_COOLDOWN_MS = 5000
+  const CLEAR_COOLDOWN_MS = 3000
 
   /**
    * Clear badge and mark notifications as read
@@ -46,7 +47,7 @@ export const useBadgeManager = () => {
     lastClearTimeRef.current = now
 
     try {
-      // Clear the app badge immediately
+      // Clear the app badge immediately for instant feedback
       await setAppBadge(0)
 
       // Mark notifications as read on the server
@@ -61,6 +62,16 @@ export const useBadgeManager = () => {
 
       if (!response.ok) {
         console.warn('[BadgeManager] Failed to mark notifications as read')
+        return
+      }
+
+      // Check if the server returned a new unread count (race condition detection)
+      // If new notifications arrived while we were marking, update the badge
+      const data = await response.json()
+      if (data.newUnreadCount && data.newUnreadCount > 0) {
+        // New notifications arrived while we were marking - update badge
+        console.log(`[BadgeManager] New notifications arrived: ${data.newUnreadCount}`)
+        await setAppBadge(data.newUnreadCount)
       }
     } catch (error) {
       console.error('[BadgeManager] Error clearing badge:', error)

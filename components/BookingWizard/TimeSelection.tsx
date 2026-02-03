@@ -15,6 +15,7 @@ interface TimeSelectionProps {
   barberId: string
   shopSettings?: BarbershopSettings | null
   barberWorkDays?: WorkDay[]
+  barberBookingSettings?: BarberBookingSettings | null
 }
 
 interface EnrichedTimeSlot extends TimeSlot {
@@ -22,7 +23,7 @@ interface EnrichedTimeSlot extends TimeSlot {
   tooSoon?: boolean // True if slot is within min_hours_before_booking
 }
 
-export function TimeSelection({ barberId, shopSettings, barberWorkDays }: TimeSelectionProps) {
+export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], barberBookingSettings }: TimeSelectionProps) {
   const { date, timeTimestamp, setTime, nextStep, prevStep } = useBookingStore()
   const [availableSlots, setAvailableSlots] = useState<EnrichedTimeSlot[]>([])
   const [reservedSlots, setReservedSlots] = useState<EnrichedTimeSlot[]>([])
@@ -31,74 +32,12 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays }: TimeSe
   const [error, setError] = useState<string | null>(null)
   const [showReserved, setShowReserved] = useState(false)
   const [showTooSoon, setShowTooSoon] = useState(false)
-  const [workDays, setWorkDays] = useState<WorkDay[]>(barberWorkDays || [])
-  const [barberBookingSettings, setBarberBookingSettings] = useState<BarberBookingSettings | null>(null)
   const { report } = useBugReporter('TimeSelection')
-
-  // Fetch barber booking settings with retry logic for Safari/iOS
-  useEffect(() => {
-    const fetchBookingSettings = async () => {
-      try {
-        const supabase = createClient()
-        const { data } = await withSupabaseRetry(async () => {
-          const result = await supabase
-            .from('barber_booking_settings')
-            .select('*')
-            .eq('barber_id', barberId)
-            .single()
-          if (result.error && result.error.code !== 'PGRST116') {
-            throw new Error(result.error.message)
-          }
-          return result
-        })
-        
-        if (data) {
-          setBarberBookingSettings(data as BarberBookingSettings)
-        }
-      } catch (err) {
-        console.error('[TimeSelection] Error fetching booking settings:', err)
-        await report(err, 'Fetching barber booking settings')
-      }
-    }
-    
-    fetchBookingSettings()
-  }, [barberId, report])
-
-  // Fetch work days if not provided as prop - with retry logic for Safari/iOS
-  useEffect(() => {
-    const fetchWorkDays = async () => {
-      if (barberWorkDays && barberWorkDays.length > 0) {
-        setWorkDays(barberWorkDays)
-        return
-      }
-      
-      try {
-        const supabase = createClient()
-        const { data } = await withSupabaseRetry(async () => {
-          const result = await supabase
-            .from('work_days')
-            .select('*')
-            .eq('user_id', barberId)
-          if (result.error) throw new Error(result.error.message)
-          return result
-        })
-        
-        if (data) {
-          setWorkDays(data as WorkDay[])
-        }
-      } catch (err) {
-        console.error('[TimeSelection] Error fetching work days:', err)
-        await report(err, 'Fetching work days')
-      }
-    }
-    
-    fetchWorkDays()
-  }, [barberId, barberWorkDays, report])
 
   // Get work hours for a specific day - uses day-specific hours from work_days
   const getWorkHoursForDay = (dateTimestamp: number): { start: string; end: string } => {
     const dayName = getDayKeyInIsrael(dateTimestamp)
-    const workDaysMap = workDaysToMap(workDays)
+    const workDaysMap = workDaysToMap(barberWorkDays)
     return getWorkHoursFromService(shopSettings || null, dayName, workDaysMap)
   }
 
@@ -214,7 +153,7 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays }: TimeSe
 
     fetchTimeSlots()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [barberId, date, workDays, barberBookingSettings])
+  }, [barberId, date, barberWorkDays, barberBookingSettings])
 
   const handleSelect = (timestamp: number) => {
     setTime(timestamp)

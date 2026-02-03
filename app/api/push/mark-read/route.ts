@@ -92,13 +92,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`[API] Marked all notifications as read for ${recipientType} ${recipientId}`)
+    // Get the new count after marking - this helps detect if new notifications
+    // arrived while we were marking (race condition protection)
+    const newUnreadCount = await pushService.getUnreadCount(
+      recipientType as 'customer' | 'barber',
+      recipientId
+    )
+
+    console.log(`[API] Marked all notifications as read for ${recipientType} ${recipientId}, new count: ${newUnreadCount}`)
 
     return NextResponse.json({
       success: true,
       message: 'All notifications marked as read',
       recipientType,
-      recipientId
+      recipientId,
+      newUnreadCount // Return this so client can update badge if needed
     })
   } catch (error) {
     console.error('[API] Error marking notifications as read:', error)

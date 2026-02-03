@@ -4,7 +4,7 @@ import { AppHeader } from '@/components/AppHeader'
 import { BookingWizardClient } from '@/components/BookingWizard/BookingWizardClient'
 import { BarberNotFoundClient } from '@/components/BarberProfile/BarberNotFoundClient'
 import { isValidUUID, generateSlugFromEnglishName, getPreferredBarberSlug } from '@/lib/utils'
-import type { BarberWithWorkDays, Service, BarbershopSettings, BarbershopClosure, BarberClosure, BarberMessage } from '@/types/database'
+import type { BarberWithWorkDays, Service, BarbershopSettings, BarbershopClosure, BarberClosure, BarberMessage, BarberBookingSettings } from '@/types/database'
 
 interface BookPageProps {
   params: Promise<{ barberId: string }>
@@ -110,7 +110,8 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
     shopSettingsResult,
     shopClosuresResult,
     barberClosuresResult,
-    barberMessagesResult
+    barberMessagesResult,
+    barberBookingSettingsResult
   ] = await Promise.all([
     // Barber-specific services
     supabase
@@ -139,7 +140,13 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
       .from('barber_messages')
       .select('*')
       .eq('barber_id', barber.id)
-      .eq('is_active', true)
+      .eq('is_active', true),
+    // Barber booking settings (max booking days, min hours before, etc.)
+    supabase
+      .from('barber_booking_settings')
+      .select('*')
+      .eq('barber_id', barber.id)
+      .single()
   ])
   
   const services = servicesResult.data as Service[] | null
@@ -147,6 +154,8 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
   const shopClosures = shopClosuresResult.data as BarbershopClosure[] | null
   const barberClosures = barberClosuresResult.data as BarberClosure[] | null
   const barberMessages = barberMessagesResult.data as BarberMessage[] | null
+  // barberBookingSettings can be null if no custom settings exist (uses defaults)
+  const barberBookingSettings = barberBookingSettingsResult.data as BarberBookingSettings | null
   
   return (
     <>
@@ -170,6 +179,7 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
           shopClosures={shopClosures || []}
           barberClosures={barberClosures || []}
           barberMessages={barberMessages || []}
+          barberBookingSettings={barberBookingSettings}
           preSelectedServiceId={preSelectedServiceId}
         />
       </main>

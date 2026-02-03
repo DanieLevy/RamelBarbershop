@@ -3,6 +3,7 @@
 import { cn, formatDateHebrew, formatTime as formatTimeUtil } from '@/lib/utils'
 import { X, Calendar, Scissors, User, Phone, AlertCircle, CheckCircle, XCircle, History, StickyNote } from 'lucide-react'
 import type { Reservation, Service, User as UserType, Customer } from '@/types/database'
+import { Portal } from '@/components/ui/Portal'
 
 interface ReservationWithDetails extends Reservation {
   services?: Service
@@ -82,15 +83,16 @@ export function AppointmentDetailModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
+    <Portal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        {/* Backdrop */}
+        <div
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          onClick={onClose}
+        />
 
-      {/* Modal */}
-      <div className="relative w-full max-w-md bg-background-card border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-fade-in-up">
+        {/* Modal */}
+        <div className="relative w-full max-w-md bg-background-card border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-fade-in-up">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-white/10">
           <h2 className="text-lg font-medium text-foreground-light">פרטי התור</h2>
@@ -228,8 +230,9 @@ export function AppointmentDetailModal({
             סגור
           </button>
         </div>
+        </div>
       </div>
-    </div>
+    </Portal>
   )
 }
 

@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { useAuthStore } from '@/store/useAuthStore'
-import type { BarberWithWorkDays, Service, BarbershopSettings, BarbershopClosure, BarberClosure, BarberMessage } from '@/types/database'
+import type { BarberWithWorkDays, Service, BarbershopSettings, BarbershopClosure, BarberClosure, BarberMessage, BarberBookingSettings } from '@/types/database'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { StepIndicator } from './StepIndicator'
 import { ServiceSelection } from './ServiceSelection'
@@ -24,6 +24,7 @@ interface BookingWizardClientProps {
   shopClosures?: BarbershopClosure[]
   barberClosures?: BarberClosure[]
   barberMessages?: BarberMessage[]
+  barberBookingSettings?: BarberBookingSettings | null
   preSelectedServiceId?: string
 }
 
@@ -35,6 +36,7 @@ export function BookingWizardClient({
   shopClosures = [],
   barberClosures = [],
   barberMessages = [],
+  barberBookingSettings,
   preSelectedServiceId,
 }: BookingWizardClientProps) {
   const { step, setBarberId, setService, nextStep, setLoggedInUser, reset, getActualStep, isUserLoggedIn } = useBookingStore()
@@ -106,6 +108,7 @@ export function BookingWizardClient({
             shopSettings={shopSettings}
             shopClosures={shopClosures}
             barberClosures={barberClosures}
+            barberBookingSettings={barberBookingSettings}
           />
         )
       case 'time':
@@ -113,6 +116,8 @@ export function BookingWizardClient({
           <TimeSelection 
             barberId={barberId}
             shopSettings={shopSettings}
+            barberWorkDays={barber.work_days}
+            barberBookingSettings={barberBookingSettings}
           />
         )
       case 'details':

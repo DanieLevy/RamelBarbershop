@@ -3,11 +3,9 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBookingStore } from '@/store/useBookingStore'
-import { createClient } from '@/lib/supabase/client'
 import type { WorkDay, BarbershopSettings, BarbershopClosure, BarberClosure, BarberBookingSettings } from '@/types/database'
 import { cn, nowInIsrael, getIsraelDayStart, getDayIndexInIsrael } from '@/lib/utils'
 import { ChevronRight, ChevronLeft, X } from 'lucide-react'
-import { withSupabaseRetry } from '@/lib/utils/retry'
 
 /**
  * Monthly Calendar Picker Component
@@ -28,6 +26,7 @@ interface DateSelectionProps {
   shopSettings?: BarbershopSettings | null
   shopClosures?: BarbershopClosure[]
   barberClosures?: BarberClosure[]
+  barberBookingSettings?: BarberBookingSettings | null
 }
 
 // Hebrew weekday labels (RTL order: Sunday first on right)
@@ -70,48 +69,16 @@ export function DateSelection({
   workDays, 
   shopSettings, 
   shopClosures = [], 
-  barberClosures = [] 
+  barberClosures = [],
+  barberBookingSettings
 }: DateSelectionProps) {
   const router = useRouter()
   const { date: selectedDate, setDate, nextStep, barberId } = useBookingStore()
   const [currentMonth, setCurrentMonth] = useState(() => new Date())
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null)
   const [unavailableInfo, setUnavailableInfo] = useState<UnavailableInfo>({ show: false, reason: '' })
-  const [barberBookingSettings, setBarberBookingSettings] = useState<BarberBookingSettings | null>(null)
   const gridRef = useRef<HTMLDivElement>(null)
   const cellRefs = useRef<(HTMLButtonElement | null)[]>([])
-
-  // Fetch barber booking settings with retry logic for Safari/iOS
-  useEffect(() => {
-    if (!barberId) return
-    
-    const fetchBookingSettings = async () => {
-      try {
-        const supabase = createClient()
-        const { data } = await withSupabaseRetry(async () => {
-          const result = await supabase
-            .from('barber_booking_settings')
-            .select('*')
-            .eq('barber_id', barberId)
-            .single()
-          // PGRST116 = no rows found, which is OK (use defaults)
-          if (result.error && result.error.code !== 'PGRST116') {
-            throw new Error(result.error.message)
-          }
-          return result
-        })
-        
-        if (data) {
-          setBarberBookingSettings(data as BarberBookingSettings)
-        }
-      } catch (err) {
-        console.error('[DateSelection] Error fetching booking settings:', err)
-        // Continue with default settings - don't block the UI
-      }
-    }
-    
-    fetchBookingSettings()
-  }, [barberId])
 
   // Generate calendar days for the current month view
   const calendarDays = useMemo(() => {
