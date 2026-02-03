@@ -383,6 +383,17 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     if (value && index < 5) {
       otpInputRefs.current[index + 1]?.focus()
     }
+    
+    // Auto-verify when all 6 digits are entered
+    if (value && index === 5) {
+      const allFilled = newOtp.every(digit => digit !== '')
+      if (allFilled && !loading && confirmation) {
+        // Pass the code directly to avoid race condition with React state updates
+        const code = newOtp.join('')
+        // Small delay to allow UI to update and show the complete code
+        setTimeout(() => handleVerifyOtp(code), 150)
+      }
+    }
   }
 
   const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -391,8 +402,27 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     }
   }
 
-  const handleVerifyOtp = async () => {
-    const code = otp.join('')
+  const handleOtpPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault()
+    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+    if (pastedData) {
+      const newOtp = [...otp]
+      for (let i = 0; i < 6; i++) {
+        newOtp[i] = pastedData[i] || ''
+      }
+      setOtp(newOtp)
+      const focusIndex = Math.min(pastedData.length, 5)
+      otpInputRefs.current[focusIndex]?.focus()
+      
+      // Auto-verify if full 6-digit code was pasted
+      if (pastedData.length === 6 && !loading && confirmation) {
+        setTimeout(() => handleVerifyOtp(pastedData), 150)
+      }
+    }
+  }
+
+  const handleVerifyOtp = async (codeOverride?: string) => {
+    const code = codeOverride || otp.join('')
     
     if (code.length !== 6) {
       setError('נא להזין קוד בן 6 ספרות')
@@ -911,6 +941,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                   value={digit}
                   onChange={(e) => handleOtpChange(index, e.target.value)}
                   onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                  onPaste={handleOtpPaste}
                   disabled={loading}
                   className={cn(
                     'w-10 h-12 xs:w-11 xs:h-13 text-center text-lg font-bold rounded-lg bg-background-card border-2 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold transition-all',
@@ -925,7 +956,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             )}
             
             <button
-              onClick={handleVerifyOtp}
+              onClick={() => handleVerifyOtp()}
               disabled={loading || otp.join('').length !== 6}
               className={cn(
                 'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center',
@@ -1069,6 +1100,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                   value={digit}
                   onChange={(e) => handleOtpChange(index, e.target.value)}
                   onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                  onPaste={handleOtpPaste}
                   disabled={loading}
                   className={cn(
                     'w-10 h-12 xs:w-11 xs:h-13 text-center text-lg font-bold rounded-lg bg-background-card border-2 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold transition-all',

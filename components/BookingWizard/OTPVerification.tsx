@@ -379,12 +379,14 @@ export function OTPVerification() {
     if (value && index === 5) {
       const allFilled = newOtp.every(digit => digit !== '')
       if (allFilled && !verifying) {
-        // Small delay to allow state to update and show the complete code
+        // Pass the code directly to avoid race condition with React state updates
+        const code = newOtp.join('')
+        // Small delay to allow UI to update and show the complete code
         setTimeout(() => {
           if (mode === 'email') {
-            handleVerifyEmailOtp()
+            handleVerifyEmailOtp(code)
           } else if (otpConfirmation) {
-            handleVerifySmsOtp()
+            handleVerifySmsOtp(code)
           }
         }, 150)
       }
@@ -420,20 +422,21 @@ export function OTPVerification() {
       inputRefs.current[focusIndex]?.focus()
       
       // Auto-verify if full 6-digit code was pasted
+      // Pass the pasted code directly to avoid race condition
       if (pastedData.length === 6 && !verifying) {
         setTimeout(() => {
           if (mode === 'email') {
-            handleVerifyEmailOtp()
+            handleVerifyEmailOtp(pastedData)
           } else if (otpConfirmation) {
-            handleVerifySmsOtp()
+            handleVerifySmsOtp(pastedData)
           }
         }, 150)
       }
     }
   }
 
-  const handleVerifySmsOtp = async () => {
-    const code = otp.join('')
+  const handleVerifySmsOtp = async (codeOverride?: string) => {
+    const code = codeOverride || otp.join('')
     
     if (code.length !== 6) {
       setError('נא להזין קוד בן 6 ספרות')
@@ -526,8 +529,8 @@ export function OTPVerification() {
     }
   }
 
-  const handleVerifyEmailOtp = async () => {
-    const code = otp.join('')
+  const handleVerifyEmailOtp = async (codeOverride?: string) => {
+    const code = codeOverride || otp.join('')
     
     if (code.length !== 6) {
       setError('נא להזין קוד בן 6 ספרות')
@@ -745,7 +748,7 @@ export function OTPVerification() {
             unlockFlow()
             prevStep()
           }}
-          className="text-sm text-foreground-muted hover:text-foreground-light transition-colors"
+          className="text-sm text-foreground-muted hover:text-foreground-light transition-colors flex items-center justify-center w-full"
         >
           ← חזור לפרטים אישיים
         </button>
@@ -829,7 +832,7 @@ export function OTPVerification() {
             prevStep()
           }}
           disabled={verifying}
-          className="text-sm text-foreground-muted hover:text-foreground-light transition-colors"
+          className="text-sm text-foreground-muted hover:text-foreground-light transition-colors flex items-center justify-center w-full"
         >
           ← חזור לפרטים אישיים
         </button>
@@ -934,7 +937,7 @@ export function OTPVerification() {
             onClick={handleVerify}
             disabled={!canVerify}
             className={cn(
-              'w-full py-3.5 px-4 rounded-xl font-medium transition-all text-lg',
+              'w-full py-3.5 px-4 rounded-xl font-medium transition-all text-lg flex items-center justify-center',
               canVerify
                 ? 'bg-accent-gold text-background-dark hover:bg-accent-gold/90 cursor-pointer'
                 : 'bg-foreground-muted/20 text-foreground-muted cursor-not-allowed'
@@ -1011,7 +1014,7 @@ export function OTPVerification() {
         }}
         disabled={verifying}
         className={cn(
-          'text-sm transition-colors',
+          'text-sm transition-colors flex items-center justify-center w-full',
           verifying 
             ? 'text-foreground-muted/50 cursor-not-allowed' 
             : 'text-foreground-muted hover:text-foreground-light'

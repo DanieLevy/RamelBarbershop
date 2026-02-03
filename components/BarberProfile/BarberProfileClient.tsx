@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Phone, Clock, ChevronLeft, Bell, Loader2 } from 'lucide-react'
+import { Phone, Clock, ChevronLeft, Bell, Loader2, Home } from 'lucide-react'
 import { cn, formatPrice, buildBarberBookingUrl } from '@/lib/utils'
 import { GallerySlideshow } from './GallerySlideshow'
 import type { BarberWithWorkDays, Service, BarbershopSettings, BarberMessage, BarberGalleryImage } from '@/types/database'
@@ -78,16 +78,17 @@ export function BarberProfileClient({
 
   return (
     <div className="flex flex-col min-h-screen bg-background-dark">
-      {/* Hero Section - Clean full-image display */}
+      {/* Hero Section - Full-bleed immersive display extending into notch */}
       <div className="relative w-full">
-        {/* Safe area spacer for notch devices */}
+        {/* Hero Image/Gallery Container - Extends into safe area for edge-to-edge display */}
         <div 
-          className="w-full bg-background-dark"
-          style={{ height: 'var(--header-top-offset, 0px)' }}
-        />
-        
-        {/* Hero Image/Gallery Container - Larger aspect for immersive display */}
-        <div className="relative w-full aspect-[3/4] sm:aspect-[4/3] max-h-[55vh] overflow-hidden">
+          className="relative w-full aspect-[3/4] sm:aspect-[4/3] max-h-[60vh] overflow-hidden"
+          style={{ 
+            // Extend into safe area (notch) on iPhone
+            marginTop: 'calc(-1 * env(safe-area-inset-top, 0px))',
+            paddingTop: 'env(safe-area-inset-top, 0px)',
+          }}
+        >
           <GallerySlideshow
             images={galleryImages}
             fallbackImage={barber.img_url || '/icon.png'}
@@ -96,6 +97,18 @@ export function BarberProfileClient({
             barberName={barber.fullname}
             interval={5000}
           />
+          
+          {/* Back to Home Button - Floating overlay in safe area */}
+          <button
+            onClick={() => router.push('/')}
+            className="absolute top-0 right-0 z-10 p-3 m-2 rounded-full bg-black/30 backdrop-blur-sm text-white/90 hover:bg-black/50 active:scale-95 transition-all"
+            style={{ 
+              marginTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)',
+            }}
+            aria-label="חזרה לדף הבית"
+          >
+            <Home size={20} strokeWidth={2} />
+          </button>
           
           {/* Minimal Name Overlay - Only name, clean design */}
           <div className="absolute bottom-0 left-0 right-0 pb-6 pt-16 bg-gradient-to-t from-background-dark via-background-dark/80 to-transparent">
@@ -133,9 +146,9 @@ export function BarberProfileClient({
           {barber.phone && (
             <a
               href={`tel:${barber.phone.startsWith('+') ? barber.phone : '+972' + barber.phone.replace(/^0/, '')}`}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-gold/10 border border-accent-gold/30 rounded-full active:scale-95 transition-transform"
-              aria-label="התקשר לספר"
+              className="flex items-center gap-1.5 text-sm text-foreground-muted hover:text-accent-gold transition-colors"
             >
+              
               <Phone size={12} strokeWidth={1.5} className="text-accent-gold" />
               <span className="text-xs text-accent-gold font-medium">התקשר</span>
             </a>
@@ -171,53 +184,70 @@ export function BarberProfileClient({
               <p className="text-foreground-muted text-sm">אין שירותים זמינים כרגע</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {services.map((service) => (
-                <div
-                  key={service.id}
-                  className="w-full rounded-xl border bg-white/[0.03] border-white/10 overflow-hidden"
-                >
-                  <div className="p-3 flex items-center justify-between gap-3">
-                    {/* Service Info */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-medium text-foreground-light">
-                        {service.name_he}
-                      </h3>
+            /* Services list - no border, with gradient dividers */
+            <div className="w-full">
+              {services.map((service, index) => (
+                <div key={service.id}>
+                  {/* Gradient divider - fades out on sides */}
+                  {index > 0 && (
+                    <div className="mx-4 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                  )}
+                  
+                  <button
+                    onClick={() => handleServiceSelect(service.id)}
+                    disabled={loadingServiceId !== null}
+                    className={cn(
+                      'w-full transition-all duration-150 group',
+                      'hover:bg-white/[0.03]',
+                      'active:bg-white/[0.05]',
+                      loadingServiceId === service.id && 'opacity-70 cursor-wait'
+                    )}
+                  >
+                    {/* Use dir="ltr" to force left-to-right flex, then swap items visually */}
+                    <div className="py-4 flex items-center w-full" dir="ltr">
+                      {/* Book Button - on LEFT side */}
+                      <div 
+                        className={cn(
+                          'px-6 py-2 rounded-lg text-base font-bold',
+                          'border border-accent-gold/40 text-accent-gold bg-accent-gold/5',
+                          'group-hover:border-accent-gold/60',
+                          'flex items-center justify-center gap-1 flex-shrink-0',
+                          'transition-all duration-150'
+                        )}
+                      >
+                        {loadingServiceId === service.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <>
+                            <ChevronLeft size={11} strokeWidth={2.5} className="group-hover:-translate-x-0.5 transition-transform" />
+                            הזמן
+                          </>
+                        )}
+                      </div>
                       
-                      {/* Duration & Price Row */}
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[11px] text-foreground-muted flex items-center gap-1">
-                          <Clock size={10} strokeWidth={1.5} />
-                          {service.duration} דק׳
-                        </span>
-                        <span className="text-accent-gold font-bold text-sm">
-                          {formatPrice(service.price)}
-                        </span>
+                      {/* Spacer to push text to right */}
+                      <div className="flex-1" />
+                      
+                      {/* Service Info - on RIGHT side, text aligned right */}
+                      <div className="text-right">
+                        <h3 className="text-lg font-medium text-foreground-light leading-tight">
+                          {service.name_he}
+                        </h3>
+                        
+                        {/* Duration & Price - inline, right aligned */}
+                        <div className="flex items-center justify-end gap-2 mt-1">
+                          <span className="text-sm text-foreground-muted flex items-center gap-1">
+                            <Clock size={10} strokeWidth={1.5} />
+                            {service.duration} דק׳
+                          </span>
+                          <span className="text-sm text-foreground-muted/50">•</span>
+                          <span className="text-accent-gold font-semibold text-sm">
+                            {formatPrice(service.price)}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    
-                    {/* Book Button */}
-                    <button
-                      onClick={() => handleServiceSelect(service.id)}
-                      disabled={loadingServiceId !== null}
-                      className={cn(
-                        'px-4 py-2 rounded-lg text-sm font-medium',
-                        'bg-accent-gold text-background-dark',
-                        'hover:bg-accent-gold/90 active:scale-95 transition-all',
-                        'flex items-center justify-center gap-1 flex-shrink-0',
-                        loadingServiceId === service.id && 'opacity-80 cursor-wait'
-                      )}
-                    >
-                      {loadingServiceId === service.id ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <>
-                          הזמן
-                          <ChevronLeft size={12} strokeWidth={2.5} />
-                        </>
-                      )}
-                    </button>
-                  </div>
+                  </button>
                 </div>
               ))}
             </div>

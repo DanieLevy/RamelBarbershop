@@ -209,18 +209,14 @@ export default async function BarberPage({ params }: BarberPageProps) {
   }
   
   return (
-    <>
-      <AppHeader barberImgUrl={barber.img_url || undefined} />
-      
-      <main id="main-content" tabIndex={-1} className="min-h-screen bg-background-dark outline-none">
-        <BarberProfileClient 
-          barber={barberForClient} 
-          services={activeServices} 
-          shopSettings={shopSettings}
-          barberMessages={activeMessages}
-          galleryImages={sortedGallery}
-        />
-      </main>
-    </>
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-background-dark outline-none">
+      <BarberProfileClient 
+        barber={barberForClient} 
+        services={activeServices} 
+        shopSettings={shopSettings}
+        barberMessages={activeMessages}
+        galleryImages={sortedGallery}
+      />
+    </main>
   )
 }

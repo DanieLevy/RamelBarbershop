@@ -14,7 +14,7 @@ export default function BarberProfileLoading() {
       <main className="min-h-screen bg-background-dark flex items-center justify-center">
         <ScissorsLoader 
           size="lg" 
-          text="טוען פרופיל ספר.. " 
+          text="טוען..." 
         />
       </main>
     </>

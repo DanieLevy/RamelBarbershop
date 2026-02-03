@@ -116,11 +116,11 @@ export function MobileBottomNav() {
     return () => clearInterval(interval)
   }, [fetchUpcomingCount])
 
-  // Don't show on dashboard pages, barber booking wizard, or dev console
+  // Don't show on dashboard pages, barber booking wizard, barber profile pages, or dev console
   const shouldHide = pathname.startsWith('/barber/dashboard') || 
                      pathname.includes('/book') ||
                      pathname.startsWith('/dev') ||
-                     (pathname.startsWith('/barber/') && pathname !== '/barber/login' && !pathname.match(/^\/barber\/[^/]+$/))
+                     pathname.match(/^\/barber\/[^/]+$/) // Hide on barber profile pages like /barber/asaf.ohana
 
   
   // Scroll-based hide/show logic

@@ -100,7 +100,7 @@ export function formatTimeForSms(timestamp: number): string {
  */
 export function buildReminderMessage(firstName: string, time: string): string {
   const truncatedName = extractFirstName(firstName)
-  return `היי ${truncatedName}, תזכורת לתור היום ב${time}. מספרת רם אל`
+  return `היי ${truncatedName}, תזכורת לתור שלך היום בשעה: ${time}. מספרת רם אל`
 }
 
 /**
