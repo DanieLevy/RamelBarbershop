@@ -509,111 +509,189 @@ export async function POST(request: NextRequest) {
     // Get customer settings
     const customerIds = [...new Set(reservations.map(r => r.customer_id))]
     const customerSettings = await getCustomerSettings(customerIds)
-
-    // Process each reservation
-    for (const res of reservations) {
+    
+    // Pre-fetch push subscription status for all customers (optimization)
+    const pushSubStatus = new Map<string, boolean>()
+    await Promise.all(
+      customerIds.map(async (customerId) => {
+        const hasSub = await hasActivePushSubscription(customerId)
+        pushSubStatus.set(customerId, hasSub)
+      })
+    )
+    
+    // PARALLEL PROCESSING: Process reservations in controlled batches
+    // This significantly reduces execution time while maintaining safety
+    const BATCH_SIZE = 5 // Process 5 at a time to avoid overwhelming APIs
+    
+    /**
+     * Process a single reservation - sends SMS and Push, marks as sent
+     * This function is self-contained and can run in parallel safely
+     */
+    const processOneReservation = async (res: ReservationForReminder): Promise<{
+      detail: BatchResults['details'][0]
+      smsSent: boolean
+      smsFailed: boolean
+      pushSent: boolean
+      pushFailed: boolean
+      skippedDisabled: boolean
+      skippedNoPhone: boolean
+    }> => {
       const detail: BatchResults['details'][0] = {
         reservationId: res.id,
         customerName: res.customer_name
       }
+      
+      const result = {
+        detail,
+        smsSent: false,
+        smsFailed: false,
+        pushSent: false,
+        pushFailed: false,
+        skippedDisabled: false,
+        skippedNoPhone: false
+      }
 
       try {
-        // Get customer preferences
+        // Get customer preferences (all pre-fetched, no async needed)
         const settings = customerSettings.get(res.customer_id)
         const hasValidPhone = isValidIsraeliMobile(res.customer_phone)
-        const hasPushSub = await hasActivePushSubscription(res.customer_id)
+        const hasPushSub = pushSubStatus.get(res.customer_id) || false
 
         const { sendSms, sendPush } = getNotificationMethods(settings, hasValidPhone, hasPushSub)
 
         // Check if all notifications disabled
         if (!sendSms && !sendPush) {
           if (!hasValidPhone && !hasPushSub) {
-            results.skipped_no_phone++
+            result.skippedNoPhone = true
           } else {
-            results.skipped_disabled++
+            result.skippedDisabled = true
           }
-          continue
+          return result
         }
 
-        // Send SMS reminder
-        if (sendSms) {
-          const firstName = extractFirstName(res.customer_name)
-          
-          console.log(`[ProcessReminders] Sending SMS for ${res.id} to ${res.customer_phone.slice(0,3)}****`)
-          
-          const smsResult = await sendSmsReminder(
-            res.customer_phone,
-            firstName,
-            res.time_timestamp
-          )
-          
-          detail.smsResult = {
-            success: smsResult.success,
-            error: smsResult.error
-          }
-
-          if (smsResult.success) {
-            // CRITICAL: Mark reservation IMMEDIATELY after successful SMS
-            // This prevents duplicate sends if cron runs again before we finish
-            let marked: boolean
+        // Send SMS and Push in parallel for this reservation
+        const [smsOutcome, pushOutcome] = await Promise.allSettled([
+          // SMS Promise
+          sendSms ? (async () => {
+            const firstName = extractFirstName(res.customer_name)
+            console.log(`[ProcessReminders] Sending SMS for ${res.id} to ${res.customer_phone.slice(0,3)}****`)
             
-            if (res.isRecurring && res.recurringId) {
-              // For recurring, update last_reminder_date
-              marked = await markRecurringReminderSent(res.recurringId)
-            } else {
-              // For regular reservations, update sms_reminder_sent_at
-              marked = await markSmsReminderSent(res.id)
-            }
+            const smsResult = await sendSmsReminder(
+              res.customer_phone,
+              firstName,
+              res.time_timestamp
+            )
             
-            if (marked) {
-              results.sms_sent++
-              console.log(`[ProcessReminders] ✅ SMS sent and marked for ${res.id}${res.isRecurring ? ' (recurring)' : ''}`)
-            } else {
-              // SMS sent but marking failed - log this as a warning
-              // The SMS was sent, so we count it, but there's risk of duplicate
-              results.sms_sent++
-              console.warn(`[ProcessReminders] ⚠️ SMS sent for ${res.id} but marking failed!`)
+            detail.smsResult = {
+              success: smsResult.success,
+              error: smsResult.error
             }
-          } else {
-            results.sms_failed++
-            console.error(`[ProcessReminders] ❌ SMS failed for ${res.id}:`, smsResult.error)
-          }
-        }
 
-        // Send Push notification (independent of SMS)
-        if (sendPush) {
-          const context: ReminderContext = {
-            reservationId: res.id,
-            customerId: res.customer_id,
-            barberId: res.barber_id,
-            customerName: res.customer_name,
-            barberName: res.barber_name,
-            serviceName: res.service_name,
-            appointmentTime: res.time_timestamp
-          }
-
-          const pushResult = await pushService.sendReminder(context)
+            if (smsResult.success) {
+              // CRITICAL: Mark reservation IMMEDIATELY after successful SMS
+              // This prevents duplicate sends if cron runs again before we finish
+              let marked: boolean
+              
+              if (res.isRecurring && res.recurringId) {
+                marked = await markRecurringReminderSent(res.recurringId)
+              } else {
+                marked = await markSmsReminderSent(res.id)
+              }
+              
+              if (marked) {
+                result.smsSent = true
+                console.log(`[ProcessReminders] ✅ SMS sent and marked for ${res.id}${res.isRecurring ? ' (recurring)' : ''}`)
+              } else {
+                result.smsSent = true
+                console.warn(`[ProcessReminders] ⚠️ SMS sent for ${res.id} but marking failed!`)
+              }
+            } else {
+              result.smsFailed = true
+              console.error(`[ProcessReminders] ❌ SMS failed for ${res.id}:`, smsResult.error)
+            }
+          })() : Promise.resolve(),
           
-          detail.pushResult = {
-            success: pushResult.success,
-            error: pushResult.errors?.join(', ')
-          }
+          // Push Promise
+          sendPush ? (async () => {
+            const context: ReminderContext = {
+              reservationId: res.id,
+              customerId: res.customer_id,
+              barberId: res.barber_id,
+              customerName: res.customer_name,
+              barberName: res.barber_name,
+              serviceName: res.service_name,
+              appointmentTime: res.time_timestamp
+            }
 
-          if (pushResult.success) {
-            results.push_sent++
-            console.log(`[ProcessReminders] ✅ Push sent for ${res.id}`)
-          } else {
-            results.push_failed++
-            console.error(`[ProcessReminders] ❌ Push failed for ${res.id}:`, pushResult.errors)
-          }
+            const pushResult = await pushService.sendReminder(context)
+            
+            detail.pushResult = {
+              success: pushResult.success,
+              error: pushResult.errors?.join(', ')
+            }
+
+            if (pushResult.success) {
+              result.pushSent = true
+              console.log(`[ProcessReminders] ✅ Push sent for ${res.id}`)
+            } else {
+              result.pushFailed = true
+              console.error(`[ProcessReminders] ❌ Push failed for ${res.id}:`, pushResult.errors)
+            }
+          })() : Promise.resolve()
+        ])
+        
+        // Log any unexpected errors from Promise.allSettled
+        if (smsOutcome.status === 'rejected') {
+          console.error(`[ProcessReminders] SMS promise rejected for ${res.id}:`, smsOutcome.reason)
+          result.smsFailed = true
+          detail.smsResult = { success: false, error: 'Promise rejected' }
         }
-
-        results.details.push(detail)
+        if (pushOutcome.status === 'rejected') {
+          console.error(`[ProcessReminders] Push promise rejected for ${res.id}:`, pushOutcome.reason)
+          result.pushFailed = true
+          detail.pushResult = { success: false, error: 'Promise rejected' }
+        }
         
       } catch (err) {
         console.error(`[ProcessReminders] Error processing ${res.id}:`, err)
         detail.smsResult = { success: false, error: 'Processing error' }
-        results.details.push(detail)
+        result.smsFailed = true
+      }
+      
+      return result
+    }
+    
+    // Process reservations in batches
+    console.log(`[ProcessReminders] Processing in batches of ${BATCH_SIZE}...`)
+    
+    for (let i = 0; i < reservations.length; i += BATCH_SIZE) {
+      const batch = reservations.slice(i, i + BATCH_SIZE)
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1
+      const totalBatches = Math.ceil(reservations.length / BATCH_SIZE)
+      
+      console.log(`[ProcessReminders] Batch ${batchNum}/${totalBatches}: processing ${batch.length} reservations`)
+      
+      // Process batch in parallel
+      const batchResults = await Promise.allSettled(
+        batch.map(res => processOneReservation(res))
+      )
+      
+      // Aggregate results from this batch
+      for (const outcome of batchResults) {
+        if (outcome.status === 'fulfilled') {
+          const { detail, smsSent, smsFailed, pushSent, pushFailed, skippedDisabled, skippedNoPhone } = outcome.value
+          results.details.push(detail)
+          if (smsSent) results.sms_sent++
+          if (smsFailed) results.sms_failed++
+          if (pushSent) results.push_sent++
+          if (pushFailed) results.push_failed++
+          if (skippedDisabled) results.skipped_disabled++
+          if (skippedNoPhone) results.skipped_no_phone++
+        } else {
+          // Entire promise rejected - should be rare
+          console.error(`[ProcessReminders] Batch item promise rejected:`, outcome.reason)
+          results.sms_failed++
+        }
       }
     }
 
