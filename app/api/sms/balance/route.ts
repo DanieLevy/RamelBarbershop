@@ -16,15 +16,19 @@ import { validateDevToken, unauthorizedResponse } from '@/lib/auth/dev-auth'
 export const dynamic = 'force-dynamic'
 
 // 019 API Response type for balance
+// Response can be either nested (wrapped in "balance" object) or flat at root level
 interface O19BalanceResponse {
+  // Nested format
   balance?: {
     status: number | string
     message?: string
     balance?: number | string
     interantional_balance?: number | string
   }
+  // Flat format (balance fields at root level)
   status?: number | string
   message?: string
+  interantional_balance?: number | string
 }
 
 export async function GET(request: NextRequest) {
@@ -81,17 +85,38 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Handle response - 019 may wrap in "balance" object
-    const status = responseData.balance?.status ?? responseData.status
-    const statusNum = typeof status === 'string' ? parseInt(status, 10) : status
+    // Handle response - 019 can return either:
+    // 1. Nested: { balance: { status, balance, interantional_balance, message } }
+    // 2. Flat: { status, balance, interantional_balance, message }
+    const isNested = responseData.balance && typeof responseData.balance === 'object'
+    const status = isNested ? responseData.balance?.status : responseData.status
+    const statusNum = typeof status === 'string' ? parseInt(status, 10) : (status ?? -1)
     
     console.log(`[${requestId}] 019 Balance Response:`, responseData)
 
     // Status 0 = success
     if (statusNum === 0) {
-      const balance = responseData.balance?.balance
-      const internationalBalance = responseData.balance?.interantional_balance
-      const message = responseData.balance?.message ?? responseData.message
+      // Get balance from nested or flat response
+      // Note: In flat format, "balance" is the value itself, not an object
+      let balance: number | string | undefined
+      let internationalBalance: number | string | undefined
+      let message: string | undefined
+      
+      if (isNested) {
+        // Nested format: responseData.balance.balance
+        balance = responseData.balance?.balance
+        internationalBalance = responseData.balance?.interantional_balance
+        message = responseData.balance?.message
+      } else {
+        // Flat format: responseData.balance is the actual balance value (when it's a string/number)
+        // But we need to check if it's a number/string, not an object
+        const rawBalance = (responseData as { balance?: string | number }).balance
+        if (typeof rawBalance === 'string' || typeof rawBalance === 'number') {
+          balance = rawBalance
+        }
+        internationalBalance = responseData.interantional_balance
+        message = responseData.message
+      }
       
       return NextResponse.json({
         success: true,

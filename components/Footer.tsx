@@ -198,7 +198,10 @@ export function Footer({ settings }: FooterProps) {
             >
               © {currentYear} {shopName}. כל הזכויות שמורות.
             </button>
-            <span className="text-[10px] text-foreground-muted/50 font-mono">
+            <span 
+              className="text-[10px] text-foreground-muted/50 font-mono"
+              suppressHydrationWarning
+            >
               v{APP_VERSION}
             </span>
           </div>
