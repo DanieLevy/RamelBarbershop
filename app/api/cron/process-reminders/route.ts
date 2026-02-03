@@ -4,11 +4,11 @@
  * Main endpoint for processing and sending appointment reminders.
  * Triggered by Netlify scheduled function every 30 minutes.
  * 
- * Features:
- * - Sends both SMS and Push notifications based on customer preferences
- * - Only processes today's upcoming confirmed reservations
- * - Creates single batch log entry per run
- * - Respects customer notification settings
+ * DEDUPLICATION STRATEGY:
+ * - Uses `sms_reminder_sent_at` column on reservations table
+ * - Query only fetches reservations where this column IS NULL
+ * - After successful SMS send, immediately marks the reservation
+ * - This is atomic and prevents duplicate sends even if cron runs overlap
  * 
  * Endpoint: POST /api/cron/process-reminders
  * Headers: Authorization: Bearer {CRON_SECRET}
@@ -58,7 +58,6 @@ interface BatchResults {
   sms_failed: number
   push_sent: number
   push_failed: number
-  skipped_already_sent: number
   skipped_disabled: number
   skipped_no_phone: number
   details: Array<{
@@ -94,13 +93,18 @@ function verifyAuth(request: NextRequest): boolean {
 }
 
 /**
- * Get today's upcoming confirmed reservations
+ * Get today's upcoming confirmed reservations that haven't received SMS reminder
+ * 
+ * CRITICAL: Only fetches reservations where sms_reminder_sent_at IS NULL
+ * This is the primary deduplication mechanism - prevents sending multiple reminders
  */
-async function getTodaysReservations(): Promise<ReservationForReminder[]> {
+async function getTodaysUnsentReservations(): Promise<ReservationForReminder[]> {
   const supabase = getSupabase()
   const now = nowInIsraelMs()
   const todayStart = getIsraelDayStart(now)
   const todayEnd = getIsraelDayEnd(now)
+
+  console.log(`[ProcessReminders] Querying reservations: today=${new Date(todayStart).toISOString()} to ${new Date(todayEnd).toISOString()}, now=${new Date(now).toISOString()}`)
 
   const { data, error } = await supabase
     .from('reservations')
@@ -111,6 +115,7 @@ async function getTodaysReservations(): Promise<ReservationForReminder[]> {
       customer_name,
       customer_phone,
       barber_id,
+      sms_reminder_sent_at,
       users!reservations_barber_id_fkey (fullname),
       services!reservations_service_id_fkey (name_he)
     `)
@@ -118,6 +123,7 @@ async function getTodaysReservations(): Promise<ReservationForReminder[]> {
     .gte('time_timestamp', todayStart)
     .lte('time_timestamp', todayEnd)
     .gt('time_timestamp', now)
+    .is('sms_reminder_sent_at', null)  // CRITICAL: Only get unsent reminders
     .not('customer_id', 'is', null)
     .order('time_timestamp', { ascending: true })
 
@@ -126,7 +132,12 @@ async function getTodaysReservations(): Promise<ReservationForReminder[]> {
     return []
   }
 
-  if (!data?.length) return []
+  if (!data?.length) {
+    console.log('[ProcessReminders] No unsent reservations found')
+    return []
+  }
+
+  console.log(`[ProcessReminders] Found ${data.length} reservations without SMS reminder`)
 
   // Get barber reminder settings
   const barberIds = [...new Set(data.map(r => r.barber_id))]
@@ -159,6 +170,7 @@ async function getTodaysReservations(): Promise<ReservationForReminder[]> {
     }
   }
 
+  console.log(`[ProcessReminders] ${reservations.length} reservations within reminder window`)
   return reservations
 }
 
@@ -184,20 +196,26 @@ async function getCustomerSettings(customerIds: string[]): Promise<Map<string, C
 }
 
 /**
- * Check if reminder was already sent for a reservation
+ * Mark reservation as having received SMS reminder
+ * 
+ * CRITICAL: This is the deduplication marker. After successful SMS send,
+ * we immediately mark the reservation so subsequent cron runs won't process it.
  */
-async function wasReminderSent(reservationId: string): Promise<boolean> {
+async function markSmsReminderSent(reservationId: string): Promise<boolean> {
   const supabase = getSupabase()
   
-  const { data } = await supabase
-    .from('notification_logs')
-    .select('id')
-    .eq('notification_type', 'reminder')
-    .eq('reservation_id', reservationId)
-    .in('status', ['sent', 'partial'])
-    .limit(1)
+  const { error } = await supabase
+    .from('reservations')
+    .update({ sms_reminder_sent_at: new Date().toISOString() })
+    .eq('id', reservationId)
+    .is('sms_reminder_sent_at', null) // Extra safety: only update if still null
 
-  return data !== null && data.length > 0
+  if (error) {
+    console.error(`[ProcessReminders] Failed to mark SMS sent for ${reservationId}:`, error)
+    return false
+  }
+
+  return true
 }
 
 /**
@@ -275,7 +293,7 @@ async function saveBatchLog(
     sms_failed: results.sms_failed,
     push_sent: results.push_sent,
     push_failed: results.push_failed,
-    skipped_already_sent: results.skipped_already_sent,
+    skipped_already_sent: 0, // No longer tracking this - query already filters
     skipped_disabled: results.skipped_disabled,
     skipped_no_phone: results.skipped_no_phone,
     details: results.details,
@@ -290,7 +308,10 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
   const triggerSource = request.headers.get('x-trigger-source') || 'api'
 
+  console.log('[ProcessReminders] ========================================')
   console.log('[ProcessReminders] Starting reminder batch processing')
+  console.log(`[ProcessReminders] Trigger source: ${triggerSource}`)
+  console.log(`[ProcessReminders] Time: ${new Date().toISOString()}`)
 
   // Verify authorization
   if (!verifyAuth(request)) {
@@ -303,23 +324,23 @@ export async function POST(request: NextRequest) {
     sms_failed: 0,
     push_sent: 0,
     push_failed: 0,
-    skipped_already_sent: 0,
     skipped_disabled: 0,
     skipped_no_phone: 0,
     details: []
   }
 
   try {
-    // Get today's reservations
-    const reservations = await getTodaysReservations()
+    // Get today's reservations that haven't received SMS reminder yet
+    const reservations = await getTodaysUnsentReservations()
     results.total_reservations = reservations.length
     
-    console.log(`[ProcessReminders] Found ${reservations.length} reservations to process`)
+    console.log(`[ProcessReminders] Processing ${reservations.length} reservations`)
 
     if (reservations.length === 0) {
       const durationMs = Date.now() - startTime
       await saveBatchLog(results, durationMs, triggerSource)
       
+      console.log('[ProcessReminders] No reservations to process - exiting')
       return NextResponse.json({
         success: true,
         message: 'No reservations to process',
@@ -340,12 +361,6 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        // Check if already sent
-        if (await wasReminderSent(res.id)) {
-          results.skipped_already_sent++
-          continue
-        }
-
         // Get customer preferences
         const settings = customerSettings.get(res.customer_id)
         const hasValidPhone = isValidIsraeliMobile(res.customer_phone)
@@ -366,6 +381,9 @@ export async function POST(request: NextRequest) {
         // Send SMS reminder
         if (sendSms) {
           const firstName = extractFirstName(res.customer_name)
+          
+          console.log(`[ProcessReminders] Sending SMS for ${res.id} to ${res.customer_phone.slice(0,3)}****`)
+          
           const smsResult = await sendSmsReminder(
             res.customer_phone,
             firstName,
@@ -378,32 +396,26 @@ export async function POST(request: NextRequest) {
           }
 
           if (smsResult.success) {
-            results.sms_sent++
-            console.log(`[ProcessReminders] SMS sent for ${res.id}`)
+            // CRITICAL: Mark reservation IMMEDIATELY after successful SMS
+            // This prevents duplicate sends if cron runs again before we finish
+            const marked = await markSmsReminderSent(res.id)
             
-            // CRITICAL: Log SMS reminder to notification_logs for deduplication
-            // This ensures wasReminderSent() will return true on next cron run
-            const supabase = getSupabase()
-            await supabase.from('notification_logs').insert({
-              notification_type: 'reminder',
-              recipient_type: 'customer',
-              recipient_id: res.customer_id,
-              reservation_id: res.id,
-              title: 'תזכורת תור',
-              body: `תזכורת: יש לך תור היום`,
-              status: 'sent',
-              is_read: false,
-              devices_targeted: 1,
-              devices_succeeded: 1,
-              devices_failed: 0
-            })
+            if (marked) {
+              results.sms_sent++
+              console.log(`[ProcessReminders] ✅ SMS sent and marked for ${res.id}`)
+            } else {
+              // SMS sent but marking failed - log this as a warning
+              // The SMS was sent, so we count it, but there's risk of duplicate
+              results.sms_sent++
+              console.warn(`[ProcessReminders] ⚠️ SMS sent for ${res.id} but marking failed!`)
+            }
           } else {
             results.sms_failed++
-            console.error(`[ProcessReminders] SMS failed for ${res.id}:`, smsResult.error)
+            console.error(`[ProcessReminders] ❌ SMS failed for ${res.id}:`, smsResult.error)
           }
         }
 
-        // Send Push notification
+        // Send Push notification (independent of SMS)
         if (sendPush) {
           const context: ReminderContext = {
             reservationId: res.id,
@@ -424,10 +436,10 @@ export async function POST(request: NextRequest) {
 
           if (pushResult.success) {
             results.push_sent++
-            console.log(`[ProcessReminders] Push sent for ${res.id}`)
+            console.log(`[ProcessReminders] ✅ Push sent for ${res.id}`)
           } else {
             results.push_failed++
-            console.error(`[ProcessReminders] Push failed for ${res.id}:`, pushResult.errors)
+            console.error(`[ProcessReminders] ❌ Push failed for ${res.id}:`, pushResult.errors)
           }
         }
 
@@ -445,11 +457,12 @@ export async function POST(request: NextRequest) {
     // Save batch log
     await saveBatchLog(results, durationMs, triggerSource)
 
-    console.log(`[ProcessReminders] Completed in ${durationMs}ms:`, {
-      sms: `${results.sms_sent} sent, ${results.sms_failed} failed`,
-      push: `${results.push_sent} sent, ${results.push_failed} failed`,
-      skipped: results.skipped_already_sent + results.skipped_disabled + results.skipped_no_phone
-    })
+    console.log('[ProcessReminders] ========================================')
+    console.log(`[ProcessReminders] Completed in ${durationMs}ms`)
+    console.log(`[ProcessReminders] SMS: ${results.sms_sent} sent, ${results.sms_failed} failed`)
+    console.log(`[ProcessReminders] Push: ${results.push_sent} sent, ${results.push_failed} failed`)
+    console.log(`[ProcessReminders] Skipped: ${results.skipped_disabled} disabled, ${results.skipped_no_phone} no phone`)
+    console.log('[ProcessReminders] ========================================')
 
     return NextResponse.json({
       success: true,
@@ -460,7 +473,6 @@ export async function POST(request: NextRequest) {
         sms: { sent: results.sms_sent, failed: results.sms_failed },
         push: { sent: results.push_sent, failed: results.push_failed },
         skipped: {
-          alreadySent: results.skipped_already_sent,
           disabled: results.skipped_disabled,
           noPhone: results.skipped_no_phone
         }

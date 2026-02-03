@@ -785,6 +785,7 @@ export type Database = {
           service_id: string
           status: string | null
           time_timestamp: number
+          sms_reminder_sent_at: string | null
           version: number
         }
         Insert: {
@@ -802,6 +803,7 @@ export type Database = {
           id?: string
           service_id: string
           status?: string | null
+          sms_reminder_sent_at?: string | null
           version?: number
           time_timestamp: number
         }
@@ -820,6 +822,7 @@ export type Database = {
           id?: string
           service_id?: string
           status?: string | null
+          sms_reminder_sent_at?: string | null
           time_timestamp?: number
           version?: number
         }

@@ -1,6 +1,6 @@
 // Service Worker for Ramel Barbershop PWA
 // Version is updated automatically during build
-const APP_VERSION = '2.0.0-2026.02.03.1206';
+const APP_VERSION = '2.0.0-2026.02.03.1211';
 const CACHE_NAME = `ramel-pwa-${APP_VERSION}`;
 
 // Icon version - increment when icons change to bust cache
