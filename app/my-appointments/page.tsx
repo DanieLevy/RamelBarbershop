@@ -147,18 +147,24 @@ function MyAppointmentsContent() {
       
       // Only select necessary fields for performance
       // Include version for optimistic locking
+      // IMPORTANT: date_timestamp is required for AppointmentDetailModal
       let query = supabase
         .from('reservations')
         .select(`
           id, 
+          date_timestamp,
           time_timestamp, 
           status, 
-          customer_name, 
+          customer_name,
+          customer_phone,
+          barber_notes,
           cancelled_by, 
+          cancellation_reason,
           barber_id, 
           service_id,
           version,
-          services (id, name_he), 
+          created_at,
+          services (id, name_he, price), 
           users (id, fullname)
         `)
         .order('time_timestamp', { ascending: false })
