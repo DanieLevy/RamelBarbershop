@@ -29,7 +29,6 @@ export async function GET(request: NextRequest) {
       supabase.from('barbershop_closures').select('id', { count: 'exact', head: true }),
       supabase.from('products').select('id', { count: 'exact', head: true }),
       supabase.from('barber_messages').select('id', { count: 'exact', head: true }),
-      supabase.from('barber_schedules').select('id', { count: 'exact', head: true }),
       supabase.from('barbershop_settings').select('id', { count: 'exact', head: true }),
       supabase.from('customer_notification_settings').select('id', { count: 'exact', head: true }),
       supabase.from('barber_notification_settings').select('id', { count: 'exact', head: true }),
@@ -48,11 +47,10 @@ export async function GET(request: NextRequest) {
       { name: 'barbershop_closures', rows: tableCounts[8].count || 0 },
       { name: 'products', rows: tableCounts[9].count || 0 },
       { name: 'barber_messages', rows: tableCounts[10].count || 0 },
-      { name: 'barber_schedules', rows: tableCounts[11].count || 0 },
-      { name: 'barbershop_settings', rows: tableCounts[12].count || 0 },
-      { name: 'customer_notification_settings', rows: tableCounts[13].count || 0 },
-      { name: 'barber_notification_settings', rows: tableCounts[14].count || 0 },
-      { name: 'barber_booking_settings', rows: tableCounts[15].count || 0 },
+      { name: 'barbershop_settings', rows: tableCounts[11].count || 0 },
+      { name: 'customer_notification_settings', rows: tableCounts[12].count || 0 },
+      { name: 'barber_notification_settings', rows: tableCounts[13].count || 0 },
+      { name: 'barber_booking_settings', rows: tableCounts[14].count || 0 },
     ]
 
     // Check database connectivity with timing

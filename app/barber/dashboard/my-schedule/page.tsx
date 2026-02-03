@@ -231,24 +231,6 @@ export default function MySchedulePage() {
         }
       }
       
-      // Also update the legacy barber_schedules table for backward compatibility
-      const workingDays = workDays.filter(d => d.isWorking).map(d => d.dayOfWeek)
-      const { error: scheduleError } = await supabase
-        .from('barber_schedules')
-        .upsert({
-          barber_id: barber.id,
-          work_days: workingDays,
-          // Use the first working day's hours as the "global" hours for legacy compatibility
-          work_hours_start: workDays.find(d => d.isWorking)?.startTime || '09:00',
-          work_hours_end: workDays.find(d => d.isWorking)?.endTime || '19:00',
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'barber_id' })
-      
-      if (scheduleError) {
-        console.error('Error updating barber_schedules:', scheduleError)
-        // Don't throw - this is just for backward compatibility
-      }
-      
       toast.success('לוח הזמנים עודכן בהצלחה!')
       fetchData()
     } catch (err) {

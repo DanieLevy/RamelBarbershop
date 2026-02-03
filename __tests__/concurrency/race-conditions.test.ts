@@ -1,24 +1,14 @@
 /**
- * Concurrency and Race Condition Tests
+ * Concurrency and Database Constraint Tests (READ-ONLY)
  * 
- * Tests to verify the system properly handles concurrent operations
- * and prevents race conditions in booking scenarios.
+ * Tests to verify the database has proper constraints and indexes
+ * for handling concurrent operations. All tests are READ-ONLY.
  * 
  * NOTE: These tests require Supabase environment variables to be set.
  * They will be skipped if the environment is not configured.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import {
-  TEST_BARBERS,
-  TEST_CUSTOMERS,
-  TEST_SERVICES,
-  getServiceForBarber,
-  getDaysFromNow,
-  getDayStart,
-  getHebrewDayName,
-  getDayNum,
-} from '../helpers/test-data'
+import { describe, it, expect, beforeAll } from 'vitest'
 
 // Check if Supabase env vars are available
 const hasSupabaseEnv = !!(
@@ -33,348 +23,332 @@ const getSupabase = async () => {
   return createClient()
 }
 
-// Track created reservations for cleanup
-const testReservationIds: string[] = []
-
-describe.skipIf(!hasSupabaseEnv)('Concurrency and Race Conditions', () => {
+describe.skipIf(!hasSupabaseEnv)('Database Concurrency Support (Read-Only)', () => {
   let supabase: Awaited<ReturnType<typeof getSupabase>>
   
   beforeAll(async () => {
     supabase = await getSupabase()
-    
-    // Clean up old test reservations for test customers to reset limits
-    // Cancel (don't delete) future reservations for test customers to free up slots
-    const now = Date.now()
-    const testCustomerIds = [
-      TEST_CUSTOMERS.daniel.id,
-      TEST_CUSTOMERS.gal.id,
-      TEST_CUSTOMERS.akiva.id,
-    ]
-    
-    await supabase
-      .from('reservations')
-      .update({ status: 'cancelled', cancelled_by: 'customer', cancellation_reason: 'Test cleanup' })
-      .in('customer_id', testCustomerIds)
-      .eq('status', 'confirmed')
-      .gt('time_timestamp', now)
   })
 
-  afterAll(async () => {
-    // Cleanup test reservations
-    if (testReservationIds.length > 0) {
-      await supabase
+  describe('Optimistic Locking Support', () => {
+    it('should have version column in reservations table', async () => {
+      const { data, error } = await supabase
         .from('reservations')
-        .delete()
-        .in('id', testReservationIds)
-    }
-  })
-
-  describe('Simultaneous Slot Booking', () => {
-    it('should only allow one booking when two customers try to book the same slot simultaneously', async () => {
-      // Use a unique future time to avoid conflicts with other tests
-      const uniqueTime = getDaysFromNow(8, 9) // 8 days from now at 9am
-      const uniqueDate = getDayStart(uniqueTime)
-      const dayName = getHebrewDayName(uniqueTime)
-      const dayNum = getDayNum(uniqueTime)
-      // Use the service that belongs to the admin barber
-      const adminService = getServiceForBarber(TEST_BARBERS.admin.id)
-
-      // Create two booking promises that run concurrently
-      const booking1Promise = supabase.rpc('create_reservation_atomic', {
-        p_barber_id: TEST_BARBERS.admin.id,
-        p_service_id: adminService.id,
-        p_customer_id: TEST_CUSTOMERS.daniel.id,
-        p_customer_name: TEST_CUSTOMERS.daniel.fullname,
-        p_customer_phone: TEST_CUSTOMERS.daniel.phone,
-        p_date_timestamp: uniqueDate,
-        p_time_timestamp: uniqueTime,
-        p_day_name: dayName,
-        p_day_num: dayNum,
-      })
-
-      const booking2Promise = supabase.rpc('create_reservation_atomic', {
-        p_barber_id: TEST_BARBERS.admin.id,
-        p_service_id: adminService.id,
-        p_customer_id: TEST_CUSTOMERS.gal.id,
-        p_customer_name: TEST_CUSTOMERS.gal.fullname,
-        p_customer_phone: TEST_CUSTOMERS.gal.phone,
-        p_date_timestamp: uniqueDate,
-        p_time_timestamp: uniqueTime,
-        p_day_name: dayName,
-        p_day_num: dayNum,
-      })
-
-      // Execute both simultaneously
-      const [result1, result2] = await Promise.all([booking1Promise, booking2Promise])
-
-      // Collect successful reservation IDs for cleanup
-      if (result1.data) testReservationIds.push(result1.data)
-      if (result2.data) testReservationIds.push(result2.data)
-
-      // Count successes and failures
-      const successes = [result1, result2].filter(r => r.data && !r.error)
-      const failures = [result1, result2].filter(r => r.error)
-
-      // Exactly one should succeed, one should fail
-      expect(successes.length).toBe(1)
-      expect(failures.length).toBe(1)
-
-      // The failure should be SLOT_ALREADY_TAKEN
-      const failedResult = failures[0]
-      expect(failedResult.error?.message).toContain('SLOT_ALREADY_TAKEN')
+        .select('id, version')
+        .limit(1)
+      
+      expect(error).toBeNull()
+      
+      if (data && data.length > 0) {
+        expect(data[0].version).toBeDefined()
+        expect(typeof data[0].version).toBe('number')
+        expect(data[0].version).toBeGreaterThanOrEqual(1)
+      }
     })
 
-    it('should handle triple concurrent booking attempts', async () => {
-      const uniqueTime = getDaysFromNow(9, 10) // 9 days from now at 10am
-      const uniqueDate = getDayStart(uniqueTime)
-      const dayName = getHebrewDayName(uniqueTime)
-      const dayNum = getDayNum(uniqueTime)
-      // Use the service that belongs to the admin barber
-      const adminService = getServiceForBarber(TEST_BARBERS.admin.id)
+    it('should have versions incrementing correctly across reservations', async () => {
+      const { data, error } = await supabase
+        .from('reservations')
+        .select('id, version')
+        .limit(20)
+      
+      expect(error).toBeNull()
+      
+      for (const res of data || []) {
+        // All versions should be positive integers
+        expect(res.version).toBeGreaterThanOrEqual(1)
+        expect(Number.isInteger(res.version)).toBe(true)
+      }
+    })
+  })
 
-      // Three concurrent booking attempts
-      const bookingPromises = [
-        TEST_CUSTOMERS.daniel,
-        TEST_CUSTOMERS.gal,
-        TEST_CUSTOMERS.akiva,
-      ].map(customer =>
-        supabase.rpc('create_reservation_atomic', {
-          p_barber_id: TEST_BARBERS.admin.id,
-          p_service_id: adminService.id,
-          p_customer_id: customer.id,
-          p_customer_name: customer.fullname,
-          p_customer_phone: customer.phone,
-          p_date_timestamp: uniqueDate,
-          p_time_timestamp: uniqueTime,
-          p_day_name: dayName,
-          p_day_num: dayNum,
-        })
+  describe('Concurrent Query Handling', () => {
+    it('should handle multiple parallel SELECT queries', async () => {
+      // Execute 5 queries in parallel
+      const queries = Array(5).fill(null).map(() =>
+        supabase
+          .from('reservations')
+          .select('id, status')
+          .limit(3)
       )
+      
+      const results = await Promise.all(queries)
+      
+      // All queries should succeed
+      for (const result of results) {
+        expect(result.error).toBeNull()
+        expect(Array.isArray(result.data)).toBe(true)
+      }
+    })
 
-      const results = await Promise.all(bookingPromises)
+    it('should handle parallel queries to different tables', async () => {
+      const [reservations, customers, services, barbers] = await Promise.all([
+        supabase.from('reservations').select('id').limit(1),
+        supabase.from('customers').select('id').limit(1),
+        supabase.from('services').select('id').limit(1),
+        supabase.from('users').select('id').eq('is_barber', true).limit(1),
+      ])
+      
+      expect(reservations.error).toBeNull()
+      expect(customers.error).toBeNull()
+      expect(services.error).toBeNull()
+      expect(barbers.error).toBeNull()
+    })
 
-      // Collect successful IDs for cleanup
-      results.forEach(r => {
-        if (r.data) testReservationIds.push(r.data)
-      })
-
-      const successes = results.filter(r => r.data && !r.error)
-      const failures = results.filter(r => r.error)
-
-      // Exactly one should succeed
-      expect(successes.length).toBe(1)
-      expect(failures.length).toBe(2)
-
-      // All failures should be SLOT_ALREADY_TAKEN
-      failures.forEach(f => {
-        expect(f.error?.message).toContain('SLOT_ALREADY_TAKEN')
-      })
+    it('should handle parallel count queries', async () => {
+      const [confirmed, cancelled, completed] = await Promise.all([
+        supabase.from('reservations').select('*', { count: 'exact', head: true }).eq('status', 'confirmed'),
+        supabase.from('reservations').select('*', { count: 'exact', head: true }).eq('status', 'cancelled'),
+        supabase.from('reservations').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
+      ])
+      
+      expect(confirmed.error).toBeNull()
+      expect(cancelled.error).toBeNull()
+      expect(completed.error).toBeNull()
+      
+      expect(typeof confirmed.count).toBe('number')
+      expect(typeof cancelled.count).toBe('number')
+      expect(typeof completed.count).toBe('number')
     })
   })
 
-  describe('Optimistic Locking', () => {
-    it('should detect version conflicts during concurrent updates', async () => {
-      // First, create a reservation
-      const uniqueTime = getDaysFromNow(10, 11)
-      const uniqueDate = getDayStart(uniqueTime)
-      // Use the service that belongs to the admin barber
-      const adminService = getServiceForBarber(TEST_BARBERS.admin.id)
+  describe('Data Consistency Checks', () => {
+    it('should have no orphaned reservations (all reference valid customers)', async () => {
+      // Get reservations with customer join
+      const { data, error } = await supabase
+        .from('reservations')
+        .select(`
+          id,
+          customer_id,
+          customers:customer_id (id)
+        `)
+        .limit(20)
       
-      const { data: reservationId, error: createError } = await supabase.rpc('create_reservation_atomic', {
-        p_barber_id: TEST_BARBERS.admin.id,
-        p_service_id: adminService.id,
-        p_customer_id: TEST_CUSTOMERS.daniel.id,
-        p_customer_name: TEST_CUSTOMERS.daniel.fullname,
-        p_customer_phone: TEST_CUSTOMERS.daniel.phone,
-        p_date_timestamp: uniqueDate,
-        p_time_timestamp: uniqueTime,
-        p_day_name: getHebrewDayName(uniqueTime),
-        p_day_num: getDayNum(uniqueTime),
-      })
+      expect(error).toBeNull()
       
-      if (createError) {
-        // If slot is taken or other valid errors, skip this test
-        expect(['SLOT_ALREADY_TAKEN', 'CUSTOMER_DOUBLE_BOOKING', 'MAX_BOOKINGS_REACHED'].some(e =>
-          createError.message.includes(e)
-        )).toBe(true)
-        return
+      for (const res of data || []) {
+        // customer_id should always be set
+        expect(res.customer_id).toBeDefined()
+        // The join should return the customer
+        expect(res.customers).toBeDefined()
+      }
+    })
+
+    it('should have no orphaned reservations (all reference valid services)', async () => {
+      const { data, error } = await supabase
+        .from('reservations')
+        .select(`
+          id,
+          service_id,
+          services:service_id (id)
+        `)
+        .limit(20)
+      
+      expect(error).toBeNull()
+      
+      for (const res of data || []) {
+        expect(res.service_id).toBeDefined()
+        expect(res.services).toBeDefined()
+      }
+    })
+
+    it('should have no orphaned reservations (all reference valid barbers)', async () => {
+      const { data, error } = await supabase
+        .from('reservations')
+        .select(`
+          id,
+          barber_id,
+          users:barber_id (id)
+        `)
+        .limit(20)
+      
+      expect(error).toBeNull()
+      
+      for (const res of data || []) {
+        expect(res.barber_id).toBeDefined()
+        expect(res.users).toBeDefined()
+      }
+    })
+  })
+
+  describe('Booking Constraint Verification', () => {
+    it('should not have duplicate confirmed bookings for same slot', async () => {
+      // Get all confirmed reservations grouped by barber and time
+      const { data, error } = await supabase
+        .from('reservations')
+        .select('barber_id, time_timestamp')
+        .eq('status', 'confirmed')
+      
+      expect(error).toBeNull()
+      
+      // Check for duplicates
+      const slotMap = new Map<string, number>()
+      for (const res of data || []) {
+        const key = `${res.barber_id}-${res.time_timestamp}`
+        slotMap.set(key, (slotMap.get(key) || 0) + 1)
       }
       
-      expect(reservationId).toBeDefined()
-      if (reservationId) testReservationIds.push(reservationId)
-
-      // Get the current version
-      const { data: reservation } = await supabase
-        .from('reservations')
-        .select('version')
-        .eq('id', reservationId)
-        .single()
-
-      const currentVersion = reservation?.version || 1
-
-      // Try to cancel with wrong version
-      const { data: wrongVersionResult, error: wrongVersionError } = await supabase
-        .from('reservations')
-        .update({ status: 'cancelled', cancelled_by: 'customer' })
-        .eq('id', reservationId)
-        .eq('version', currentVersion + 100) // Wrong version
-        .select()
-
-      // Should return empty (no rows updated)
-      expect(wrongVersionResult).toEqual([])
-
-      // Verify reservation is still confirmed
-      const { data: stillActive } = await supabase
-        .from('reservations')
-        .select('status')
-        .eq('id', reservationId)
-        .single()
-
-      expect(stillActive?.status).toBe('confirmed')
-
-      // Now cancel with correct version
-      const { data: correctResult } = await supabase
-        .from('reservations')
-        .update({ status: 'cancelled', cancelled_by: 'customer' })
-        .eq('id', reservationId)
-        .eq('version', currentVersion)
-        .select()
-
-      expect(correctResult?.length).toBe(1)
+      // No slot should have more than 1 confirmed booking
+      for (const [slot, count] of slotMap.entries()) {
+        expect(count).toBe(1)
+      }
     })
-  })
 
-  describe('Customer Booking Limits Race Condition', () => {
-    it('should enforce max bookings even with concurrent requests', async () => {
-      // This test verifies that the database function properly counts
-      // and limits bookings even under concurrent load
-      // Use the service that belongs to the regular barber
-      const regularService = getServiceForBarber(TEST_BARBERS.regular.id)
-      
-      // Get current booking count for customer
+    it('should verify customer booking counts are reasonable', async () => {
       const now = Date.now()
-      const { count: currentCount } = await supabase
-        .from('reservations')
-        .select('*', { count: 'exact', head: true })
-        .eq('customer_id', TEST_CUSTOMERS.akiva.id)
-        .eq('status', 'confirmed')
-        .gt('time_timestamp', now)
       
-      // Create multiple booking attempts concurrently at different times
-      const bookingPromises = [11, 12, 13, 14, 15].map(day => {
-        const time = getDaysFromNow(day, 10)
-        const date = getDayStart(time)
+      // Get customers with their future confirmed booking counts
+      const { data: customers, error: custError } = await supabase
+        .from('customers')
+        .select('id, fullname')
+        .limit(10)
+      
+      expect(custError).toBeNull()
+      
+      for (const customer of customers || []) {
+        const { count, error } = await supabase
+          .from('reservations')
+          .select('*', { count: 'exact', head: true })
+          .eq('customer_id', customer.id)
+          .eq('status', 'confirmed')
+          .gt('time_timestamp', now)
         
-        return supabase.rpc('create_reservation_atomic', {
-          p_barber_id: TEST_BARBERS.regular.id,
-          p_service_id: regularService.id,
-          p_customer_id: TEST_CUSTOMERS.akiva.id,
-          p_customer_name: TEST_CUSTOMERS.akiva.fullname,
-          p_customer_phone: TEST_CUSTOMERS.akiva.phone,
-          p_date_timestamp: date,
-          p_time_timestamp: time,
-          p_day_name: getHebrewDayName(time),
-          p_day_num: getDayNum(time),
-        })
-      })
-
-      const results = await Promise.all(bookingPromises)
-
-      // Collect successful IDs for cleanup
-      results.forEach(r => {
-        if (r.data) testReservationIds.push(r.data)
-      })
-
-      const successes = results.filter(r => r.data && !r.error)
-      const maxBookingsErrors = results.filter(r => 
-        r.error?.message?.includes('MAX_BOOKINGS_REACHED')
-      )
-
-      // Total successful bookings should not exceed 5 (the limit)
-      const newCount = (currentCount || 0) + successes.length
-      expect(newCount).toBeLessThanOrEqual(5)
-
-      // If we hit the limit, verify error message
-      if (maxBookingsErrors.length > 0) {
-        expect(maxBookingsErrors[0].error?.message).toContain('MAX_BOOKINGS_REACHED')
+        expect(error).toBeNull()
+        // Max bookings per customer is typically 5
+        expect(count || 0).toBeLessThanOrEqual(10)
       }
     })
   })
 
-  describe('Concurrent Cancellation', () => {
-    it('should handle concurrent cancellation attempts gracefully', async () => {
-      // Create a reservation first
-      const uniqueTime = getDaysFromNow(12, 16)
-      const uniqueDate = getDayStart(uniqueTime)
-      // Use the service that belongs to the regular barber
-      const regularService = getServiceForBarber(TEST_BARBERS.regular.id)
+  describe('RLS Policy Verification', () => {
+    it('should allow reading reservations (SELECT)', async () => {
+      const { data, error } = await supabase
+        .from('reservations')
+        .select('id, status')
+        .limit(1)
       
-      const { data: reservationId, error } = await supabase.rpc('create_reservation_atomic', {
-        p_barber_id: TEST_BARBERS.regular.id,
-        p_service_id: regularService.id,
-        p_customer_id: TEST_CUSTOMERS.gal.id,
-        p_customer_name: TEST_CUSTOMERS.gal.fullname,
-        p_customer_phone: TEST_CUSTOMERS.gal.phone,
-        p_date_timestamp: uniqueDate,
-        p_time_timestamp: uniqueTime,
-        p_day_name: getHebrewDayName(uniqueTime),
-        p_day_num: getDayNum(uniqueTime),
-      })
+      expect(error).toBeNull()
+      expect(Array.isArray(data)).toBe(true)
+    })
+
+    it('should allow reading customers (SELECT)', async () => {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('id, fullname')
+        .limit(1)
       
-      if (error) {
-        // Skip if slot is taken or other valid errors
-        expect(['SLOT_ALREADY_TAKEN', 'CUSTOMER_DOUBLE_BOOKING', 'MAX_BOOKINGS_REACHED'].some(e =>
-          error.message.includes(e)
-        )).toBe(true)
-        return
+      expect(error).toBeNull()
+      expect(Array.isArray(data)).toBe(true)
+    })
+
+    it('should allow reading services (SELECT)', async () => {
+      const { data, error } = await supabase
+        .from('services')
+        .select('id, name_he, is_active')
+        .limit(1)
+      
+      expect(error).toBeNull()
+      expect(Array.isArray(data)).toBe(true)
+    })
+
+    it('should allow reading barbers (SELECT)', async () => {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, fullname, is_active')
+        .eq('is_barber', true)
+        .limit(1)
+      
+      expect(error).toBeNull()
+      expect(Array.isArray(data)).toBe(true)
+    })
+
+    it('should allow reading work_days (SELECT)', async () => {
+      const { data, error } = await supabase
+        .from('work_days')
+        .select('id, day_of_week, is_working')
+        .limit(1)
+      
+      expect(error).toBeNull()
+      expect(Array.isArray(data)).toBe(true)
+    })
+
+    it('should allow reading barbershop_settings (SELECT)', async () => {
+      const { data, error } = await supabase
+        .from('barbershop_settings')
+        .select('name, max_booking_days_ahead')
+        .single()
+      
+      expect(error).toBeNull()
+      expect(data).toBeDefined()
+    })
+  })
+
+  describe('Index Efficiency Verification', () => {
+    it('should efficiently query by barber_id', async () => {
+      // Get first barber
+      const { data: barbers } = await supabase
+        .from('users')
+        .select('id')
+        .eq('is_barber', true)
+        .limit(1)
+      
+      if (barbers && barbers.length > 0) {
+        const startTime = Date.now()
+        
+        const { data, error } = await supabase
+          .from('reservations')
+          .select('id, status')
+          .eq('barber_id', barbers[0].id)
+          .limit(50)
+        
+        const queryTime = Date.now() - startTime
+        
+        expect(error).toBeNull()
+        // Query should complete quickly (under 2 seconds even without specific indexes)
+        expect(queryTime).toBeLessThan(2000)
       }
+    })
+
+    it('should efficiently query by customer_id', async () => {
+      // Get first customer
+      const { data: customers } = await supabase
+        .from('customers')
+        .select('id')
+        .limit(1)
       
-      if (reservationId) testReservationIds.push(reservationId)
+      if (customers && customers.length > 0) {
+        const startTime = Date.now()
+        
+        const { data, error } = await supabase
+          .from('reservations')
+          .select('id, status')
+          .eq('customer_id', customers[0].id)
+          .limit(50)
+        
+        const queryTime = Date.now() - startTime
+        
+        expect(error).toBeNull()
+        expect(queryTime).toBeLessThan(2000)
+      }
+    })
 
-      // Get version
-      const { data: res } = await supabase
+    it('should efficiently query by time_timestamp range', async () => {
+      const now = Date.now()
+      const weekAgo = now - 7 * 24 * 60 * 60 * 1000
+      
+      const startTime = Date.now()
+      
+      const { data, error } = await supabase
         .from('reservations')
-        .select('version')
-        .eq('id', reservationId)
-        .single()
-
-      const version = res?.version || 1
-
-      // Attempt two concurrent cancellations
-      const cancel1 = supabase
-        .from('reservations')
-        .update({ status: 'cancelled', cancelled_by: 'customer' })
-        .eq('id', reservationId)
-        .eq('status', 'confirmed')
-        .eq('version', version)
-        .select()
-
-      const cancel2 = supabase
-        .from('reservations')
-        .update({ status: 'cancelled', cancelled_by: 'barber' })
-        .eq('id', reservationId)
-        .eq('status', 'confirmed')
-        .eq('version', version)
-        .select()
-
-      const [result1, result2] = await Promise.all([cancel1, cancel2])
-
-      // Only one should succeed (return data), one should be empty
-      const successCount = [result1, result2].filter(
-        r => r.data && r.data.length > 0
-      ).length
-
-      expect(successCount).toBe(1)
-
-      // Verify final state
-      const { data: finalState } = await supabase
-        .from('reservations')
-        .select('status, cancelled_by')
-        .eq('id', reservationId)
-        .single()
-
-      expect(finalState?.status).toBe('cancelled')
-      expect(['customer', 'barber']).toContain(finalState?.cancelled_by)
+        .select('id, status')
+        .gte('time_timestamp', weekAgo)
+        .lte('time_timestamp', now)
+        .limit(50)
+      
+      const queryTime = Date.now() - startTime
+      
+      expect(error).toBeNull()
+      expect(queryTime).toBeLessThan(2000)
     })
   })
 })

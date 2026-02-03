@@ -15,7 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { pushService } from '@/lib/push/push-service'
 import type { ReminderContext } from '@/lib/push/types'
 import { 
@@ -23,6 +23,7 @@ import {
   isValidIsraeliMobile,
   extractFirstName
 } from '@/lib/sms/sms-reminder-service'
+import { reportServerError } from '@/lib/bug-reporter/helpers'
 import { getIsraelDayStart, getIsraelDayEnd, nowInIsraelMs } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
@@ -68,12 +69,9 @@ interface BatchResults {
   }>
 }
 
-// Initialize Supabase
+// Initialize Supabase with admin client (bypasses RLS for cron operations)
 function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  return createAdminClient()
 }
 
 /**
@@ -382,6 +380,23 @@ export async function POST(request: NextRequest) {
           if (smsResult.success) {
             results.sms_sent++
             console.log(`[ProcessReminders] SMS sent for ${res.id}`)
+            
+            // CRITICAL: Log SMS reminder to notification_logs for deduplication
+            // This ensures wasReminderSent() will return true on next cron run
+            const supabase = getSupabase()
+            await supabase.from('notification_logs').insert({
+              notification_type: 'reminder',
+              recipient_type: 'customer',
+              recipient_id: res.customer_id,
+              reservation_id: res.id,
+              title: 'תזכורת תור',
+              body: `תזכורת: יש לך תור היום`,
+              status: 'sent',
+              is_read: false,
+              devices_targeted: 1,
+              devices_succeeded: 1,
+              devices_failed: 0
+            })
           } else {
             results.sms_failed++
             console.error(`[ProcessReminders] SMS failed for ${res.id}:`, smsResult.error)
@@ -454,6 +469,18 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('[ProcessReminders] Fatal error:', error)
+    
+    // Report the error to bug tracking
+    await reportServerError(error, 'POST /api/cron/process-reminders', {
+      route: '/api/cron/process-reminders',
+      severity: 'critical',
+      additionalData: { 
+        triggerSource,
+        processedCount: results.total_reservations,
+        smsSent: results.sms_sent,
+        pushSent: results.push_sent
+      }
+    })
     
     const durationMs = Date.now() - startTime
     await saveBatchLog(results, durationMs, triggerSource)

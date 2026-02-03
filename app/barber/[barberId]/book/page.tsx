@@ -4,7 +4,7 @@ import { AppHeader } from '@/components/AppHeader'
 import { BookingWizardClient } from '@/components/BookingWizard/BookingWizardClient'
 import { BarberNotFoundClient } from '@/components/BarberProfile/BarberNotFoundClient'
 import { isValidUUID, generateSlugFromEnglishName, getPreferredBarberSlug } from '@/lib/utils'
-import type { BarberWithWorkDays, Service, BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure, BarberMessage } from '@/types/database'
+import type { BarberWithWorkDays, Service, BarbershopSettings, BarbershopClosure, BarberClosure, BarberMessage } from '@/types/database'
 
 interface BookPageProps {
   params: Promise<{ barberId: string }>
@@ -109,7 +109,6 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
     servicesResult,
     shopSettingsResult,
     shopClosuresResult,
-    barberScheduleResult,
     barberClosuresResult,
     barberMessagesResult
   ] = await Promise.all([
@@ -129,12 +128,6 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
       .from('barbershop_closures')
       .select('*')
       .gte('end_date', todayStr),
-    // Barber schedule
-    supabase
-      .from('barber_schedules')
-      .select('*')
-      .eq('barber_id', barber.id)
-      .single(),
     // Barber closures
     supabase
       .from('barber_closures')
@@ -152,7 +145,6 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
   const services = servicesResult.data as Service[] | null
   const shopSettings = shopSettingsResult.data as BarbershopSettings | null
   const shopClosures = shopClosuresResult.data as BarbershopClosure[] | null
-  const barberSchedule = barberScheduleResult.data as BarberSchedule | null
   const barberClosures = barberClosuresResult.data as BarberClosure[] | null
   const barberMessages = barberMessagesResult.data as BarberMessage[] | null
   
@@ -176,7 +168,6 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
           services={services || []}
           shopSettings={shopSettings}
           shopClosures={shopClosures || []}
-          barberSchedule={barberSchedule}
           barberClosures={barberClosures || []}
           barberMessages={barberMessages || []}
           preSelectedServiceId={preSelectedServiceId}

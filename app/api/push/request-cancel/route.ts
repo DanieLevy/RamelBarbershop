@@ -10,17 +10,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { pushService } from '@/lib/push/push-service'
 import { reportServerError } from '@/lib/bug-reporter/helpers'
 
 export const dynamic = 'force-dynamic'
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+// Initialize Supabase admin client (bypasses RLS for write operations)
+const supabase = createAdminClient()
 
 export async function POST(request: NextRequest) {
   try {

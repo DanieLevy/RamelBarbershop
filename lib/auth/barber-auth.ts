@@ -241,6 +241,7 @@ export async function setBarberPassword(
 
 /**
  * Create a new barber user with default work days and schedule
+ * Uses API route to bypass RLS restrictions for related tables
  */
 export async function createBarber(data: {
   username: string
@@ -250,142 +251,37 @@ export async function createBarber(data: {
   phone?: string
   role?: 'admin' | 'barber'
 }): Promise<{ success: boolean; user?: User; error?: string }> {
-  const supabase = createClient()
-  
-  const normalizedEmail = data.email.toLowerCase().trim()
-  
-  // Check if email already exists - handle error gracefully
-  const { data: existing, error: checkError } = await supabase
-    .from('users')
-    .select('id')
-    .eq('email', normalizedEmail)
-    .maybeSingle()
-  
-  // If error is not "not found", log it but continue
-  if (checkError && checkError.code !== 'PGRST116') {
-    console.error('Error checking email:', checkError)
+  try {
+    const response = await fetch('/api/barbers/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: data.username,
+        fullname: data.fullname,
+        email: data.email,
+        password: data.password,
+        phone: data.phone,
+        role: data.role || 'barber',
+      }),
+    })
+    
+    const result = await response.json()
+    
+    if (!response.ok || !result.success) {
+      console.error('Error creating barber:', result.error)
+      return { success: false, error: result.error || 'שגיאה ביצירת ספר' }
+    }
+    
+    return { success: true, user: result.user as User }
+  } catch (error) {
+    console.error('Error in createBarber:', error)
+    await reportSupabaseError(
+      { message: error instanceof Error ? error.message : 'Unknown error', code: 'NETWORK_ERROR' },
+      'Creating New Barber via API',
+      { operation: 'insert' }
+    )
+    return { success: false, error: 'שגיאה בתקשורת עם השרת' }
   }
-  
-  if (existing) {
-    return { success: false, error: 'אימייל כבר קיים במערכת' }
-  }
-  
-  const passwordHash = await hashPassword(data.password)
-  
-  const { data: newUser, error } = await supabase.from('users')
-    .insert({
-      username: data.username,
-      fullname: data.fullname,
-      email: normalizedEmail,
-      password_hash: passwordHash,
-      phone: data.phone || null,
-      role: data.role || 'barber',
-      is_barber: true,
-      is_active: true,
-    })
-    .select()
-    .single()
-  
-  if (error) {
-    console.error('Error creating barber:', error)
-    await reportSupabaseError(error, 'Creating New Barber', {
-      table: 'users',
-      operation: 'insert',
-    })
-    const errorMessage = error.message || 'שגיאה ביצירת המשתמש'
-    return { success: false, error: errorMessage }
-  }
-  
-  const createdUser = newUser as User
-  
-  // Fetch barbershop settings to get default work days and hours
-  const { data: shopSettingsData } = await supabase
-    .from('barbershop_settings')
-    .select('open_days, work_hours_start, work_hours_end')
-    .limit(1)
-    .single()
-  
-  const shopSettings = shopSettingsData as { open_days?: string[]; work_hours_start?: string; work_hours_end?: string } | null
-  const defaultOpenDays = shopSettings?.open_days || ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday']
-  const defaultWorkHoursStart = shopSettings?.work_hours_start || '09:00'
-  const defaultWorkHoursEnd = shopSettings?.work_hours_end || '19:00'
-  
-  // Create default work_days entries for the new barber
-  const allDays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-  const workDaysInserts = allDays.map(day => ({
-    user_id: createdUser.id,
-    day_of_week: day,
-    is_working: defaultOpenDays.includes(day),
-  }))
-  
-  const { error: workDaysError } = await supabase.from('work_days')
-    .insert(workDaysInserts)
-  
-  if (workDaysError) {
-    console.error('Error creating default work_days:', workDaysError)
-    await reportSupabaseError(workDaysError, 'Creating Default Work Days for New Barber', {
-      table: 'work_days',
-      operation: 'insert',
-    })
-    // Don't fail the barber creation, just log the error
-  }
-  
-  // Create default barber_schedules entry
-  const { error: scheduleError } = await supabase.from('barber_schedules')
-    .insert({
-      barber_id: createdUser.id,
-      work_days: defaultOpenDays,
-      work_hours_start: defaultWorkHoursStart,
-      work_hours_end: defaultWorkHoursEnd,
-    })
-  
-  if (scheduleError) {
-    console.error('Error creating default barber_schedule:', scheduleError)
-    await reportSupabaseError(scheduleError, 'Creating Default Schedule for New Barber', {
-      table: 'barber_schedules',
-      operation: 'insert',
-    })
-    // Don't fail the barber creation, just log the error
-  }
-  
-  // Create default barber_notification_settings entry (notification preferences only)
-  const { error: notificationSettingsError } = await supabase.from('barber_notification_settings')
-    .insert({
-      barber_id: createdUser.id,
-      reminder_hours_before: 3,
-      notify_on_customer_cancel: true,
-      notify_on_new_booking: true,
-      broadcast_enabled: true,
-    })
-  
-  if (notificationSettingsError) {
-    console.error('Error creating default barber_notification_settings:', notificationSettingsError)
-    await reportSupabaseError(notificationSettingsError, 'Creating Default Notification Settings for New Barber', {
-      table: 'barber_notification_settings',
-      operation: 'insert',
-    })
-    // Don't fail the barber creation, just log the error
-  }
-  
-  // Create default barber_booking_settings entry (booking/cancellation policies)
-  const { error: bookingSettingsError } = await supabase.from('barber_booking_settings')
-    .insert({
-      barber_id: createdUser.id,
-      max_booking_days_ahead: 15,    // מספר ימים שניתן לקבוע תור מראש
-      min_hours_before_booking: 1,   // ניתן להירשם לתור עד X שעות לפני
-      min_cancel_hours: 2,           // ניתן לבטל תור עד X שעות לפני
-    })
-  
-  if (bookingSettingsError) {
-    console.error('Error creating default barber_booking_settings:', bookingSettingsError)
-    await reportSupabaseError(bookingSettingsError, 'Creating Default Booking Settings for New Barber', {
-      table: 'barber_booking_settings',
-      operation: 'insert',
-    })
-    // Don't fail the barber creation, just log the error
-  }
-  
-  return { success: true, user: createdUser }
 }
 
 /**

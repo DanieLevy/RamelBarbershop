@@ -4,16 +4,16 @@ import { useEffect, useState } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { createClient } from '@/lib/supabase/client'
 import { formatTime, cn, parseTimeString, generateTimeSlots, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael, nowInIsrael } from '@/lib/utils'
-import type { TimeSlot, BarbershopSettings, BarberSchedule, WorkDay, BarberBookingSettings } from '@/types/database'
+import type { TimeSlot, BarbershopSettings, WorkDay, BarberBookingSettings } from '@/types/database'
 import { ChevronRight, ChevronDown, ChevronUp, Clock } from 'lucide-react'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { getWorkHours as getWorkHoursFromService, workDaysToMap } from '@/lib/services/availability.service'
+import { withSupabaseRetry } from '@/lib/utils/retry'
 
 interface TimeSelectionProps {
   barberId: string
   shopSettings?: BarbershopSettings | null
-  barberSchedule?: BarberSchedule | null
   barberWorkDays?: WorkDay[]
 }
 
@@ -22,7 +22,7 @@ interface EnrichedTimeSlot extends TimeSlot {
   tooSoon?: boolean // True if slot is within min_hours_before_booking
 }
 
-export function TimeSelection({ barberId, shopSettings, barberSchedule, barberWorkDays }: TimeSelectionProps) {
+export function TimeSelection({ barberId, shopSettings, barberWorkDays }: TimeSelectionProps) {
   const { date, timeTimestamp, setTime, nextStep, prevStep } = useBookingStore()
   const [availableSlots, setAvailableSlots] = useState<EnrichedTimeSlot[]>([])
   const [reservedSlots, setReservedSlots] = useState<EnrichedTimeSlot[]>([])
@@ -35,25 +35,36 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule, barberWo
   const [barberBookingSettings, setBarberBookingSettings] = useState<BarberBookingSettings | null>(null)
   const { report } = useBugReporter('TimeSelection')
 
-  // Fetch barber booking settings
+  // Fetch barber booking settings with retry logic for Safari/iOS
   useEffect(() => {
     const fetchBookingSettings = async () => {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('barber_booking_settings')
-        .select('*')
-        .eq('barber_id', barberId)
-        .single()
-      
-      if (data) {
-        setBarberBookingSettings(data as BarberBookingSettings)
+      try {
+        const supabase = createClient()
+        const { data } = await withSupabaseRetry(async () => {
+          const result = await supabase
+            .from('barber_booking_settings')
+            .select('*')
+            .eq('barber_id', barberId)
+            .single()
+          if (result.error && result.error.code !== 'PGRST116') {
+            throw new Error(result.error.message)
+          }
+          return result
+        })
+        
+        if (data) {
+          setBarberBookingSettings(data as BarberBookingSettings)
+        }
+      } catch (err) {
+        console.error('[TimeSelection] Error fetching booking settings:', err)
+        await report(err, 'Fetching barber booking settings')
       }
     }
     
     fetchBookingSettings()
-  }, [barberId])
+  }, [barberId, report])
 
-  // Fetch work days if not provided as prop
+  // Fetch work days if not provided as prop - with retry logic for Safari/iOS
   useEffect(() => {
     const fetchWorkDays = async () => {
       if (barberWorkDays && barberWorkDays.length > 0) {
@@ -61,25 +72,34 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule, barberWo
         return
       }
       
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('work_days')
-        .select('*')
-        .eq('user_id', barberId)
-      
-      if (data) {
-        setWorkDays(data as WorkDay[])
+      try {
+        const supabase = createClient()
+        const { data } = await withSupabaseRetry(async () => {
+          const result = await supabase
+            .from('work_days')
+            .select('*')
+            .eq('user_id', barberId)
+          if (result.error) throw new Error(result.error.message)
+          return result
+        })
+        
+        if (data) {
+          setWorkDays(data as WorkDay[])
+        }
+      } catch (err) {
+        console.error('[TimeSelection] Error fetching work days:', err)
+        await report(err, 'Fetching work days')
       }
     }
     
     fetchWorkDays()
-  }, [barberId, barberWorkDays])
+  }, [barberId, barberWorkDays, report])
 
   // Get work hours for a specific day - uses day-specific hours from work_days
   const getWorkHoursForDay = (dateTimestamp: number): { start: string; end: string } => {
     const dayName = getDayKeyInIsrael(dateTimestamp)
     const workDaysMap = workDaysToMap(workDays)
-    return getWorkHoursFromService(shopSettings || null, barberSchedule || null, dayName, workDaysMap)
+    return getWorkHoursFromService(shopSettings || null, dayName, workDaysMap)
   }
 
   useEffect(() => {
@@ -111,26 +131,28 @@ export function TimeSelection({ barberId, shopSettings, barberSchedule, barberWo
         const dayStartMs = getIsraelDayStart(date.dateTimestamp)
         const dayEndMs = getIsraelDayEnd(date.dateTimestamp)
         
-        // Fetch existing reservations - simple query, no duration needed
+        // Fetch existing reservations with retry logic for Safari/iOS "Load failed" errors
         // Each reservation blocks exactly one 30-minute slot
-        const { data: reservations, error: resError } = await supabase
-          .from('reservations')
-          .select('time_timestamp, customer_name, status')
-          .eq('barber_id', barberId)
-          .gte('time_timestamp', dayStartMs)
-          .lte('time_timestamp', dayEndMs)
-          .neq('status', 'cancelled') as { 
-            data: { 
-              time_timestamp: number
-              customer_name: string
-              status: string
-            }[] | null
-            error: unknown 
-          }
+        let reservations: { time_timestamp: number; customer_name: string; status: string | null }[] | null = null
         
-        if (resError) {
-          console.error('Error fetching reservations:', resError)
+        try {
+          const result = await withSupabaseRetry(async () => {
+            const res = await supabase
+              .from('reservations')
+              .select('time_timestamp, customer_name, status')
+              .eq('barber_id', barberId)
+              .gte('time_timestamp', dayStartMs)
+              .lte('time_timestamp', dayEndMs)
+              .neq('status', 'cancelled')
+            if (res.error) throw new Error(res.error.message)
+            return res
+          })
+          reservations = result.data as { time_timestamp: number; customer_name: string; status: string | null }[] | null
+        } catch (resError) {
+          console.error('[TimeSelection] Error fetching reservations:', resError)
           await report(new Error((resError as Error)?.message || 'Unknown reservation fetch error'), 'Fetching reservations for time slots')
+          // Don't fail entirely - show slots without reservation data
+          // User will see a more accurate view on retry
         }
         
         // Create a set of reserved timestamps - simple exact match

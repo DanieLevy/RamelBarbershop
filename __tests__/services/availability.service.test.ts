@@ -2,12 +2,13 @@
  * Tests for Availability Service
  * 
  * Tests the date availability checking logic including shop closures,
- * barber schedules, and work day validation.
+ * barber work days, and work day validation.
+ * All tests are READ-ONLY - no database writes.
  */
 
 import { describe, it, expect } from 'vitest'
-import { isDateAvailable, getWorkHours } from '@/lib/services/availability.service'
-import type { BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure } from '@/types/database'
+import { isDateAvailable, getWorkHours, workDaysToMap, type DayWorkHours } from '@/lib/services/availability.service'
+import type { BarbershopSettings, BarbershopClosure, BarberClosure } from '@/types/database'
 
 // ============================================================
 // Mock Data Factories
@@ -49,15 +50,14 @@ const createShopSettings = (overrides: Partial<BarbershopSettings> = {}): Barber
   ...overrides,
 })
 
-const createBarberSchedule = (overrides: Partial<BarberSchedule> = {}): BarberSchedule => ({
-  id: 'barber-schedule-id',
-  barber_id: 'barber-id',
-  work_days: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday'],
-  work_hours_start: '10:00',
-  work_hours_end: '18:00',
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-  ...overrides,
+const createBarberWorkDays = (): DayWorkHours => ({
+  sunday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+  monday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+  tuesday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+  wednesday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+  thursday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+  friday: { isWorking: false, startTime: null, endTime: null },
+  saturday: { isWorking: false, startTime: null, endTime: null },
 })
 
 // Helper to get a date for a specific day of week
@@ -92,7 +92,6 @@ describe('Availability Service', () => {
           saturdayTimestamp,
           shopSettings,
           [],
-          null,
           []
         )
         
@@ -104,6 +103,7 @@ describe('Availability Service', () => {
         const shopSettings = createShopSettings({
           open_days: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
         })
+        const barberWorkDays = createBarberWorkDays()
         
         // Get a Sunday (day 0)
         const sundayTimestamp = getDateForDayOfWeek(0)
@@ -112,8 +112,8 @@ describe('Availability Service', () => {
           sundayTimestamp,
           shopSettings,
           [],
-          null,
-          []
+          [],
+          barberWorkDays
         )
         
         expect(result.available).toBe(true)
@@ -142,7 +142,6 @@ describe('Availability Service', () => {
           today.getTime(),
           shopSettings,
           shopClosures,
-          null,
           []
         )
         
@@ -168,7 +167,6 @@ describe('Availability Service', () => {
           today.getTime(),
           shopSettings,
           shopClosures,
-          null,
           []
         )
         
@@ -177,15 +175,13 @@ describe('Availability Service', () => {
       })
     })
 
-    describe('Barber Schedule', () => {
+    describe('Barber Work Days', () => {
       it('should return unavailable when barber does not work on that day', () => {
         const shopSettings = createShopSettings({
           open_days: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
         })
         
-        const barberSchedule = createBarberSchedule({
-          work_days: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday'],
-        })
+        const barberWorkDays = createBarberWorkDays() // Friday is not working
         
         // Get a Friday (day 5) - shop open but barber not working
         const fridayTimestamp = getDateForDayOfWeek(5)
@@ -194,8 +190,8 @@ describe('Availability Service', () => {
           fridayTimestamp,
           shopSettings,
           [],
-          barberSchedule,
-          []
+          [],
+          barberWorkDays
         )
         
         expect(result.available).toBe(false)
@@ -204,10 +200,7 @@ describe('Availability Service', () => {
 
       it('should return available when barber works on that day', () => {
         const shopSettings = createShopSettings()
-        
-        const barberSchedule = createBarberSchedule({
-          work_days: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday'],
-        })
+        const barberWorkDays = createBarberWorkDays()
         
         // Get a Sunday (day 0)
         const sundayTimestamp = getDateForDayOfWeek(0)
@@ -216,8 +209,8 @@ describe('Availability Service', () => {
           sundayTimestamp,
           shopSettings,
           [],
-          barberSchedule,
-          []
+          [],
+          barberWorkDays
         )
         
         expect(result.available).toBe(true)
@@ -227,6 +220,7 @@ describe('Availability Service', () => {
     describe('Barber Closures', () => {
       it('should return unavailable during barber closure period', () => {
         const shopSettings = createShopSettings()
+        const barberWorkDays = createBarberWorkDays()
         const today = new Date()
         const nextWeek = new Date(today)
         nextWeek.setDate(today.getDate() + 7)
@@ -244,8 +238,8 @@ describe('Availability Service', () => {
           today.getTime(),
           shopSettings,
           [],
-          null,
-          barberClosures
+          barberClosures,
+          barberWorkDays
         )
         
         expect(result.available).toBe(false)
@@ -254,6 +248,7 @@ describe('Availability Service', () => {
 
       it('should use default message when barber closure has no reason', () => {
         const shopSettings = createShopSettings()
+        const barberWorkDays = createBarberWorkDays()
         const today = new Date()
         const tomorrow = new Date(today)
         tomorrow.setDate(today.getDate() + 1)
@@ -271,8 +266,8 @@ describe('Availability Service', () => {
           today.getTime(),
           shopSettings,
           [],
-          null,
-          barberClosures
+          barberClosures,
+          barberWorkDays
         )
         
         expect(result.available).toBe(false)
@@ -283,6 +278,7 @@ describe('Availability Service', () => {
     describe('Combined Scenarios', () => {
       it('should check shop closure before barber closure', () => {
         const shopSettings = createShopSettings()
+        const barberWorkDays = createBarberWorkDays()
         const today = new Date()
         const tomorrow = new Date(today)
         tomorrow.setDate(today.getDate() + 1)
@@ -308,8 +304,8 @@ describe('Availability Service', () => {
           today.getTime(),
           shopSettings,
           shopClosures,
-          null,
-          barberClosures
+          barberClosures,
+          barberWorkDays
         )
         
         expect(result.available).toBe(false)
@@ -324,7 +320,6 @@ describe('Availability Service', () => {
           sundayTimestamp,
           null,
           [],
-          null,
           []
         )
         
@@ -335,40 +330,54 @@ describe('Availability Service', () => {
   })
 
   describe('getWorkHours', () => {
-    it('should return barber schedule hours when available', () => {
+    it('should return barber work day hours when available', () => {
       const shopSettings = createShopSettings({
         work_hours_start: '09:00',
         work_hours_end: '19:00',
       })
       
-      const barberSchedule = createBarberSchedule({
-        work_hours_start: '10:00',
-        work_hours_end: '18:00',
-      })
+      const barberWorkDays = createBarberWorkDays()
       
-      const result = getWorkHours(shopSettings, barberSchedule)
+      const result = getWorkHours(shopSettings, 'sunday', barberWorkDays)
       
       expect(result.start).toBe('10:00')
       expect(result.end).toBe('18:00')
     })
 
-    it('should fall back to shop settings when no barber schedule', () => {
+    it('should fall back to shop settings when no barber work days', () => {
       const shopSettings = createShopSettings({
         work_hours_start: '09:00',
         work_hours_end: '19:00',
       })
       
-      const result = getWorkHours(shopSettings, null)
+      const result = getWorkHours(shopSettings)
       
       expect(result.start).toBe('09:00')
       expect(result.end).toBe('19:00')
     })
 
     it('should return default hours when no settings available', () => {
-      const result = getWorkHours(null, null)
+      const result = getWorkHours(null)
       
       expect(result.start).toBe('09:00')
       expect(result.end).toBe('19:00')
+    })
+  })
+
+  describe('workDaysToMap', () => {
+    it('should convert WorkDay array to DayWorkHours map', () => {
+      const workDays = [
+        { id: '1', user_id: 'user-1', day_of_week: 'sunday', is_working: true, start_time: '10:00', end_time: '18:00', created_at: '', updated_at: '' },
+        { id: '2', user_id: 'user-1', day_of_week: 'monday', is_working: true, start_time: '10:00', end_time: '18:00', created_at: '', updated_at: '' },
+        { id: '3', user_id: 'user-1', day_of_week: 'friday', is_working: false, start_time: null, end_time: null, created_at: '', updated_at: '' },
+      ]
+      
+      const result = workDaysToMap(workDays as any)
+      
+      expect(result.sunday.isWorking).toBe(true)
+      expect(result.sunday.startTime).toBe('10:00')
+      expect(result.monday.isWorking).toBe(true)
+      expect(result.friday.isWorking).toBe(false)
     })
   })
 })

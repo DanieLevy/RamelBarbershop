@@ -6,8 +6,9 @@
  */
 
 import webpush from 'web-push'
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getNotificationTemplate } from './notification-templates'
+import type { Json } from '@/types/database'
 import type {
   NotificationPayload,
   SendNotificationResult,
@@ -23,11 +24,9 @@ import type {
   CustomerNotificationSettings,
 } from './types'
 
-// Initialize Supabase client for server-side operations
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+// Initialize Supabase admin client for server-side operations
+// Uses service_role key to bypass RLS for push subscription management
+const supabase = createAdminClient()
 
 // VAPID configuration
 const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
@@ -281,7 +280,7 @@ class PushNotificationService {
       sender_id: senderId || null,
       title: payload.title,
       body: payload.body,
-      payload: { ...payload.data, ...metadata }
+      payload: { ...payload.data, ...metadata } as Json
     })
 
     // Calculate badge count based on shouldBadge flag
@@ -599,7 +598,7 @@ class PushNotificationService {
     sender_id: string | null
     title: string
     body: string
-    payload?: Record<string, unknown> | null
+    payload?: Json | null
   }): Promise<string> {
     const { data: log, error } = await supabase
       .from('notification_logs')

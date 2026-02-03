@@ -45,6 +45,7 @@ export function isRetryableError(error: Error): boolean {
       message.includes('econnreset') ||
       message.includes('socket hang up') ||
       message.includes('load failed') ||  // Safari/iOS specific
+      message.includes('fetch failed') ||  // Generic fetch failure
       message.includes('failed to fetch') ||  // Chrome/generic
       message.includes('network request failed') ||  // Various browsers
       message.includes('the internet connection appears to be offline')) {  // Safari offline

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
-import type { BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure, BarberMessage, WorkDay, BarberBookingSettings } from '@/types/database'
+import type { BarbershopSettings, BarbershopClosure, BarberClosure, BarberMessage, WorkDay, BarberBookingSettings } from '@/types/database'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
 import { getTodayDateString, getIsraelDateString, getDayKeyInIsrael } from '@/lib/utils'
 
@@ -53,27 +53,6 @@ export async function getBarbershopClosures(): Promise<BarbershopClosure[]> {
   }
   
   return (data as BarbershopClosure[]) || []
-}
-
-/**
- * Get barber schedule (legacy - global hours)
- * @deprecated Use getBarberWorkDays for day-specific hours
- */
-export async function getBarberSchedule(barberId: string): Promise<BarberSchedule | null> {
-  const supabase = createClient()
-  
-  const { data, error } = await supabase
-    .from('barber_schedules')
-    .select('*')
-    .eq('barber_id', barberId)
-    .single()
-  
-  if (error && error.code !== 'PGRST116') {
-    console.error('Error fetching barber schedule:', error)
-    await reportSupabaseError(error, 'Fetching barber schedule', { table: 'barber_schedules', operation: 'select' })
-  }
-  
-  return data as BarberSchedule | null
 }
 
 /**
@@ -175,13 +154,12 @@ export async function getBarberMessages(barberId: string): Promise<BarberMessage
 
 /**
  * Check if a specific date is available for booking
- * Now supports day-specific work hours via barberWorkDays
+ * Uses day-specific work hours via barberWorkDays
  */
 export function isDateAvailable(
   dateTimestamp: number,
   shopSettings: BarbershopSettings | null,
   shopClosures: BarbershopClosure[],
-  barberSchedule: BarberSchedule | null,
   barberClosures: BarberClosure[],
   barberWorkDays?: DayWorkHours
 ): { available: boolean; reason?: string } {
@@ -203,19 +181,13 @@ export function isDateAvailable(
     return { available: false, reason: shopClosure.reason || 'המספרה סגורה בתאריך זה' }
   }
   
-  // Check if barber works on this day using day-specific work days (new method)
+  // Check if barber works on this day using day-specific work days
   if (barberWorkDays && barberWorkDays[dayName]) {
     if (!barberWorkDays[dayName].isWorking) {
       return { available: false, reason: 'הספר לא עובד ביום זה' }
     }
-  }
-  // Fallback to legacy barberSchedule if no workDays provided
-  else if (barberSchedule && !barberSchedule.work_days.includes(dayName)) {
-    return { available: false, reason: 'הספר לא עובד ביום זה' }
-  }
-  
-  // If no barber schedule at all, use shop settings as fallback
-  if (!barberSchedule && !barberWorkDays && shopSettings && !shopSettings.open_days.includes(dayName)) {
+  } else if (!barberWorkDays && shopSettings && !shopSettings.open_days.includes(dayName)) {
+    // If no work days data, use shop settings as fallback
     return { available: false, reason: 'הספר לא עובד ביום זה' }
   }
   
@@ -232,20 +204,18 @@ export function isDateAvailable(
 
 /**
  * Get work hours for a barber on a specific date
- * Now supports day-specific hours via barberWorkDays
+ * Uses day-specific hours via barberWorkDays
  * 
  * @param shopSettings - Barbershop settings (fallback)
- * @param barberSchedule - Legacy barber schedule (fallback)
  * @param dayName - Day of week (e.g., 'sunday', 'monday')
  * @param barberWorkDays - Day-specific work hours map
  */
 export function getWorkHours(
   shopSettings: BarbershopSettings | null,
-  barberSchedule: BarberSchedule | null,
   dayName?: string,
   barberWorkDays?: DayWorkHours
 ): { start: string; end: string } {
-  // Day-specific hours take priority (new method)
+  // Day-specific hours take priority
   if (dayName && barberWorkDays && barberWorkDays[dayName]) {
     const dayHours = barberWorkDays[dayName]
     if (dayHours.isWorking && dayHours.startTime && dayHours.endTime) {
@@ -258,14 +228,6 @@ export function getWorkHours(
         start: normalizeTime(dayHours.startTime),
         end: normalizeTime(dayHours.endTime),
       }
-    }
-  }
-  
-  // Fallback to legacy barber schedule (global hours)
-  if (barberSchedule) {
-    return {
-      start: barberSchedule.work_hours_start,
-      end: barberSchedule.work_hours_end,
     }
   }
   

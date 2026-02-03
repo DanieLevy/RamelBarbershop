@@ -1172,7 +1172,7 @@ export type User = Tables<'users'>
 export type Customer = Tables<'customers'>
 export type BarbershopSettings = Tables<'barbershop_settings'>
 export type BarbershopClosure = Tables<'barbershop_closures'>
-export type BarberSchedule = Tables<'barber_schedules'>
+// BarberSchedule removed - deprecated, use work_days table instead
 export type BarberClosure = Tables<'barber_closures'>
 export type BarberMessage = Tables<'barber_messages'>
 export type BarberGalleryImage = Tables<'barber_gallery'>
@@ -1216,7 +1216,7 @@ export interface BarberWithWorkDays extends User {
 }
 
 export interface BarberWithSchedule extends User {
-  barber_schedules?: BarberSchedule[]
+  // barber_schedules removed - use work_days instead
   barber_closures?: BarberClosure[]
   barber_messages?: BarberMessage[]
 }

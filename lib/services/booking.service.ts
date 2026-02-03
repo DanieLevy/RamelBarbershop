@@ -137,72 +137,47 @@ export async function createReservation(
   }
   
   try {
-    const supabase = createClient()
-    
-    // Call the atomic database function
-    const { data: result, error } = await supabase.rpc('create_reservation_atomic', {
-      p_barber_id: data.barberId,
-      p_service_id: data.serviceId,
-      p_customer_id: data.customerId,
-      p_customer_name: data.customerName.trim(),
-      p_customer_phone: data.customerPhone.replace(/\D/g, ''),
-      p_date_timestamp: data.dateTimestamp,
-      p_time_timestamp: data.timeTimestamp,
-      p_day_name: data.dayName,
-      p_day_num: data.dayNum,
-      p_barber_notes: data.barberNotes?.trim() || null,
+    // Call the server-side API route to create the reservation
+    // This uses the service_role key to bypass RLS
+    const response = await fetch('/api/reservations/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        barberId: data.barberId,
+        serviceId: data.serviceId,
+        customerId: data.customerId,
+        customerName: data.customerName.trim(),
+        customerPhone: data.customerPhone.replace(/\D/g, ''),
+        dateTimestamp: data.dateTimestamp,
+        timeTimestamp: data.timeTimestamp,
+        dayName: data.dayName,
+        dayNum: data.dayNum,
+        barberNotes: data.barberNotes?.trim() || null,
+      }),
     })
     
-    if (error) {
-      console.error('[BookingService] Database error:', error)
+    const result = await response.json()
+    
+    if (!response.ok || !result.success) {
+      console.error('[BookingService] API error:', result)
       
-      // Parse specific error codes from database
-      const errorCode = parseBookingError(error.message)
-      
-      if (errorCode !== 'DATABASE_ERROR') {
-        // Known business logic error
-        return {
-          success: false,
-          error: errorCode,
-          message: ERROR_MESSAGES[errorCode],
-        }
-      }
-      
-      // Handle unique constraint violation (backup for race condition)
-      if (error.code === '23505') {
-        if (error.message.includes('idx_unique_confirmed_booking')) {
-          return {
-            success: false,
-            error: 'SLOT_ALREADY_TAKEN',
-            message: ERROR_MESSAGES.SLOT_ALREADY_TAKEN,
-          }
-        }
-        if (error.message.includes('idx_customer_no_double_booking')) {
-          return {
-            success: false,
-            error: 'CUSTOMER_DOUBLE_BOOKING',
-            message: ERROR_MESSAGES.CUSTOMER_DOUBLE_BOOKING,
-          }
-        }
-      }
-      
-      await reportSupabaseError(error, 'Creating reservation via atomic function', {
-        table: 'reservations',
-        operation: 'rpc',
-      })
+      const errorCode = (result.error as BookingErrorCode) || 'DATABASE_ERROR'
+      const message = result.message || ERROR_MESSAGES[errorCode] || ERROR_MESSAGES.DATABASE_ERROR
       
       return {
         success: false,
-        error: 'DATABASE_ERROR',
-        message: ERROR_MESSAGES.DATABASE_ERROR,
+        error: errorCode,
+        message,
       }
     }
     
-    console.log('[BookingService] Reservation created successfully:', result)
+    console.log('[BookingService] Reservation created successfully:', result.reservationId)
     
     return {
       success: true,
-      reservationId: result as string,
+      reservationId: result.reservationId as string,
     }
   } catch (err) {
     console.error('[BookingService] Unexpected error:', err)
@@ -222,10 +197,11 @@ export async function createReservation(
 
 /**
  * Cancel a reservation with optimistic locking
+ * Uses server-side API route to bypass RLS restrictions
  */
 export async function cancelReservation(
   reservationId: string,
-  cancelledBy: 'customer' | 'barber',
+  cancelledBy: 'customer' | 'barber' | 'system',
   reason?: string,
   expectedVersion?: number
 ): Promise<CancelReservationResult> {
@@ -234,43 +210,32 @@ export async function cancelReservation(
   }
   
   try {
-    const supabase = createClient()
+    // Use server-side API route for cancellation (bypasses RLS)
+    const response = await fetch('/api/reservations/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reservationId,
+        cancelledBy,
+        reason,
+        expectedVersion,
+      }),
+    })
     
-    // Build update query with optimistic locking if version provided
-    let query = supabase
-      .from('reservations')
-      .update({
-        status: 'cancelled',
-        cancelled_by: cancelledBy,
-        cancellation_reason: reason || null,
-      })
-      .eq('id', reservationId)
-      .eq('status', 'confirmed') // Only cancel if still confirmed
+    const result = await response.json()
     
-    // Add version check for optimistic locking
-    if (expectedVersion !== undefined) {
-      query = query.eq('version', expectedVersion)
-    }
-    
-    const { data, error } = await query.select('id, status, version')
-    
-    if (error) {
-      console.error('[BookingService] Cancel error:', error)
-      await reportSupabaseError(error, 'Cancelling reservation', {
-        table: 'reservations',
-        operation: 'update',
-      })
-      return { success: false, error: 'שגיאה בביטול התור' }
-    }
-    
-    if (!data || data.length === 0) {
-      // No rows updated - either already cancelled or version mismatch
-      console.warn('[BookingService] Cancel failed - concurrent modification or already cancelled')
-      return {
-        success: false,
-        error: 'התור כבר בוטל או עודכן על ידי אחר',
-        concurrencyConflict: true,
+    if (!response.ok || !result.success) {
+      console.error('[BookingService] Cancel error:', result.error)
+      
+      if (response.status === 409 || result.concurrencyConflict) {
+        return {
+          success: false,
+          error: result.error || 'התור כבר בוטל או עודכן על ידי אחר',
+          concurrencyConflict: true,
+        }
       }
+      
+      return { success: false, error: result.error || 'שגיאה בביטול התור' }
     }
     
     console.log('[BookingService] Reservation cancelled:', reservationId)
@@ -506,29 +471,5 @@ function parseBookingError(errorMessage: string): BookingErrorCode {
   return 'DATABASE_ERROR'
 }
 
-/**
- * Legacy function for backward compatibility
- * Creates a reservation using the old insert method
- * @deprecated Use createReservation instead
- */
-export async function createReservationLegacy(
-  data: ReservationInsert
-): Promise<{ success: boolean; id?: string; error?: string }> {
-  try {
-    const supabase = createClient()
-    
-    const { data: result, error } = await supabase
-      .from('reservations')
-      .insert(data)
-      .select('id')
-      .single()
-    
-    if (error) {
-      return { success: false, error: error.message }
-    }
-    
-    return { success: true, id: result?.id }
-  } catch {
-    return { success: false, error: 'Unknown error' }
-  }
-}
+// Note: createReservationLegacy was removed as it used direct database inserts
+// which don't work with strict RLS policies. Use createReservation() instead.

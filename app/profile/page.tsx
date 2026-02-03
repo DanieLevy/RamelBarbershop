@@ -97,15 +97,21 @@ export default function ProfilePage() {
     setSavingName(true)
     
     try {
-      const supabase = createClient()
+      // Use API route for updating customer (bypasses RLS)
+      const response = await fetch('/api/customers/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId: customer.id,
+          fullname: newName.trim(),
+        }),
+      })
       
-      const { error } = await supabase.from('customers')
-        .update({ fullname: newName.trim() })
-        .eq('id', customer.id)
+      const result = await response.json()
       
-      if (error) {
-        console.error('Error updating name:', error)
-        await report(new Error(error.message), 'Updating customer name')
+      if (!response.ok || !result.success) {
+        console.error('Error updating name:', result.error)
+        await report(new Error(result.error || 'Update failed'), 'Updating customer name')
         toast.error('שגיאה בעדכון השם')
         return
       }

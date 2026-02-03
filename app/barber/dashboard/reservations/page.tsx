@@ -16,6 +16,7 @@ import { CancelReservationModal } from '@/components/barber/CancelReservationMod
 import { BulkCancelModal } from '@/components/barber/BulkCancelModal'
 import { AppointmentDetailModal } from '@/components/barber/AppointmentDetailModal'
 import { ManualBookingModal } from '@/components/barber/ManualBookingModal'
+import { cancelReservation } from '@/lib/services/booking.service'
 
 interface ReservationWithService extends Reservation {
   services?: Service
@@ -362,35 +363,24 @@ function ReservationsContent() {
     }
     
     try {
-      const supabase = createClient()
-      
       // Use optimistic locking with version check
       const currentVersion = (reservation as ReservationWithService & { version?: number }).version || 1
       
-      const { data, error } = await supabase.from('reservations')
-        .update({ 
-          status: 'cancelled',
-          cancelled_by: 'barber',
-          cancellation_reason: reason || null
-        })
-        .eq('id', id)
-        .eq('status', 'confirmed') // Only cancel if still confirmed
-        .eq('version', currentVersion) // Optimistic locking
-        .select('id, version')
+      // Use the centralized cancelReservation service (bypasses RLS via API)
+      const result = await cancelReservation(id, 'barber', reason || undefined, currentVersion)
       
-      if (error) {
-        console.error('Error cancelling reservation:', error)
-        await report(error instanceof Error ? error : new Error(String(error)), 'Cancelling reservation', 'high')
-        toast.error('שגיאה בביטול התור')
-        return
-      }
-      
-      if (!data || data.length === 0) {
-        // Version mismatch or status changed - concurrent modification detected
-        toast.error('התור עודכן על ידי אחר. מרענן...')
-        await fetchReservations()
-        setCancelModal({ isOpen: false, reservation: null })
-        setUpdatingId(null)
+      if (!result.success) {
+        if (result.concurrencyConflict) {
+          toast.error('התור עודכן על ידי אחר. מרענן...')
+          await fetchReservations()
+          setCancelModal({ isOpen: false, reservation: null })
+          setUpdatingId(null)
+          return
+        }
+        
+        console.error('Error cancelling reservation:', result.error)
+        await report(new Error(result.error || 'Unknown error'), 'Cancelling reservation', 'high')
+        toast.error(result.error || 'שגיאה בביטול התור')
         return
       }
       
@@ -437,16 +427,14 @@ function ReservationsContent() {
     setUpdatingId('bulk')
     
     try {
-      const supabase = createClient()
-      
       for (const res of toCancel) {
-        await supabase.from('reservations')
-          .update({ 
-            status: 'cancelled',
-            cancelled_by: 'barber',
-            cancellation_reason: reason || null
-          })
-          .eq('id', res.id)
+        // Use the centralized cancelReservation service (bypasses RLS via API)
+        const result = await cancelReservation(res.id, 'barber', reason || undefined)
+        
+        if (!result.success) {
+          console.warn('[Bulk Cancel] Failed to cancel:', res.id, result.error)
+          // Continue with other cancellations even if one fails
+        }
         
         // Send push notification to each customer (fire and forget)
         if (res.customer_id) {

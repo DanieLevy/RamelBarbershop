@@ -27,7 +27,7 @@ import {
   createTestReservationData,
 } from '../helpers/test-data'
 
-// Mock Supabase client
+// Mock Supabase client (used for other service functions like checkSlotAvailability)
 const mockRpc = vi.fn()
 const mockFrom = vi.fn()
 const mockSelect = vi.fn()
@@ -36,6 +36,9 @@ const mockGt = vi.fn()
 const mockUpdate = vi.fn()
 const mockMaybeSingle = vi.fn()
 const mockSingle = vi.fn()
+
+// Mock fetch for API route calls
+const mockFetch = vi.fn()
 
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
@@ -51,6 +54,9 @@ vi.mock('@/lib/bug-reporter/helpers', () => ({
 describe('Booking Service', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    
+    // Setup global fetch mock
+    global.fetch = mockFetch
     
     // Setup default mock chain for from queries
     mockFrom.mockReturnValue({
@@ -200,42 +206,48 @@ describe('Booking Service', () => {
   describe('createReservation - Success Cases', () => {
     it('should create reservation successfully with valid data', async () => {
       const reservationId = 'new-reservation-uuid'
-      mockRpc.mockResolvedValue({ data: reservationId, error: null })
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true, reservationId }),
+      })
       
       const data = createTestReservationData()
       const result = await createReservation(data)
       
       expect(result.success).toBe(true)
       expect(result.reservationId).toBe(reservationId)
-      expect(mockRpc).toHaveBeenCalledWith('create_reservation_atomic', expect.objectContaining({
-        p_barber_id: data.barberId,
-        p_service_id: data.serviceId,
-        p_customer_id: data.customerId,
+      expect(mockFetch).toHaveBeenCalledWith('/api/reservations/create', expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
       }))
     })
 
     it('should normalize phone number by removing non-digits', async () => {
       const reservationId = 'new-reservation-uuid'
-      mockRpc.mockResolvedValue({ data: reservationId, error: null })
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true, reservationId }),
+      })
       
       const data = createTestReservationData({ customerPhone: '050-287-9998' })
       await createReservation(data)
       
-      expect(mockRpc).toHaveBeenCalledWith('create_reservation_atomic', expect.objectContaining({
-        p_customer_phone: '0502879998',
-      }))
+      const callBody = JSON.parse(mockFetch.mock.calls[0][1].body)
+      expect(callBody.customerPhone).toBe('0502879998')
     })
 
     it('should trim customer name', async () => {
       const reservationId = 'new-reservation-uuid'
-      mockRpc.mockResolvedValue({ data: reservationId, error: null })
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true, reservationId }),
+      })
       
       const data = createTestReservationData({ customerName: '  דניאל לוי  ' })
       await createReservation(data)
       
-      expect(mockRpc).toHaveBeenCalledWith('create_reservation_atomic', expect.objectContaining({
-        p_customer_name: 'דניאל לוי',
-      }))
+      const callBody = JSON.parse(mockFetch.mock.calls[0][1].body)
+      expect(callBody.customerName).toBe('דניאל לוי')
     })
   })
 
@@ -254,9 +266,13 @@ describe('Booking Service', () => {
 
     errorCodes.forEach(({ dbError, expectedCode }) => {
       it(`should parse ${dbError} error correctly`, async () => {
-        mockRpc.mockResolvedValue({ 
-          data: null, 
-          error: { message: `Error: ${dbError}` } 
+        mockFetch.mockResolvedValue({
+          ok: false,
+          json: () => Promise.resolve({ 
+            success: false, 
+            error: expectedCode,
+            message: `Error message for ${dbError}` 
+          }),
         })
         
         const data = createTestReservationData()
@@ -269,12 +285,13 @@ describe('Booking Service', () => {
     })
 
     it('should handle unique constraint violation for slot', async () => {
-      mockRpc.mockResolvedValue({ 
-        data: null, 
-        error: { 
-          code: '23505',
-          message: 'violates unique constraint "idx_unique_confirmed_booking"' 
-        } 
+      mockFetch.mockResolvedValue({
+        ok: false,
+        json: () => Promise.resolve({ 
+          success: false, 
+          error: 'SLOT_ALREADY_TAKEN',
+          message: 'השעה כבר נתפסה' 
+        }),
       })
       
       const data = createTestReservationData()
@@ -285,12 +302,13 @@ describe('Booking Service', () => {
     })
 
     it('should handle unique constraint violation for double booking', async () => {
-      mockRpc.mockResolvedValue({ 
-        data: null, 
-        error: { 
-          code: '23505',
-          message: 'violates unique constraint "idx_customer_no_double_booking"' 
-        } 
+      mockFetch.mockResolvedValue({
+        ok: false,
+        json: () => Promise.resolve({ 
+          success: false, 
+          error: 'CUSTOMER_DOUBLE_BOOKING',
+          message: 'כבר יש לך תור' 
+        }),
       })
       
       const data = createTestReservationData()
@@ -301,9 +319,13 @@ describe('Booking Service', () => {
     })
 
     it('should return DATABASE_ERROR for unknown errors', async () => {
-      mockRpc.mockResolvedValue({ 
-        data: null, 
-        error: { message: 'Unknown database error' } 
+      mockFetch.mockResolvedValue({
+        ok: false,
+        json: () => Promise.resolve({ 
+          success: false, 
+          error: 'DATABASE_ERROR',
+          message: 'שגיאה ביצירת התור' 
+        }),
       })
       
       const data = createTestReservationData()
@@ -314,7 +336,7 @@ describe('Booking Service', () => {
     })
 
     it('should return UNKNOWN_ERROR for exceptions', async () => {
-      mockRpc.mockRejectedValue(new Error('Network error'))
+      mockFetch.mockRejectedValue(new Error('Network error'))
       
       const data = createTestReservationData()
       const result = await createReservation(data)
@@ -479,6 +501,16 @@ describe('Booking Service', () => {
       { code: 'DATABASE_ERROR', expectedHebrew: 'שגיאה ביצירת' },
     ]
 
+    // Map of error codes to their expected Hebrew messages from the API
+    const hebrewMessages: Record<string, string> = {
+      SLOT_ALREADY_TAKEN: 'השעה כבר נתפסה. אנא בחר שעה אחרת.',
+      CUSTOMER_BLOCKED: 'לא ניתן לקבוע תור. אנא פנה לצוות המספרה.',
+      CUSTOMER_DOUBLE_BOOKING: 'כבר יש לך תור בשעה זו.',
+      MAX_BOOKINGS_REACHED: 'הגעת למקסימום התורים המותרים.',
+      DATE_OUT_OF_RANGE: 'התאריך שנבחר חורג מטווח ההזמנות המותר.',
+      DATABASE_ERROR: 'שגיאה ביצירת התור. נסה שוב.',
+    }
+    
     errorMessages.forEach(({ code, expectedHebrew }) => {
       it(`should return Hebrew message for ${code}`, async () => {
         if (code === 'VALIDATION_ERROR') {
@@ -486,9 +518,13 @@ describe('Booking Service', () => {
           const result = await createReservation(data)
           expect(result.message).toContain(expectedHebrew)
         } else {
-          mockRpc.mockResolvedValue({ 
-            data: null, 
-            error: { message: code === 'DATABASE_ERROR' ? 'unknown' : code } 
+          mockFetch.mockResolvedValue({
+            ok: false,
+            json: () => Promise.resolve({ 
+              success: false, 
+              error: code,
+              message: hebrewMessages[code] || 'שגיאה' 
+            }),
           })
           
           const data = createTestReservationData()

@@ -11,6 +11,7 @@
 
 import { NextResponse } from 'next/server'
 import { pushService } from '@/lib/push/push-service'
+import { reportServerError } from '@/lib/bug-reporter/helpers'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -65,6 +66,12 @@ export async function GET(request: Request) {
     return NextResponse.json(response)
   } catch (error) {
     console.error('[Cron Cleanup] Error:', error)
+    
+    // Report the error
+    await reportServerError(error, 'GET /api/cron/cleanup-push', {
+      route: '/api/cron/cleanup-push',
+      severity: 'high'
+    })
     
     return NextResponse.json({
       success: false,

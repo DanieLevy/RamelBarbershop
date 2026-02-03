@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { pushService } from '@/lib/push/push-service'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { reportServerError } from '@/lib/bug-reporter/helpers'
 
 export async function POST(request: NextRequest) {
@@ -32,7 +32,8 @@ export async function POST(request: NextRequest) {
 
     // Mark single notification as read
     if (notificationId && !markAll) {
-      const supabase = await createClient()
+      // Use admin client for write operations (bypasses RLS)
+      const supabase = createAdminClient()
       
       // Verify the notification belongs to this user
       const { data: notification, error: fetchError } = await supabase

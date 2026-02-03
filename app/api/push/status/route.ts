@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pushService } from '@/lib/push/push-service'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { reportServerError } from '@/lib/bug-reporter/helpers'
 import type { DeviceInfo, CustomerNotificationSettings } from '@/lib/push/types'
 
@@ -92,7 +93,8 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    const supabase = await createClient()
+    // Use admin client for write operations (bypasses RLS)
+    const supabase = createAdminClient()
     
     // Check if settings exist
     const { data: existing } = await supabase
@@ -113,9 +115,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (existing) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any
-      const { error } = await db
+      const { error } = await supabase
         .from('customer_notification_settings')
         .update(updateData)
         .eq('customer_id', customerId)
@@ -127,9 +127,7 @@ export async function PATCH(request: NextRequest) {
         )
       }
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any
-      const { error } = await db
+      const { error } = await supabase
         .from('customer_notification_settings')
         .insert({
           customer_id: customerId,

@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { usePushNotifications, getDeviceIcon } from '@/hooks/usePushNotifications'
 import { usePWA } from '@/hooks/usePWA'
 import { useAuthStore } from '@/store/useAuthStore'
-import { createClient } from '@/lib/supabase/client'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -68,18 +67,15 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
     
     setLoadingSettings(true)
     try {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('customer_notification_settings')
-        .select('sms_reminder_enabled, push_reminder_enabled, reminder_method')
-        .eq('customer_id', customer.id)
-        .single()
+      // Use API route to fetch settings (bypasses RLS)
+      const response = await fetch(`/api/customers/notification-settings?customerId=${customer.id}`)
+      const result = await response.json()
 
-      if (data) {
+      if (result.success && result.settings) {
         setReminderSettings({
-          sms_reminder_enabled: data.sms_reminder_enabled ?? true,
-          push_reminder_enabled: data.push_reminder_enabled ?? true,
-          reminder_method: data.reminder_method ?? 'both'
+          sms_reminder_enabled: result.settings.sms_reminder_enabled ?? true,
+          push_reminder_enabled: result.settings.push_reminder_enabled ?? true,
+          reminder_method: result.settings.reminder_method ?? 'both'
         })
       }
     } catch (err) {
@@ -94,21 +90,25 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
     
     setSavingSettings(true)
     try {
-      const supabase = createClient()
       const newSettings = { ...reminderSettings, ...updates }
       
-      // Upsert the settings
-      const { error } = await supabase
-        .from('customer_notification_settings')
-        .upsert({
-          customer_id: customer.id,
-          sms_reminder_enabled: newSettings.sms_reminder_enabled,
-          push_reminder_enabled: newSettings.push_reminder_enabled,
-          reminder_method: newSettings.reminder_method,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'customer_id' })
+      // Use API route to update settings (bypasses RLS)
+      const response = await fetch('/api/customers/notification-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId: customer.id,
+          smsReminderEnabled: newSettings.sms_reminder_enabled,
+          pushReminderEnabled: newSettings.push_reminder_enabled,
+          reminderMethod: newSettings.reminder_method,
+        }),
+      })
+      
+      const result = await response.json()
 
-      if (error) throw error
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to update settings')
+      }
 
       setReminderSettings(newSettings)
       toast.success('ההגדרות נשמרו')

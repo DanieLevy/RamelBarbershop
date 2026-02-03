@@ -1,6 +1,14 @@
-import { createClient } from '@/lib/supabase/client'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { TrustedDevice, Customer } from '@/types/database'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
+
+/**
+ * Get Supabase admin client for trusted device operations
+ * Uses service_role to bypass RLS - this service is only called from server-side
+ */
+function getSupabase() {
+  return createAdminClient()
+}
 
 // Device token expiration in days
 const DEVICE_EXPIRATION_DAYS = 30
@@ -78,7 +86,7 @@ export async function createTrustedDevice(
   phone: string,
   userAgent?: string
 ): Promise<string | null> {
-  const supabase = createClient()
+  const supabase = getSupabase()
   
   const deviceToken = generateDeviceToken()
   const expiresAt = getExpirationDate()
@@ -122,7 +130,7 @@ export async function validateTrustedDevice(
   phone: string,
   token: string
 ): Promise<TrustedDeviceResult> {
-  const supabase = createClient()
+  const supabase = getSupabase()
   const normalizedPhone = phone.replace(/\D/g, '')
   
   // Find the device by token
@@ -192,7 +200,7 @@ export async function validateTrustedDevice(
  * Called after successful use of the device
  */
 export async function extendDeviceExpiration(token: string): Promise<void> {
-  const supabase = createClient()
+  const supabase = getSupabase()
   const newExpiresAt = getExpirationDate()
   
   const { error } = await supabase
@@ -215,7 +223,7 @@ export async function extendDeviceExpiration(token: string): Promise<void> {
  * Does not delete the record for audit purposes
  */
 export async function deactivateDevice(token: string): Promise<void> {
-  const supabase = createClient()
+  const supabase = getSupabase()
   
   const { error } = await supabase
     .from('trusted_devices')
@@ -234,7 +242,7 @@ export async function deactivateDevice(token: string): Promise<void> {
  * Used when customer wants to log out from all devices
  */
 export async function deactivateAllCustomerDevices(customerId: string): Promise<void> {
-  const supabase = createClient()
+  const supabase = getSupabase()
   
   const { error } = await supabase
     .from('trusted_devices')
@@ -253,7 +261,7 @@ export async function deactivateAllCustomerDevices(customerId: string): Promise<
  * Useful for future device limit feature
  */
 export async function getActiveDeviceCount(customerId: string): Promise<number> {
-  const supabase = createClient()
+  const supabase = getSupabase()
   
   const { count, error } = await supabase
     .from('trusted_devices')
@@ -277,7 +285,7 @@ export async function getActiveDeviceCount(customerId: string): Promise<number> 
  * @returns Number of devices cleaned up
  */
 export async function cleanupExpiredDevices(): Promise<number> {
-  const supabase = createClient()
+  const supabase = getSupabase()
   
   // Deactivate expired devices (don't delete for audit trail)
   const { data, error } = await supabase

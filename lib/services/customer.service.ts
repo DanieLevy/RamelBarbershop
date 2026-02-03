@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 import type { Customer } from '@/types/database'
+import { reportBug } from '@/lib/bug-reporter'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
 import { withSupabaseRetry, isRetryableError } from '@/lib/utils/retry'
 
@@ -43,6 +44,7 @@ export async function findCustomerByPhone(phone: string): Promise<Customer | nul
 
 /**
  * Create a new customer
+ * Uses getOrCreateCustomer API route for secure server-side operation.
  * 
  * @param phone - Customer phone number
  * @param fullname - Customer full name
@@ -53,26 +55,8 @@ export async function createCustomer(
   fullname: string,
   providerUid?: string
 ): Promise<Customer | null> {
-  const supabase = createClient()
-  
-  const normalizedPhone = phone.replace(/\D/g, '')
-  
-  const { data, error } = await supabase.from('customers')
-    .insert({
-      phone: normalizedPhone,
-      fullname,
-      provider_uid: providerUid || null,
-    })
-    .select()
-    .single()
-  
-  if (error) {
-    console.error('Error creating customer:', error)
-    await reportSupabaseError(error, 'Creating new customer', { table: 'customers', operation: 'insert' })
-    return null
-  }
-  
-  return data as Customer
+  // Delegate to getOrCreateCustomer which uses the API route
+  return getOrCreateCustomer(phone, fullname, providerUid)
 }
 
 /**
@@ -83,6 +67,8 @@ export async function createCustomer(
  * - Existing user with email (supabase_uid): set to 'both' 
  * - Existing user without email: keep as 'phone'
  * 
+ * Uses API route for secure server-side operation (bypasses RLS).
+ * 
  * @param phone - Customer phone number
  * @param fullname - Customer full name
  * @param providerUid - SMS provider user ID (e.g., "o19-0501234567")
@@ -92,81 +78,30 @@ export async function getOrCreateCustomer(
   fullname: string,
   providerUid?: string
 ): Promise<Customer | null> {
-  const supabase = createClient()
-  const normalizedPhone = phone.replace(/\D/g, '')
-  
-  // First check if customer exists
-  const existing = await findCustomerByPhone(normalizedPhone)
-  
-  if (existing) {
-    // Customer exists - update their record
-    // Determine auth_method: if they have supabase_uid (email), set to 'both', otherwise 'phone'
-    const hasEmail = existing.supabase_uid !== null && existing.supabase_uid !== undefined
-    const newAuthMethod: AuthMethod = hasEmail ? 'both' : 'phone'
-    
-    const updateData: Record<string, unknown> = {
-      last_login_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-    
-    // Handle SMS provider UID
-    // Update provider_uid in these cases:
-    // 1. No existing UID (first SMS login)
-    // 2. Migrating from old format to new (existing UID doesn't start with current provider prefix)
-    // 3. UID matches current provider (deterministic - should be same value)
-    if (providerUid) {
-      const existingUid = existing.provider_uid
-      const shouldUpdateUid = 
-        !existingUid || // No existing UID
-        (providerUid.startsWith('o19-') && !existingUid.startsWith('o19-')) || // Migrating to 019
-        existingUid === providerUid // Same deterministic UID (no-op but safe)
-      
-      if (shouldUpdateUid) {
-        updateData.provider_uid = providerUid
-        console.log(`[CustomerService] Updating provider_uid from '${existingUid}' to '${providerUid}'`)
-      }
-    }
-    
-    // Only update auth_method if it needs to change to 'both' or if it wasn't set
-    if (newAuthMethod === 'both' || !existing.auth_method || existing.auth_method === 'email') {
-      updateData.auth_method = newAuthMethod
-    }
-    
-    const { data, error } = await supabase.from('customers')
-      .update(updateData)
-      .eq('id', existing.id)
-      .select()
-      .single()
-    
-    if (error) {
-      console.error('Error updating customer:', error)
-      return existing // Return existing on update failure
-    }
-    
-    console.log(`[CustomerService] Updated customer ${existing.id}, auth_method: '${newAuthMethod}'`)
-    return data as Customer
-  }
-  
-  // Create new customer with phone auth
-  const { data, error } = await supabase.from('customers')
-    .insert({
-      phone: normalizedPhone,
-      fullname,
-      provider_uid: providerUid || null,
-      auth_method: 'phone',
-      last_login_at: new Date().toISOString(),
+  try {
+    const response = await fetch('/api/customers/get-or-create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, fullname, providerUid }),
     })
-    .select()
-    .single()
-  
-  if (error) {
-    console.error('Error creating customer:', error)
-    await reportSupabaseError(error, 'Creating customer with phone', { table: 'customers', operation: 'insert' })
+    
+    const result = await response.json()
+    
+    if (!response.ok || !result.success) {
+      console.error('[CustomerService] getOrCreateCustomer API error:', result.error)
+      return null
+    }
+    
+    return result.customer as Customer
+  } catch (error) {
+    console.error('[CustomerService] getOrCreateCustomer error:', error)
+    await reportSupabaseError(
+      { message: error instanceof Error ? error.message : String(error), code: 'API_ERROR' },
+      'Get or create customer via API',
+      { table: 'customers', operation: 'rpc' }
+    )
     return null
   }
-  
-  console.log(`[CustomerService] Created new customer with phone, auth_method: 'phone'`)
-  return data as Customer
 }
 
 /**
@@ -265,51 +200,48 @@ export async function getCustomerById(customerId: string): Promise<Customer | nu
 
 /**
  * Update customer details
+ * Uses API route for secure server-side operation.
  */
 export async function updateCustomer(
   customerId: string,
-  updates: { fullname?: string }
+  updates: { fullname?: string; email?: string }
 ): Promise<Customer | null> {
-  const supabase = createClient()
-  
-  const { data, error } = await supabase.from('customers')
-    .update({
-      ...updates,
-      updated_at: new Date().toISOString(),
+  try {
+    const response = await fetch('/api/customers/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customerId, ...updates }),
     })
-    .eq('id', customerId)
-    .select()
-    .single()
-  
-  if (error) {
-    console.error('Error updating customer:', error)
-    await reportSupabaseError(error, 'Updating customer profile', { table: 'customers', operation: 'update' })
+    
+    const result = await response.json()
+    
+    if (!response.ok || !result.success) {
+      console.error('[CustomerService] updateCustomer API error:', result.error)
+      return null
+    }
+    
+    return result.customer as Customer
+  } catch (error) {
+    console.error('[CustomerService] updateCustomer error:', error)
+    await reportSupabaseError(
+      { message: error instanceof Error ? error.message : String(error), code: 'API_ERROR' },
+      'Update customer via API',
+      { table: 'customers', operation: 'rpc' }
+    )
     return null
   }
-  
-  return data as Customer
 }
 
 /**
  * Update customer name only
+ * Delegates to updateCustomer API route.
  */
 export async function updateCustomerName(
   customerId: string,
   fullname: string
 ): Promise<boolean> {
-  const supabase = createClient()
-  
-  const { error } = await supabase.from('customers')
-    .update({ fullname: fullname.trim() })
-    .eq('id', customerId)
-  
-  if (error) {
-    console.error('Error updating customer name:', error)
-    await reportSupabaseError(error, 'Updating customer name', { table: 'customers', operation: 'update' })
-    return false
-  }
-  
-  return true
+  const result = await updateCustomer(customerId, { fullname: fullname.trim() })
+  return result !== null
 }
 
 /**
@@ -441,6 +373,7 @@ export async function findCustomerByEmail(email: string): Promise<Customer | nul
 /**
  * Get or create a customer using email authentication
  * This is used when a user signs up via email fallback
+ * Uses API route to bypass RLS restrictions
  */
 export async function getOrCreateCustomerWithEmail(
   phone: string,
@@ -448,52 +381,45 @@ export async function getOrCreateCustomerWithEmail(
   email: string,
   supabaseUid?: string
 ): Promise<Customer | null> {
-  const supabase = createClient()
-  const normalizedPhone = phone.replace(/\D/g, '')
-  const normalizedEmail = email.trim().toLowerCase()
-  
-  // First check if customer exists with this phone
-  const existingByPhone = await findCustomerByPhone(normalizedPhone)
-  
-  if (existingByPhone) {
-    // Customer exists - link email to their account
-    const updated = await linkEmailToCustomer(existingByPhone.id, normalizedEmail, supabaseUid)
-    return updated || existingByPhone
-  }
-  
-  // Check if email is already used by another customer
-  const existingByEmail = await findCustomerByEmail(normalizedEmail)
-  if (existingByEmail) {
-    // Email already in use - update last login and return
-    await updateLastLogin(existingByEmail.id, undefined, supabaseUid)
-    return existingByEmail
-  }
-  
-  // Create new customer with email auth
-  const { data, error } = await supabase.from('customers')
-    .insert({
-      phone: normalizedPhone,
-      fullname,
-      email: normalizedEmail,
-      auth_method: 'email',
-      supabase_uid: supabaseUid || null,
-      last_login_at: new Date().toISOString(),
+  try {
+    const response = await fetch('/api/customers/get-or-create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone,
+        fullname,
+        email,
+        supabaseUid,
+      }),
     })
-    .select()
-    .single()
-  
-  if (error) {
-    console.error('Error creating customer with email:', error)
-    await reportSupabaseError(error, 'Creating customer with email', { table: 'customers', operation: 'insert' })
+    
+    const result = await response.json()
+    
+    if (!response.ok || !result.success) {
+      console.error('Error creating customer with email:', result.error)
+      await reportBug(
+        new Error(result.error || 'Failed to create customer with email'),
+        'Creating customer with email via API',
+        { additionalData: { phone: phone.slice(0, 3) + '****', email: email.split('@')[0] + '@***' } }
+      )
+      return null
+    }
+    
+    return result.customer as Customer
+  } catch (error) {
+    console.error('Error in getOrCreateCustomerWithEmail:', error)
+    await reportBug(
+      error instanceof Error ? error : new Error(String(error)),
+      'Creating customer with email via API'
+    )
     return null
   }
-  
-  return data as Customer
 }
 
 /**
  * Link email to an existing customer account
  * Used when a phone-registered user adds email as fallback
+ * Uses API route to bypass RLS restrictions
  * 
  * Auth method logic:
  * - If user has provider_uid (previously used SMS) → set to 'both'
@@ -507,14 +433,14 @@ export async function linkEmailToCustomer(
   const supabase = createClient()
   const normalizedEmail = email.trim().toLowerCase()
   
-  // Check if email is already used by another customer
+  // Check if email is already used by another customer (read-only operation)
   const existingWithEmail = await findCustomerByEmail(normalizedEmail)
   if (existingWithEmail && existingWithEmail.id !== customerId) {
     console.error('Email already linked to another customer')
     return null
   }
   
-  // First, fetch the current customer to check their provider_uid
+  // First, fetch the current customer to check their provider_uid (read-only)
   const { data: currentCustomer } = await supabase
     .from('customers')
     .select('provider_uid, auth_method')
@@ -527,31 +453,42 @@ export async function linkEmailToCustomer(
   const hasUsedSms = currentCustomer?.provider_uid !== null && currentCustomer?.provider_uid !== undefined
   const newAuthMethod: AuthMethod = hasUsedSms ? 'both' : 'email'
   
-  const updateData: Record<string, unknown> = {
-    email: normalizedEmail,
-    auth_method: newAuthMethod,
-    updated_at: new Date().toISOString(),
-    last_login_at: new Date().toISOString(),
-  }
-  
-  if (supabaseUid) {
-    updateData.supabase_uid = supabaseUid
-  }
-  
-  const { data, error } = await supabase.from('customers')
-    .update(updateData)
-    .eq('id', customerId)
-    .select()
-    .single()
-  
-  if (error) {
-    console.error('Error linking email to customer:', error)
-    await reportSupabaseError(error, 'Linking email to customer', { table: 'customers', operation: 'update' })
+  try {
+    // Use API route for UPDATE operation (bypasses RLS)
+    const response = await fetch('/api/customers/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customerId,
+        email: normalizedEmail,
+        authMethod: newAuthMethod,
+        supabaseUid,
+        lastLoginAt: true,
+      }),
+    })
+    
+    const result = await response.json()
+    
+    if (!response.ok || !result.success) {
+      console.error('Error linking email to customer:', result.error)
+      await reportBug(
+        new Error(result.error || 'Failed to link email'),
+        'Linking email to customer via API',
+        { additionalData: { customerId, email: normalizedEmail.split('@')[0] + '@***' } }
+      )
+      return null
+    }
+    
+    console.log(`[CustomerService] Linked email to customer ${customerId}, auth_method set to '${newAuthMethod}'`)
+    return result.customer as Customer
+  } catch (error) {
+    console.error('Error in linkEmailToCustomer:', error)
+    await reportBug(
+      error instanceof Error ? error : new Error(String(error)),
+      'Linking email to customer via API'
+    )
     return null
   }
-  
-  console.log(`[CustomerService] Linked email to customer ${customerId}, auth_method set to '${newAuthMethod}'`)
-  return data as Customer
 }
 
 /**

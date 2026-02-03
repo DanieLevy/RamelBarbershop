@@ -5,6 +5,7 @@ import { X, Loader2, Search, User, Calendar, Clock, UserPlus, Scissors, AlertTri
 import { cn, generateTimeSlots, parseTimeString, nowInIsrael, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { createReservation } from '@/lib/services/booking.service'
+import { getOrCreateCustomer } from '@/lib/services/customer.service'
 import { format, addDays, isSameDay } from 'date-fns'
 import { toast } from 'sonner'
 import type { Customer, BarbershopSettings, Service, WorkDay } from '@/types/database'
@@ -364,21 +365,17 @@ export function ManualBookingModal({
         customerName = selectedCustomer!.fullname
         customerPhone = selectedCustomer!.phone
       } else {
-        // Create a walkin customer record
+        // Create a walkin customer record via API route (bypasses RLS)
         // Use provided phone if available, otherwise generate a placeholder
         const phoneToUse = walkinPhone.trim() || 'walkin-' + Date.now()
         
-        const { data: newCustomer, error: customerError } = await supabase
-          .from('customers')
-          .insert({
-            fullname: walkinName.trim(),
-            phone: phoneToUse,
-          })
-          .select()
-          .single()
+        const newCustomer = await getOrCreateCustomer(
+          phoneToUse,
+          walkinName.trim()
+        )
         
-        if (customerError || !newCustomer) {
-          console.error('Error creating walkin customer:', customerError)
+        if (!newCustomer) {
+          console.error('Error creating walkin customer')
           toast.error('שגיאה ביצירת לקוח')
           setSaving(false)
           return

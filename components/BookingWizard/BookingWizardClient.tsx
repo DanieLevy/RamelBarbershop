@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { useAuthStore } from '@/store/useAuthStore'
-import type { BarberWithWorkDays, Service, BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure, BarberMessage } from '@/types/database'
+import type { BarberWithWorkDays, Service, BarbershopSettings, BarbershopClosure, BarberClosure, BarberMessage } from '@/types/database'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { StepIndicator } from './StepIndicator'
 import { ServiceSelection } from './ServiceSelection'
@@ -22,7 +22,6 @@ interface BookingWizardClientProps {
   services: Service[]
   shopSettings?: BarbershopSettings | null
   shopClosures?: BarbershopClosure[]
-  barberSchedule?: BarberSchedule | null
   barberClosures?: BarberClosure[]
   barberMessages?: BarberMessage[]
   preSelectedServiceId?: string
@@ -34,7 +33,6 @@ export function BookingWizardClient({
   services,
   shopSettings,
   shopClosures = [],
-  barberSchedule,
   barberClosures = [],
   barberMessages = [],
   preSelectedServiceId,
@@ -107,7 +105,6 @@ export function BookingWizardClient({
             workDays={barber.work_days}
             shopSettings={shopSettings}
             shopClosures={shopClosures}
-            barberSchedule={barberSchedule}
             barberClosures={barberClosures}
           />
         )
@@ -116,7 +113,6 @@ export function BookingWizardClient({
           <TimeSelection 
             barberId={barberId}
             shopSettings={shopSettings}
-            barberSchedule={barberSchedule}
           />
         )
       case 'details':

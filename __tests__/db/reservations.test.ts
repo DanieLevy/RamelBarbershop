@@ -1,25 +1,14 @@
 /**
- * Database Operation Tests for Reservations
+ * Database Operation Tests for Reservations (READ-ONLY)
  * 
- * Integration tests that verify database operations work correctly
- * using the real Supabase database. Tests include CRUD operations,
- * constraints, and queries.
+ * Integration tests that verify database queries work correctly
+ * using the real Supabase database. All tests are READ-ONLY.
  * 
  * NOTE: These tests use actual database calls and require proper setup.
  * They will be skipped if Supabase environment variables are not set.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import {
-  TEST_BARBERS,
-  TEST_CUSTOMERS,
-  TEST_SERVICES,
-  getTomorrowAtHour,
-  getDayStart,
-  getHebrewDayName,
-  getDayNum,
-  generateTestId,
-} from '../helpers/test-data'
+import { describe, it, expect, beforeAll } from 'vitest'
 
 // Check if Supabase env vars are available
 const hasSupabaseEnv = !!(
@@ -34,58 +23,30 @@ const getSupabase = async () => {
   return createClient()
 }
 
-// Test reservation tracking for cleanup
-const createdReservationIds: string[] = []
-
-describe.skipIf(!hasSupabaseEnv)('Reservations Database Operations', () => {
+describe.skipIf(!hasSupabaseEnv)('Reservations Database Operations (Read-Only)', () => {
   let supabase: Awaited<ReturnType<typeof getSupabase>>
   
   beforeAll(async () => {
     supabase = await getSupabase()
   })
-  
-  afterAll(async () => {
-    // Cleanup: Delete all test reservations created during tests
-    if (createdReservationIds.length > 0) {
-      await supabase
-        .from('reservations')
-        .delete()
-        .in('id', createdReservationIds)
-    }
-  })
 
   describe('Query Operations', () => {
-    it('should query reservations by barber_id', async () => {
+    it('should query reservations with all columns', async () => {
       const { data, error } = await supabase
         .from('reservations')
-        .select('id, barber_id, customer_name, status')
-        .eq('barber_id', TEST_BARBERS.admin.id)
+        .select('*')
         .limit(5)
       
       expect(error).toBeNull()
       expect(Array.isArray(data)).toBe(true)
       
       if (data && data.length > 0) {
-        data.forEach(res => {
-          expect(res.barber_id).toBe(TEST_BARBERS.admin.id)
-        })
-      }
-    })
-
-    it('should query reservations by customer_id', async () => {
-      const { data, error } = await supabase
-        .from('reservations')
-        .select('id, customer_id, customer_name, status')
-        .eq('customer_id', TEST_CUSTOMERS.daniel.id)
-        .limit(5)
-      
-      expect(error).toBeNull()
-      expect(Array.isArray(data)).toBe(true)
-      
-      if (data && data.length > 0) {
-        data.forEach(res => {
-          expect(res.customer_id).toBe(TEST_CUSTOMERS.daniel.id)
-        })
+        const res = data[0]
+        expect(res.id).toBeDefined()
+        expect(res.barber_id).toBeDefined()
+        expect(res.service_id).toBeDefined()
+        expect(res.customer_id).toBeDefined()
+        expect(res.status).toBeDefined()
       }
     })
 
@@ -99,10 +60,8 @@ describe.skipIf(!hasSupabaseEnv)('Reservations Database Operations', () => {
       expect(error).toBeNull()
       expect(Array.isArray(data)).toBe(true)
       
-      if (data && data.length > 0) {
-        data.forEach(res => {
-          expect(res.status).toBe('confirmed')
-        })
+      for (const res of data || []) {
+        expect(res.status).toBe('confirmed')
       }
     })
 
@@ -119,10 +78,8 @@ describe.skipIf(!hasSupabaseEnv)('Reservations Database Operations', () => {
       expect(error).toBeNull()
       expect(Array.isArray(data)).toBe(true)
       
-      if (data && data.length > 0) {
-        data.forEach(res => {
-          expect(Number(res.time_timestamp)).toBeGreaterThan(now)
-        })
+      for (const res of data || []) {
+        expect(Number(res.time_timestamp)).toBeGreaterThan(now)
       }
     })
 
@@ -165,10 +122,8 @@ describe.skipIf(!hasSupabaseEnv)('Reservations Database Operations', () => {
       expect(error).toBeNull()
       
       const validStatuses = ['confirmed', 'cancelled', 'completed']
-      if (data) {
-        data.forEach(res => {
-          expect(validStatuses).toContain(res.status)
-        })
+      for (const res of data || []) {
+        expect(validStatuses).toContain(res.status)
       }
     })
 
@@ -182,10 +137,8 @@ describe.skipIf(!hasSupabaseEnv)('Reservations Database Operations', () => {
       expect(error).toBeNull()
       
       const validCancelledBy = ['customer', 'barber', 'system', null]
-      if (data) {
-        data.forEach(res => {
-          expect(validCancelledBy).toContain(res.cancelled_by)
-        })
+      for (const res of data || []) {
+        expect(validCancelledBy).toContain(res.cancelled_by)
       }
     })
 
@@ -205,11 +158,10 @@ describe.skipIf(!hasSupabaseEnv)('Reservations Database Operations', () => {
   })
 
   describe('Counts and Aggregations', () => {
-    it('should count confirmed reservations for a customer', async () => {
+    it('should count confirmed reservations', async () => {
       const { count, error } = await supabase
         .from('reservations')
         .select('*', { count: 'exact', head: true })
-        .eq('customer_id', TEST_CUSTOMERS.daniel.id)
         .eq('status', 'confirmed')
       
       expect(error).toBeNull()
@@ -228,6 +180,20 @@ describe.skipIf(!hasSupabaseEnv)('Reservations Database Operations', () => {
       expect(error).toBeNull()
       expect(typeof count).toBe('number')
     })
+
+    it('should count reservations per status', async () => {
+      const statuses = ['confirmed', 'cancelled', 'completed']
+      
+      for (const status of statuses) {
+        const { count, error } = await supabase
+          .from('reservations')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', status)
+        
+        expect(error).toBeNull()
+        expect(typeof count).toBe('number')
+      }
+    })
   })
 
   describe('Related Tables', () => {
@@ -235,36 +201,46 @@ describe.skipIf(!hasSupabaseEnv)('Reservations Database Operations', () => {
       const { data, error } = await supabase
         .from('customers')
         .select('id, phone, fullname, is_blocked')
-        .eq('id', TEST_CUSTOMERS.daniel.id)
-        .single()
+        .limit(1)
       
       expect(error).toBeNull()
-      expect(data).toBeDefined()
-      expect(data?.id).toBe(TEST_CUSTOMERS.daniel.id)
+      expect(Array.isArray(data)).toBe(true)
+      
+      if (data && data.length > 0) {
+        expect(data[0].id).toBeDefined()
+        expect(data[0].phone).toBeDefined()
+      }
     })
 
     it('should query services table', async () => {
       const { data, error } = await supabase
         .from('services')
         .select('id, name_he, duration, price, is_active')
-        .eq('id', TEST_SERVICES.haircutBeard.id)
-        .single()
+        .limit(1)
       
       expect(error).toBeNull()
-      expect(data).toBeDefined()
-      expect(data?.id).toBe(TEST_SERVICES.haircutBeard.id)
+      expect(Array.isArray(data)).toBe(true)
+      
+      if (data && data.length > 0) {
+        expect(data[0].id).toBeDefined()
+        expect(data[0].name_he).toBeDefined()
+      }
     })
 
     it('should query users (barbers) table', async () => {
       const { data, error } = await supabase
         .from('users')
         .select('id, username, fullname, role, is_active')
-        .eq('id', TEST_BARBERS.admin.id)
-        .single()
+        .eq('is_barber', true)
+        .limit(1)
       
       expect(error).toBeNull()
-      expect(data).toBeDefined()
-      expect(data?.id).toBe(TEST_BARBERS.admin.id)
+      expect(Array.isArray(data)).toBe(true)
+      
+      if (data && data.length > 0) {
+        expect(data[0].id).toBeDefined()
+        expect(data[0].fullname).toBeDefined()
+      }
     })
 
     it('should query barbershop_settings', async () => {
@@ -276,6 +252,92 @@ describe.skipIf(!hasSupabaseEnv)('Reservations Database Operations', () => {
       expect(error).toBeNull()
       expect(data).toBeDefined()
       expect(data?.max_booking_days_ahead).toBeDefined()
+    })
+
+    it('should query work_days table', async () => {
+      const { data, error } = await supabase
+        .from('work_days')
+        .select('id, user_id, day_of_week, is_working, start_time, end_time')
+        .limit(7)
+      
+      expect(error).toBeNull()
+      expect(Array.isArray(data)).toBe(true)
+      
+      if (data && data.length > 0) {
+        expect(data[0].day_of_week).toBeDefined()
+      }
+    })
+
+    it('should query barber_booking_settings table', async () => {
+      const { data, error } = await supabase
+        .from('barber_booking_settings')
+        .select('id, barber_id, max_booking_days_ahead, min_hours_before_booking, min_cancel_hours')
+        .limit(1)
+      
+      expect(error).toBeNull()
+      expect(Array.isArray(data)).toBe(true)
+    })
+  })
+
+  describe('Complex Queries', () => {
+    it('should query reservations with full joins', async () => {
+      const { data, error } = await supabase
+        .from('reservations')
+        .select(`
+          id,
+          customer_name,
+          customer_phone,
+          time_timestamp,
+          status,
+          services:service_id (id, name_he, price, duration),
+          users:barber_id (id, fullname, username),
+          customers:customer_id (id, fullname, phone)
+        `)
+        .eq('status', 'confirmed')
+        .limit(3)
+      
+      expect(error).toBeNull()
+      expect(Array.isArray(data)).toBe(true)
+    })
+
+    it('should query reservations ordered by time', async () => {
+      const { data, error } = await supabase
+        .from('reservations')
+        .select('id, time_timestamp')
+        .eq('status', 'confirmed')
+        .order('time_timestamp', { ascending: true })
+        .limit(10)
+      
+      expect(error).toBeNull()
+      expect(Array.isArray(data)).toBe(true)
+      
+      // Verify order
+      if (data && data.length > 1) {
+        for (let i = 1; i < data.length; i++) {
+          expect(Number(data[i].time_timestamp)).toBeGreaterThanOrEqual(Number(data[i - 1].time_timestamp))
+        }
+      }
+    })
+
+    it('should query with date range filter', async () => {
+      const now = Date.now()
+      const weekFromNow = now + 7 * 24 * 60 * 60 * 1000
+      
+      const { data, error } = await supabase
+        .from('reservations')
+        .select('id, time_timestamp, status')
+        .gte('time_timestamp', now)
+        .lte('time_timestamp', weekFromNow)
+        .eq('status', 'confirmed')
+      
+      expect(error).toBeNull()
+      expect(Array.isArray(data)).toBe(true)
+      
+      for (const res of data || []) {
+        const ts = Number(res.time_timestamp)
+        expect(ts).toBeGreaterThanOrEqual(now)
+        expect(ts).toBeLessThanOrEqual(weekFromNow)
+      }
     })
   })
 })

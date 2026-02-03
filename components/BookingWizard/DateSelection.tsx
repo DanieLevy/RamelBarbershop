@@ -4,9 +4,10 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBookingStore } from '@/store/useBookingStore'
 import { createClient } from '@/lib/supabase/client'
-import type { WorkDay, BarbershopSettings, BarbershopClosure, BarberSchedule, BarberClosure, BarberBookingSettings } from '@/types/database'
+import type { WorkDay, BarbershopSettings, BarbershopClosure, BarberClosure, BarberBookingSettings } from '@/types/database'
 import { cn, nowInIsrael, getIsraelDayStart, getDayIndexInIsrael } from '@/lib/utils'
 import { ChevronRight, ChevronLeft, X } from 'lucide-react'
+import { withSupabaseRetry } from '@/lib/utils/retry'
 
 /**
  * Monthly Calendar Picker Component
@@ -26,7 +27,6 @@ interface DateSelectionProps {
   workDays: WorkDay[]
   shopSettings?: BarbershopSettings | null
   shopClosures?: BarbershopClosure[]
-  barberSchedule?: BarberSchedule | null
   barberClosures?: BarberClosure[]
 }
 
@@ -70,7 +70,6 @@ export function DateSelection({
   workDays, 
   shopSettings, 
   shopClosures = [], 
-  barberSchedule, 
   barberClosures = [] 
 }: DateSelectionProps) {
   const router = useRouter()
@@ -82,20 +81,32 @@ export function DateSelection({
   const gridRef = useRef<HTMLDivElement>(null)
   const cellRefs = useRef<(HTMLButtonElement | null)[]>([])
 
-  // Fetch barber booking settings
+  // Fetch barber booking settings with retry logic for Safari/iOS
   useEffect(() => {
     if (!barberId) return
     
     const fetchBookingSettings = async () => {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('barber_booking_settings')
-        .select('*')
-        .eq('barber_id', barberId)
-        .single()
-      
-      if (data) {
-        setBarberBookingSettings(data as BarberBookingSettings)
+      try {
+        const supabase = createClient()
+        const { data } = await withSupabaseRetry(async () => {
+          const result = await supabase
+            .from('barber_booking_settings')
+            .select('*')
+            .eq('barber_id', barberId)
+            .single()
+          // PGRST116 = no rows found, which is OK (use defaults)
+          if (result.error && result.error.code !== 'PGRST116') {
+            throw new Error(result.error.message)
+          }
+          return result
+        })
+        
+        if (data) {
+          setBarberBookingSettings(data as BarberBookingSettings)
+        }
+      } catch (err) {
+        console.error('[DateSelection] Error fetching booking settings:', err)
+        // Continue with default settings - don't block the UI
       }
     }
     
@@ -171,7 +182,10 @@ export function DateSelection({
       const currentHour = now.getHours()
       const currentMinute = now.getMinutes()
       
-      let endTimeStr = barberSchedule?.work_hours_end || shopSettings?.work_hours_end || '19:00'
+      // Get end time from work_days or shop settings
+      const dayKey = DAY_KEYS[day.date.getDay()]
+      const workDay = workDays.find(wd => wd.day_of_week.toLowerCase() === dayKey)
+      let endTimeStr = workDay?.end_time || shopSettings?.work_hours_end || '19:00'
       if (endTimeStr.includes(':')) {
         endTimeStr = endTimeStr.split(':').slice(0, 2).join(':')
       }
@@ -210,19 +224,15 @@ export function DateSelection({
       }
     }
     
-    // 6. Check if barber works on this day
-    // Priority: work_days table (day-specific) > barberSchedule (legacy global)
-    const workDay = workDays.find((wd) => wd.day_of_week.toLowerCase() === day.dayKey)
-    if (workDay) {
-      // Use day-specific work_days table (new method)
-      if (!workDay.is_working) {
+    // 6. Check if barber works on this day using work_days table
+    const workDayEntry = workDays.find((wd) => wd.day_of_week.toLowerCase() === day.dayKey)
+    if (workDayEntry) {
+      if (!workDayEntry.is_working) {
         return { available: false, reason: 'הספר לא עובד', type: 'barber_not_working' }
       }
-    } else if (barberSchedule?.work_days && barberSchedule.work_days.length > 0) {
-      // Fallback to legacy barberSchedule
-      if (!barberSchedule.work_days.includes(day.dayKey)) {
-        return { available: false, reason: 'הספר לא עובד', type: 'barber_not_working' }
-      }
+    } else if (shopSettings && !shopSettings.open_days.includes(day.dayKey)) {
+      // Fallback to shop settings if no work_days data
+      return { available: false, reason: 'הספר לא עובד', type: 'barber_not_working' }
     }
     
     // 7. Check barber closure with optional reason
@@ -239,7 +249,7 @@ export function DateSelection({
     }
     
     return { available: true }
-  }, [shopSettings, shopClosures, barberSchedule, barberClosures, workDays, maxBookingDate, barberBookingSettings])
+  }, [shopSettings, shopClosures, barberClosures, workDays, maxBookingDate, barberBookingSettings])
 
   // Handle date selection - allows clicking outside-month days if they're available
   const handleSelect = useCallback((day: CalendarDay, index: number) => {
