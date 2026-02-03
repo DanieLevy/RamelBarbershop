@@ -10,7 +10,8 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { pushService } from '@/lib/push/push-service'
 import type { ReminderContext } from '@/lib/push/types'
-import { nowInIsraelMs, getIsraelDayStart, getIsraelDayEnd } from '@/lib/utils'
+import { nowInIsraelMs, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael, parseTimeString } from '@/lib/utils'
+import type { DayOfWeek } from '@/types/database'
 
 // Type for reservation with joined data from the reminder query
 interface ReservationWithJoins {
@@ -19,6 +20,17 @@ interface ReservationWithJoins {
   customer_id: string | null
   customer_name: string
   barber_id: string
+  users: { fullname: string } | null
+  services: { name_he: string } | null
+}
+
+// Type for recurring appointment with joined data
+interface RecurringWithJoins {
+  id: string
+  barber_id: string
+  customer_id: string
+  time_slot: string
+  customers: { fullname: string; phone: string } | null
   users: { fullname: string } | null
   services: { name_he: string } | null
 }
@@ -178,7 +190,164 @@ export async function getAppointmentsForReminders(
     }
   }
 
-  return appointmentsInWindow
+  // Also get recurring appointments for today
+  const recurringAppointments = await getRecurringAppointmentsForToday(client, now, todayStart)
+  
+  // Merge recurring with regular appointments
+  const allAppointments = [...appointmentsInWindow, ...recurringAppointments]
+  
+  console.log(`[ReminderService] Total appointments (regular + recurring): ${allAppointments.length}`)
+  
+  return allAppointments
+}
+
+/**
+ * Get recurring appointments for today that need reminders
+ * 
+ * Fetches active recurring appointments for today's day of week,
+ * converts them to the standard reminder format with synthetic IDs.
+ */
+async function getRecurringAppointmentsForToday(
+  client: SupabaseClient,
+  now: number,
+  todayStart: number
+): Promise<AppointmentForReminder[]> {
+  // Get today's day of week in Israel timezone
+  const dayKey = getDayKeyInIsrael(now) as DayOfWeek
+  
+  console.log(`[ReminderService] Fetching recurring appointments for ${dayKey}`)
+  
+  const { data, error } = await client
+    .from('recurring_appointments')
+    .select(`
+      id,
+      barber_id,
+      customer_id,
+      time_slot,
+      customers!recurring_appointments_customer_id_fkey (
+        fullname,
+        phone
+      ),
+      users!recurring_appointments_barber_id_fkey (
+        fullname
+      ),
+      services!recurring_appointments_service_id_fkey (
+        name_he
+      )
+    `)
+    .eq('day_of_week', dayKey)
+    .eq('is_active', true)
+  
+  if (error) {
+    console.error('[ReminderService] Error fetching recurring appointments:', error)
+    return []
+  }
+  
+  if (!data || data.length === 0) {
+    console.log('[ReminderService] No recurring appointments for today')
+    return []
+  }
+  
+  console.log(`[ReminderService] Found ${data.length} recurring appointments for ${dayKey}`)
+  
+  // Get all unique barber IDs from recurring
+  const barberIds = [...new Set(data.map(r => r.barber_id).filter(Boolean))]
+  
+  // Check for barber closures today
+  const todayDateStr = new Date(todayStart).toISOString().split('T')[0]
+  
+  const { data: closuresData, error: closuresError } = await client
+    .from('barber_closures')
+    .select('barber_id')
+    .in('barber_id', barberIds)
+    .lte('start_date', todayDateStr)
+    .gte('end_date', todayDateStr)
+  
+  if (closuresError) {
+    console.error('[ReminderService] Error fetching barber closures:', closuresError)
+  }
+  
+  // Create a set of barber IDs with closures today
+  const barbersClosed = new Set<string>(
+    closuresData?.map(c => c.barber_id) || []
+  )
+  
+  if (barbersClosed.size > 0) {
+    console.log(`[ReminderService] ${barbersClosed.size} barbers have closures today - skipping their recurring`)
+  }
+  
+  // Fetch barber notification settings
+  const { data: settingsData, error: settingsError } = await client
+    .from('barber_notification_settings')
+    .select('barber_id, reminder_hours_before')
+    .in('barber_id', barberIds)
+  
+  if (settingsError) {
+    console.error('[ReminderService] Error fetching barber settings for recurring:', settingsError)
+  }
+  
+  // Create a map of barber_id -> reminder_hours_before (default 3)
+  const settingsMap = new Map<string, number>()
+  settingsData?.forEach(s => {
+    settingsMap.set(s.barber_id, s.reminder_hours_before)
+  })
+  
+  // Convert recurring appointments to the standard format
+  const recurringReminders: AppointmentForReminder[] = []
+  
+  for (const rec of data) {
+    const recData = rec as unknown as RecurringWithJoins
+    
+    // Skip if barber has a closure today
+    if (barbersClosed.has(recData.barber_id)) {
+      console.log(`[ReminderService] Skipping recurring ${recData.id} - barber has closure today`)
+      continue
+    }
+    
+    // Parse time slot (HH:MM) and create timestamp for today
+    const { hour, minute } = parseTimeString(recData.time_slot)
+    
+    // Create timestamp for today's date + recurring time
+    const appointmentDate = new Date(todayStart)
+    appointmentDate.setHours(hour, minute, 0, 0)
+    const appointmentTime = appointmentDate.getTime()
+    
+    // Skip if appointment time has already passed
+    if (appointmentTime <= now) {
+      continue
+    }
+    
+    // Check if within reminder window
+    const reminderHours = settingsMap.get(recData.barber_id) || 3
+    const reminderWindowEnd = now + (reminderHours * 60 * 60 * 1000)
+    
+    if (appointmentTime > reminderWindowEnd) {
+      continue // Not yet in reminder window
+    }
+    
+    // Calculate hours until appointment
+    const hoursUntil = Math.round((appointmentTime - now) / (60 * 60 * 1000))
+    
+    // Create a synthetic ID for the recurring instance (date-based)
+    // Format: recurring-{id}-{YYYYMMDD}
+    const dateStr = appointmentDate.toISOString().split('T')[0].replace(/-/g, '')
+    const syntheticId = `recurring-${recData.id}-${dateStr}`
+    
+    recurringReminders.push({
+      id: syntheticId,
+      time_timestamp: appointmentTime,
+      customer_id: recData.customer_id,
+      customer_name: recData.customers?.fullname || 'לקוח קבוע',
+      barber_id: recData.barber_id,
+      barber_name: recData.users?.fullname || 'הספר',
+      service_name: recData.services?.name_he || 'שירות',
+      reminder_hours_before: Math.max(1, hoursUntil)
+    })
+  }
+  
+  console.log(`[ReminderService] ${recurringReminders.length} recurring appointments in reminder window`)
+  
+  return recurringReminders
 }
 
 /**

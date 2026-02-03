@@ -989,6 +989,77 @@ export type Database = {
           },
         ]
       }
+      recurring_appointments: {
+        Row: {
+          id: string
+          barber_id: string
+          customer_id: string
+          service_id: string
+          day_of_week: 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday'
+          time_slot: string
+          notes: string | null
+          is_active: boolean
+          created_at: string | null
+          created_by: string | null
+          deactivated_at: string | null
+        }
+        Insert: {
+          id?: string
+          barber_id: string
+          customer_id: string
+          service_id: string
+          day_of_week: 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday'
+          time_slot: string
+          notes?: string | null
+          is_active?: boolean
+          created_at?: string | null
+          created_by?: string | null
+          deactivated_at?: string | null
+        }
+        Update: {
+          id?: string
+          barber_id?: string
+          customer_id?: string
+          service_id?: string
+          day_of_week?: 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday'
+          time_slot?: string
+          notes?: string | null
+          is_active?: boolean
+          created_at?: string | null
+          created_by?: string | null
+          deactivated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_appointments_barber_id_fkey"
+            columns: ["barber_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_appointments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_appointments_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_appointments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1333,4 +1404,59 @@ export interface BarberBookingSettings {
   min_cancel_hours: number
   created_at: string | null
   updated_at: string | null
+}
+
+// =============================================================================
+// RECURRING APPOINTMENTS
+// =============================================================================
+
+/** Day of week type for recurring appointments */
+export type DayOfWeek = 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday'
+
+/** Hebrew day names mapping */
+export const DAY_OF_WEEK_HEBREW: Record<DayOfWeek, string> = {
+  sunday: 'ראשון',
+  monday: 'שני',
+  tuesday: 'שלישי',
+  wednesday: 'רביעי',
+  thursday: 'חמישי',
+  friday: 'שישי',
+  saturday: 'שבת',
+}
+
+/** Row type for recurring appointments */
+export type RecurringAppointment = Tables<'recurring_appointments'>
+
+/** Insert type for recurring appointments */
+export type RecurringAppointmentInsert = TablesInsert<'recurring_appointments'>
+
+/** Update type for recurring appointments */
+export type RecurringAppointmentUpdate = TablesUpdate<'recurring_appointments'>
+
+/** Recurring appointment with related data (barber, customer, service) */
+export interface RecurringAppointmentWithDetails extends RecurringAppointment {
+  users?: User  // barber
+  customers?: Customer
+  services?: Service
+}
+
+/** Data for creating a new recurring appointment */
+export interface CreateRecurringAppointmentData {
+  barber_id: string
+  customer_id: string
+  service_id: string
+  day_of_week: DayOfWeek
+  time_slot: string  // Format: "HH:MM" (e.g., "18:00")
+  notes?: string
+  created_by: string
+}
+
+/** Recurring appointment for customer display */
+export interface CustomerRecurringAppointment {
+  id: string
+  barber_name: string
+  service_name: string
+  day_of_week: DayOfWeek
+  day_of_week_hebrew: string
+  time_slot: string
 }

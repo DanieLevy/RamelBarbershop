@@ -10,15 +10,16 @@ import { GlassCard } from '@/components/ui/GlassCard'
 import { AppointmentDetailModal } from '@/components/barber/AppointmentDetailModal'
 import { toast } from 'sonner'
 import { cn, formatTime as formatTimeUtil, timestampToIsraelDate, nowInIsrael, isSameDayInIsrael } from '@/lib/utils'
-import { Calendar, Scissors, User, X, History, ChevronRight, LogIn, Info, AlertCircle } from 'lucide-react'
+import { Calendar, Scissors, User, X, History, ChevronRight, LogIn, Info, AlertCircle, Repeat, Clock } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import type { ReservationWithDetails } from '@/types/database'
+import type { ReservationWithDetails, CustomerRecurringAppointment } from '@/types/database'
 import { LoginModal } from '@/components/LoginModal'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { useHaptics } from '@/hooks/useHaptics'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { cancelReservation } from '@/lib/services/booking.service'
 import { CancelBlockedModal } from '@/components/booking/CancelBlockedModal'
+import { getRecurringByCustomer } from '@/lib/services/recurring.service'
 
 type TabType = 'upcoming' | 'past' | 'cancelled'
 
@@ -61,6 +62,7 @@ function MyAppointmentsContent() {
   const tabParam = searchParams.get('tab') as TabType | null
   
   const [reservations, setReservations] = useState<ReservationWithDetails[]>([])
+  const [recurringAppointments, setRecurringAppointments] = useState<CustomerRecurringAppointment[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabType>('upcoming')
   const [cancellingId, setCancellingId] = useState<string | null>(null)
@@ -85,9 +87,22 @@ function MyAppointmentsContent() {
   useEffect(() => {
     if (customer?.id || customer?.phone) {
       fetchReservations()
+      fetchRecurringAppointments()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customer?.id, customer?.phone])
+
+  const fetchRecurringAppointments = async () => {
+    if (!customer?.id) return
+    
+    try {
+      const recurring = await getRecurringByCustomer(customer.id)
+      setRecurringAppointments(recurring)
+    } catch (err) {
+      console.error('Error fetching recurring appointments:', err)
+      // Don't show error toast - recurring is optional display
+    }
+  }
 
   // Handle URL params from push notification deep links
   // This processes highlight and tab params to show the specific reservation
@@ -465,6 +480,47 @@ function MyAppointmentsContent() {
                 <span className="sm:hidden">+</span>
               </button>
             </div>
+            
+            {/* Recurring Appointments Section */}
+            {recurringAppointments.length > 0 && (
+              <div className="mb-6">
+                <GlassCard className="p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
+                      <Repeat size={16} className="text-purple-400" />
+                    </div>
+                    <h2 className="text-base font-medium text-foreground-light">תורים קבועים</h2>
+                  </div>
+                  <div className="space-y-2">
+                    {recurringAppointments.map(rec => (
+                      <div 
+                        key={rec.id}
+                        className="flex items-center justify-between gap-3 py-2 px-3 bg-white/[0.03] rounded-xl border border-white/[0.06]"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex flex-col items-center w-12">
+                            <span className="text-sm font-medium text-purple-400">{rec.time_slot}</span>
+                            <span className="text-xs text-foreground-muted">יום {rec.day_of_week_hebrew}</span>
+                          </div>
+                          <div className="border-l border-white/10 h-8" />
+                          <div>
+                            <p className="text-sm text-foreground-light">{rec.barber_name}</p>
+                            <p className="text-xs text-foreground-muted flex items-center gap-1">
+                              <Scissors size={10} />
+                              {rec.service_name}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-purple-400/60 bg-purple-500/10 px-2 py-1 rounded-full">
+                          <Clock size={10} />
+                          <span>כל שבוע</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </GlassCard>
+              </div>
+            )}
             
             {/* Tabs - Compact Pills */}
             <div className="flex gap-1.5 mb-4 p-1 bg-white/[0.03] rounded-xl border border-white/[0.06]">

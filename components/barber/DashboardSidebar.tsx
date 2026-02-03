@@ -21,6 +21,7 @@ import {
   Package,
   Bell,
   Images,
+  Repeat,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -34,6 +35,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'סקירה כללית', href: '/barber/dashboard', icon: Home },
   { label: 'התורים שלי', href: '/barber/dashboard/reservations', icon: Calendar },
+  { label: 'תורים קבועים', href: '/barber/dashboard/recurring', icon: Repeat },
   { label: 'הלקוחות שלי', href: '/barber/dashboard/customers', icon: Users },
   { label: 'השירותים שלי', href: '/barber/dashboard/services', icon: Scissors },
   { label: 'הלו"ז שלי', href: '/barber/dashboard/my-schedule', icon: Clock },

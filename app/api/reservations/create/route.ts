@@ -8,6 +8,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { reportBug } from '@/lib/bug-reporter'
+import type { DayOfWeek } from '@/types/database'
 
 // UUID validation
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -28,6 +29,7 @@ interface CreateReservationRequest {
 // Error messages (Hebrew)
 const ERROR_MESSAGES: Record<string, string> = {
   SLOT_ALREADY_TAKEN: 'השעה כבר נתפסה. אנא בחר שעה אחרת.',
+  SLOT_RESERVED_RECURRING: 'השעה שמורה לתור קבוע.',
   CUSTOMER_BLOCKED: 'לא ניתן לקבוע תור. אנא פנה לצוות המספרה.',
   CUSTOMER_DOUBLE_BOOKING: 'כבר יש לך תור בשעה זו.',
   MAX_BOOKINGS_REACHED: 'הגעת למקסימום התורים המותרים. בטל תור קיים כדי לקבוע חדש.',
@@ -35,6 +37,43 @@ const ERROR_MESSAGES: Record<string, string> = {
   BARBER_PAUSED: 'הספר אינו זמין כרגע לקביעת תורים.',
   VALIDATION_ERROR: 'חסרים נתונים ליצירת התור.',
   DATABASE_ERROR: 'שגיאה ביצירת התור. נסה שוב.',
+}
+
+/**
+ * Get day of week from timestamp in Israel timezone
+ */
+function getDayOfWeekFromTimestamp(timestamp: number): DayOfWeek {
+  const date = new Date(timestamp)
+  // Convert to Israel timezone
+  const israelDateStr = date.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem', weekday: 'long' }).toLowerCase()
+  // Map to our day format
+  const dayMap: Record<string, DayOfWeek> = {
+    'sunday': 'sunday',
+    'monday': 'monday',
+    'tuesday': 'tuesday',
+    'wednesday': 'wednesday',
+    'thursday': 'thursday',
+    'friday': 'friday',
+    'saturday': 'saturday',
+  }
+  return dayMap[israelDateStr] || 'sunday'
+}
+
+/**
+ * Convert timestamp to time slot string (HH:MM) in Israel timezone
+ */
+function timestampToTimeSlot(timestamp: number): string {
+  const date = new Date(timestamp)
+  // Get hours and minutes in Israel timezone
+  const israelTimeStr = date.toLocaleString('en-US', {
+    timeZone: 'Asia/Jerusalem',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  // Format is "HH:MM", but some locales might return "H:MM"
+  const [hours, minutes] = israelTimeStr.split(':')
+  return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`
 }
 
 function parseBookingError(message: string): string {
@@ -105,6 +144,33 @@ export async function POST(request: NextRequest) {
     }
     
     const supabase = createAdminClient()
+    
+    // Check for recurring appointment conflict before creating
+    // This prevents booking a slot that's reserved for a recurring customer
+    const dayOfWeek = getDayOfWeekFromTimestamp(body.timeTimestamp)
+    const timeSlot = timestampToTimeSlot(body.timeTimestamp)
+    
+    const { data: recurringConflict, error: recurringError } = await supabase
+      .from('recurring_appointments')
+      .select('id')
+      .eq('barber_id', body.barberId)
+      .eq('day_of_week', dayOfWeek)
+      .eq('time_slot', timeSlot)
+      .eq('is_active', true)
+      .maybeSingle()
+    
+    if (recurringError) {
+      console.error('[API/Create] Recurring check error:', recurringError)
+      // Don't fail the request, just log and continue
+    }
+    
+    if (recurringConflict) {
+      console.log('[API/Create] Recurring conflict found:', recurringConflict.id)
+      return NextResponse.json(
+        { success: false, error: 'SLOT_RESERVED_RECURRING', message: ERROR_MESSAGES.SLOT_RESERVED_RECURRING },
+        { status: 409 }
+      )
+    }
     
     // Call the atomic database function with service_role (bypasses RLS)
     const { data: reservationId, error } = await supabase.rpc('create_reservation_atomic', {

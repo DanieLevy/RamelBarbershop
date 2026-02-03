@@ -4,12 +4,13 @@ import { useEffect, useState } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { createClient } from '@/lib/supabase/client'
 import { formatTime, cn, parseTimeString, generateTimeSlots, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael, nowInIsrael } from '@/lib/utils'
-import type { TimeSlot, BarbershopSettings, WorkDay, BarberBookingSettings } from '@/types/database'
-import { ChevronRight, ChevronDown, ChevronUp, Clock } from 'lucide-react'
+import type { TimeSlot, BarbershopSettings, WorkDay, BarberBookingSettings, DayOfWeek } from '@/types/database'
+import { ChevronRight, ChevronDown, ChevronUp, Clock, Repeat } from 'lucide-react'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { getWorkHours as getWorkHoursFromService, workDaysToMap } from '@/lib/services/availability.service'
 import { withSupabaseRetry } from '@/lib/utils/retry'
+import { getRecurringForDay } from '@/lib/services/recurring.service'
 
 interface TimeSelectionProps {
   barberId: string
@@ -21,6 +22,7 @@ interface TimeSelectionProps {
 interface EnrichedTimeSlot extends TimeSlot {
   reservedBy?: string
   tooSoon?: boolean // True if slot is within min_hours_before_booking
+  isRecurring?: boolean // True if slot is reserved by a recurring appointment
 }
 
 export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], barberBookingSettings }: TimeSelectionProps) {
@@ -106,6 +108,35 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
           }
         }
         
+        // Fetch recurring appointments for this day
+        // These are pre-set appointments that repeat every week
+        const dayKey = getDayKeyInIsrael(date.dateTimestamp) as DayOfWeek
+        let recurringSlots: Array<{ time_slot: string; customer_name: string }> = []
+        
+        try {
+          recurringSlots = await getRecurringForDay(barberId, dayKey)
+        } catch (recError) {
+          console.error('[TimeSelection] Error fetching recurring slots:', recError)
+          // Continue without recurring data
+        }
+        
+        // Convert recurring time_slot (HH:MM) to timestamp for the selected date
+        const recurringTimestamps = new Set<number>()
+        const recurringMap = new Map<number, string>()
+        
+        for (const rec of recurringSlots) {
+          const { hour, minute } = parseTimeString(rec.time_slot)
+          // Create timestamp for this date + time
+          const recDate = new Date(date.dateTimestamp)
+          // Use Israel timezone context
+          const israelDate = new Date(recDate.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }))
+          israelDate.setHours(hour, minute, 0, 0)
+          const recTimestamp = israelDate.getTime()
+          
+          recurringTimestamps.add(recTimestamp)
+          recurringMap.set(recTimestamp, `${rec.customer_name} (קבוע)`)
+        }
+        
         // Calculate minimum booking time threshold
         // min_hours_before_booking: how many hours before the slot must you book
         const minHoursBefore = barberBookingSettings?.min_hours_before_booking ?? 1
@@ -123,6 +154,14 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
               time_timestamp: slot.timestamp,
               is_available: false,
               reservedBy: reservedMap.get(slot.timestamp),
+            })
+          } else if (recurringTimestamps.has(slot.timestamp)) {
+            // Slot is blocked by a recurring appointment
+            reserved.push({
+              time_timestamp: slot.timestamp,
+              is_available: false,
+              reservedBy: recurringMap.get(slot.timestamp),
+              isRecurring: true,
             })
           } else if (slot.timestamp < minBookingTimeMs) {
             // Slot is within min_hours_before_booking window - can't book
@@ -280,10 +319,18 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
                   {reservedSlots.map((slot) => (
                     <div
                       key={slot.time_timestamp}
-                      className="py-3 px-2 rounded-xl text-sm font-medium bg-background-card/30 text-foreground-muted/50 line-through cursor-not-allowed text-center"
+                      className={cn(
+                        "py-3 px-2 rounded-xl text-sm font-medium cursor-not-allowed text-center relative",
+                        slot.isRecurring
+                          ? "bg-purple-500/10 text-purple-400/60 border border-purple-500/20"
+                          : "bg-background-card/30 text-foreground-muted/50 line-through"
+                      )}
                       title={slot.reservedBy ? `תפוס: ${slot.reservedBy}` : 'תפוס'}
                     >
                       {formatTime(slot.time_timestamp)}
+                      {slot.isRecurring && (
+                        <Repeat size={10} className="absolute top-1 left-1 text-purple-400/60" />
+                      )}
                     </div>
                   ))}
                 </div>
