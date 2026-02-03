@@ -6,7 +6,7 @@ import { cn, parseTimeString } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { createRecurring, checkRecurringConflict } from '@/lib/services/recurring.service'
 import { toast } from 'sonner'
-import type { Customer, Service, WorkDay, DayOfWeek } from '@/types/database'
+import type { Customer, Service, WorkDay, DayOfWeek, BarbershopSettings } from '@/types/database'
 import { Portal } from '@/components/ui/Portal'
 import { useBugReporter } from '@/hooks/useBugReporter'
 
@@ -51,6 +51,7 @@ export function CreateRecurringModal({
   const [services, setServices] = useState<Service[]>([])
   const [loadingServices, setLoadingServices] = useState(true)
   const [barberWorkDays, setBarberWorkDays] = useState<WorkDay[]>([])
+  const [shopSettings, setShopSettings] = useState<BarbershopSettings | null>(null)
   const [existingRecurring, setExistingRecurring] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
 
@@ -66,6 +67,7 @@ export function CreateRecurringModal({
       setSearchResults([])
       fetchServices()
       fetchBarberWorkDays()
+      fetchShopSettings()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
@@ -87,6 +89,19 @@ export function CreateRecurringModal({
     
     if (data) {
       setBarberWorkDays(data as WorkDay[])
+    }
+  }
+
+  const fetchShopSettings = async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('barbershop_settings')
+      .select('*')
+      .limit(1)
+      .single()
+    
+    if (data) {
+      setShopSettings(data as BarbershopSettings)
     }
   }
 
@@ -175,6 +190,7 @@ export function CreateRecurringModal({
   }, [selectedDay, barberWorkDays])
 
   // Generate available time slots for selected day
+  // IMPORTANT: Uses 30-minute intervals to match the booking system
   const availableTimeSlots = useMemo(() => {
     if (!selectedDayWorkHours) return []
     
@@ -183,7 +199,7 @@ export function CreateRecurringModal({
     
     const slots: string[] = []
     
-    // Generate slots in 15-minute increments
+    // Generate slots in 30-minute increments (matching booking system)
     let currentHour = startTime.hour
     let currentMinute = startTime.minute
     
@@ -191,7 +207,7 @@ export function CreateRecurringModal({
       const timeSlot = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`
       slots.push(timeSlot)
       
-      currentMinute += 15
+      currentMinute += 30 // Fixed 30-minute intervals
       if (currentMinute >= 60) {
         currentMinute = 0
         currentHour++
@@ -201,13 +217,23 @@ export function CreateRecurringModal({
     return slots
   }, [selectedDayWorkHours])
 
-  // Get available days (days where barber works)
+  // Get available days (days where BOTH barbershop is open AND barber works)
   const availableDays = useMemo(() => {
+    // Get shop open days (defaults to all days if not set)
+    const shopOpenDays = shopSettings?.open_days || []
+    
     return DAY_OPTIONS.filter(day => {
+      // Check if barbershop is open on this day
+      const shopIsOpen = shopOpenDays.length === 0 || shopOpenDays.includes(day.value)
+      
+      // Check if barber works on this day
       const workDay = barberWorkDays.find(wd => wd.day_of_week === day.value)
-      return workDay?.is_working
+      const barberWorks = workDay?.is_working === true
+      
+      // Day is only available if both shop is open AND barber works
+      return shopIsOpen && barberWorks
     })
-  }, [barberWorkDays])
+  }, [barberWorkDays, shopSettings])
 
   // Handle save
   const handleSave = async () => {

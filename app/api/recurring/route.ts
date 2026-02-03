@@ -207,7 +207,27 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // 4. Verify barber works on this day and time
+    // 4. Verify barbershop is open on this day
+    const { data: shopSettings, error: shopError } = await supabase
+      .from('barbershop_settings')
+      .select('open_days')
+      .limit(1)
+      .single()
+    
+    if (shopError) {
+      console.error('[API/Recurring] Shop settings check error:', shopError)
+    }
+    
+    // Check if the shop is open on this day
+    const shopOpenDays = shopSettings?.open_days as string[] || []
+    if (shopOpenDays.length > 0 && !shopOpenDays.includes(body.day_of_week)) {
+      return NextResponse.json(
+        { success: false, error: 'BARBER_NOT_WORKING', message: 'המספרה סגורה ביום זה' },
+        { status: 400 }
+      )
+    }
+    
+    // 5. Verify barber works on this day and time
     const { data: workDay, error: workDayError } = await supabase
       .from('work_days')
       .select('is_working, start_time, end_time')
