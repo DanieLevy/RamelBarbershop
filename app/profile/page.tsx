@@ -157,7 +157,7 @@ export default function ProfilePage() {
     return (
       <>
         <AppHeader />
-        <main className="relative top-24 min-h-screen px-4 py-8 pt-[env(safe-area-inset-top)]">
+        <main className="relative top-24 min-h-screen px-4 py-8">
           <div className="flex flex-col items-center justify-center py-20">
             <ScissorsLoader size="lg" text="טוען..." />
           </div>
@@ -174,7 +174,7 @@ export default function ProfilePage() {
     <>
       <AppHeader />
       
-      <main id="main-content" tabIndex={-1} className="relative top-20 sm:top-24 min-h-screen bg-background-dark outline-none pt-[env(safe-area-inset-top)]">
+      <main id="main-content" tabIndex={-1} className="relative top-20 sm:top-24 min-h-screen bg-background-dark outline-none">
         <div className="px-4 py-4 pb-24">
           <div className="max-w-sm mx-auto">
             {/* Compact Profile Card */}

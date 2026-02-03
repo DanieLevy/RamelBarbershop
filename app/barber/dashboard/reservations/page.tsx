@@ -9,9 +9,11 @@ import { cn, formatTime as formatTimeUtil, nowInIsrael, generateTimeSlots, parse
 import { getExternalLinkProps } from '@/lib/utils/external-link'
 import { addDays, format, startOfWeek, endOfWeek, isSameDay, parse } from 'date-fns'
 import { he } from 'date-fns/locale'
-import { Calendar, Phone, X, Plus, ChevronDown, MessageCircle } from 'lucide-react'
+import { Calendar, Phone, X, Plus, ChevronDown, MessageCircle, Repeat } from 'lucide-react'
 import type { Reservation, Service, BarbershopSettings, WorkDay } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { getRecurringByBarber } from '@/lib/services/recurring.service'
+import { israelDateToTimestamp } from '@/lib/utils'
 import { CancelReservationModal } from '@/components/barber/CancelReservationModal'
 import { BulkCancelModal } from '@/components/barber/BulkCancelModal'
 import { AppointmentDetailModal } from '@/components/barber/AppointmentDetailModal'
@@ -20,6 +22,17 @@ import { cancelReservation } from '@/lib/services/booking.service'
 
 interface ReservationWithService extends Reservation {
   services?: Service
+  isRecurring?: boolean
+}
+
+interface RecurringForDisplay {
+  id: string
+  time_slot: string
+  day_of_week: string
+  customer_name: string
+  customer_phone: string
+  service_name: string
+  time_timestamp: number
 }
 
 type ViewMode = 'all' | 'upcoming_only' | 'cancelled'
@@ -88,6 +101,9 @@ function ReservationsContent() {
   // Toggle for showing empty slots
   const [showEmptySlots, setShowEmptySlots] = useState(true)
   
+  // Recurring appointments for today
+  const [todaysRecurring, setTodaysRecurring] = useState<RecurringForDisplay[]>([])
+  
   // Manual booking modal state
   const [manualBookingModal, setManualBookingModal] = useState<{
     isOpen: boolean
@@ -100,6 +116,7 @@ function ReservationsContent() {
       fetchReservations()
       fetchShopSettings()
       fetchBarberWorkDays()
+      fetchRecurringAppointments()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [barber?.id])
@@ -311,6 +328,52 @@ function ReservationsContent() {
     
     if (data) {
       setBarberWorkDays(data as WorkDay[])
+    }
+  }
+
+  const fetchRecurringAppointments = async () => {
+    if (!barber?.id) return
+    
+    try {
+      const recurringData = await getRecurringByBarber(barber.id)
+      
+      // Convert to display format with calculated timestamps
+      const now = Date.now()
+      const todayStart = getIsraelDayStart(now)
+      const todayDayKey = getDayKeyInIsrael(now)
+      
+      const displayRecurring: RecurringForDisplay[] = recurringData
+        .filter(rec => rec.day_of_week === todayDayKey) // Only today's recurring
+        .map(rec => {
+          const [hours, minutes] = rec.time_slot.split(':').map(Number)
+          const israelDate = timestampToIsraelDate(todayStart)
+          const appointmentTime = israelDateToTimestamp(
+            israelDate.getFullYear(),
+            israelDate.getMonth() + 1,
+            israelDate.getDate(),
+            hours,
+            minutes
+          )
+          
+          const customer = rec.customers as { fullname: string; phone: string } | undefined
+          const service = rec.services as { name_he: string } | undefined
+          
+          return {
+            id: rec.id,
+            time_slot: rec.time_slot.substring(0, 5),
+            day_of_week: rec.day_of_week,
+            customer_name: customer?.fullname || 'לקוח קבוע',
+            customer_phone: customer?.phone || '',
+            service_name: service?.name_he || 'שירות',
+            time_timestamp: appointmentTime
+          }
+        })
+        .filter(rec => rec.time_timestamp > now) // Only upcoming
+        .sort((a, b) => a.time_timestamp - b.time_timestamp)
+      
+      setTodaysRecurring(displayRecurring)
+    } catch (err) {
+      console.error('Error fetching recurring appointments:', err)
     }
   }
 
@@ -867,6 +930,46 @@ function ReservationsContent() {
           הוסף תור
         </button>
       </div>
+
+      {/* Today's Recurring Appointments Section */}
+      {quickDate === 'today' && todaysRecurring.length > 0 && (
+        <div className="mb-4 bg-purple-500/5 border border-purple-500/20 rounded-xl p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-6 h-6 rounded-full bg-purple-500/20 flex items-center justify-center">
+              <Repeat size={12} className="text-purple-400" />
+            </div>
+            <h3 className="text-sm font-medium text-purple-300">תורים קבועים להיום</h3>
+          </div>
+          <div className="space-y-1.5">
+            {todaysRecurring.map(rec => (
+              <div 
+                key={rec.id}
+                className="flex items-center gap-3 py-2 px-3 bg-purple-500/10 rounded-lg"
+              >
+                <div className="flex flex-col items-center w-10">
+                  <span className="text-sm font-medium text-purple-400">{rec.time_slot}</span>
+                </div>
+                <div className="w-0.5 h-6 bg-purple-400/40 rounded-full" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-foreground-light truncate">{rec.customer_name}</p>
+                  <p className="text-xs text-foreground-muted truncate">{rec.service_name}</p>
+                </div>
+                {rec.customer_phone && (
+                  <a
+                    href={`tel:${rec.customer_phone}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-1.5 rounded-lg hover:bg-purple-500/20 transition-colors"
+                    aria-label="התקשר"
+                  >
+                    <Phone size={14} className="text-purple-400" />
+                  </a>
+                )}
+                <span className="text-[10px] text-purple-400/60 bg-purple-500/20 px-1.5 py-0.5 rounded-full">קבוע</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Date Filter Chips - Compact Design */}
       <div className="mb-3 flex items-center gap-2 flex-wrap">
