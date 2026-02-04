@@ -38,6 +38,9 @@ interface RecurringForDisplay {
 type ViewMode = 'all' | 'upcoming_only' | 'cancelled'
 type QuickDateType = 'today' | 'tomorrow' | 'week' | 'all' | 'custom'
 
+// Module-level alias for timestamp normalization (stable reference, no re-render dependency)
+const normalizeTs = normalizeTimestampFormat
+
 // Wrap in Suspense for useSearchParams
 export default function ReservationsPage() {
   return (
@@ -534,9 +537,6 @@ function ReservationsContent() {
       setUpdatingId(null)
     }
   }
-
-  // Use shared timestamp format normalization
-  const normalizeTs = normalizeTimestampFormat
 
   // Format phone number for WhatsApp (Israeli format)
   // WhatsApp requires international format without + or spaces

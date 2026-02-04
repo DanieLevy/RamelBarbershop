@@ -4,13 +4,14 @@ import { useEffect, useState } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { createClient } from '@/lib/supabase/client'
 import { formatTime, cn, parseTimeString, generateTimeSlots, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael, nowInIsrael, getSlotKey, timestampToIsraelDate, israelDateToTimestamp } from '@/lib/utils'
-import type { TimeSlot, BarbershopSettings, WorkDay, BarberBookingSettings, DayOfWeek } from '@/types/database'
-import { ChevronRight, ChevronDown, ChevronUp, Clock, Repeat } from 'lucide-react'
+import type { TimeSlot, BarbershopSettings, WorkDay, BarberBookingSettings, DayOfWeek, BarberBreakout } from '@/types/database'
+import { ChevronRight, ChevronDown, ChevronUp, Clock, Repeat, Coffee } from 'lucide-react'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { getWorkHours as getWorkHoursFromService, workDaysToMap } from '@/lib/services/availability.service'
 import { withSupabaseRetry } from '@/lib/utils/retry'
 import { getRecurringForDay } from '@/lib/services/recurring.service'
+import { getBreakoutsForDate, isSlotInBreakout } from '@/lib/services/breakout.service'
 
 interface TimeSelectionProps {
   barberId: string
@@ -23,6 +24,8 @@ interface EnrichedTimeSlot extends TimeSlot {
   reservedBy?: string
   tooSoon?: boolean // True if slot is within min_hours_before_booking
   isRecurring?: boolean // True if slot is reserved by a recurring appointment
+  isBreakout?: boolean // True if slot is blocked by a barber breakout
+  breakoutReason?: string // Optional reason for breakout (e.g., "צהריים")
 }
 
 export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], barberBookingSettings }: TimeSelectionProps) {
@@ -163,6 +166,26 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
           return { reserved: false }
         }
         
+        // Fetch breakouts for this date
+        // These are barber breaks (lunch, early departure, etc.)
+        let breakouts: BarberBreakout[] = []
+        
+        try {
+          breakouts = await getBreakoutsForDate(barberId, date.dateTimestamp)
+        } catch (breakoutError) {
+          console.error('[TimeSelection] Error fetching breakouts:', breakoutError)
+          // Continue without breakout data
+        }
+        
+        // Get work hours end time for "until end of day" breakouts
+        const workDayEndTime = workHours.end
+        
+        // Helper function to check if a slot is blocked by a breakout
+        const checkBreakout = (slotTs: number): { blocked: boolean; reason?: string } => {
+          if (breakouts.length === 0) return { blocked: false }
+          return isSlotInBreakout(slotTs, breakouts, workDayEndTime)
+        }
+        
         // Calculate minimum booking time threshold
         // min_hours_before_booking: how many hours before the slot must you book
         const minHoursBefore = barberBookingSettings?.min_hours_before_booking ?? 1
@@ -196,18 +219,32 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
                 reservedBy: recurringCheck.reservedBy,
                 isRecurring: true,
               })
-            } else if (slot.timestamp < minBookingTimeMs) {
-              // Slot is within min_hours_before_booking window - can't book
-              tooSoon.push({
-                time_timestamp: slot.timestamp,
-                is_available: false,
-                tooSoon: true,
-              })
             } else {
-              available.push({
-                time_timestamp: slot.timestamp,
-                is_available: true,
-              })
+              // Check if slot is blocked by a barber breakout
+              const breakoutCheck = checkBreakout(slot.timestamp)
+              
+              if (breakoutCheck.blocked) {
+                // Slot is blocked by a breakout (lunch, early departure, etc.)
+                reserved.push({
+                  time_timestamp: slot.timestamp,
+                  is_available: false,
+                  reservedBy: breakoutCheck.reason || 'הפסקה',
+                  isBreakout: true,
+                  breakoutReason: breakoutCheck.reason,
+                })
+              } else if (slot.timestamp < minBookingTimeMs) {
+                // Slot is within min_hours_before_booking window - can't book
+                tooSoon.push({
+                  time_timestamp: slot.timestamp,
+                  is_available: false,
+                  tooSoon: true,
+                })
+              } else {
+                available.push({
+                  time_timestamp: slot.timestamp,
+                  is_available: true,
+                })
+              }
             }
           }
         }
@@ -355,14 +392,19 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
                       key={slot.time_timestamp}
                       className={cn(
                         "py-3 px-2 rounded-xl text-sm font-medium cursor-not-allowed text-center relative",
-                        slot.isRecurring
+                        slot.isBreakout
+                          ? "bg-amber-500/10 text-amber-400/60 border border-amber-500/20"
+                          : slot.isRecurring
                           ? "bg-purple-500/10 text-purple-400/60 border border-purple-500/20"
                           : "bg-background-card/30 text-foreground-muted/50 line-through"
                       )}
-                      title={slot.reservedBy ? `תפוס: ${slot.reservedBy}` : 'תפוס'}
+                      title={slot.isBreakout ? `הפסקה: ${slot.breakoutReason || 'הפסקה'}` : slot.reservedBy ? `תפוס: ${slot.reservedBy}` : 'תפוס'}
                     >
                       {formatTime(slot.time_timestamp)}
-                      {slot.isRecurring && (
+                      {slot.isBreakout && (
+                        <Coffee size={10} className="absolute top-1 left-1 text-amber-400/60" />
+                      )}
+                      {slot.isRecurring && !slot.isBreakout && (
                         <Repeat size={10} className="absolute top-1 left-1 text-purple-400/60" />
                       )}
                     </div>

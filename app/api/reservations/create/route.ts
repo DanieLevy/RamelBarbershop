@@ -31,6 +31,7 @@ interface CreateReservationRequest {
 const ERROR_MESSAGES: Record<string, string> = {
   SLOT_ALREADY_TAKEN: 'השעה כבר נתפסה. אנא בחר שעה אחרת.',
   SLOT_RESERVED_RECURRING: 'השעה שמורה לתור קבוע.',
+  SLOT_IN_BREAKOUT: 'השעה לא זמינה - הספר בהפסקה.',
   CUSTOMER_BLOCKED: 'לא ניתן לקבוע תור. אנא פנה לצוות המספרה.',
   CUSTOMER_DOUBLE_BOOKING: 'כבר יש לך תור בשעה זו.',
   MAX_BOOKINGS_REACHED: 'הגעת למקסימום התורים המותרים. בטל תור קיים כדי לקבוע חדש.',
@@ -171,6 +172,63 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'SLOT_RESERVED_RECURRING', message: ERROR_MESSAGES.SLOT_RESERVED_RECURRING },
         { status: 409 }
       )
+    }
+    
+    // Check for breakout conflict before creating
+    // This prevents booking a slot that's blocked by a barber break
+    const dateString = new Date(body.dateTimestamp).toISOString().split('T')[0]
+    
+    const { data: breakoutConflicts, error: breakoutError } = await supabase
+      .from('barber_breakouts')
+      .select('id, start_time, end_time, breakout_type, start_date, end_date, day_of_week')
+      .eq('barber_id', body.barberId)
+      .eq('is_active', true)
+    
+    if (breakoutError) {
+      console.error('[API/Create] Breakout check error:', breakoutError)
+      // Don't fail the request, just log and continue
+    }
+    
+    if (breakoutConflicts && breakoutConflicts.length > 0) {
+      // Check if any breakout applies to this date and time
+      const slotHour = parseInt(timeSlot.split(':')[0], 10)
+      const slotMinute = parseInt(timeSlot.split(':')[1], 10)
+      const slotMinutes = slotHour * 60 + slotMinute
+      
+      for (const breakout of breakoutConflicts) {
+        let appliesToDate = false
+        
+        // Check if breakout applies to this date
+        switch (breakout.breakout_type) {
+          case 'single':
+            appliesToDate = breakout.start_date === dateString
+            break
+          case 'date_range':
+            appliesToDate = !!(breakout.start_date && breakout.end_date &&
+              dateString >= breakout.start_date && dateString <= breakout.end_date)
+            break
+          case 'recurring':
+            appliesToDate = breakout.day_of_week === dayOfWeek
+            break
+        }
+        
+        if (appliesToDate) {
+          // Check if time falls within breakout range
+          const [startH, startM] = breakout.start_time.split(':').map(Number)
+          const startMinutes = startH * 60 + startM
+          const endMinutes = breakout.end_time
+            ? parseInt(breakout.end_time.split(':')[0], 10) * 60 + parseInt(breakout.end_time.split(':')[1], 10)
+            : 24 * 60 // Until end of day
+          
+          if (slotMinutes >= startMinutes && slotMinutes < endMinutes) {
+            console.log('[API/Create] Breakout conflict found:', breakout.id)
+            return NextResponse.json(
+              { success: false, error: 'SLOT_IN_BREAKOUT', message: 'השעה לא זמינה - הספר בהפסקה.' },
+              { status: 409 }
+            )
+          }
+        }
+      }
     }
     
     // CRITICAL: Normalize timestamps to slot boundaries before storing

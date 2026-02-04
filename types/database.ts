@@ -77,6 +77,59 @@ export type Database = {
           },
         ]
       }
+      barber_breakouts: {
+        Row: {
+          id: string
+          barber_id: string
+          breakout_type: 'single' | 'date_range' | 'recurring'
+          start_time: string
+          end_time: string | null
+          start_date: string | null
+          end_date: string | null
+          day_of_week: 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | null
+          reason: string | null
+          is_active: boolean
+          created_at: string
+          deactivated_at: string | null
+        }
+        Insert: {
+          id?: string
+          barber_id: string
+          breakout_type: 'single' | 'date_range' | 'recurring'
+          start_time: string
+          end_time?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          day_of_week?: 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | null
+          reason?: string | null
+          is_active?: boolean
+          created_at?: string
+          deactivated_at?: string | null
+        }
+        Update: {
+          id?: string
+          barber_id?: string
+          breakout_type?: 'single' | 'date_range' | 'recurring'
+          start_time?: string
+          end_time?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          day_of_week?: 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | null
+          reason?: string | null
+          is_active?: boolean
+          created_at?: string
+          deactivated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "barber_breakouts_barber_id_fkey"
+            columns: ["barber_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       barber_gallery: {
         Row: {
           id: string
@@ -1251,6 +1304,10 @@ export type BarbershopSettings = Tables<'barbershop_settings'>
 export type BarbershopClosure = Tables<'barbershop_closures'>
 // BarberSchedule removed - deprecated, use work_days table instead
 export type BarberClosure = Tables<'barber_closures'>
+export type BarberBreakout = Tables<'barber_breakouts'>
+export type BarberBreakoutInsert = TablesInsert<'barber_breakouts'>
+export type BarberBreakoutUpdate = TablesUpdate<'barber_breakouts'>
+export type BreakoutType = 'single' | 'date_range' | 'recurring'
 export type BarberMessage = Tables<'barber_messages'>
 export type BarberGalleryImage = Tables<'barber_gallery'>
 export type WorkDay = Tables<'work_days'>
