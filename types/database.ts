@@ -949,6 +949,7 @@ export type Database = {
       }
       users: {
         Row: {
+          blocked_customers: string[] | null
           created_at: string | null
           display_order: number | null
           email: string | null
@@ -968,6 +969,7 @@ export type Database = {
           username: string
         }
         Insert: {
+          blocked_customers?: string[] | null
           created_at?: string | null
           display_order?: number | null
           email?: string | null
@@ -987,6 +989,7 @@ export type Database = {
           username: string
         }
         Update: {
+          blocked_customers?: string[] | null
           created_at?: string | null
           display_order?: number | null
           email?: string | null

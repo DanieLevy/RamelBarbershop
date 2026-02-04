@@ -147,6 +147,44 @@ export async function POST(request: NextRequest) {
     
     const supabase = createAdminClient()
     
+    // Check if customer is blocked by this barber (per-barber blocking)
+    // Returns generic error to avoid revealing the blocking
+    const { data: barberData, error: barberBlockError } = await supabase
+      .from('users')
+      .select('blocked_customers')
+      .eq('id', body.barberId)
+      .single()
+    
+    if (barberBlockError) {
+      console.error('[API/Create] Barber block check error:', barberBlockError)
+      // Don't fail - continue with booking
+    }
+    
+    if (barberData?.blocked_customers?.includes(body.customerPhone)) {
+      console.log('[API/Create] Blocked customer attempt:', body.customerPhone, 'for barber:', body.barberId)
+      
+      // Send push notification to barber about the blocked attempt (fire and forget)
+      try {
+        fetch(`${request.nextUrl.origin}/api/push/notify-blocked-attempt`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            barberId: body.barberId,
+            customerName: body.customerName,
+            customerPhone: body.customerPhone,
+          })
+        }).catch(err => console.error('[API/Create] Failed to send blocked attempt notification:', err))
+      } catch {
+        // Ignore errors - notification is optional
+      }
+      
+      // Return generic error (don't reveal blocking)
+      return NextResponse.json(
+        { success: false, error: 'GENERIC_ERROR', message: 'אופס, אירעה שגיאה ביצירת התור.' },
+        { status: 400 }
+      )
+    }
+    
     // Check for recurring appointment conflict before creating
     // This prevents booking a slot that's reserved for a recurring customer
     const dayOfWeek = getDayOfWeekFromTimestamp(body.timeTimestamp)

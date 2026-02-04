@@ -437,6 +437,7 @@ export function ManualBookingModal({
             body: JSON.stringify({
               reservationId: result.reservationId,
               customerId: customerId,
+              customerName: customerName,
               barberId: barberId,
               barberName: barberName || 'הספר',
               serviceName: selectedService.name_he,

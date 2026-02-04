@@ -5,8 +5,8 @@ import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { Plus, Trash, Calendar, Clock, ChevronDown, ChevronUp } from 'lucide-react'
-import type { BarberClosure, BarbershopSettings, WorkDay } from '@/types/database'
+import { Clock, ChevronDown, ChevronUp } from 'lucide-react'
+import type { BarbershopSettings, WorkDay } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
 
 const DAYS = [
@@ -32,18 +32,10 @@ export default function MySchedulePage() {
   const { report } = useBugReporter('MySchedulePage')
   
   const [workDays, setWorkDays] = useState<DaySchedule[]>([])
-  const [closures, setClosures] = useState<BarberClosure[]>([])
   const [shopSettings, setShopSettings] = useState<BarbershopSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [savingSchedule, setSavingSchedule] = useState(false)
-  const [savingClosure, setSavingClosure] = useState(false)
   const [expandedDay, setExpandedDay] = useState<string | null>(null)
-  
-  // Closure form
-  const [showClosureForm, setShowClosureForm] = useState(false)
-  const [closureStartDate, setClosureStartDate] = useState('')
-  const [closureEndDate, setClosureEndDate] = useState('')
-  const [closureReason, setClosureReason] = useState('')
 
   // Helper to normalize time format for consistent comparison
   const normalizeTime = useCallback((time: string | null): string => {
@@ -116,14 +108,6 @@ export default function MySchedulePage() {
       setWorkDays(defaults)
     }
     
-    // Fetch barber closures
-    const { data: closuresData } = await supabase
-      .from('barber_closures')
-      .select('*')
-      .eq('barber_id', barber.id)
-      .order('start_date', { ascending: true })
-    
-    setClosures((closuresData as BarberClosure[]) || [])
     setLoading(false)
   }, [barber?.id, normalizeTime, report])
 
@@ -240,78 +224,6 @@ export default function MySchedulePage() {
     }
     
     setSavingSchedule(false)
-  }
-
-  const handleAddClosure = async () => {
-    if (!barber?.id) return
-    
-    if (!closureStartDate || !closureEndDate) {
-      toast.error('נא לבחור תאריכי התחלה וסיום')
-      return
-    }
-    
-    if (new Date(closureStartDate) > new Date(closureEndDate)) {
-      toast.error('תאריך התחלה לא יכול להיות אחרי תאריך הסיום')
-      return
-    }
-    
-    setSavingClosure(true)
-    const supabase = createClient()
-    
-    const { error } = await supabase.from('barber_closures')
-      .insert({
-        barber_id: barber.id,
-        start_date: closureStartDate,
-        end_date: closureEndDate,
-        reason: closureReason || null,
-      })
-    
-    if (error) {
-      console.error('Error adding closure:', error)
-      await report(new Error(error.message), 'Adding barber closure')
-      toast.error('שגיאה בהוספת יום סגירה')
-    } else {
-      toast.success('יום הסגירה נוסף בהצלחה!')
-      setShowClosureForm(false)
-      setClosureStartDate('')
-      setClosureEndDate('')
-      setClosureReason('')
-      fetchData()
-    }
-    
-    setSavingClosure(false)
-  }
-
-  const handleDeleteClosure = async (id: string) => {
-    if (!confirm('האם למחוק את יום הסגירה?')) return
-    
-    const supabase = createClient()
-    
-    const { error } = await supabase
-      .from('barber_closures')
-      .delete()
-      .eq('id', id)
-    
-    if (error) {
-      console.error('Error deleting closure:', error)
-      await report(new Error(error.message), 'Deleting barber closure')
-      toast.error('שגיאה במחיקה')
-    } else {
-      toast.success('נמחק בהצלחה')
-      fetchData()
-    }
-  }
-
-  const formatDate = (dateStr: string): string => {
-    return new Date(dateStr).toLocaleDateString('he-IL', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-    })
-  }
-
-  const isUpcoming = (endDate: string): boolean => {
-    return new Date(endDate) >= new Date()
   }
 
   if (loading) {
@@ -482,112 +394,6 @@ export default function MySchedulePage() {
         </button>
       </div>
 
-      {/* Personal Closures */}
-      <div className="bg-background-card border border-white/10 rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-foreground-light flex items-center gap-2">
-            <Calendar size={20} strokeWidth={1.5} className="text-accent-gold" />
-            ימי היעדרות
-          </h3>
-          <button
-            onClick={() => setShowClosureForm(!showClosureForm)}
-            className="flex items-center gap-2 px-3 py-1.5 bg-accent-gold text-background-dark rounded-lg text-sm font-medium hover:bg-accent-gold/90 transition-colors"
-          >
-            <Plus size={12} strokeWidth={1.5} />
-            הוסף
-          </button>
-        </div>
-
-        {/* Add Closure Form */}
-        {showClosureForm && (
-          <div className="mb-4 p-4 bg-background-dark rounded-xl border border-white/5">
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="flex flex-col gap-2">
-                <label className="text-foreground-light text-sm">מתאריך</label>
-                <input
-                  type="date"
-                  value={closureStartDate}
-                  onChange={(e) => setClosureStartDate(e.target.value)}
-                  className="w-full p-2 rounded-lg bg-background-card border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-sm"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-foreground-light text-sm">עד תאריך</label>
-                <input
-                  type="date"
-                  value={closureEndDate}
-                  onChange={(e) => setClosureEndDate(e.target.value)}
-                  className="w-full p-2 rounded-lg bg-background-card border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-sm"
-                />
-              </div>
-            </div>
-            <div className="flex flex-col gap-2 mb-4">
-              <label className="text-foreground-light text-sm">סיבה (מוצג ללקוחות)</label>
-              <input
-                type="text"
-                value={closureReason}
-                onChange={(e) => setClosureReason(e.target.value)}
-                placeholder="לדוגמה: חופשה"
-                className="w-full p-2 rounded-lg bg-background-card border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold text-sm"
-              />
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleAddClosure}
-                disabled={savingClosure}
-                className="flex-1 py-2 bg-accent-gold text-background-dark rounded-lg text-sm font-medium hover:bg-accent-gold/90 disabled:opacity-50"
-              >
-                {savingClosure ? 'שומר...' : 'שמור'}
-              </button>
-              <button
-                onClick={() => setShowClosureForm(false)}
-                className="px-4 py-2 bg-background-card border border-white/10 text-foreground-muted rounded-lg text-sm hover:text-foreground-light"
-              >
-                ביטול
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Closures List */}
-        {closures.length === 0 ? (
-          <div className="text-center py-6">
-            <p className="text-foreground-muted text-sm">אין ימי היעדרות מתוכננים</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {closures.map((closure) => (
-              <div
-                key={closure.id}
-                className={cn(
-                  'flex items-center justify-between p-3 rounded-xl border',
-                  isUpcoming(closure.end_date)
-                    ? 'bg-background-dark border-white/5'
-                    : 'bg-background-dark/50 border-white/5 opacity-60'
-                )}
-              >
-                <div>
-                  <p className="text-foreground-light text-sm">
-                    {formatDate(closure.start_date)}
-                    {closure.start_date !== closure.end_date && (
-                      <> - {formatDate(closure.end_date)}</>
-                    )}
-                  </p>
-                  {closure.reason && (
-                    <p className="text-foreground-muted text-xs">{closure.reason}</p>
-                  )}
-                </div>
-                <button
-                  onClick={() => handleDeleteClosure(closure.id)}
-                  className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors flex items-center justify-center"
-                >
-                  <Trash size={12} strokeWidth={1.5} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   )
 }

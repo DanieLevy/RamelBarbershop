@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { useAuthStore } from '@/store/useAuthStore'
 import type { BarberWithWorkDays, Service, BarbershopSettings, BarbershopClosure, BarberClosure, BarberMessage, BarberBookingSettings } from '@/types/database'
@@ -15,6 +15,8 @@ import { Confirmation } from './Confirmation'
 import { LoggedInConfirmation } from './LoggedInConfirmation'
 import { Bell } from 'lucide-react'
 import ErrorBoundary from '@/components/ErrorBoundary'
+import { getBarberClosures } from '@/lib/services/availability.service'
+import { createClient } from '@/lib/supabase/client'
 
 interface BookingWizardClientProps {
   barberId: string
@@ -42,11 +44,61 @@ export function BookingWizardClient({
   const { step, setBarberId, setService, nextStep, setLoggedInUser, reset, getActualStep, isUserLoggedIn } = useBookingStore()
   const { customer: loggedInCustomer, isLoggedIn, isInitialized } = useAuthStore()
   
+  // Dynamic closures state - initialized with server-side data, updated via real-time subscription
+  const [dynamicBarberClosures, setDynamicBarberClosures] = useState<BarberClosure[]>(barberClosures)
+  
+  // Refresh closures from server
+  const refreshClosures = useCallback(async () => {
+    try {
+      const freshClosures = await getBarberClosures(barberId)
+      setDynamicBarberClosures(freshClosures)
+      console.log('[BookingWizard] Closures refreshed:', freshClosures.length)
+    } catch (err) {
+      console.error('[BookingWizard] Error refreshing closures:', err)
+    }
+  }, [barberId])
+  
   // Set barber ID on mount and reset on unmount
   useEffect(() => {
     setBarberId(barberId)
     return () => reset()
   }, [barberId, setBarberId, reset])
+  
+  // Real-time subscription for barber closures
+  useEffect(() => {
+    const supabase = createClient()
+    
+    // Subscribe to barber_closures changes for this barber
+    const channel = supabase
+      .channel(`barber_closures_${barberId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'barber_closures',
+          filter: `barber_id=eq.${barberId}`
+        },
+        (payload) => {
+          console.log('[BookingWizard] Closure change detected:', payload.eventType)
+          // Refresh closures when any change occurs
+          refreshClosures()
+        }
+      )
+      .subscribe()
+    
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [barberId, refreshClosures])
+  
+  // Refresh closures when entering date selection step
+  useEffect(() => {
+    const actualStep = getActualStep()
+    if (actualStep === 'date') {
+      refreshClosures()
+    }
+  }, [step, getActualStep, refreshClosures])
 
   // Handle pre-selected service - auto-advance to date selection
   useEffect(() => {
@@ -84,7 +136,7 @@ export function BookingWizardClient({
             workDays={barber.work_days}
             shopSettings={shopSettings}
             shopClosures={shopClosures}
-            barberClosures={barberClosures}
+            barberClosures={dynamicBarberClosures}
             barberBookingSettings={barberBookingSettings}
           />
         )

@@ -91,6 +91,7 @@ interface SectionHeaderProps {
   subtitle?: string
   className?: string
   align?: 'center' | 'start'
+  onTitleClick?: () => void
 }
 
 /**
@@ -101,6 +102,7 @@ export const SectionHeader = ({
   subtitle,
   className,
   align = 'center',
+  onTitleClick,
 }: SectionHeaderProps) => {
   return (
     <div className={cn(
@@ -111,7 +113,13 @@ export const SectionHeader = ({
       {/* Full-width divider line - lighter color */}
       <div className="w-full h-px bg-gradient-to-r from-transparent via-white/15 to-transparent mb-6 sm:mb-8" />
       
-      <h2 className="text-2xl sm:text-3xl lg:text-4xl font-light text-foreground-light">
+      <h2 
+        className={cn(
+          "text-2xl sm:text-3xl lg:text-4xl font-light text-foreground-light",
+          onTitleClick && "cursor-pointer select-none"
+        )}
+        onClick={onTitleClick}
+      >
         {title}
       </h2>
       

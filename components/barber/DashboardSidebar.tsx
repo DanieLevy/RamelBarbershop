@@ -23,6 +23,9 @@ import {
   Images,
   Repeat,
   Coffee,
+  CalendarOff,
+  BarChart3,
+  UserX,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -38,9 +41,12 @@ const navItems: NavItem[] = [
   { label: 'התורים שלי', href: '/barber/dashboard/reservations', icon: Calendar },
   { label: 'תורים קבועים', href: '/barber/dashboard/recurring', icon: Repeat },
   { label: 'הפסקות', href: '/barber/dashboard/breakouts', icon: Coffee },
+  { label: 'ימי היעדרות', href: '/barber/dashboard/absence-days', icon: CalendarOff },
   { label: 'הלקוחות שלי', href: '/barber/dashboard/customers', icon: Users },
+  { label: 'לקוחות חסומים', href: '/barber/dashboard/blocked-customers', icon: UserX },
   { label: 'השירותים שלי', href: '/barber/dashboard/services', icon: Scissors },
   { label: 'הלו"ז שלי', href: '/barber/dashboard/my-schedule', icon: Clock },
+  { label: 'דוחות', href: '/barber/dashboard/reports', icon: BarChart3 },
   { label: 'פרופיל', href: '/barber/dashboard/profile', icon: User },
   { label: 'גלריה', href: '/barber/dashboard/gallery', icon: Images },
   { label: 'העדפות', href: '/barber/dashboard/preferences', icon: Bell },
