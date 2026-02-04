@@ -1,4 +1,4 @@
-import { format, addDays, startOfDay, setHours, setMinutes } from 'date-fns'
+import { format, addDays, startOfDay, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns'
 import { toZonedTime, fromZonedTime } from 'date-fns-tz'
 import { he } from 'date-fns/locale'
 
@@ -360,7 +360,11 @@ export function generateTimeSlots(
   const slots: { timestamp: number; time: string }[] = []
   
   const baseDate = timestampToIsraelDate(dateTimestamp)
-  const startDate = setMinutes(setHours(baseDate, startHour), startMinute)
+  let startDate = setMinutes(setHours(baseDate, startHour), startMinute)
+  // CRITICAL: Zero out seconds and milliseconds for clean slot timestamps
+  // This ensures all generated slots have consistent timestamps (e.g., 17:30:00.000 not 17:30:42.952)
+  // Without this, slots from different sources (calendar vs nowInIsrael) would have different seconds
+  startDate = setSeconds(setMilliseconds(startDate, 0), 0)
   
   // Handle midnight (00:00) as end of day (24:00)
   // If endHour is 0 and endMinute is 0, treat it as 24:00 (next day midnight)
@@ -371,6 +375,8 @@ export function generateTimeSlots(
   } else {
     endDate = setMinutes(setHours(baseDate, endHour), endMinute)
   }
+  // Also zero out end date seconds/ms for consistency
+  endDate = setSeconds(setMilliseconds(endDate, 0), 0)
   
   let currentTime = startDate.getTime()
   const endTime = endDate.getTime()

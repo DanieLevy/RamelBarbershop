@@ -96,16 +96,29 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
           // User will see a more accurate view on retry
         }
         
-        // Create a set of reserved timestamps - simple exact match
+        // Create array of reserved timestamps with tolerance matching
         // Each booking occupies exactly one 30-minute slot
-        const reservedTimestamps = new Set<number>()
+        // Tolerance of 60 seconds handles legacy data with non-zero seconds/milliseconds
+        const SLOT_TOLERANCE_MS = 60 * 1000 // 60 seconds tolerance
+        
+        const reservedTimestampsList: number[] = []
         const reservedMap = new Map<number, string>()
         
         if (reservations) {
           for (const res of reservations) {
-            reservedTimestamps.add(res.time_timestamp)
+            reservedTimestampsList.push(res.time_timestamp)
             reservedMap.set(res.time_timestamp, res.customer_name)
           }
+        }
+        
+        // Helper function to check if a slot matches a reserved timestamp within tolerance
+        const isSlotReserved = (slotTs: number): { reserved: boolean; reservedBy?: string } => {
+          for (const resTs of reservedTimestampsList) {
+            if (Math.abs(slotTs - resTs) < SLOT_TOLERANCE_MS) {
+              return { reserved: true, reservedBy: reservedMap.get(resTs) }
+            }
+          }
+          return { reserved: false }
         }
         
         // Fetch recurring appointments for this day
@@ -121,7 +134,7 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
         }
         
         // Convert recurring time_slot (HH:MM) to timestamp for the selected date
-        const recurringTimestamps = new Set<number>()
+        const recurringTimestampsList: number[] = []
         const recurringMap = new Map<number, string>()
         
         for (const rec of recurringSlots) {
@@ -133,8 +146,18 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
           israelDate.setHours(hour, minute, 0, 0)
           const recTimestamp = israelDate.getTime()
           
-          recurringTimestamps.add(recTimestamp)
+          recurringTimestampsList.push(recTimestamp)
           recurringMap.set(recTimestamp, `${rec.customer_name} (קבוע)`)
+        }
+        
+        // Helper function to check if a slot matches a recurring timestamp within tolerance
+        const isSlotRecurring = (slotTs: number): { reserved: boolean; reservedBy?: string } => {
+          for (const recTs of recurringTimestampsList) {
+            if (Math.abs(slotTs - recTs) < SLOT_TOLERANCE_MS) {
+              return { reserved: true, reservedBy: recurringMap.get(recTs) }
+            }
+          }
+          return { reserved: false }
         }
         
         // Calculate minimum booking time threshold
@@ -149,32 +172,40 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
         const tooSoon: EnrichedTimeSlot[] = []
         
         for (const slot of allSlots) {
-          if (reservedTimestamps.has(slot.timestamp)) {
+          // Check if slot is reserved using tolerance matching
+          const reservationCheck = isSlotReserved(slot.timestamp)
+          
+          if (reservationCheck.reserved) {
             reserved.push({
               time_timestamp: slot.timestamp,
               is_available: false,
-              reservedBy: reservedMap.get(slot.timestamp),
-            })
-          } else if (recurringTimestamps.has(slot.timestamp)) {
-            // Slot is blocked by a recurring appointment
-            reserved.push({
-              time_timestamp: slot.timestamp,
-              is_available: false,
-              reservedBy: recurringMap.get(slot.timestamp),
-              isRecurring: true,
-            })
-          } else if (slot.timestamp < minBookingTimeMs) {
-            // Slot is within min_hours_before_booking window - can't book
-            tooSoon.push({
-              time_timestamp: slot.timestamp,
-              is_available: false,
-              tooSoon: true,
+              reservedBy: reservationCheck.reservedBy,
             })
           } else {
-            available.push({
-              time_timestamp: slot.timestamp,
-              is_available: true,
-            })
+            // Check if slot is reserved by recurring appointment using tolerance matching
+            const recurringCheck = isSlotRecurring(slot.timestamp)
+            
+            if (recurringCheck.reserved) {
+              // Slot is blocked by a recurring appointment
+              reserved.push({
+                time_timestamp: slot.timestamp,
+                is_available: false,
+                reservedBy: recurringCheck.reservedBy,
+                isRecurring: true,
+              })
+            } else if (slot.timestamp < minBookingTimeMs) {
+              // Slot is within min_hours_before_booking window - can't book
+              tooSoon.push({
+                time_timestamp: slot.timestamp,
+                is_available: false,
+                tooSoon: true,
+              })
+            } else {
+              available.push({
+                time_timestamp: slot.timestamp,
+                is_available: true,
+              })
+            }
           }
         }
         

@@ -250,8 +250,10 @@ export function ManualBookingModal({
     
     if (isNaN(hour) || isNaN(minute)) return null
     
-    // Create timestamp for the selected date with custom time
-    const date = new Date(selectedDate)
+    // Create clean timestamp for the selected date with custom time
+    // Use Israel day start to get a clean base date (00:00:00.000)
+    const cleanDayStart = getIsraelDayStart(selectedDate)
+    const date = new Date(cleanDayStart)
     date.setHours(hour, minute, 0, 0)
     
     return date.getTime()
