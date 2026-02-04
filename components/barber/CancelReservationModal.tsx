@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { X, AlertTriangle, Calendar, Clock } from 'lucide-react'
-import { cn, formatTime, formatDateHebrew } from '@/lib/utils'
+import { cn, formatTime, formatDateHebrew, normalizeTimestampFormat } from '@/lib/utils'
 import { Portal } from '@/components/ui/Portal'
 
 interface ReservationInfo {
@@ -42,13 +42,8 @@ export function CancelReservationModal({
     onClose()
   }
 
-  // Normalize timestamp
-  const normalizeTs = (ts: number): number => {
-    if (ts < 946684800000) return ts * 1000
-    return ts
-  }
-
-  const timestamp = normalizeTs(reservation.time_timestamp)
+  // Normalize timestamp format (seconds to ms if needed)
+  const timestamp = normalizeTimestampFormat(reservation.time_timestamp)
 
   return (
     <Portal>

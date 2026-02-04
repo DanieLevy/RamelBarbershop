@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { cn, formatTime as formatTimeUtil, nowInIsrael, generateTimeSlots, parseTimeString, getIsraelDayStart, getIsraelDayEnd, timestampToIsraelDate, isSameDayInIsrael, getDayKeyInIsrael } from '@/lib/utils'
+import { cn, formatTime as formatTimeUtil, nowInIsrael, generateTimeSlots, parseTimeString, getIsraelDayStart, getIsraelDayEnd, timestampToIsraelDate, isSameDayInIsrael, getDayKeyInIsrael, getSlotKey, normalizeTimestampFormat } from '@/lib/utils'
 import { getExternalLinkProps } from '@/lib/utils/external-link'
 import { addDays, format, startOfWeek, endOfWeek, isSameDay, parse } from 'date-fns'
 import { he } from 'date-fns/locale'
@@ -535,11 +535,8 @@ function ReservationsContent() {
     }
   }
 
-  // Normalize timestamp
-  const normalizeTs = (ts: number): number => {
-    if (ts < 946684800000) return ts * 1000
-    return ts
-  }
+  // Use shared timestamp format normalization
+  const normalizeTs = normalizeTimestampFormat
 
   // Format phone number for WhatsApp (Israeli format)
   // WhatsApp requires international format without + or spaces
@@ -747,13 +744,20 @@ function ReservationsContent() {
         // Track which reservations have been added to avoid duplicates
         const addedReservationIds = new Set<string>()
         
+        // Build slot key map for fast lookup
+        const reservationsBySlotKey = new Map<string, ReservationWithService>()
+        for (const res of upcomingReservations) {
+          const slotKey = getSlotKey(normalizeTs(res.time_timestamp))
+          reservationsBySlotKey.set(slotKey, res)
+        }
+        
         for (const slot of allSlots) {
           // Only show future slots
           if (slot.timestamp <= now) continue
           
-          const reservation = upcomingReservations.find(res => 
-            Math.abs(normalizeTs(res.time_timestamp) - slot.timestamp) < 60000
-          )
+          // Use slot key matching (robust, ignores milliseconds)
+          const slotKey = getSlotKey(slot.timestamp)
+          const reservation = reservationsBySlotKey.get(slotKey)
           
           if (reservation) {
             items.push({ type: 'reservation', data: reservation, isPast: false })

@@ -8,6 +8,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
+import { normalizeToSlotBoundary, SLOT_INTERVAL_MS } from '@/lib/utils'
 
 // ============================================================
 // Types
@@ -252,6 +253,7 @@ export async function cancelReservation(
 
 /**
  * Check if a time slot is available for booking
+ * Uses slot boundary matching for robust comparison
  */
 export async function checkSlotAvailability(
   barberId: string,
@@ -264,11 +266,17 @@ export async function checkSlotAvailability(
   try {
     const supabase = createClient()
     
+    // Normalize to slot boundary for robust matching
+    const slotStart = normalizeToSlotBoundary(timeTimestamp)
+    const slotEnd = slotStart + SLOT_INTERVAL_MS - 1
+    
+    // Query using range to catch any timestamps within the same 30-minute slot
     const { data, error } = await supabase
       .from('reservations')
       .select('id')
       .eq('barber_id', barberId)
-      .eq('time_timestamp', timeTimestamp)
+      .gte('time_timestamp', slotStart)
+      .lte('time_timestamp', slotEnd)
       .eq('status', 'confirmed')
       .maybeSingle()
     

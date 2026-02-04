@@ -8,6 +8,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
+import { getSlotKey, timestampToIsraelDate, israelDateToTimestamp, getIsraelDayStart, getDayKeyInIsrael } from '@/lib/utils'
 import type {
   RecurringAppointment,
   RecurringAppointmentWithDetails,
@@ -427,7 +428,7 @@ export const checkReservationConflicts = async (
     // Calculate date range in milliseconds (today to maxDaysAhead)
     // Using Israel timezone for consistency
     const nowMs = Date.now()
-    const startOfTodayIsrael = getStartOfDayInIsrael(nowMs)
+    const startOfTodayIsrael = getIsraelDayStart(nowMs)
     const endMs = startOfTodayIsrael + (maxDaysAhead * 24 * 60 * 60 * 1000)
     
     // Get target day number (0 = Sunday, etc.)
@@ -435,22 +436,26 @@ export const checkReservationConflicts = async (
     
     // Parse time slot
     const [hours, minutes] = timeSlot.split(':').map(Number)
-    const timeOfDayMs = (hours * 60 + minutes) * 60 * 1000
     
     // Calculate all matching timestamps within range
     const matchingTimestamps: number[] = []
-    const currentDayMs = startOfTodayIsrael
     
     for (let dayOffset = 0; dayOffset <= maxDaysAhead; dayOffset++) {
-      const dayMs = currentDayMs + (dayOffset * 24 * 60 * 60 * 1000)
-      const dateAtDay = new Date(dayMs)
-      // Get day of week in Israel timezone
-      const israelDate = new Date(dateAtDay.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }))
+      const dayMs = startOfTodayIsrael + (dayOffset * 24 * 60 * 60 * 1000)
+      
+      // Get day of week in Israel timezone using proper utility
+      const israelDate = timestampToIsraelDate(dayMs)
       
       if (israelDate.getDay() === targetDayIndex) {
         // This day matches our target day of week
-        // Calculate the exact timestamp for this day + time slot
-        const appointmentTimestamp = dayMs + timeOfDayMs
+        // Calculate the exact timestamp using Israel timezone (handles DST correctly)
+        const appointmentTimestamp = israelDateToTimestamp(
+          israelDate.getFullYear(),
+          israelDate.getMonth() + 1,
+          israelDate.getDate(),
+          hours,
+          minutes
+        )
         // Only include if it's in the future
         if (appointmentTimestamp > nowMs) {
           matchingTimestamps.push(appointmentTimestamp)
@@ -482,10 +487,12 @@ export const checkReservationConflicts = async (
       return []
     }
     
-    // Filter reservations that match our target timestamps (with 1 minute tolerance)
-    const TOLERANCE_MS = 60 * 1000 // 1 minute tolerance
+    // Filter reservations that match our target timestamps using slot key matching
+    // This is robust and handles any timestamp variations within the same 30-min slot
+    const targetSlotKeys = new Set(matchingTimestamps.map(ts => getSlotKey(ts)))
     const conflicts = (data || []).filter(r => {
-      return matchingTimestamps.some(ts => Math.abs(r.time_timestamp - ts) < TOLERANCE_MS)
+      const reservationSlotKey = getSlotKey(r.time_timestamp)
+      return targetSlotKeys.has(reservationSlotKey)
     })
     
     // Format for display
@@ -510,22 +517,7 @@ export const checkReservationConflicts = async (
   }
 }
 
-/**
- * Get start of day in Israel timezone (in milliseconds)
- */
-const getStartOfDayInIsrael = (timestampMs: number): number => {
-  const date = new Date(timestampMs)
-  const israelDateStr = date.toLocaleString('en-US', { 
-    timeZone: 'Asia/Jerusalem',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
-  // Parse "MM/DD/YYYY" format
-  const [month, day, year] = israelDateStr.split('/')
-  const startOfDay = new Date(`${year}-${month}-${day}T00:00:00+02:00`) // Israel is UTC+2 or +3
-  return startOfDay.getTime()
-}
+// getStartOfDayInIsrael has been removed - now using getIsraelDayStart from lib/utils.ts directly
 
 /**
  * Format date to Hebrew display format
@@ -580,23 +572,29 @@ export const cancelConflictingReservations = async (
 
 /**
  * Convert a time slot string (HH:MM) to a timestamp for a specific date
+ * Uses Israel timezone for proper conversion
  */
 export const timeSlotToTimestamp = (timeSlot: string, dateTimestamp: number): number => {
   const [hours, minutes] = timeSlot.split(':').map(Number)
-  const date = new Date(dateTimestamp)
-  date.setHours(hours, minutes, 0, 0)
-  return date.getTime()
+  // Convert to Israel timezone to get correct year/month/day
+  const israelDate = timestampToIsraelDate(dateTimestamp)
+  // Create timestamp using Israel timezone components
+  return israelDateToTimestamp(
+    israelDate.getFullYear(),
+    israelDate.getMonth() + 1,
+    israelDate.getDate(),
+    hours,
+    minutes
+  )
 }
 
 /**
  * Get the day of week key from a timestamp (in Israel timezone)
+ * Uses the shared utility for consistency
  */
 export const getDayOfWeekFromTimestamp = (timestamp: number): DayOfWeek => {
-  const date = new Date(timestamp)
-  // Convert to Israel timezone
-  const israelDate = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }))
-  const dayIndex = israelDate.getDay()
-  return VALID_DAYS[dayIndex]
+  // Use shared utility for Israel timezone day key
+  return getDayKeyInIsrael(timestamp) as DayOfWeek
 }
 
 /**

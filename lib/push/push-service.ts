@@ -8,6 +8,9 @@
 import webpush from 'web-push'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getNotificationTemplate } from './notification-templates'
+import { timestampToIsraelDate, nowInIsraelMs } from '@/lib/utils'
+import { format } from 'date-fns'
+import { he } from 'date-fns/locale'
 import type { Json } from '@/types/database'
 import type {
   NotificationPayload,
@@ -768,17 +771,10 @@ class PushNotificationService {
   }): Promise<SendNotificationResult> {
     const { reservationId, barberId, customerId, customerName, serviceName, appointmentTime } = params
 
-    // Format appointment time for the notification
-    const appointmentDate = new Date(appointmentTime)
-    const formattedDate = appointmentDate.toLocaleDateString('he-IL', { 
-      weekday: 'long', 
-      day: 'numeric', 
-      month: 'long' 
-    })
-    const formattedTime = appointmentDate.toLocaleTimeString('he-IL', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    })
+    // Format appointment time for the notification using Israel timezone
+    const israelDate = timestampToIsraelDate(appointmentTime)
+    const formattedDate = format(israelDate, 'EEEE, d בMMMM', { locale: he })
+    const formattedTime = format(israelDate, 'HH:mm')
 
     const payload: NotificationPayload = {
       title: `🙏 בקשת ביטול מ${customerName}`,
@@ -810,7 +806,7 @@ class PushNotificationService {
    * Get customer IDs with future appointments for a barber
    */
   private async getBarberCustomerIds(barberId: string): Promise<string[]> {
-    const now = Date.now()
+    const now = nowInIsraelMs() // Use Israel timezone for consistency
     
     const { data } = await supabase
       .from('reservations')

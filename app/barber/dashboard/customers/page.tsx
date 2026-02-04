@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
+import { cn, nowInIsraelMs } from '@/lib/utils'
 import { getExternalLinkProps } from '@/lib/utils/external-link'
 import { 
   Users, 
@@ -94,7 +94,7 @@ export default function MyCustomersPage() {
     
     setLoading(true)
     const supabase = createClient()
-    const now = Date.now()
+    const now = nowInIsraelMs() // Use Israel timezone for consistency
     
     try {
       // 1. Get all reservations for this barber (both past and future)

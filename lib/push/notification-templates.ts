@@ -7,7 +7,7 @@
 
 import { format } from 'date-fns'
 import { he } from 'date-fns/locale'
-import { timestampToIsraelDate, formatHebrewDuration as formatDuration } from '@/lib/utils'
+import { timestampToIsraelDate, formatHebrewDuration as formatDuration, nowInIsraelMs } from '@/lib/utils'
 import type { 
   NotificationPayload, 
   NotificationType,
@@ -84,8 +84,8 @@ function getReminderTemplate(context: ReminderContext): NotificationPayload {
   const date = formatShortDate(context.appointmentTime)
   const fullDate = formatDate(context.appointmentTime)
   
-  // Calculate time until appointment
-  const now = Date.now()
+  // Calculate time until appointment (use Israel timezone for consistency)
+  const now = nowInIsraelMs()
   const msUntil = context.appointmentTime - now
   const minutesUntil = Math.round(msUntil / 60000)
   

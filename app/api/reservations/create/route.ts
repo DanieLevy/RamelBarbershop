@@ -8,6 +8,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { reportBug } from '@/lib/bug-reporter'
+import { normalizeToSlotBoundary } from '@/lib/utils'
 import type { DayOfWeek } from '@/types/database'
 
 // UUID validation
@@ -172,6 +173,14 @@ export async function POST(request: NextRequest) {
       )
     }
     
+    // CRITICAL: Normalize timestamps to slot boundaries before storing
+    // This ensures all reservations have clean timestamps (e.g., 17:30:00.000 not 17:30:42.952)
+    // This is the single source of truth for timestamp normalization
+    const normalizedTimeTimestamp = normalizeToSlotBoundary(body.timeTimestamp)
+    const normalizedDateTimestamp = normalizeToSlotBoundary(body.dateTimestamp)
+    
+    console.log(`[API/Create] Normalized timestamp: ${body.timeTimestamp} → ${normalizedTimeTimestamp}`)
+    
     // Call the atomic database function with service_role (bypasses RLS)
     const { data: reservationId, error } = await supabase.rpc('create_reservation_atomic', {
       p_barber_id: body.barberId,
@@ -179,8 +188,8 @@ export async function POST(request: NextRequest) {
       p_customer_id: body.customerId,
       p_customer_name: body.customerName.trim(),
       p_customer_phone: body.customerPhone.replace(/\D/g, ''),
-      p_date_timestamp: body.dateTimestamp,
-      p_time_timestamp: body.timeTimestamp,
+      p_date_timestamp: normalizedDateTimestamp,
+      p_time_timestamp: normalizedTimeTimestamp,
       p_day_name: body.dayName,
       p_day_num: body.dayNum,
       p_barber_notes: body.barberNotes?.trim() || null,

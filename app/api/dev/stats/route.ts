@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { validateDevToken, unauthorizedResponse } from '@/lib/auth/dev-auth'
+import { getIsraelDayStart, nowInIsraelMs } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,13 +17,16 @@ export async function GET(request: NextRequest) {
 
   try {
     const supabase = await createClient()
-    const todayStart = new Date()
-    todayStart.setHours(0, 0, 0, 0)
-    const todayStartMs = todayStart.getTime()
     
-    const monthStart = new Date()
-    monthStart.setDate(1)
-    monthStart.setHours(0, 0, 0, 0)
+    // Use Israel timezone for accurate day boundaries
+    const now = nowInIsraelMs()
+    const todayStartMs = getIsraelDayStart(now)
+    
+    // Month start in Israel timezone
+    const israelDate = new Date(now)
+    israelDate.setDate(1)
+    israelDate.setHours(0, 0, 0, 0)
+    const monthStart = israelDate
 
     // Fetch all stats in parallel
     const [

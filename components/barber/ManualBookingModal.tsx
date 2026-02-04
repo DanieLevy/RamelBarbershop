@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { X, Loader2, Search, User, Calendar, Clock, UserPlus, Scissors, AlertTriangle } from 'lucide-react'
-import { cn, generateTimeSlots, parseTimeString, nowInIsrael, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael } from '@/lib/utils'
+import { cn, generateTimeSlots, parseTimeString, nowInIsrael, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael, getSlotKey } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { createReservation } from '@/lib/services/booking.service'
 import { getOrCreateCustomer } from '@/lib/services/customer.service'
@@ -259,10 +259,11 @@ export function ManualBookingModal({
     return date.getTime()
   }, [isOutOfHours, selectedDate, customHour, customMinute])
   
-  // Check if custom time slot is already reserved
+  // Check if custom time slot is already reserved using slot key comparison
   const isCustomTimeReserved = useMemo(() => {
     if (!customTimeTimestamp) return false
-    return reservedSlots.some(reserved => Math.abs(reserved - customTimeTimestamp) < 60000)
+    const customSlotKey = getSlotKey(customTimeTimestamp)
+    return reservedSlots.some(reserved => getSlotKey(reserved) === customSlotKey)
   }, [customTimeTimestamp, reservedSlots])
 
   // Generate available time slots using barber's day-specific hours
@@ -302,6 +303,9 @@ export function ManualBookingModal({
       30
     )
     
+    // Build set of reserved slot keys for fast lookup
+    const reservedSlotKeys = new Set(reservedSlots.map(ts => getSlotKey(ts)))
+    
     // Filter out reserved and past slots
     const now = Date.now()
     return allSlots.filter(slot => {
@@ -309,10 +313,8 @@ export function ManualBookingModal({
       if (isSameDay(selectedDate, israelNow) && slot.timestamp < now) {
         return false
       }
-      // Skip reserved slots
-      return !reservedSlots.some(reserved => 
-        Math.abs(reserved - slot.timestamp) < 60000
-      )
+      // Skip reserved slots using slot key comparison
+      return !reservedSlotKeys.has(getSlotKey(slot.timestamp))
     })
   }, [selectedDate, shopSettings, reservedSlots, israelNow, barberWorkDays])
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { createClient } from '@/lib/supabase/client'
-import { formatTime, cn, parseTimeString, generateTimeSlots, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael, nowInIsrael } from '@/lib/utils'
+import { formatTime, cn, parseTimeString, generateTimeSlots, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael, nowInIsrael, getSlotKey, timestampToIsraelDate, israelDateToTimestamp } from '@/lib/utils'
 import type { TimeSlot, BarbershopSettings, WorkDay, BarberBookingSettings, DayOfWeek } from '@/types/database'
 import { ChevronRight, ChevronDown, ChevronUp, Clock, Repeat } from 'lucide-react'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
@@ -96,27 +96,26 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
           // User will see a more accurate view on retry
         }
         
-        // Create array of reserved timestamps with tolerance matching
-        // Each booking occupies exactly one 30-minute slot
-        // Tolerance of 60 seconds handles legacy data with non-zero seconds/milliseconds
-        const SLOT_TOLERANCE_MS = 60 * 1000 // 60 seconds tolerance
-        
-        const reservedTimestampsList: number[] = []
-        const reservedMap = new Map<number, string>()
+        // Create slot key map for fast lookup
+        // Using slot keys (e.g., "2026-02-04-17-30") instead of raw timestamps
+        // This is MUCH more robust than millisecond comparison
+        const reservedSlotKeys = new Set<string>()
+        const reservedMap = new Map<string, string>() // slot key -> customer name
         
         if (reservations) {
           for (const res of reservations) {
-            reservedTimestampsList.push(res.time_timestamp)
-            reservedMap.set(res.time_timestamp, res.customer_name)
+            // Convert stored timestamp to slot key - handles any dirty timestamps
+            const slotKey = getSlotKey(res.time_timestamp)
+            reservedSlotKeys.add(slotKey)
+            reservedMap.set(slotKey, res.customer_name)
           }
         }
         
-        // Helper function to check if a slot matches a reserved timestamp within tolerance
+        // Helper function to check if a slot is reserved using slot key comparison
         const isSlotReserved = (slotTs: number): { reserved: boolean; reservedBy?: string } => {
-          for (const resTs of reservedTimestampsList) {
-            if (Math.abs(slotTs - resTs) < SLOT_TOLERANCE_MS) {
-              return { reserved: true, reservedBy: reservedMap.get(resTs) }
-            }
+          const slotKey = getSlotKey(slotTs)
+          if (reservedSlotKeys.has(slotKey)) {
+            return { reserved: true, reservedBy: reservedMap.get(slotKey) }
           }
           return { reserved: false }
         }
@@ -133,29 +132,33 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
           // Continue without recurring data
         }
         
-        // Convert recurring time_slot (HH:MM) to timestamp for the selected date
-        const recurringTimestampsList: number[] = []
-        const recurringMap = new Map<number, string>()
+        // Convert recurring time_slot (HH:MM) to slot keys for the selected date
+        const recurringSlotKeys = new Set<string>()
+        const recurringMap = new Map<string, string>() // slot key -> customer name
         
         for (const rec of recurringSlots) {
           const { hour, minute } = parseTimeString(rec.time_slot)
-          // Create timestamp for this date + time
-          const recDate = new Date(date.dateTimestamp)
-          // Use Israel timezone context
-          const israelDate = new Date(recDate.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }))
-          israelDate.setHours(hour, minute, 0, 0)
-          const recTimestamp = israelDate.getTime()
+          // Create timestamp using Israel timezone properly (handles DST)
+          const israelDate = timestampToIsraelDate(date.dateTimestamp)
+          const recTimestamp = israelDateToTimestamp(
+            israelDate.getFullYear(),
+            israelDate.getMonth() + 1,
+            israelDate.getDate(),
+            hour,
+            minute
+          )
           
-          recurringTimestampsList.push(recTimestamp)
-          recurringMap.set(recTimestamp, `${rec.customer_name} (קבוע)`)
+          // Use slot key for consistent matching
+          const slotKey = getSlotKey(recTimestamp)
+          recurringSlotKeys.add(slotKey)
+          recurringMap.set(slotKey, `${rec.customer_name} (קבוע)`)
         }
         
-        // Helper function to check if a slot matches a recurring timestamp within tolerance
+        // Helper function to check if a slot is reserved by recurring using slot key
         const isSlotRecurring = (slotTs: number): { reserved: boolean; reservedBy?: string } => {
-          for (const recTs of recurringTimestampsList) {
-            if (Math.abs(slotTs - recTs) < SLOT_TOLERANCE_MS) {
-              return { reserved: true, reservedBy: recurringMap.get(recTs) }
-            }
+          const slotKey = getSlotKey(slotTs)
+          if (recurringSlotKeys.has(slotKey)) {
+            return { reserved: true, reservedBy: recurringMap.get(slotKey) }
           }
           return { reserved: false }
         }
@@ -172,7 +175,7 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
         const tooSoon: EnrichedTimeSlot[] = []
         
         for (const slot of allSlots) {
-          // Check if slot is reserved using tolerance matching
+          // Check if slot is reserved using slot key matching (robust, ignores milliseconds)
           const reservationCheck = isSlotReserved(slot.timestamp)
           
           if (reservationCheck.reserved) {
@@ -182,7 +185,7 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
               reservedBy: reservationCheck.reservedBy,
             })
           } else {
-            // Check if slot is reserved by recurring appointment using tolerance matching
+            // Check if slot is reserved by recurring appointment using slot key matching
             const recurringCheck = isSlotRecurring(slot.timestamp)
             
             if (recurringCheck.reserved) {

@@ -9,7 +9,7 @@ import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { AppointmentDetailModal } from '@/components/barber/AppointmentDetailModal'
 import { toast } from 'sonner'
-import { cn, formatTime as formatTimeUtil, timestampToIsraelDate, nowInIsrael, isSameDayInIsrael } from '@/lib/utils'
+import { cn, formatTime as formatTimeUtil, timestampToIsraelDate, nowInIsrael, isSameDayInIsrael, normalizeTimestampFormat } from '@/lib/utils'
 import { Calendar, Scissors, User, X, History, ChevronRight, LogIn, Info, AlertCircle, Repeat, Clock } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { ReservationWithDetails, CustomerRecurringAppointment } from '@/types/database'
@@ -124,9 +124,7 @@ function MyAppointmentsContent() {
       } else {
         // Determine which tab the reservation belongs to
         const now = Date.now()
-        const resTime = targetReservation.time_timestamp < 946684800000 
-          ? targetReservation.time_timestamp * 1000 
-          : targetReservation.time_timestamp
+        const resTime = normalizeTimestampFormat(targetReservation.time_timestamp)
         
         if (targetReservation.status === 'cancelled') {
           setActiveTab('cancelled')
@@ -255,9 +253,7 @@ function MyAppointmentsContent() {
       
       if (minCancelHours > 0) {
         const now = Date.now()
-        const resTime = reservation.time_timestamp < 946684800000 
-          ? reservation.time_timestamp * 1000 
-          : reservation.time_timestamp
+        const resTime = normalizeTimestampFormat(reservation.time_timestamp)
         const hoursUntil = (resTime - now) / (1000 * 60 * 60)
         
         if (hoursUntil < minCancelHours && hoursUntil > 0) {
@@ -335,11 +331,8 @@ function MyAppointmentsContent() {
     }
   }
 
-  // Normalize timestamp
-  const normalizeTimestamp = (ts: number): number => {
-    if (ts < 946684800000) return ts * 1000
-    return ts
-  }
+  // Use shared timestamp format normalization
+  const normalizeTimestamp = normalizeTimestampFormat
 
   const isUpcoming = (reservation: ReservationWithDetails): boolean => {
     const now = Date.now()
