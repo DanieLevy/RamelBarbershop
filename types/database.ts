@@ -1136,6 +1136,7 @@ export type Database = {
           p_day_name: string
           p_day_num: string
           p_barber_notes?: string | null
+          p_max_days_ahead?: number | null
         }
         Returns: string
       }

@@ -3,6 +3,24 @@
  * 
  * Server-side reservation creation using the atomic database function.
  * Uses service_role to bypass RLS for secure reservation management.
+ * 
+ * VALIDATION LAYERS:
+ * 1. Input validation (UUIDs, required fields)
+ * 2. Parallel pre-checks (all run concurrently for performance):
+ *    - Barber exists & is active
+ *    - Per-barber customer blocking
+ *    - Recurring appointment conflicts
+ *    - Breakout (break time) conflicts
+ *    - Barber closures (absence days)
+ *    - Barbershop closures
+ *    - Working hours validation
+ *    - Booking settings (max days ahead, min hours before)
+ *    - Past time validation
+ * 3. Atomic database function (race-condition safe):
+ *    - Slot availability (with advisory lock)
+ *    - Global customer blocking
+ *    - Customer double booking prevention
+ *    - Max future bookings enforcement
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -27,18 +45,38 @@ interface CreateReservationRequest {
   barberNotes?: string
 }
 
-// Error messages (Hebrew)
+// Error messages (Hebrew) - Complete list of all validation scenarios
 const ERROR_MESSAGES: Record<string, string> = {
+  // Input validation
+  VALIDATION_ERROR: 'חסרים נתונים ליצירת התור.',
+  
+  // Barber availability
+  BARBER_NOT_FOUND: 'הספר לא נמצא במערכת.',
+  BARBER_PAUSED: 'הספר אינו זמין כרגע לקביעת תורים.',
+  BARBER_CLOSED: 'הספר ביום חופש בתאריך זה.',
+  SHOP_CLOSED: 'המספרה סגורה בתאריך זה.',
+  OUTSIDE_WORK_HOURS: 'השעה מחוץ לשעות העבודה של הספר.',
+  NOT_WORKING_DAY: 'הספר לא עובד ביום זה.',
+  
+  // Time-based restrictions
+  PAST_APPOINTMENT: 'לא ניתן לקבוע תור לזמן שעבר.',
+  TOO_CLOSE_TO_APPOINTMENT: 'לא ניתן לקבוע תור בהתראה כה קצרה.',
+  DATE_OUT_OF_RANGE: 'התאריך שנבחר חורג מטווח ההזמנות המותר.',
+  
+  // Slot conflicts
   SLOT_ALREADY_TAKEN: 'השעה כבר נתפסה. אנא בחר שעה אחרת.',
   SLOT_RESERVED_RECURRING: 'השעה שמורה לתור קבוע.',
   SLOT_IN_BREAKOUT: 'השעה לא זמינה - הספר בהפסקה.',
+  
+  // Customer restrictions
   CUSTOMER_BLOCKED: 'לא ניתן לקבוע תור. אנא פנה לצוות המספרה.',
   CUSTOMER_DOUBLE_BOOKING: 'כבר יש לך תור בשעה זו.',
   MAX_BOOKINGS_REACHED: 'הגעת למקסימום התורים המותרים. בטל תור קיים כדי לקבוע חדש.',
-  DATE_OUT_OF_RANGE: 'התאריך שנבחר חורג מטווח ההזמנות המותר.',
-  BARBER_PAUSED: 'הספר אינו זמין כרגע לקביעת תורים.',
-  VALIDATION_ERROR: 'חסרים נתונים ליצירת התור.',
+  
+  // Generic errors
+  GENERIC_ERROR: 'אופס, אירעה שגיאה ביצירת התור.',
   DATABASE_ERROR: 'שגיאה ביצירת התור. נסה שוב.',
+  UNKNOWN_ERROR: 'שגיאה בלתי צפויה. נסה שוב.',
 }
 
 /**
@@ -78,6 +116,26 @@ function timestampToTimeSlot(timestamp: number): string {
   return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`
 }
 
+/**
+ * Get date string in Israel timezone (YYYY-MM-DD)
+ */
+function getIsraelDateString(timestamp: number): string {
+  const date = new Date(timestamp)
+  // Get date parts in Israel timezone
+  const year = date.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem', year: 'numeric' })
+  const month = date.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem', month: '2-digit' })
+  const day = date.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem', day: '2-digit' })
+  return `${year}-${month}-${day}`
+}
+
+/**
+ * Convert time string (HH:MM or HH:MM:SS) to minutes since midnight
+ */
+function timeToMinutes(timeStr: string): number {
+  const parts = timeStr.split(':').map(Number)
+  return parts[0] * 60 + (parts[1] || 0)
+}
+
 function parseBookingError(message: string): string {
   const errorCodes = [
     'SLOT_ALREADY_TAKEN',
@@ -101,7 +159,9 @@ export async function POST(request: NextRequest) {
   try {
     const body: CreateReservationRequest = await request.json()
     
-    // Validate all required fields
+    // ============================================================
+    // PHASE 1: Input Validation (synchronous, fast)
+    // ============================================================
     const validationErrors: string[] = []
     
     if (!body.barberId?.trim() || !UUID_REGEX.test(body.barberId)) {
@@ -147,20 +207,105 @@ export async function POST(request: NextRequest) {
     
     const supabase = createAdminClient()
     
-    // Check if customer is blocked by this barber (per-barber blocking)
-    // Returns generic error to avoid revealing the blocking
-    const { data: barberData, error: barberBlockError } = await supabase
-      .from('users')
-      .select('blocked_customers')
-      .eq('id', body.barberId)
-      .single()
+    // Pre-compute values needed for parallel queries (Israel timezone)
+    const dayOfWeek = getDayOfWeekFromTimestamp(body.timeTimestamp)
+    const timeSlot = timestampToTimeSlot(body.timeTimestamp)
+    const dateString = getIsraelDateString(body.dateTimestamp)
+    const slotMinutes = timeToMinutes(timeSlot)
+    const now = Date.now()
     
-    if (barberBlockError) {
-      console.error('[API/Create] Barber block check error:', barberBlockError)
-      // Don't fail - continue with booking
+    // ============================================================
+    // PHASE 2: Parallel Validation Queries (performance optimized)
+    // All independent checks run concurrently
+    // ============================================================
+    console.log('[API/Create] Running parallel validation checks...')
+    
+    const [
+      barberResult,
+      recurringResult,
+      breakoutResult,
+      barberClosuresResult,
+      shopClosuresResult,
+      workDaysResult,
+      bookingSettingsResult,
+    ] = await Promise.all([
+      // 1. Barber data: exists, is active, blocked customers list
+      supabase
+        .from('users')
+        .select('id, is_active, blocked_customers')
+        .eq('id', body.barberId)
+        .eq('is_barber', true)
+        .single(),
+      
+      // 2. Recurring appointment conflict
+      supabase
+        .from('recurring_appointments')
+        .select('id')
+        .eq('barber_id', body.barberId)
+        .eq('day_of_week', dayOfWeek)
+        .eq('time_slot', timeSlot)
+        .eq('is_active', true)
+        .maybeSingle(),
+      
+      // 3. Breakout conflicts (barber breaks)
+      supabase
+        .from('barber_breakouts')
+        .select('id, start_time, end_time, breakout_type, start_date, end_date, day_of_week')
+        .eq('barber_id', body.barberId)
+        .eq('is_active', true),
+      
+      // 4. Barber closures (absence days)
+      supabase
+        .from('barber_closures')
+        .select('id, start_date, end_date')
+        .eq('barber_id', body.barberId),
+      
+      // 5. Barbershop closures
+      supabase
+        .from('barbershop_closures')
+        .select('id, start_date, end_date'),
+      
+      // 6. Work days for this barber on requested day
+      supabase
+        .from('work_days')
+        .select('is_working, start_time, end_time')
+        .eq('user_id', body.barberId)
+        .eq('day_of_week', dayOfWeek)
+        .single(),
+      
+      // 7. Per-barber booking settings
+      supabase
+        .from('barber_booking_settings')
+        .select('max_booking_days_ahead, min_hours_before_booking')
+        .eq('barber_id', body.barberId)
+        .maybeSingle(),
+    ])
+    
+    console.log('[API/Create] Parallel checks completed, evaluating results...')
+    
+    // ============================================================
+    // PHASE 3: Evaluate All Validation Results
+    // ============================================================
+    
+    // 3.1 Check barber exists and is active
+    if (barberResult.error || !barberResult.data) {
+      console.error('[API/Create] Barber not found:', body.barberId)
+      return NextResponse.json(
+        { success: false, error: 'BARBER_NOT_FOUND', message: ERROR_MESSAGES.BARBER_NOT_FOUND },
+        { status: 400 }
+      )
     }
     
-    if (barberData?.blocked_customers?.includes(body.customerPhone)) {
+    if (barberResult.data.is_active === false) {
+      console.log('[API/Create] Barber is paused:', body.barberId)
+      return NextResponse.json(
+        { success: false, error: 'BARBER_PAUSED', message: ERROR_MESSAGES.BARBER_PAUSED },
+        { status: 400 }
+      )
+    }
+    
+    // 3.2 Check per-barber customer blocking
+    if (barberResult.data.blocked_customers?.includes(body.customerPhone)) {
       console.log('[API/Create] Blocked customer attempt:', body.customerPhone, 'for barber:', body.barberId)
       
       // Send push notification to barber about the blocked attempt (fire and forget)
@@ -180,60 +325,140 @@ export async function POST(request: NextRequest) {
       
       // Return generic error (don't reveal blocking)
       return NextResponse.json(
-        { success: false, error: 'GENERIC_ERROR', message: 'אופס, אירעה שגיאה ביצירת התור.' },
+        { success: false, error: 'GENERIC_ERROR', message: ERROR_MESSAGES.GENERIC_ERROR },
         { status: 400 }
       )
     }
     
-    // Check for recurring appointment conflict before creating
-    // This prevents booking a slot that's reserved for a recurring customer
-    const dayOfWeek = getDayOfWeekFromTimestamp(body.timeTimestamp)
-    const timeSlot = timestampToTimeSlot(body.timeTimestamp)
+    // 3.3 Check past time validation
+    if (body.timeTimestamp < now) {
+      console.log('[API/Create] Past appointment attempt:', new Date(body.timeTimestamp).toISOString())
+      return NextResponse.json(
+        { success: false, error: 'PAST_APPOINTMENT', message: ERROR_MESSAGES.PAST_APPOINTMENT },
+        { status: 400 }
+      )
+    }
     
-    const { data: recurringConflict, error: recurringError } = await supabase
-      .from('recurring_appointments')
-      .select('id')
-      .eq('barber_id', body.barberId)
-      .eq('day_of_week', dayOfWeek)
-      .eq('time_slot', timeSlot)
-      .eq('is_active', true)
-      .maybeSingle()
+    // 3.4 Check per-barber booking settings (min hours before, max days ahead)
+    const bookingSettings = bookingSettingsResult.data
+    if (bookingSettings) {
+      // Check min hours before booking
+      if (bookingSettings.min_hours_before_booking) {
+        const minMilliseconds = bookingSettings.min_hours_before_booking * 60 * 60 * 1000
+        const timeUntilAppointment = body.timeTimestamp - now
+        
+        if (timeUntilAppointment < minMilliseconds) {
+          console.log('[API/Create] Too close to appointment:', {
+            minHours: bookingSettings.min_hours_before_booking,
+            hoursRemaining: (timeUntilAppointment / (60 * 60 * 1000)).toFixed(2),
+          })
+          return NextResponse.json(
+            { success: false, error: 'TOO_CLOSE_TO_APPOINTMENT', message: ERROR_MESSAGES.TOO_CLOSE_TO_APPOINTMENT },
+            { status: 400 }
+          )
+        }
+      }
+      
+      // Check max days ahead (per-barber override)
+      if (bookingSettings.max_booking_days_ahead) {
+        const maxMilliseconds = bookingSettings.max_booking_days_ahead * 24 * 60 * 60 * 1000
+        const daysAhead = body.dateTimestamp - now
+        
+        if (daysAhead > maxMilliseconds) {
+          console.log('[API/Create] Date out of range:', {
+            maxDays: bookingSettings.max_booking_days_ahead,
+            daysRequested: Math.ceil(daysAhead / (24 * 60 * 60 * 1000)),
+          })
+          return NextResponse.json(
+            { success: false, error: 'DATE_OUT_OF_RANGE', message: ERROR_MESSAGES.DATE_OUT_OF_RANGE },
+            { status: 400 }
+          )
+        }
+      }
+    }
     
-    if (recurringError) {
-      console.error('[API/Create] Recurring check error:', recurringError)
+    // 3.5 Check working hours
+    if (workDaysResult.error) {
+      console.error('[API/Create] Work days check error:', workDaysResult.error)
+      // Don't fail - database function will catch this
+    } else if (workDaysResult.data) {
+      const workDay = workDaysResult.data
+      
+      // Check if barber works on this day
+      if (!workDay.is_working) {
+        console.log('[API/Create] Barber not working on day:', dayOfWeek)
+        return NextResponse.json(
+          { success: false, error: 'NOT_WORKING_DAY', message: ERROR_MESSAGES.NOT_WORKING_DAY },
+          { status: 400 }
+        )
+      }
+      
+      // Check if time is within working hours
+      if (workDay.start_time && workDay.end_time) {
+        const startMinutes = timeToMinutes(workDay.start_time)
+        const endMinutes = timeToMinutes(workDay.end_time)
+        
+        if (slotMinutes < startMinutes || slotMinutes >= endMinutes) {
+          console.log('[API/Create] Outside work hours:', {
+            requested: timeSlot,
+            workHours: `${workDay.start_time} - ${workDay.end_time}`,
+          })
+          return NextResponse.json(
+            { success: false, error: 'OUTSIDE_WORK_HOURS', message: ERROR_MESSAGES.OUTSIDE_WORK_HOURS },
+            { status: 400 }
+          )
+        }
+      }
+    }
+    
+    // 3.6 Check barber closures (absence days)
+    if (!barberClosuresResult.error && barberClosuresResult.data) {
+      for (const closure of barberClosuresResult.data) {
+        if (dateString >= closure.start_date && dateString <= closure.end_date) {
+          console.log('[API/Create] Barber closure found:', closure.id)
+          return NextResponse.json(
+            { success: false, error: 'BARBER_CLOSED', message: ERROR_MESSAGES.BARBER_CLOSED },
+            { status: 409 }
+          )
+        }
+      }
+    }
+    
+    // 3.7 Check barbershop closures
+    if (!shopClosuresResult.error && shopClosuresResult.data) {
+      for (const closure of shopClosuresResult.data) {
+        if (dateString >= closure.start_date && dateString <= closure.end_date) {
+          console.log('[API/Create] Shop closure found:', closure.id)
+          return NextResponse.json(
+            { success: false, error: 'SHOP_CLOSED', message: ERROR_MESSAGES.SHOP_CLOSED },
+            { status: 409 }
+          )
+        }
+      }
+    }
+    
+    // 3.8 Check recurring appointment conflict
+    if (recurringResult.error) {
+      console.error('[API/Create] Recurring check error:', recurringResult.error)
       // Don't fail the request, just log and continue
     }
     
-    if (recurringConflict) {
-      console.log('[API/Create] Recurring conflict found:', recurringConflict.id)
+    if (recurringResult.data) {
+      console.log('[API/Create] Recurring conflict found:', recurringResult.data.id)
       return NextResponse.json(
         { success: false, error: 'SLOT_RESERVED_RECURRING', message: ERROR_MESSAGES.SLOT_RESERVED_RECURRING },
         { status: 409 }
       )
     }
     
-    // Check for breakout conflict before creating
-    // This prevents booking a slot that's blocked by a barber break
-    const dateString = new Date(body.dateTimestamp).toISOString().split('T')[0]
-    
-    const { data: breakoutConflicts, error: breakoutError } = await supabase
-      .from('barber_breakouts')
-      .select('id, start_time, end_time, breakout_type, start_date, end_date, day_of_week')
-      .eq('barber_id', body.barberId)
-      .eq('is_active', true)
-    
-    if (breakoutError) {
-      console.error('[API/Create] Breakout check error:', breakoutError)
+    // 3.9 Check breakout conflicts
+    if (breakoutResult.error) {
+      console.error('[API/Create] Breakout check error:', breakoutResult.error)
       // Don't fail the request, just log and continue
     }
     
-    if (breakoutConflicts && breakoutConflicts.length > 0) {
-      // Check if any breakout applies to this date and time
-      const slotHour = parseInt(timeSlot.split(':')[0], 10)
-      const slotMinute = parseInt(timeSlot.split(':')[1], 10)
-      const slotMinutes = slotHour * 60 + slotMinute
-      
-      for (const breakout of breakoutConflicts) {
+    if (breakoutResult.data && breakoutResult.data.length > 0) {
+      for (const breakout of breakoutResult.data) {
         let appliesToDate = false
         
         // Check if breakout applies to this date
@@ -252,16 +477,15 @@ export async function POST(request: NextRequest) {
         
         if (appliesToDate) {
           // Check if time falls within breakout range
-          const [startH, startM] = breakout.start_time.split(':').map(Number)
-          const startMinutes = startH * 60 + startM
+          const startMinutes = timeToMinutes(breakout.start_time)
           const endMinutes = breakout.end_time
-            ? parseInt(breakout.end_time.split(':')[0], 10) * 60 + parseInt(breakout.end_time.split(':')[1], 10)
+            ? timeToMinutes(breakout.end_time)
             : 24 * 60 // Until end of day
           
           if (slotMinutes >= startMinutes && slotMinutes < endMinutes) {
             console.log('[API/Create] Breakout conflict found:', breakout.id)
             return NextResponse.json(
-              { success: false, error: 'SLOT_IN_BREAKOUT', message: 'השעה לא זמינה - הספר בהפסקה.' },
+              { success: false, error: 'SLOT_IN_BREAKOUT', message: ERROR_MESSAGES.SLOT_IN_BREAKOUT },
               { status: 409 }
             )
           }
@@ -269,15 +493,23 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    // ============================================================
+    // PHASE 4: Normalize Timestamps and Create Reservation
+    // ============================================================
+    
     // CRITICAL: Normalize timestamps to slot boundaries before storing
     // This ensures all reservations have clean timestamps (e.g., 17:30:00.000 not 17:30:42.952)
-    // This is the single source of truth for timestamp normalization
     const normalizedTimeTimestamp = normalizeToSlotBoundary(body.timeTimestamp)
     const normalizedDateTimestamp = normalizeToSlotBoundary(body.dateTimestamp)
     
     console.log(`[API/Create] Normalized timestamp: ${body.timeTimestamp} → ${normalizedTimeTimestamp}`)
     
+    // Calculate per-barber max days ahead for database function
+    // Use per-barber setting if available, otherwise database will use global default
+    const maxDaysAhead = bookingSettings?.max_booking_days_ahead ?? null
+    
     // Call the atomic database function with service_role (bypasses RLS)
+    // This handles final race-condition-safe validation and insert
     const { data: reservationId, error } = await supabase.rpc('create_reservation_atomic', {
       p_barber_id: body.barberId,
       p_service_id: body.serviceId,
@@ -289,6 +521,7 @@ export async function POST(request: NextRequest) {
       p_day_name: body.dayName,
       p_day_num: body.dayNum,
       p_barber_notes: body.barberNotes?.trim() || null,
+      p_max_days_ahead: maxDaysAhead,
     })
     
     if (error) {
@@ -342,7 +575,7 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    console.log('[API/Create] Reservation created:', reservationId)
+    console.log('[API/Create] Reservation created successfully:', reservationId)
     
     return NextResponse.json({
       success: true,
