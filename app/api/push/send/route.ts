@@ -10,7 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { pushService } from '@/lib/push/push-service'
-import { reportServerError } from '@/lib/bug-reporter/helpers'
+import { reportApiError } from '@/lib/bug-reporter/helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -139,9 +139,8 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('[API push/send] Error:', error)
-    await reportServerError(error, 'POST /api/push/send', {
-      route: '/api/push/send',
-      severity: 'high'
+    await reportApiError(error, request, 'Send push notification failed', {
+      severity: 'high',
     })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unknown error' },

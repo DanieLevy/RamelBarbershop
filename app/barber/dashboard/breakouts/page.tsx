@@ -2,12 +2,13 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { Coffee, Plus, Trash2, Clock, Calendar, AlertCircle, Repeat, X } from 'lucide-react'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import type { BarberBreakout, BreakoutType, DayOfWeek } from '@/types/database'
 import { DAY_OF_WEEK_HEBREW_MAP } from '@/lib/services/breakout.service'
+import { Button } from '@heroui/react'
 
 // Day order for grouping recurring breakouts
 const DAY_ORDER: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
@@ -76,13 +77,13 @@ export default function BreakoutsPage() {
       if (data.success) {
         setBreakouts(data.data || [])
       } else {
-        toast.error('שגיאה בטעינת הפסקות')
+        showToast.error('שגיאה בטעינת הפסקות')
         await report(new Error(data.message || 'Unknown error'), 'Fetching breakouts')
       }
     } catch (err) {
       console.error('Error fetching breakouts:', err)
       await report(err instanceof Error ? err : new Error(String(err)), 'Fetching breakouts')
-      toast.error('שגיאה בטעינת הפסקות')
+      showToast.error('שגיאה בטעינת הפסקות')
     } finally {
       setLoading(false)
     }
@@ -101,22 +102,22 @@ export default function BreakoutsPage() {
     
     // Validation
     if (!formData.startTime) {
-      toast.error('נא לבחור שעת התחלה')
+      showToast.error('נא לבחור שעת התחלה')
       return
     }
     
     if (formData.breakoutType === 'single' && !formData.startDate) {
-      toast.error('נא לבחור תאריך')
+      showToast.error('נא לבחור תאריך')
       return
     }
     
     if (formData.breakoutType === 'date_range') {
       if (!formData.startDate || !formData.endDate) {
-        toast.error('נא לבחור תאריכי התחלה וסיום')
+        showToast.error('נא לבחור תאריכי התחלה וסיום')
         return
       }
       if (formData.endDate < formData.startDate) {
-        toast.error('תאריך סיום חייב להיות אחרי תאריך התחלה')
+        showToast.error('תאריך סיום חייב להיות אחרי תאריך התחלה')
         return
       }
     }
@@ -144,9 +145,9 @@ export default function BreakoutsPage() {
       const data = await res.json()
       
       if (data.success) {
-        toast.success('ההפסקה נוספה בהצלחה')
+        showToast.success('ההפסקה נוספה בהצלחה')
         if (data.cancelledCount > 0) {
-          toast.info(`${data.cancelledCount} תורים בוטלו`)
+          showToast.info(`${data.cancelledCount} תורים בוטלו`)
         }
         setShowForm(false)
         setPendingFormData(null)
@@ -166,12 +167,12 @@ export default function BreakoutsPage() {
         setPendingFormData(formData)
         setShowConflictModal(true)
       } else {
-        toast.error(data.message || 'שגיאה ביצירת הפסקה')
+        showToast.error(data.message || 'שגיאה ביצירת הפסקה')
       }
     } catch (err) {
       console.error('Error creating breakout:', err)
       await report(err instanceof Error ? err : new Error(String(err)), 'Creating breakout')
-      toast.error('שגיאה ביצירת הפסקה')
+      showToast.error('שגיאה ביצירת הפסקה')
     } finally {
       setSaving(false)
     }
@@ -192,15 +193,15 @@ export default function BreakoutsPage() {
       const data = await res.json()
       
       if (data.success) {
-        toast.success('ההפסקה נמחקה בהצלחה')
+        showToast.success('ההפסקה נמחקה בהצלחה')
         await fetchBreakouts()
       } else {
-        toast.error(data.message || 'שגיאה במחיקת ההפסקה')
+        showToast.error(data.message || 'שגיאה במחיקת ההפסקה')
       }
     } catch (err) {
       console.error('Error deleting breakout:', err)
       await report(err instanceof Error ? err : new Error(String(err)), 'Deleting breakout')
-      toast.error('שגיאה במחיקת ההפסקה')
+      showToast.error('שגיאה במחיקת ההפסקה')
     } finally {
       setDeletingId(null)
     }
@@ -270,13 +271,13 @@ export default function BreakoutsPage() {
           </p>
         </div>
         
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-gold text-background-dark rounded-xl font-medium hover:bg-accent-gold/90 transition-colors"
+        <Button
+          onPress={() => setShowForm(!showForm)}
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-gold text-background-dark rounded-xl font-medium hover:bg-accent-gold/90"
         >
           <Plus size={18} />
           <span>הוסף הפסקה</span>
-        </button>
+        </Button>
       </div>
 
       {/* Stats - Horizontal Row */}
@@ -421,10 +422,10 @@ export default function BreakoutsPage() {
           
           {/* Actions */}
           <div className="flex gap-3">
-            <button
-              onClick={() => handleSubmit()}
-              disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-gold text-background-dark rounded-xl font-medium hover:bg-accent-gold/90 transition-colors disabled:opacity-50"
+            <Button
+              onPress={() => handleSubmit()}
+              isDisabled={saving}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-gold text-background-dark rounded-xl font-medium hover:bg-accent-gold/90"
             >
               {saving ? (
                 <div className="w-5 h-5 border-2 border-background-dark border-t-transparent rounded-full animate-spin" />
@@ -432,14 +433,15 @@ export default function BreakoutsPage() {
                 <Plus size={18} />
               )}
               <span>הוסף הפסקה</span>
-            </button>
-            <button
-              onClick={() => setShowForm(false)}
-              disabled={saving}
-              className="px-4 py-2.5 bg-white/5 text-foreground-muted rounded-xl font-medium hover:bg-white/10 transition-colors"
+            </Button>
+            <Button
+              variant="ghost"
+              onPress={() => setShowForm(false)}
+              isDisabled={saving}
+              className="px-4 py-2.5 bg-white/5 text-foreground-muted rounded-xl font-medium hover:bg-white/10"
             >
               ביטול
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -456,13 +458,13 @@ export default function BreakoutsPage() {
           <p className="text-sm text-foreground-muted mb-4">
             הוסף הפסקות כדי לחסום שעות ללקוחות - לצהריים, אירועים, או יציאה מוקדמת
           </p>
-          <button
-            onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-accent-gold text-background-dark rounded-xl font-medium hover:bg-accent-gold/90 transition-colors"
+          <Button
+            onPress={() => setShowForm(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-accent-gold text-background-dark rounded-xl font-medium hover:bg-accent-gold/90"
           >
             <Plus size={18} />
             <span>הוסף הפסקה</span>
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="space-y-2">
@@ -496,13 +498,15 @@ export default function BreakoutsPage() {
               </div>
               
               {/* Delete Button */}
-              <button
-                onClick={() => handleDelete(breakout.id)}
-                disabled={deletingId === breakout.id}
+              <Button
+                variant="ghost"
+                isIconOnly
+                onPress={() => handleDelete(breakout.id)}
+                isDisabled={deletingId === breakout.id}
                 className={cn(
-                  'flex items-center justify-center p-2 rounded-lg transition-colors flex-shrink-0',
+                  'min-w-[36px] w-9 h-9 rounded-lg flex-shrink-0',
                   deletingId === breakout.id
-                    ? 'bg-red-500/20 text-red-400 cursor-not-allowed'
+                    ? 'bg-red-500/20 text-red-400'
                     : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
                 )}
                 aria-label="מחק הפסקה"
@@ -512,7 +516,7 @@ export default function BreakoutsPage() {
                 ) : (
                   <Trash2 size={16} />
                 )}
-              </button>
+              </Button>
             </div>
           ))}
         </div>
@@ -550,10 +554,10 @@ export default function BreakoutsPage() {
               </div>
               
               <div className="flex gap-3">
-                <button
-                  onClick={() => handleSubmit(true)}
-                  disabled={saving}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 text-white rounded-xl font-medium hover:bg-red-500/90 transition-colors disabled:opacity-50"
+                <Button
+                  onPress={() => handleSubmit(true)}
+                  isDisabled={saving}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 text-white rounded-xl font-medium hover:bg-red-500/90"
                 >
                   {saving ? (
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -561,19 +565,20 @@ export default function BreakoutsPage() {
                     <Trash2 size={18} />
                   )}
                   <span>בטל תורים והמשך</span>
-                </button>
-                <button
-                  onClick={() => {
+                </Button>
+                <Button
+                  variant="ghost"
+                  onPress={() => {
                     setShowConflictModal(false)
                     setPendingFormData(null)
                     setConflicts([])
                   }}
-                  disabled={saving}
-                  className="px-4 py-2.5 bg-white/5 text-foreground-muted rounded-xl font-medium hover:bg-white/10 transition-colors flex items-center gap-2"
+                  isDisabled={saving}
+                  className="px-4 py-2.5 bg-white/5 text-foreground-muted rounded-xl font-medium hover:bg-white/10 flex items-center gap-2"
                 >
                   <X size={18} />
                   ביטול
-                </button>
+                </Button>
               </div>
             </div>
           </div>

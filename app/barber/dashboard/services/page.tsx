@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { Plus, Pencil, Trash2, Scissors } from 'lucide-react'
 import type { Service } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { Button } from '@heroui/react'
 
 export default function ServicesPage() {
   const { barber } = useBarberAuthStore()
@@ -77,17 +78,17 @@ export default function ServicesPage() {
 
   const handleSubmit = async () => {
     if (!nameHe.trim()) {
-      toast.error('נא להזין שם שירות')
+      showToast.error('נא להזין שם שירות')
       return
     }
     
     if (duration <= 0) {
-      toast.error('נא להזין משך זמן תקין')
+      showToast.error('נא להזין משך זמן תקין')
       return
     }
     
     if (price < 0) {
-      toast.error('מחיר לא יכול להיות שלילי')
+      showToast.error('מחיר לא יכול להיות שלילי')
       return
     }
     
@@ -113,9 +114,9 @@ export default function ServicesPage() {
       
       if (error) {
         console.error('Error updating service:', error)
-        toast.error(`שגיאה בעדכון השירות: ${error.message || 'שגיאה לא ידועה'}`)
+        showToast.error(`שגיאה בעדכון השירות: ${error.message || 'שגיאה לא ידועה'}`)
       } else {
-        toast.success('השירות עודכן בהצלחה!')
+        showToast.success('השירות עודכן בהצלחה!')
         resetForm()
         fetchServices()
       }
@@ -127,9 +128,9 @@ export default function ServicesPage() {
       
       if (error) {
         console.error('Error creating service:', error)
-        toast.error(`שגיאה ביצירת השירות: ${error.message || 'שגיאה לא ידועה'}`)
+        showToast.error(`שגיאה ביצירת השירות: ${error.message || 'שגיאה לא ידועה'}`)
       } else {
-        toast.success('השירות נוסף בהצלחה!')
+        showToast.success('השירות נוסף בהצלחה!')
         resetForm()
         fetchServices()
       }
@@ -150,9 +151,9 @@ export default function ServicesPage() {
     
     if (error) {
       console.error('Error deleting service:', error)
-      toast.error('שגיאה במחיקה')
+      showToast.error('שגיאה במחיקה')
     } else {
-      toast.success('השירות נמחק בהצלחה!')
+      showToast.success('השירות נמחק בהצלחה!')
       fetchServices()
     }
   }
@@ -172,13 +173,13 @@ export default function ServicesPage() {
           <h1 className="text-2xl font-medium text-foreground-light">השירותים שלי</h1>
           <p className="text-foreground-muted mt-1">נהל את השירותים שאתה מציע</p>
         </div>
-        <button
-          onClick={() => { resetForm(); setShowForm(true) }}
+        <Button
+          onPress={() => { resetForm(); setShowForm(true) }}
           className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-background-dark rounded-lg font-medium hover:bg-accent-gold/90 transition-colors"
         >
           <Plus size={16} strokeWidth={1.5} />
           הוסף שירות
-        </button>
+        </Button>
       </div>
       
       {/* 30-minute slot info */}
@@ -255,9 +256,9 @@ export default function ServicesPage() {
           </div>
 
           <div className="flex gap-3 mt-6">
-            <button
-              onClick={handleSubmit}
-              disabled={saving}
+            <Button
+              onPress={handleSubmit}
+              isDisabled={saving}
               className={cn(
                 'flex-1 py-3 rounded-xl font-medium transition-all flex items-center justify-center',
                 saving
@@ -266,13 +267,14 @@ export default function ServicesPage() {
               )}
             >
               {saving ? 'שומר...' : editingId ? 'עדכן' : 'הוסף'}
-            </button>
-            <button
-              onClick={resetForm}
+            </Button>
+            <Button
+              variant="ghost"
+              onPress={resetForm}
               className="px-6 py-3 rounded-xl bg-background-dark border border-white/10 text-foreground-muted hover:text-foreground-light transition-colors flex items-center justify-center"
             >
               ביטול
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -305,20 +307,24 @@ export default function ServicesPage() {
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleEdit(service)}
-                    className="p-2 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition-colors flex items-center justify-center"
-                    title="ערוך"
+                  <Button
+                    variant="ghost"
+                    isIconOnly
+                    onPress={() => handleEdit(service)}
+                    className="min-w-[32px] w-8 h-8 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition-colors"
+                    aria-label="ערוך"
                   >
                     <Pencil size={16} strokeWidth={1.5} />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(service.id)}
-                    className="p-2 text-foreground-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors flex items-center justify-center"
-                    title="מחק"
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    isIconOnly
+                    onPress={() => handleDelete(service.id)}
+                    className="min-w-[32px] w-8 h-8 text-foreground-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                    aria-label="מחק"
                   >
                     <Trash2 size={16} strokeWidth={1.5} />
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}

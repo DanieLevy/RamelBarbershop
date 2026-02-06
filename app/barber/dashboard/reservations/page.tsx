@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, Suspense, useRef, useCallback } from 'rea
 import { useSearchParams } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn, formatTime as formatTimeUtil, nowInIsrael, generateTimeSlots, parseTimeString, getIsraelDayStart, getIsraelDayEnd, timestampToIsraelDate, isSameDayInIsrael, getDayKeyInIsrael, getSlotKey, normalizeTimestampFormat } from '@/lib/utils'
 import { getExternalLinkProps } from '@/lib/utils/external-link'
 import { addDays, format, startOfWeek, endOfWeek, isSameDay, parse } from 'date-fns'
@@ -19,6 +19,7 @@ import { BulkCancelModal } from '@/components/barber/BulkCancelModal'
 import { AppointmentDetailModal } from '@/components/barber/AppointmentDetailModal'
 import { ManualBookingModal } from '@/components/barber/ManualBookingModal'
 import { cancelReservation } from '@/lib/services/booking.service'
+import { Button, Switch } from '@heroui/react'
 
 interface ReservationWithService extends Reservation {
   services?: Service
@@ -233,7 +234,7 @@ function ReservationsContent() {
             if (payload.eventType === 'INSERT') {
               const newRes = payload.new as ReservationWithService
               if (newRes.status === 'confirmed') {
-                toast.info('תור חדש התקבל!')
+                showToast.info('תור חדש התקבל!')
               }
             }
             
@@ -242,7 +243,7 @@ function ReservationsContent() {
               const updated = payload.new as ReservationWithService
               const old = payload.old as { status?: string }
               if (updated.status === 'cancelled' && old.status === 'confirmed' && updated.cancelled_by === 'customer') {
-                toast.warning('לקוח ביטל תור')
+                showToast.warning('לקוח ביטל תור')
               }
             }
           }
@@ -267,7 +268,7 @@ function ReservationsContent() {
               }, delay)
             } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
               console.error('[Realtime] Max reconnection attempts reached')
-              toast.error('התנתק מעדכונים בזמן אמת. רענן את הדף.')
+              showToast.error('התנתק מעדכונים בזמן אמת. רענן את הדף.')
             }
           } else if (status === 'CLOSED') {
             console.log('[Realtime] Channel closed')
@@ -403,7 +404,7 @@ function ReservationsContent() {
       if (error) {
         console.error('Error fetching reservations:', error)
         await report(new Error(error.message), 'Fetching barber reservations')
-        toast.error('שגיאה בטעינת התורים')
+        showToast.error('שגיאה בטעינת התורים')
         return
       }
       
@@ -411,7 +412,7 @@ function ReservationsContent() {
     } catch (err) {
       console.error('Error fetching reservations:', err)
       await report(err, 'Fetching barber reservations (exception)')
-      toast.error('שגיאה בטעינת התורים')
+      showToast.error('שגיאה בטעינת התורים')
     } finally {
       setLoading(false)
     }
@@ -423,7 +424,7 @@ function ReservationsContent() {
     // Get reservation details before cancelling for notification
     const reservation = reservations.find(r => r.id === id)
     if (!reservation) {
-      toast.error('התור לא נמצא')
+      showToast.error('התור לא נמצא')
       setUpdatingId(null)
       return
     }
@@ -437,7 +438,7 @@ function ReservationsContent() {
       
       if (!result.success) {
         if (result.concurrencyConflict) {
-          toast.error('התור עודכן על ידי אחר. מרענן...')
+          showToast.error('התור עודכן על ידי אחר. מרענן...')
           await fetchReservations()
           setCancelModal({ isOpen: false, reservation: null })
           setUpdatingId(null)
@@ -446,7 +447,7 @@ function ReservationsContent() {
         
         console.error('Error cancelling reservation:', result.error)
         await report(new Error(result.error || 'Unknown error'), 'Cancelling reservation', 'high')
-        toast.error(result.error || 'שגיאה בביטול התור')
+        showToast.error(result.error || 'שגיאה בביטול התור')
         return
       }
       
@@ -475,12 +476,12 @@ function ReservationsContent() {
         console.log('[Barber Cancel] No customer_id found, cannot send push notification')
       }
       
-      toast.success('התור בוטל בהצלחה')
+      showToast.success('התור בוטל בהצלחה')
       setCancelModal({ isOpen: false, reservation: null })
       await fetchReservations()
     } catch (err) {
       console.error('Error cancelling reservation:', err)
-      toast.error('שגיאה בביטול התור')
+      showToast.error('שגיאה בביטול התור')
     } finally {
       setUpdatingId(null)
     }
@@ -526,13 +527,13 @@ function ReservationsContent() {
         }
       }
       
-      toast.success(`${toCancel.length} תורים בוטלו בהצלחה`)
+      showToast.success(`${toCancel.length} תורים בוטלו בהצלחה`)
       setBulkCancelModal({ isOpen: false, reservations: [] })
       await fetchReservations()
     } catch (err) {
       console.error('Error bulk cancelling:', err)
       await report(err, 'Bulk cancelling reservations', 'high')
-      toast.error('שגיאה בביטול התורים')
+      showToast.error('שגיאה בביטול התורים')
     } finally {
       setUpdatingId(null)
     }
@@ -895,15 +896,16 @@ function ReservationsContent() {
         <div className="mb-3 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
           <span className="text-amber-400 text-sm">מתחבר מחדש לעדכונים בזמן אמת...</span>
-          <button
-            onClick={() => {
+          <Button
+            onPress={() => {
               fetchReservations()
-              toast.info('מרענן נתונים...')
+              showToast.info('מרענן נתונים...')
             }}
+            variant="ghost"
             className="mr-auto text-amber-400 hover:text-amber-300 text-sm underline"
           >
             רענן ידנית
-          </button>
+          </Button>
         </div>
       )}
       
@@ -1080,20 +1082,16 @@ function ReservationsContent() {
           {(quickDate === 'today' || quickDate === 'tomorrow' || quickDate === 'custom') && (
             <label className="flex items-center gap-2 text-xs text-foreground-muted cursor-pointer">
               <span>משבצות פנויות</span>
-              <button
-                onClick={() => setShowEmptySlots(!showEmptySlots)}
-                className={cn(
-                  'w-10 h-6 rounded-full transition-colors relative flex-shrink-0',
-                  showEmptySlots ? 'bg-accent-gold' : 'bg-white/10'
-                )}
-                aria-checked={showEmptySlots}
-                role="switch"
+              <Switch
+                isSelected={showEmptySlots}
+                onChange={setShowEmptySlots}
               >
-                <div className={cn(
-                  'absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all',
-                  showEmptySlots ? 'right-0.5' : 'left-0.5'
-                )} />
-              </button>
+                <Switch.Control className={cn(
+                  showEmptySlots ? 'bg-accent-gold' : 'bg-white/10'
+                )}>
+                  <Switch.Thumb/>
+                </Switch.Control>
+              </Switch>
             </label>
           )}
         </div>
@@ -1104,20 +1102,17 @@ function ReservationsContent() {
         <div className="flex items-center justify-end mb-3">
           <label className="flex items-center gap-2 text-sm text-foreground-muted cursor-pointer">
             <span>הצג משבצות פנויות</span>
-            <button
-              onClick={() => setShowEmptySlots(!showEmptySlots)}
-              className={cn(
-                'w-12 h-7 rounded-full transition-colors relative flex-shrink-0',
-                showEmptySlots ? 'bg-accent-gold' : 'bg-white/10'
-              )}
-              aria-checked={showEmptySlots}
-              role="switch"
+            <Switch
+              isSelected={showEmptySlots}
+              onChange={setShowEmptySlots}
             >
-              <div className={cn(
-                'absolute top-1 w-5 h-5 rounded-full bg-white transition-all',
-                showEmptySlots ? 'right-1' : 'left-1'
-              )} />
-            </button>
+              <Switch.Control className={cn(
+                'w-12 h-7',
+                showEmptySlots ? 'bg-accent-gold' : 'bg-white/10'
+              )}>
+                <Switch.Thumb />
+              </Switch.Control>
+            </Switch>
           </label>
         </div>
       )}
@@ -1176,20 +1171,21 @@ function ReservationsContent() {
                     </div>
                     
                     {/* Add button */}
-                    <button
-                      onClick={() => {
+                    <Button
+                      onPress={() => {
                         setManualBookingModal({
                           isOpen: true,
                           preselectedDate: getSelectedDate(),
                           preselectedTime: item.timestamp
                         })
                       }}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/[0.05] text-foreground-muted/50 hover:bg-accent-gold/20 hover:text-accent-gold transition-colors opacity-0 group-hover:opacity-100"
-                      title="הוסף תור"
+                      isIconOnly
+                      variant="ghost"
+                      className="min-w-[32px] w-8 h-8 flex items-center justify-center rounded-lg bg-white/[0.05] text-foreground-muted/50 hover:bg-accent-gold/20 hover:text-accent-gold transition-colors opacity-0 group-hover:opacity-100"
                       aria-label="הוסף תור"
                     >
                       <Plus size={16} strokeWidth={2} />
-                    </button>
+                    </Button>
                   </div>
                 )
               }
@@ -1288,22 +1284,25 @@ function ReservationsContent() {
                     
                     {/* Cancel - Only for upcoming appointments */}
                     {res.status === 'confirmed' && isUpcoming && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setCancelModal({ isOpen: true, reservation: res })
-                        }}
-                        disabled={updatingId === res.id}
-                        className={cn(
-                          'icon-btn p-2 rounded-lg transition-colors',
-                          updatingId === res.id
-                            ? 'opacity-50 cursor-not-allowed'
-                            : 'hover:bg-red-500/10 text-red-400'
-                        )}
-                        aria-label="בטל"
-                      >
-                        <X size={16} strokeWidth={1.5} />
-                      </button>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          onPress={() => {
+                            setCancelModal({ isOpen: true, reservation: res })
+                          }}
+                          isDisabled={updatingId === res.id}
+                          isIconOnly
+                          variant="ghost"
+                          className={cn(
+                            'icon-btn p-2 rounded-lg transition-colors min-w-[32px] w-8 h-8',
+                            updatingId === res.id
+                              ? 'opacity-50 cursor-not-allowed'
+                              : 'hover:bg-red-500/10 text-red-400'
+                          )}
+                          aria-label="בטל"
+                        >
+                          <X size={16} strokeWidth={1.5} />
+                        </Button>
+                      </div>
                     )}
                     
                     {/* Cancelled Badge */}

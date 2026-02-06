@@ -1,6 +1,6 @@
 'use client'
 
-import { Phone, Mail, Clock } from 'lucide-react'
+import { Phone, Mail, Clock, ArrowUpRight } from 'lucide-react'
 import { SectionContainer, SectionHeader, SectionContent } from './home/SectionContainer'
 import { cn, formatOpeningHours, isTimeWithinBusinessHours } from '@/lib/utils'
 import { openExternalLink } from '@/lib/utils/external-link'
@@ -29,6 +29,98 @@ const TikTokIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className || 'w-6 h-6'}>
     <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
   </svg>
+)
+
+// Reusable Contact Card Component for complex layouts
+interface ContactCardProps {
+  onClick: () => void
+  icon: React.ReactNode
+  title: string
+  subtitle: string
+  variant: 'gold' | 'whatsapp'
+  className?: string
+}
+
+const ContactCard = ({ onClick, icon, title, subtitle, variant, className }: ContactCardProps) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={cn(
+      'group relative w-full overflow-hidden rounded-xl p-3 sm:p-4',
+      'flex items-center gap-3',
+      'transition-all duration-200 ease-out',
+      'hover:scale-[1.01] active:scale-[0.99]',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background-dark',
+      variant === 'gold' && 'bg-white/[0.04] border border-accent-gold/20 hover:border-accent-gold/40 focus-visible:ring-accent-gold',
+      variant === 'whatsapp' && 'bg-white/[0.04] border border-green-500/20 hover:border-green-500/40 focus-visible:ring-green-500',
+      className
+    )}
+  >
+    {/* Icon container - compact */}
+    <div className={cn(
+      'relative z-10 shrink-0 w-10 h-10 rounded-xl flex items-center justify-center',
+      'transition-all duration-200',
+      variant === 'gold' && 'bg-accent-gold/10',
+      variant === 'whatsapp' && 'bg-green-500/10'
+    )}>
+      {icon}
+    </div>
+    
+    {/* Text content - compact */}
+    <div className="relative z-10 flex-1 text-right min-w-0">
+      <p className="text-foreground-muted text-xs">{title}</p>
+      <p className={cn(
+        'font-medium text-sm truncate',
+        variant === 'gold' && 'text-accent-gold',
+        variant === 'whatsapp' && 'text-green-400'
+      )} dir="ltr">
+        {subtitle}
+      </p>
+    </div>
+    
+    {/* Arrow indicator */}
+    <ArrowUpRight className={cn(
+      'relative z-10 w-4 h-4 opacity-40 group-hover:opacity-70',
+      'transition-opacity duration-200',
+      variant === 'gold' && 'text-accent-gold',
+      variant === 'whatsapp' && 'text-green-400'
+    )} />
+  </button>
+)
+
+// Social Button Component
+interface SocialButtonProps {
+  onClick: () => void
+  icon: React.ReactNode
+  label: string
+  hoverColor: string
+  className?: string
+}
+
+const SocialButton = ({ onClick, icon, label, className }: SocialButtonProps) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={cn(
+      'group relative w-16 h-16 rounded-xl overflow-hidden',
+      'bg-white/[0.03] border border-white/[0.06]',
+      'flex flex-col items-center justify-center gap-1',
+      'transition-all duration-200 ease-out',
+      'hover:border-white/10 hover:bg-white/[0.05] active:scale-[0.98]',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background-dark',
+      className
+    )}
+  >
+    {/* Icon */}
+    <div className="relative z-10 transition-transform duration-200 group-hover:scale-105">
+      {icon}
+    </div>
+    
+    {/* Label */}
+    <span className="relative z-10 text-[9px] font-medium text-foreground-muted group-hover:text-foreground-light transition-colors duration-200">
+      {label}
+    </span>
+  </button>
 )
 
 interface ContactSectionProps {
@@ -87,6 +179,7 @@ export function ContactSection({ settings }: ContactSectionProps) {
     window.open(`mailto:${email}`, '_self')
   }
 
+  
   return (
     <SectionContainer variant="accent" animate={true} className="index-contact">
       <SectionContent maxWidth="4xl">
@@ -96,107 +189,66 @@ export function ContactSection({ settings }: ContactSectionProps) {
         />
 
         {/* Primary CTAs - Call and WhatsApp */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
           {showPhone && (
-            <button
+            <ContactCard
               onClick={openPhone}
-              className={cn(
-                'flex items-center justify-center gap-4 p-5',
-                'glass-gold rounded-2xl',
-                'transition-all hover:scale-[1.02] active:scale-[0.98]',
-                'group'
-              )}
-            >
-              <div className="w-12 h-12 rounded-full bg-accent-gold/20 flex items-center justify-center group-hover:bg-accent-gold/30 transition-colors">
-                <Phone size={22} strokeWidth={1.5} className="text-accent-gold" />
-              </div>
-              <div className="text-right">
-                <p className="text-foreground-light font-medium">התקשר עכשיו</p>
-                <p className="text-accent-gold text-lg font-medium" dir="ltr">{phone}</p>
-              </div>
-            </button>
+              icon={<Phone size={18} strokeWidth={1.5} className="text-accent-gold" />}
+              title="התקשר עכשיו"
+              subtitle={phone}
+              variant="gold"
+            />
           )}
 
           {showWhatsapp && (
-            <button
+            <ContactCard
               onClick={openWhatsApp}
-              className={cn(
-                'flex items-center justify-center gap-4 p-5',
-                'rounded-2xl border border-green-500/30 bg-green-500/10',
-                'transition-all hover:scale-[1.02] active:scale-[0.98] hover:bg-green-500/20',
-                'group'
-              )}
-            >
-              <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center group-hover:bg-green-500/30 transition-colors">
-                <WhatsAppIcon className="w-6 h-6 text-green-400" />
-              </div>
-              <div className="text-right">
-                <p className="text-foreground-light font-medium">שלח הודעה</p>
-                <p className="text-green-400 font-medium">WhatsApp</p>
-              </div>
-            </button>
+              icon={<WhatsAppIcon className="w-[18px] h-[18px] text-green-400" />}
+              title="שלח הודעה"
+              subtitle="WhatsApp"
+              variant="whatsapp"
+            />
           )}
         </div>
 
-        {/* Secondary - Email and Social */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+        {/* Secondary - Email and Social - Compact horizontal */}
+        <div className={cn(
+          'flex justify-center gap-2 mb-6',
+        )}>
           {showEmail && email && (
-            <button
+            <SocialButton
               onClick={openEmail}
-              className={cn(
-                'flex flex-col items-center justify-center gap-2 p-4',
-                'glass-subtle rounded-xl',
-                'transition-all hover:scale-[1.02] active:scale-[0.98] hover:border-accent-gold/30'
-              )}
-            >
-              <Mail size={24} strokeWidth={1.5} className="text-foreground-muted" />
-              <span className="text-foreground-muted text-xs">אימייל</span>
-            </button>
+              icon={<Mail size={20} strokeWidth={1.5} className="text-foreground-muted group-hover:text-accent-gold transition-colors duration-200" />}
+              label="אימייל"
+              hoverColor=""
+            />
           )}
 
           {showInstagram && instagramUrl && (
-            <button
+            <SocialButton
               onClick={() => openExternalLink(instagramUrl)}
-              className={cn(
-                'flex flex-col items-center justify-center gap-2 p-4',
-                'glass-subtle rounded-xl',
-                'transition-all hover:scale-[1.02] active:scale-[0.98] hover:border-pink-500/30',
-                'group'
-              )}
-            >
-              <InstagramIcon className="w-6 h-6 text-foreground-muted group-hover:text-pink-400 transition-colors" />
-              <span className="text-foreground-muted text-xs group-hover:text-pink-400 transition-colors">Instagram</span>
-            </button>
+              icon={<InstagramIcon className="w-5 h-5 text-foreground-muted group-hover:text-pink-400 transition-colors duration-200" />}
+              label="Instagram"
+              hoverColor=""
+            />
           )}
 
           {showFacebook && facebookUrl && (
-            <button
+            <SocialButton
               onClick={() => openExternalLink(facebookUrl)}
-              className={cn(
-                'flex flex-col items-center justify-center gap-2 p-4',
-                'glass-subtle rounded-xl',
-                'transition-all hover:scale-[1.02] active:scale-[0.98] hover:border-blue-500/30',
-                'group'
-              )}
-            >
-              <FacebookIcon className="w-6 h-6 text-foreground-muted group-hover:text-blue-400 transition-colors" />
-              <span className="text-foreground-muted text-xs group-hover:text-blue-400 transition-colors">Facebook</span>
-            </button>
+              icon={<FacebookIcon className="w-5 h-5 text-foreground-muted group-hover:text-blue-400 transition-colors duration-200" />}
+              label="Facebook"
+              hoverColor=""
+            />
           )}
 
           {showTiktok && tiktokUrl && (
-            <button
+            <SocialButton
               onClick={() => openExternalLink(tiktokUrl)}
-              className={cn(
-                'flex flex-col items-center justify-center gap-2 p-4',
-                'glass-subtle rounded-xl',
-                'transition-all hover:scale-[1.02] active:scale-[0.98] hover:border-purple-500/30',
-                'group'
-              )}
-            >
-              <TikTokIcon className="w-6 h-6 text-foreground-muted group-hover:text-purple-400 transition-colors" />
-              <span className="text-foreground-muted text-xs group-hover:text-purple-400 transition-colors">TikTok</span>
-            </button>
+              icon={<TikTokIcon className="w-5 h-5 text-foreground-muted group-hover:text-white transition-colors duration-200" />}
+              label="TikTok"
+              hoverColor=""
+            />
           )}
         </div>
 

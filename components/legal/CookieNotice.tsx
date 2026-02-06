@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { Cookie, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from '@heroui/react'
 import { useNotificationManager, useNotificationTiming } from '@/components/NotificationManager'
 
 const COOKIE_CONSENT_KEY = 'cookie-consent-v2'
@@ -87,20 +88,23 @@ export function CookieNotice() {
   return (
     <div
       className={cn(
-        'fixed bottom-0 left-0 right-0 z-[998]',
+        'fixed left-0 right-0 z-[998]',
         'transition-all duration-200 ease-out',
         'pointer-events-auto',
-        'pb-safe', // Safe area for iOS home indicator
         isAnimating ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'
       )}
+      style={{ bottom: 0 }}
       role="dialog"
       aria-labelledby="cookie-title"
     >
-      {/* Compact Banner */}
-      <div className="bg-background-darker/95 backdrop-blur-md border-t border-white/10 px-4 py-3">
+      {/* Compact Banner - fully attached to bottom */}
+      <div 
+        className="bg-[#0a0c0e] border-t border-white/10 px-4"
+        style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)', paddingTop: '12px' }}
+      >
         <div className="max-w-xl mx-auto flex items-center gap-3">
           {/* Icon */}
-          <div className="w-8 h-8 rounded-full bg-accent-gold/20 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-accent-gold/20 flex items-center justify-center shrink-0">
             <Cookie size={16} className="text-accent-gold" />
           </div>
 
@@ -115,23 +119,26 @@ export function CookieNotice() {
             </Link>
           </p>
 
-          {/* Buttons - Compact */}
+          {/* Buttons - Compact with squared button */}
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => handleConsent('all')}
-              className="px-3 py-1.5 bg-accent-gold text-background-dark text-xs font-medium rounded-lg hover:bg-accent-gold/90 transition-colors"
-              type="button"
+            <Button
+              variant="primary"
+              size="sm"
+              onPress={() => handleConsent('all')}
+              className="text-xs !rounded-lg px-4"
             >
               אישור
-            </button>
-            <button
-              onClick={handleDismiss}
-              className="p-1.5 text-foreground-muted hover:text-foreground-light transition-colors rounded-lg hover:bg-white/10"
+            </Button>
+            <Button
+              variant="ghost"
+              isIconOnly
+              size="sm"
+              onPress={handleDismiss}
               aria-label="סגור"
-              type="button"
+              className=""
             >
               <X size={16} />
-            </button>
+            </Button>
           </div>
         </div>
       </div>

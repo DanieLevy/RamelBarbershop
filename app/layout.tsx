@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next'
-import { Toaster } from 'sonner'
 import './globals.css'
 import { Providers } from './providers'
 import { AuthProvider } from '@/components/AuthProvider'
@@ -11,6 +10,7 @@ import { CookieNotice } from '@/components/legal/CookieNotice'
 import { SkipLink } from '@/components/a11y/SkipLink'
 import { NotificationManagerProvider } from '@/components/NotificationManager'
 import { PhoneCollectionManager } from '@/components/profile/PhoneCollectionManager'
+import { EnhancedToaster } from '@/components/ui/EnhancedToaster'
 
 export const metadata: Metadata = {
   title: 'רם אל ברברשופ - Ramel Barbershop',
@@ -57,11 +57,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="he" dir="rtl" data-scroll-behavior="smooth" suppressHydrationWarning>
+    <html lang="he" dir="rtl" data-theme="dark" className="dark" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         <PWAHead />
       </head>
-      <body className="min-h-screen bg-background-dark" suppressHydrationWarning>
+      <body className="min-h-screen bg-background text-foreground font-ploni" suppressHydrationWarning>
         <SkipLink />
         <Providers>
           <NotificationManagerProvider>
@@ -76,26 +76,7 @@ export default function RootLayout({
               </PWAProvider>
             </AuthProvider>
           </NotificationManagerProvider>
-          <Toaster
-            position="top-center"
-            dir="rtl"
-            closeButton
-            richColors
-            theme="light"
-            toastOptions={{
-              className: 'mt-16 md:mt-0',
-              classNames: {
-                toast: 'bg-white/95 backdrop-blur-xl border shadow-xl font-ploni rounded-xl',
-                title: 'font-medium text-sm',
-                description: 'text-xs opacity-80',
-                closeButton: '!bg-transparent hover:!bg-black/5 !border-0 !w-4 !h-4 !p-0 !m-0 !right-1.5 !top-1.5 [&>svg]:!w-2.5 [&>svg]:!h-2.5 !text-gray-400 hover:!text-gray-600 !transition-colors',
-                success: '!bg-emerald-50/95 !border-emerald-200 !text-emerald-800 [&>[data-icon]]:text-emerald-500',
-                error: '!bg-rose-50/95 !border-rose-200 !text-rose-800 [&>[data-icon]]:text-rose-500',
-                warning: '!bg-amber-50/95 !border-amber-200 !text-amber-800 [&>[data-icon]]:text-amber-500',
-                info: '!bg-sky-50/95 !border-sky-200 !text-sky-800 [&>[data-icon]]:text-sky-500',
-              },
-            }}
-          />
+          <EnhancedToaster />
         </Providers>
       </body>
     </html>

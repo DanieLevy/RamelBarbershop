@@ -5,13 +5,14 @@ import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { updateBarber, setBarberPassword } from '@/lib/auth/barber-auth'
 import { createClient } from '@/lib/supabase/client'
 import { uploadAvatar } from '@/lib/storage/upload'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn, buildShareableBarberLink, generateSlugFromEnglishName, getPreferredBarberSlug } from '@/lib/utils'
 import { User, Camera, Bell, Plus, Trash, Pencil, Upload, Link2, Copy, Check, ExternalLink, Globe, Instagram } from 'lucide-react'
 import type { BarberMessage } from '@/types/database'
 import Image from 'next/image'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { ImagePositionEditor } from '@/components/barber/ImagePositionEditor'
+import { Button } from '@heroui/react'
 
 export default function ProfilePage() {
   const { barber, setBarber } = useBarberAuthStore()
@@ -96,7 +97,7 @@ export default function ProfilePage() {
     
     if (result.success && result.url) {
       setImgUrl(result.url)
-      toast.success('התמונה הועלתה בהצלחה!')
+      showToast.success('התמונה הועלתה בהצלחה!')
       
       // Automatically save the profile with new image
       const updateResult = await updateBarber(barber.id, {
@@ -108,7 +109,7 @@ export default function ProfilePage() {
       }
     } else {
       await report(new Error(result.error || 'Avatar upload failed'), 'Uploading barber avatar')
-      toast.error(result.error || 'שגיאה בהעלאת התמונה')
+      showToast.error(result.error || 'שגיאה בהעלאת התמונה')
     }
     
     setUploadingImage(false)
@@ -131,10 +132,10 @@ export default function ProfilePage() {
       setImgPositionX(x)
       setImgPositionY(y)
       setBarber({ ...barber, img_position_x: x, img_position_y: y } as typeof barber)
-      toast.success('מיקום התמונה נשמר!')
+      showToast.success('מיקום התמונה נשמר!')
     } else {
       await report(new Error(result.error || 'Position save failed'), 'Saving image position')
-      toast.error('שגיאה בשמירת המיקום')
+      showToast.error('שגיאה בשמירת המיקום')
     }
   }
 
@@ -142,13 +143,13 @@ export default function ProfilePage() {
     if (!barber?.id) return
     
     if (!fullname.trim()) {
-      toast.error('נא להזין שם')
+      showToast.error('נא להזין שם')
       return
     }
     
     // Validate email format
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      toast.error('נא להזין כתובת אימייל תקינה')
+      showToast.error('נא להזין כתובת אימייל תקינה')
       return
     }
     
@@ -156,7 +157,7 @@ export default function ProfilePage() {
     
     // Validate English name format (only English letters and spaces)
     if (nameEn && !/^[a-zA-Z\s]+$/.test(nameEn.trim())) {
-      toast.error('שם באנגלית חייב להכיל רק אותיות באנגלית')
+      showToast.error('שם באנגלית חייב להכיל רק אותיות באנגלית')
       setSavingProfile(false)
       return
     }
@@ -180,7 +181,7 @@ export default function ProfilePage() {
         })
         
         if (conflict) {
-          toast.error('השם באנגלית כבר תפוס על ידי ספר אחר, נסה שם אחר')
+          showToast.error('השם באנגלית כבר תפוס על ידי ספר אחר, נסה שם אחר')
           setSavingProfile(false)
           return
         }
@@ -190,7 +191,7 @@ export default function ProfilePage() {
     // Validate Instagram URL format if provided
     const cleanedInstagramUrl = instagramUrl.trim()
     if (cleanedInstagramUrl && !cleanedInstagramUrl.includes('instagram.com')) {
-      toast.error('נא להזין קישור תקין לאינסטגרם')
+      showToast.error('נא להזין קישור תקין לאינסטגרם')
       setSavingProfile(false)
       return
     }
@@ -206,11 +207,11 @@ export default function ProfilePage() {
     })
     
     if (result.success) {
-      toast.success('הפרופיל עודכן בהצלחה!')
+      showToast.success('הפרופיל עודכן בהצלחה!')
       setBarber({ ...barber, fullname, email, phone, img_url: imgUrl, username, name_en: nameEn.trim() || null, instagram_url: cleanedInstagramUrl || null } as typeof barber)
     } else {
       await report(new Error(result.error || 'Profile update failed'), 'Saving barber profile')
-      toast.error(result.error || 'שגיאה בעדכון')
+      showToast.error(result.error || 'שגיאה בעדכון')
     }
     
     setSavingProfile(false)
@@ -220,17 +221,17 @@ export default function ProfilePage() {
     if (!barber?.id) return
     
     if (!newPassword) {
-      toast.error('נא להזין סיסמה חדשה')
+      showToast.error('נא להזין סיסמה חדשה')
       return
     }
     
     if (newPassword.length < 6) {
-      toast.error('הסיסמה חייבת להכיל לפחות 6 תווים')
+      showToast.error('הסיסמה חייבת להכיל לפחות 6 תווים')
       return
     }
     
     if (newPassword !== confirmPassword) {
-      toast.error('הסיסמאות אינן תואמות')
+      showToast.error('הסיסמאות אינן תואמות')
       return
     }
     
@@ -239,12 +240,12 @@ export default function ProfilePage() {
     const result = await setBarberPassword(barber.id, newPassword)
     
     if (result.success) {
-      toast.success('הסיסמה עודכנה בהצלחה!')
+      showToast.success('הסיסמה עודכנה בהצלחה!')
       setNewPassword('')
       setConfirmPassword('')
     } else {
       await report(new Error(result.error || 'Password change failed'), 'Changing barber password')
-      toast.error(result.error || 'שגיאה בעדכון הסיסמה')
+      showToast.error(result.error || 'שגיאה בעדכון הסיסמה')
     }
     
     setSavingPassword(false)
@@ -254,7 +255,7 @@ export default function ProfilePage() {
     if (!barber?.id) return
     
     if (!messageText.trim()) {
-      toast.error('נא להזין הודעה')
+      showToast.error('נא להזין הודעה')
       return
     }
     
@@ -271,9 +272,9 @@ export default function ProfilePage() {
       if (error || !data || data.length === 0) {
         console.error('Error updating message:', error)
         await report(new Error(error?.message || 'Message update failed'), 'Updating barber message')
-        toast.error('שגיאה בעדכון ההודעה')
+        showToast.error('שגיאה בעדכון ההודעה')
       } else {
-        toast.success('ההודעה עודכנה!')
+        showToast.success('ההודעה עודכנה!')
         resetMessageForm()
         fetchMessages()
       }
@@ -290,9 +291,9 @@ export default function ProfilePage() {
       if (error || !data || data.length === 0) {
         console.error('Error creating message:', error)
         await report(new Error(error?.message || 'Message creation failed'), 'Creating barber message')
-        toast.error('שגיאה ביצירת ההודעה')
+        showToast.error('שגיאה ביצירת ההודעה')
       } else {
-        toast.success('ההודעה נוספה!')
+        showToast.success('ההודעה נוספה!')
         resetMessageForm()
         fetchMessages()
       }
@@ -313,7 +314,7 @@ export default function ProfilePage() {
     if (error || !data || data.length === 0) {
       console.error('Error toggling message:', error)
       await report(new Error(error?.message || 'Message toggle failed'), 'Toggling barber message visibility')
-      toast.error('שגיאה בעדכון')
+      showToast.error('שגיאה בעדכון')
     } else {
       fetchMessages()
     }
@@ -332,9 +333,9 @@ export default function ProfilePage() {
     if (error) {
       console.error('Error deleting message:', error)
       await report(new Error(error.message), 'Deleting barber message')
-      toast.error('שגיאה במחיקה')
+      showToast.error('שגיאה במחיקה')
     } else {
-      toast.success('ההודעה נמחקה')
+      showToast.success('ההודעה נמחקה')
       fetchMessages()
     }
   }
@@ -532,18 +533,18 @@ export default function ProfilePage() {
             </p>
           </div>
 
-          <button
-            onClick={handleSaveProfile}
-            disabled={savingProfile}
+          <Button
+            onPress={handleSaveProfile}
+            isDisabled={savingProfile}
             className={cn(
-              'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center',
+              'w-full py-3 rounded-xl font-medium',
               savingProfile
-                ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
+                ? 'bg-foreground-muted/30 text-foreground-muted'
                 : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
             )}
           >
             {savingProfile ? 'שומר...' : 'שמור פרופיל'}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -578,7 +579,7 @@ export default function ProfilePage() {
                           onClick={() => {
                             navigator.clipboard.writeText(fullUrl)
                             setLinkCopied(true)
-                            toast.success('הקישור הועתק!')
+                            showToast.success('הקישור הועתק!')
                             setTimeout(() => setLinkCopied(false), 2000)
                           }}
                           className={cn(
@@ -610,7 +611,7 @@ export default function ProfilePage() {
                       onClick={() => {
                         navigator.clipboard.writeText(fullUrl)
                         setLinkCopied(true)
-                        toast.success('הקישור הועתק!')
+                        showToast.success('הקישור הועתק!')
                         setTimeout(() => setLinkCopied(false), 2000)
                       }}
                     >
@@ -680,18 +681,18 @@ export default function ProfilePage() {
             />
           </div>
 
-          <button
-            onClick={handleChangePassword}
-            disabled={savingPassword}
+          <Button
+            onPress={handleChangePassword}
+            isDisabled={savingPassword}
             className={cn(
-              'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center',
+              'w-full py-3 rounded-xl font-medium',
               savingPassword
-                ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
+                ? 'bg-foreground-muted/30 text-foreground-muted'
                 : 'bg-blue-500 text-white hover:bg-blue-600'
             )}
           >
             {savingPassword ? 'מעדכן...' : 'עדכן סיסמה'}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -702,13 +703,14 @@ export default function ProfilePage() {
             <Bell size={20} strokeWidth={1.5} className="text-accent-gold" />
             הודעות ללקוחות
           </h3>
-          <button
-            onClick={() => { resetMessageForm(); setShowMessageForm(true) }}
-            className="flex items-center gap-2 px-3 py-1.5 bg-accent-gold text-background-dark rounded-lg text-sm font-medium hover:bg-accent-gold/90 transition-colors"
+          <Button
+            size="sm"
+            onPress={() => { resetMessageForm(); setShowMessageForm(true) }}
+            className="flex items-center gap-2 px-3 py-1.5 min-w-0 h-auto bg-accent-gold text-background-dark rounded-lg text-sm font-medium hover:bg-accent-gold/90"
           >
             <Plus size={12} strokeWidth={1.5} />
             הוסף
-          </button>
+          </Button>
         </div>
 
         <p className="text-foreground-muted text-sm mb-4">
@@ -726,19 +728,20 @@ export default function ProfilePage() {
               className="w-full p-3 rounded-lg bg-background-card border border-white/10 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold resize-none text-sm"
             />
             <div className="flex gap-2 mt-3">
-              <button
-                onClick={handleSaveMessage}
-                disabled={savingMessage}
-                className="flex-1 py-2 bg-accent-gold text-background-dark rounded-lg text-sm font-medium hover:bg-accent-gold/90 disabled:opacity-50"
+              <Button
+                onPress={handleSaveMessage}
+                isDisabled={savingMessage}
+                className="flex-1 py-2 bg-accent-gold text-background-dark rounded-lg text-sm font-medium hover:bg-accent-gold/90"
               >
                 {savingMessage ? 'שומר...' : editingMessageId ? 'עדכן' : 'הוסף'}
-              </button>
-              <button
-                onClick={resetMessageForm}
+              </Button>
+              <Button
+                variant="ghost"
+                onPress={resetMessageForm}
                 className="px-4 py-2 bg-background-card border border-white/10 text-foreground-muted rounded-lg text-sm hover:text-foreground-light"
               >
                 ביטול
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -762,29 +765,35 @@ export default function ProfilePage() {
               >
                 <p className="text-foreground-light text-sm flex-1">{msg.message}</p>
                 <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => handleToggleMessage(msg.id, msg.is_active)}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onPress={() => handleToggleMessage(msg.id, msg.is_active)}
                     className={cn(
-                      'px-2 py-1 rounded text-xs font-medium transition-colors',
+                      'px-2 py-1 min-w-0 h-auto rounded text-xs font-medium',
                       msg.is_active
                         ? 'bg-green-500/10 text-green-400'
                         : 'bg-foreground-muted/10 text-foreground-muted'
                     )}
                   >
                     {msg.is_active ? 'פעיל' : 'מושבת'}
-                  </button>
-                  <button
-                    onClick={() => handleEditMessage(msg)}
-                    className="p-1.5 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded transition-colors flex items-center justify-center"
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    isIconOnly
+                    onPress={() => handleEditMessage(msg)}
+                    className="min-w-[28px] w-7 h-7 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded"
                   >
                     <Pencil size={12} strokeWidth={1.5} />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteMessage(msg.id)}
-                    className="p-1.5 text-foreground-muted hover:text-red-400 hover:bg-red-500/10 rounded transition-colors flex items-center justify-center"
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    isIconOnly
+                    onPress={() => handleDeleteMessage(msg.id)}
+                    className="min-w-[28px] w-7 h-7 text-foreground-muted hover:text-red-400 hover:bg-red-500/10 rounded"
                   >
                     <Trash size={12} strokeWidth={1.5} />
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}

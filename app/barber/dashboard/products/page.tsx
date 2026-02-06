@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { uploadProductImage, deleteProductImage } from '@/lib/storage/upload'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn, formatPrice } from '@/lib/utils'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { 
@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import Image from 'next/image'
 import type { Product } from '@/types/database'
+import { Button, Switch } from '@heroui/react'
 
 export default function ProductsPage() {
   const router = useRouter()
@@ -61,7 +62,7 @@ export default function ProductsPage() {
     } catch (error) {
       console.error('Error fetching products:', error)
       await report(error, 'Fetching products list')
-      toast.error('שגיאה בטעינת המוצרים')
+      showToast.error('שגיאה בטעינת המוצרים')
     } finally {
       setLoading(false)
     }
@@ -111,13 +112,13 @@ export default function ProductsPage() {
     // Validate file type
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg']
     if (!allowedTypes.includes(file.type)) {
-      toast.error('סוג קובץ לא נתמך. יש להעלות תמונה בפורמט JPEG, PNG או WebP.')
+      showToast.error('סוג קובץ לא נתמך. יש להעלות תמונה בפורמט JPEG, PNG או WebP.')
       return
     }
     
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('גודל הקובץ חייב להיות עד 5MB')
+      showToast.error('גודל הקובץ חייב להיות עד 5MB')
       return
     }
     
@@ -127,13 +128,13 @@ export default function ProductsPage() {
 
   const handleSubmit = async () => {
     if (!formData.name_he.trim() || !formData.price) {
-      toast.error('נא למלא שם ומחיר')
+      showToast.error('נא למלא שם ומחיר')
       return
     }
     
     const price = parseFloat(formData.price)
     if (isNaN(price) || price <= 0) {
-      toast.error('נא להזין מחיר תקין')
+      showToast.error('נא להזין מחיר תקין')
       return
     }
     
@@ -150,7 +151,7 @@ export default function ProductsPage() {
         const uploadResult = await uploadProductImage(selectedFile, productId)
         
         if (!uploadResult.success) {
-          toast.error(uploadResult.error || 'שגיאה בהעלאת התמונה')
+          showToast.error(uploadResult.error || 'שגיאה בהעלאת התמונה')
           setSaving(false)
           setUploading(false)
           return
@@ -179,7 +180,7 @@ export default function ProductsPage() {
           .eq('id', editingProduct.id)
         
         if (error) throw error
-        toast.success('המוצר עודכן בהצלחה!')
+        showToast.success('המוצר עודכן בהצלחה!')
       } else {
         // Create new product
         const { error } = await db
@@ -195,7 +196,7 @@ export default function ProductsPage() {
           })
         
         if (error) throw error
-        toast.success('המוצר נוסף בהצלחה!')
+        showToast.success('המוצר נוסף בהצלחה!')
       }
       
       resetForm()
@@ -203,7 +204,7 @@ export default function ProductsPage() {
     } catch (error) {
       console.error('Error saving product:', error)
       await report(error, 'Saving product')
-      toast.error('שגיאה בשמירת המוצר')
+      showToast.error('שגיאה בשמירת המוצר')
     } finally {
       setSaving(false)
     }
@@ -231,12 +232,12 @@ export default function ProductsPage() {
       
       if (error) throw error
       
-      toast.success('המוצר נמחק בהצלחה')
+      showToast.success('המוצר נמחק בהצלחה')
       fetchProducts()
     } catch (error) {
       console.error('Error deleting product:', error)
       await report(error, 'Deleting product')
-      toast.error('שגיאה במחיקת המוצר')
+      showToast.error('שגיאה במחיקת המוצר')
     }
   }
 
@@ -250,12 +251,12 @@ export default function ProductsPage() {
       
       if (error) throw error
       
-      toast.success(product.is_active ? 'המוצר הוסתר' : 'המוצר הופעל')
+      showToast.success(product.is_active ? 'המוצר הוסתר' : 'המוצר הופעל')
       fetchProducts()
     } catch (error) {
       console.error('Error toggling product:', error)
       await report(error, 'Toggling product visibility')
-      toast.error('שגיאה בעדכון המוצר')
+      showToast.error('שגיאה בעדכון המוצר')
     }
   }
 
@@ -276,13 +277,13 @@ export default function ProductsPage() {
           <h1 className="text-2xl font-medium text-foreground-light">ניהול מוצרים</h1>
           <p className="text-foreground-muted mt-1">הוסף ונהל את המוצרים שנמכרים במספרה</p>
         </div>
-        <button
-          onClick={() => { resetForm(); setShowForm(true) }}
-          className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-background-dark rounded-lg font-medium hover:bg-accent-gold/90 transition-colors"
+        <Button
+          onPress={() => { resetForm(); setShowForm(true) }}
+          className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-background-dark rounded-lg font-medium hover:bg-accent-gold/90"
         >
           <Plus size={16} strokeWidth={1.5} />
           הוסף מוצר
-        </button>
+        </Button>
       </div>
 
       {/* Add/Edit Form */}
@@ -292,12 +293,14 @@ export default function ProductsPage() {
             <h3 className="text-lg font-medium text-foreground-light">
               {editingProduct ? 'עריכת מוצר' : 'מוצר חדש'}
             </h3>
-            <button
-              onClick={resetForm}
-              className="p-2 text-foreground-muted hover:text-foreground-light transition-colors"
+            <Button
+              variant="ghost"
+              isIconOnly
+              onPress={resetForm}
+              className="min-w-[40px] w-10 h-10 text-foreground-muted hover:text-foreground-light"
             >
               <X size={20} strokeWidth={1.5} />
-            </button>
+            </Button>
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -334,14 +337,14 @@ export default function ProductsPage() {
                     onChange={handleFileSelect}
                     className="hidden"
                   />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-foreground-light hover:bg-white/10 transition-colors text-sm"
+                  <Button
+                    variant="ghost"
+                    onPress={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-foreground-light hover:bg-white/10 text-sm"
                   >
                     <Upload size={14} strokeWidth={1.5} />
                     {previewImage ? 'שנה תמונה' : 'העלה תמונה'}
-                  </button>
+                  </Button>
                   <p className="text-xs text-foreground-muted mt-2">
                     JPEG, PNG או WebP עד 5MB
                   </p>
@@ -403,23 +406,17 @@ export default function ProductsPage() {
             
             {/* Active Toggle */}
             <div className="sm:col-span-2 flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
-                className={cn(
-                  'w-12 h-7 rounded-full transition-colors relative flex-shrink-0',
-                  formData.is_active ? 'bg-accent-gold' : 'bg-white/10'
-                )}
-                aria-checked={formData.is_active}
-                role="switch"
+              <Switch
+                isSelected={formData.is_active}
+                onChange={(checked) => setFormData({ ...formData, is_active: checked })}
               >
-                <div 
-                  className={cn(
-                    'absolute top-1 w-5 h-5 rounded-full bg-white transition-all',
-                    formData.is_active ? 'right-1' : 'left-1'
-                  )} 
-                />
-              </button>
+                <Switch.Control className={cn(
+                  'w-12 h-7',
+                  formData.is_active ? 'bg-accent-gold' : 'bg-white/10'
+                )}>
+                  <Switch.Thumb />
+                </Switch.Control>
+              </Switch>
               <span className="text-foreground-light text-sm">
                 {formData.is_active ? 'מוצר פעיל - יוצג בקטלוג' : 'מוצר מוסתר'}
               </span>
@@ -427,24 +424,25 @@ export default function ProductsPage() {
           </div>
 
           <div className="flex gap-3">
-            <button
-              onClick={handleSubmit}
-              disabled={saving}
+            <Button
+              onPress={handleSubmit}
+              isDisabled={saving}
               className={cn(
-                'flex-1 py-3 rounded-xl font-medium transition-all flex items-center justify-center',
+                'flex-1 py-3 rounded-xl font-medium',
                 saving
-                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
+                  ? 'bg-foreground-muted/30 text-foreground-muted'
                   : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
               )}
             >
               {saving ? (uploading ? 'מעלה תמונה...' : 'שומר...') : editingProduct ? 'עדכן' : 'הוסף'}
-            </button>
-            <button
-              onClick={resetForm}
-              className="px-6 py-3 rounded-xl bg-background-dark border border-white/10 text-foreground-muted hover:text-foreground-light transition-colors flex items-center justify-center"
+            </Button>
+            <Button
+              variant="ghost"
+              onPress={resetForm}
+              className="px-6 py-3 rounded-xl bg-background-dark border border-white/10 text-foreground-muted hover:text-foreground-light"
             >
               ביטול
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -510,36 +508,42 @@ export default function ProductsPage() {
                 
                 {/* Actions */}
                 <div className="flex items-center gap-1 sm:gap-2">
-                  <button
-                    onClick={() => handleToggleActive(product)}
+                  <Button
+                    variant="ghost"
+                    isIconOnly
+                    onPress={() => handleToggleActive(product)}
                     className={cn(
-                      'icon-btn p-2 rounded-lg transition-colors',
+                      'min-w-[32px] w-8 h-8 rounded-lg',
                       product.is_active
                         ? 'text-foreground-muted hover:text-yellow-400 hover:bg-yellow-400/10'
                         : 'text-foreground-muted hover:text-green-400 hover:bg-green-400/10'
                     )}
-                    title={product.is_active ? 'הסתר' : 'הצג'}
+                    aria-label={product.is_active ? 'הסתר' : 'הצג'}
                   >
                     {product.is_active ? (
                       <EyeOff size={16} strokeWidth={1.5} />
                     ) : (
                       <Eye size={16} strokeWidth={1.5} />
                     )}
-                  </button>
-                  <button
-                    onClick={() => handleEdit(product)}
-                    className="icon-btn p-2 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition-colors"
-                    title="ערוך"
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    isIconOnly
+                    onPress={() => handleEdit(product)}
+                    className="min-w-[32px] w-8 h-8 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg"
+                    aria-label="ערוך"
                   >
                     <Pencil size={16} strokeWidth={1.5} />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(product)}
-                    className="p-2 text-foreground-muted hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                    title="מחק"
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    isIconOnly
+                    onPress={() => handleDelete(product)}
+                    className="min-w-[32px] w-8 h-8 text-foreground-muted hover:text-red-400 hover:bg-red-400/10 rounded-lg"
+                    aria-label="מחק"
                   >
                     <Trash2 size={16} strokeWidth={1.5} />
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}

@@ -1,8 +1,120 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "@heroui/styles";
 
-/* Design System Variables */
+/* ============================================
+   Tailwind v4 Theme Configuration
+   (Replaces tailwind.config.ts)
+   ============================================ */
+@theme inline {
+  /* Screen Breakpoints */
+  --breakpoint-xs: 360px;
+  --breakpoint-3xl: 1920px;
+  
+  /* Font Family */
+  --font-ploni: 'Ploni', 'Rubik', sans-serif;
+  
+  /* Colors - Background */
+  --color-background-dark: #080b0d;
+  --color-background-darker: #050708;
+  --color-background-card: rgba(26, 26, 26, 0.8);
+  --color-background-card-solid: #1a1a1a;
+  --color-background-hero: rgba(8, 11, 13, 0.6);
+  
+  /* Colors - Foreground */
+  --color-foreground-light: #F2F2F2;
+  --color-foreground-muted: #717171;
+  --color-foreground-subtle: #4a4a4a;
+  
+  /* Colors - Accent (Gold) */
+  --color-accent-orange: #D35400;
+  --color-accent-gold: #ffaa3d;
+  --color-accent-gold-light: #ffc46d;
+  --color-accent-gold-dark: #cc8830;
+  --color-accent-gold-muted: rgba(255, 170, 61, 0.6);
+  
+  /* Colors - Status */
+  --color-status-available: #22c55e;
+  --color-status-busy: #eab308;
+  --color-status-offline: #ef4444;
+  
+  /* Box Shadow */
+  --shadow-gold: 0 4px 20px rgba(255, 170, 61, 0.3);
+  --shadow-gold-lg: 0 8px 40px rgba(255, 170, 61, 0.4);
+  --shadow-gold-glow: 0 0 60px rgba(255, 170, 61, 0.25);
+  --shadow-dark: 0 4px 20px rgba(0, 0, 0, 0.5);
+  --shadow-dark-lg: 0 16px 48px rgba(0, 0, 0, 0.6);
+  --shadow-inner-gold: inset 0 0 20px rgba(255, 170, 61, 0.1);
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.25);
+  --shadow-glass-elevated: 0 16px 48px rgba(0, 0, 0, 0.35);
+  
+  /* Border Radius */
+  --radius-4xl: 2rem;
+  --radius-5xl: 2.5rem;
+  
+  /* Spacing */
+  --spacing-18: 4.5rem;
+  --spacing-22: 5.5rem;
+  --spacing-88: 22rem;
+  --spacing-128: 32rem;
+  
+  /* Z-Index */
+  --z-60: 60;
+  --z-70: 70;
+  --z-80: 80;
+  --z-90: 90;
+  --z-100: 100;
+  
+  /* Transition Timing */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-reveal: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================
+   HeroUI Theme Overrides (Ramel Barbershop)
+   ============================================ */
+:root, [data-theme="dark"] {
+  color-scheme: dark;
+  
+  /* Map gold brand to HeroUI accent */
+  --accent: oklch(0.78 0.15 65);  /* Gold: #ffaa3d */
+  --accent-foreground: oklch(0.15 0.01 285);  /* Dark text on gold */
+  --accent-soft: oklch(0.78 0.15 65 / 15%);
+  --accent-soft-foreground: oklch(0.78 0.15 65);
+  
+  /* Dark theme as default */
+  --background: oklch(0.12 0.005 285);  /* #080b0d */
+  --foreground: oklch(0.95 0 0);  /* #F2F2F2 */
+  
+  /* Surface - Slightly elevated */
+  --surface: oklch(0.18 0.005 285);
+  --surface-foreground: var(--foreground);
+  
+  /* Overlay - For modals */
+  --overlay: oklch(0.20 0.005 285);
+  --overlay-foreground: var(--foreground);
+  
+  /* Status Colors */
+  --success: oklch(0.65 0.2 145);
+  --success-foreground: var(--foreground);
+  --warning: oklch(0.78 0.15 65);
+  --warning-foreground: oklch(0.15 0.01 285);
+  --danger: oklch(0.6 0.25 25);
+  --danger-foreground: var(--foreground);
+  
+  /* Borders */
+  --border: oklch(0.25 0.005 285);
+  
+  /* Radius */
+  --radius: 0.75rem;
+  --field-radius: 1rem;
+  
+  /* Shadows - Subtle for dark theme */
+  --surface-shadow: none;
+  --overlay-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+
+/* Design System Variables (Legacy Support) */
 :root {
   /* Glass Effects */
   --glass-blur: 20px;
@@ -144,7 +256,9 @@
   }
 
   body {
-    @apply font-ploni bg-background-dark text-foreground-light;
+    font-family: 'Ploni', 'Rubik', sans-serif;
+    background-color: #080b0d;
+    color: #F2F2F2;
     margin: 0;
     overflow-x: hidden;
   }
@@ -273,18 +387,66 @@
   
   /* Dark section variant */
   .section-dark {
-    @apply section-base bg-background-dark;
+    @apply relative w-full bg-background-dark;
+    padding-top: var(--section-padding-mobile);
+    padding-bottom: var(--section-padding-mobile);
+  }
+  
+  @media (min-width: 640px) {
+    .section-dark {
+      padding-top: var(--section-padding-tablet);
+      padding-bottom: var(--section-padding-tablet);
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    .section-dark {
+      padding-top: var(--section-padding-desktop);
+      padding-bottom: var(--section-padding-desktop);
+    }
   }
   
   /* Darker section variant */
   .section-darker {
-    @apply section-base bg-background-darker;
+    @apply relative w-full bg-background-darker;
+    padding-top: var(--section-padding-mobile);
+    padding-bottom: var(--section-padding-mobile);
+  }
+  
+  @media (min-width: 640px) {
+    .section-darker {
+      padding-top: var(--section-padding-tablet);
+      padding-bottom: var(--section-padding-tablet);
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    .section-darker {
+      padding-top: var(--section-padding-desktop);
+      padding-bottom: var(--section-padding-desktop);
+    }
   }
   
   /* Accent section with gold tint */
   .section-accent {
-    @apply section-base;
+    @apply relative w-full;
+    padding-top: var(--section-padding-mobile);
+    padding-bottom: var(--section-padding-mobile);
     background: linear-gradient(180deg, #080b0d 0%, rgba(255, 170, 61, 0.03) 50%, #080b0d 100%);
+  }
+  
+  @media (min-width: 640px) {
+    .section-accent {
+      padding-top: var(--section-padding-tablet);
+      padding-bottom: var(--section-padding-tablet);
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    .section-accent {
+      padding-top: var(--section-padding-desktop);
+      padding-bottom: var(--section-padding-desktop);
+    }
   }
   
   /* Section transition - smooth gradient between sections */
@@ -332,16 +494,6 @@
     box-shadow: 0 4px 12px rgba(255, 170, 61, 0.08);
   }
 
-  .glass-card-hover {
-    @apply glass-card;
-    transition: all var(--glass-transition);
-  }
-
-  .glass-card-hover:hover {
-    border-color: rgba(255, 170, 61, 0.3);
-    box-shadow: 0 4px 20px rgba(255, 170, 61, 0.15);
-  }
-
   /* Elevated Glass (for floating elements) */
   .glass-elevated {
     background: var(--glass-bg-strong);
@@ -362,24 +514,6 @@
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   }
 
-  /* Interactive Glass (with tap feedback) */
-  .glass-interactive {
-    @apply glass-card;
-    transition: all var(--glass-transition);
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-  }
-
-  .glass-interactive:hover {
-    background: var(--glass-bg-strong);
-    transform: translateY(-2px);
-  }
-
-  .glass-interactive:active {
-    transform: scale(0.98);
-  }
-  
   /* ========================================
      MICRO-INTERACTIONS - Tactile feedback
      ======================================== */
@@ -475,6 +609,64 @@
     @apply absolute top-1 w-5 h-5 rounded-full bg-white transition-all;
   }
 
+  /* HeroUI Switch Component - Systematic Thumb Styling */
+  /* Ensures the thumb (knob) is properly sized and positioned within the control */
+  [data-slot="switch"] {
+    @apply flex-shrink-0;
+  }
+
+  [data-slot="switch-control"] {
+    @apply relative flex items-center rounded-full transition-colors;
+    min-width: 44px;
+    height: 24px;
+    padding: 2px;
+  }
+
+  [data-slot="switch-thumb"] {
+    @apply rounded-full bg-white shadow-sm transition-all duration-200;
+    width: 20px;
+    height: 20px;
+    /* HeroUI uses data-checked for state */
+  }
+
+  /* Ensure thumb moves correctly when checked */
+  [data-slot="switch-control"][data-checked="true"] [data-slot="switch-thumb"] {
+    transform: translateX(calc(100% - 2px));
+  }
+
+  /* Override for RTL */
+  [dir="rtl"] [data-slot="switch-control"][data-checked="true"] [data-slot="switch-thumb"] {
+    transform: translateX(calc(-100% + 2px));
+  }
+
+  /* Larger switch variant for better touch targets */
+  [data-slot="switch-control"].w-12 {
+    min-width: 48px;
+    height: 28px;
+    padding: 3px;
+  }
+
+  [data-slot="switch-control"].w-12 [data-slot="switch-thumb"],
+  [data-slot="switch-control"].w-11 [data-slot="switch-thumb"] {
+    width: 22px;
+    height: 22px;
+  }
+
+  [data-slot="switch-control"].h-7 {
+    height: 28px;
+    padding: 3px;
+  }
+
+  [data-slot="switch-control"].h-6 {
+    height: 24px;
+    padding: 2px;
+  }
+
+  [data-slot="switch-control"].h-6 [data-slot="switch-thumb"] {
+    width: 20px;
+    height: 20px;
+  }
+
   /* Icon Button - ensures icon centering */
   .icon-btn {
     @apply flex items-center justify-center flex-shrink-0;
@@ -553,7 +745,19 @@
 /* Utilities */
 @layer utilities {
   .content-style h1 {
-    @apply section-title;
+    @apply text-center text-2xl md:text-3xl font-light tracking-wide uppercase text-foreground-light;
+    display: grid;
+    grid-template-columns: 1fr max-content 1fr;
+    grid-gap: 16px;
+    align-items: center;
+  }
+  
+  .content-style h1::after,
+  .content-style h1::before {
+    content: "";
+    display: block;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 170, 61, 0.5), transparent);
   }
 
   /* Hide scrollbar but keep functionality */
@@ -661,9 +865,15 @@
   
   /* Horizontal scroll container - for mobile carousels */
   .scroll-x {
-    @apply flex overflow-x-auto scrollbar-hide snap-x snap-mandatory;
+    @apply flex overflow-x-auto snap-x snap-mandatory;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
     scroll-padding: 16px;
     -webkit-overflow-scrolling: touch;
+  }
+  
+  .scroll-x::-webkit-scrollbar {
+    display: none;
   }
   
   .scroll-x > * {
@@ -672,9 +882,17 @@
   
   /* Peek effect for carousels */
   .carousel-peek {
-    @apply scroll-x;
+    @apply flex overflow-x-auto snap-x snap-mandatory;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    scroll-padding: 16px;
+    -webkit-overflow-scrolling: touch;
     padding-left: 16px;
     padding-right: 16px;
+  }
+  
+  .carousel-peek::-webkit-scrollbar {
+    display: none;
   }
   
   .carousel-peek::before,
@@ -709,17 +927,17 @@
   }
   
   .status-dot-online {
-    @apply status-dot bg-green-500;
+    @apply w-2 h-2 rounded-full bg-green-500;
     box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
   }
   
   .status-dot-offline {
-    @apply status-dot bg-red-500;
+    @apply w-2 h-2 rounded-full bg-red-500;
     box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
   }
   
   .status-dot-busy {
-    @apply status-dot bg-yellow-500;
+    @apply w-2 h-2 rounded-full bg-yellow-500;
     box-shadow: 0 0 8px rgba(234, 179, 8, 0.5);
   }
 }
@@ -920,7 +1138,6 @@ html {
   
   /* Prevent iOS double-tap zoom on interactive elements */
   .btn-press,
-  .glass-interactive,
   .touch-btn {
     touch-action: manipulation;
   }
@@ -1039,17 +1256,6 @@ html {
 
 /* Touch Optimization */
 @media (hover: none) {
-  .glass-card-hover:hover,
-  .glass-interactive:hover {
-    transform: none;
-    background: var(--glass-bg);
-  }
-
-  .glass-interactive:active {
-    transform: scale(0.98);
-    background: var(--glass-bg-strong);
-  }
-
   *:focus {
     outline: none;
   }
@@ -1074,6 +1280,237 @@ button, [role="button"], a {
 .Toastify__toast-body {
   font-family: 'Ploni', 'Rubik', sans-serif;
   font-size: 1rem;
+}
+
+/* ============================================
+   Enhanced Toast (Sonner) Styles
+   Mobile-optimized with glassmorphism
+   ============================================ */
+
+/* Toast entrance animation */
+[data-sonner-toaster] [data-sonner-toast] {
+  animation: toast-slide-in 0.35s var(--ease-spring) forwards;
+}
+
+@keyframes toast-slide-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Toast exit animation */
+[data-sonner-toaster] [data-sonner-toast][data-removed="true"] {
+  animation: toast-slide-out 0.25s ease-out forwards;
+}
+
+@keyframes toast-slide-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+}
+
+/* Toast swipe dismiss animation */
+[data-sonner-toaster] [data-sonner-toast][data-swiping="true"] {
+  transition: transform 0.1s ease-out;
+}
+
+/* Enhance toast icon animations */
+[data-sonner-toast] [data-icon] svg {
+  animation: toast-icon-pop 0.4s var(--ease-spring) 0.1s backwards;
+}
+
+@keyframes toast-icon-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Loading spinner animation */
+[data-sonner-toast] [data-icon] svg.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Toast success checkmark draw animation */
+[data-sonner-toast][data-type="success"] [data-icon] svg path {
+  stroke-dasharray: 22;
+  stroke-dashoffset: 22;
+  animation: toast-check-draw 0.4s ease-out 0.2s forwards;
+}
+
+@keyframes toast-check-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Toast content stagger animation */
+[data-sonner-toast] [data-title] {
+  animation: toast-content-in 0.3s ease-out 0.05s backwards;
+}
+
+[data-sonner-toast] [data-description] {
+  animation: toast-content-in 0.3s ease-out 0.1s backwards;
+}
+
+@keyframes toast-content-in {
+  0% {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* RTL-specific content animation */
+[dir="rtl"] [data-sonner-toast] [data-title],
+[dir="rtl"] [data-sonner-toast] [data-description] {
+  animation-name: toast-content-in-rtl;
+}
+
+@keyframes toast-content-in-rtl {
+  0% {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Toast action button hover effect */
+[data-sonner-toast] button[data-button="true"] {
+  transition: all 0.2s ease-out;
+}
+
+[data-sonner-toast] button[data-button="true"]:hover {
+  transform: translateY(-1px);
+}
+
+[data-sonner-toast] button[data-button="true"]:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Toast close button animation */
+[data-sonner-toast] [data-close-button] {
+  transition: all 0.15s ease-out;
+  opacity: 0;
+}
+
+[data-sonner-toast]:hover [data-close-button],
+[data-sonner-toast]:focus-within [data-close-button] {
+  opacity: 1;
+}
+
+/* Mobile: always show close button for touch targets */
+@media (max-width: 640px) {
+  [data-sonner-toast] [data-close-button] {
+    opacity: 0.6;
+  }
+  
+  [data-sonner-toast]:hover [data-close-button],
+  [data-sonner-toast]:focus-within [data-close-button] {
+    opacity: 1;
+  }
+}
+
+/* Enhanced toast hover effect */
+[data-sonner-toast]:hover {
+  transform: scale(1.01);
+}
+
+/* Disable hover effects on mobile */
+@media (hover: none) {
+  [data-sonner-toast]:hover {
+    transform: none;
+  }
+}
+
+/* Toast stack effect - subtle opacity for stacked toasts */
+[data-sonner-toaster][data-expanded="false"] [data-sonner-toast]:not(:first-of-type) {
+  opacity: 0.8;
+}
+
+/* Success toast pulse animation on the border */
+[data-sonner-toast][data-type="success"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.5), rgba(52, 211, 153, 0.3));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: toast-border-pulse 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes toast-border-pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* Error toast shake animation */
+[data-sonner-toast][data-type="error"] {
+  animation: toast-slide-in 0.35s var(--ease-spring) forwards, toast-shake 0.5s ease-in-out 0.3s;
+}
+
+@keyframes toast-shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  [data-sonner-toaster] [data-sonner-toast],
+  [data-sonner-toast] [data-icon] svg,
+  [data-sonner-toast] [data-title],
+  [data-sonner-toast] [data-description],
+  [data-sonner-toast]::before {
+    animation: none !important;
+    transition: opacity 0.2s ease !important;
+  }
 }
 
 /* React Day Picker Custom Styles */

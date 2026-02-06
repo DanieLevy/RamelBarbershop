@@ -6,7 +6,8 @@ import { usePushNotifications, getDeviceIcon } from '@/hooks/usePushNotification
 import { usePWA } from '@/hooks/usePWA'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { cn, formatHebrewMinutes, formatHebrewHours, formatHebrewDays } from '@/lib/utils'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
+import { Button } from '@heroui/react'
 import {
   Bell,
   BellOff,
@@ -49,9 +50,9 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
     setIsEnabling(true)
     const success = await push.subscribe()
     if (success) {
-      toast.success('התראות הופעלו בהצלחה!')
+      showToast.success('התראות הופעלו בהצלחה!')
     } else if (push.error) {
-      toast.error(push.error)
+      showToast.error(push.error)
     }
     setIsEnabling(false)
   }
@@ -71,17 +72,17 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
     
     if (currentPermission === 'granted') {
       // Permission granted in settings! Auto-subscribe
-      toast.success('הרשאה זוהתה! מפעיל התראות...')
+      showToast.success('הרשאה זוהתה! מפעיל התראות...')
       const success = await push.subscribe()
       if (success) {
-        toast.success('התראות הופעלו בהצלחה!')
+        showToast.success('התראות הופעלו בהצלחה!')
       }
     } else if (currentPermission === 'default') {
       // Permission reset to default - user can now request again
-      toast.success('ההרשאה אופסה! כעת ניתן להפעיל התראות')
+      showToast.success('ההרשאה אופסה! כעת ניתן להפעיל התראות')
     } else {
       // Still denied
-      toast.error('ההתראות עדיין חסומות. יש לשנות בהגדרות המכשיר.')
+      showToast.error('ההתראות עדיין חסומות. יש לשנות בהגדרות המכשיר.')
     }
     
     setIsRecheckingPermission(false)
@@ -90,9 +91,9 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
   const handleDisableNotifications = async () => {
     const success = await push.unsubscribe()
     if (success) {
-      toast.success('התראות בוטלו')
+      showToast.success('התראות בוטלו')
     } else if (push.error) {
-      toast.error(push.error)
+      showToast.error(push.error)
     }
   }
 
@@ -101,9 +102,9 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
     setRemovingDeviceId(deviceToRemove.id)
     const success = await push.removeDevice(deviceToRemove.id)
     if (success) {
-      toast.success('המכשיר הוסר בהצלחה')
+      showToast.success('המכשיר הוסר בהצלחה')
     } else if (push.error) {
-      toast.error(push.error)
+      showToast.error(push.error)
     }
     setRemovingDeviceId(null)
     setDeviceToRemove(null)
@@ -159,13 +160,15 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
               {isNotificationsAvailable ? 'פעיל' : 'לא פעיל'}
             </p>
           </div>
-          <button
-            onClick={() => setShowHelp(!showHelp)}
-            className="icon-btn p-2 rounded-lg text-foreground-muted hover:text-accent-gold hover:bg-white/5 transition-colors"
+          <Button
+            onPress={() => setShowHelp(!showHelp)}
+            isIconOnly
+            variant="ghost"
+            className="min-w-[36px] w-9 h-9 icon-btn p-2 rounded-lg text-foreground-muted hover:text-accent-gold hover:bg-white/5 transition-colors"
             aria-label="עזרה"
           >
             <HelpCircle size={18} strokeWidth={1.5} />
-          </button>
+          </Button>
         </div>
 
         {/* Help Section */}
@@ -209,9 +212,9 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
               }
             </p>
             
-            <button
-              onClick={handleRecheckPermission}
-              disabled={isRecheckingPermission}
+            <Button
+              onPress={handleRecheckPermission}
+              isDisabled={isRecheckingPermission}
               className={cn(
                 'w-full py-2.5 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 text-sm',
                 isRecheckingPermission
@@ -230,15 +233,15 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
                   <span>בדוק שוב</span>
                 </>
               )}
-            </button>
+            </Button>
           </div>
         )}
 
         {/* Enable/Disable Button */}
         {push.isSupported && push.permission !== 'denied' && (
-          <button
-            onClick={isNotificationsAvailable ? handleDisableNotifications : handleEnableNotifications}
-            disabled={isEnabling || push.isLoading}
+          <Button
+            onPress={isNotificationsAvailable ? handleDisableNotifications : handleEnableNotifications}
+            isDisabled={isEnabling || push.isLoading}
             className={cn(
               'w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all',
               isNotificationsAvailable
@@ -259,19 +262,20 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
                 <span>הפעל התראות</span>
               </>
             )}
-          </button>
+          </Button>
         )}
 
         {/* Connected Devices */}
         {push.devices.length > 0 && (
           <div className="mt-4 pt-4 border-t border-white/10">
-            <button
-              onClick={() => setShowDevices(!showDevices)}
+            <Button
+              onPress={() => setShowDevices(!showDevices)}
+              variant="ghost"
               className="w-full flex items-center justify-between text-foreground-muted text-sm hover:text-foreground-light transition-colors"
             >
               <span>מכשירים מחוברים ({push.devices.length})</span>
               {showDevices ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            </button>
+            </Button>
 
             {showDevices && (
               <div className="mt-3 space-y-2">
@@ -291,10 +295,12 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
                         {formatLastUsed(device.lastUsed)}
                       </p>
                     </div>
-                    <button
-                      onClick={() => setDeviceToRemove({ id: device.id, name: device.deviceName || device.deviceType })}
-                      disabled={removingDeviceId === device.id}
-                      className="p-1.5 rounded-lg text-foreground-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    <Button
+                      onPress={() => setDeviceToRemove({ id: device.id, name: device.deviceName || device.deviceType })}
+                      isDisabled={removingDeviceId === device.id}
+                      isIconOnly
+                      variant="ghost"
+                      className="min-w-[28px] w-7 h-7 p-1.5 rounded-lg text-foreground-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
                       aria-label="הסר מכשיר"
                     >
                       {removingDeviceId === device.id ? (
@@ -302,7 +308,7 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
                       ) : (
                         <Trash2 size={14} />
                       )}
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -316,12 +322,15 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setDeviceToRemove(null)} />
           <div className="relative w-full max-w-sm glass-elevated rounded-3xl p-6 text-center">
-            <button
-              onClick={() => setDeviceToRemove(null)}
-              className="icon-btn absolute top-4 left-4 p-2 rounded-lg text-foreground-muted hover:text-foreground-light transition-colors"
+            <Button
+              onPress={() => setDeviceToRemove(null)}
+              isIconOnly
+              variant="ghost"
+              className="min-w-[36px] w-9 h-9 icon-btn absolute top-4 left-4 p-2 rounded-lg text-foreground-muted hover:text-foreground-light transition-colors"
+              aria-label="סגור"
             >
               <X size={18} />
-            </button>
+            </Button>
             
             <div className="mx-auto w-16 h-16 rounded-2xl bg-red-500/20 flex items-center justify-center mb-4">
               <Trash2 size={28} className="text-red-400" />
@@ -333,20 +342,21 @@ export function BarberNotificationSettings({ className }: BarberNotificationSett
             </p>
             
             <div className="space-y-2">
-              <button
-                onClick={confirmRemoveDevice}
-                disabled={removingDeviceId !== null}
+              <Button
+                onPress={confirmRemoveDevice}
+                isDisabled={removingDeviceId !== null}
                 className="w-full py-3 px-4 rounded-xl font-bold bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
               >
                 {removingDeviceId ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
                 <span>הסר</span>
-              </button>
-              <button
-                onClick={() => setDeviceToRemove(null)}
+              </Button>
+              <Button
+                onPress={() => setDeviceToRemove(null)}
+                variant="ghost"
                 className="w-full py-3 px-4 rounded-xl font-medium bg-white/10 text-foreground-light hover:bg-white/20 transition-colors"
               >
                 ביטול
-              </button>
+              </Button>
             </div>
           </div>
         </div>

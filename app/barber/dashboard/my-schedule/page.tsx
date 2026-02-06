@@ -3,11 +3,12 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { Clock, ChevronDown, ChevronUp } from 'lucide-react'
 import type { BarbershopSettings, WorkDay } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { Switch } from '@heroui/react'
 
 const DAYS = [
   { key: 'sunday', label: 'ראשון', shortLabel: 'א׳' },
@@ -120,7 +121,7 @@ export default function MySchedulePage() {
   const toggleDay = (dayKey: string) => {
     // Only allow days that are open in the shop
     if (!shopSettings?.open_days.includes(dayKey)) {
-      toast.error('המספרה סגורה ביום זה')
+      showToast.error('המספרה סגורה ביום זה')
       return
     }
     
@@ -157,19 +158,19 @@ export default function MySchedulePage() {
         
         if (dayStartMinutes < shopStartMinutes) {
           const dayLabel = DAYS.find(d => d.key === day.dayOfWeek)?.label || day.dayOfWeek
-          toast.error(`ביום ${dayLabel}: שעת ההתחלה לא יכולה להיות לפני ${shopStart}`)
+          showToast.error(`ביום ${dayLabel}: שעת ההתחלה לא יכולה להיות לפני ${shopStart}`)
           return
         }
         if (dayEndMinutes > shopEndMinutes) {
           const dayLabel = DAYS.find(d => d.key === day.dayOfWeek)?.label || day.dayOfWeek
           // Display "00:00" as "חצות" (midnight) for better UX
           const displayShopEnd = shopEnd === '00:00' ? 'חצות (00:00)' : shopEnd
-          toast.error(`ביום ${dayLabel}: שעת הסיום לא יכולה להיות אחרי ${displayShopEnd}`)
+          showToast.error(`ביום ${dayLabel}: שעת הסיום לא יכולה להיות אחרי ${displayShopEnd}`)
           return
         }
         if (dayStartMinutes >= dayEndMinutes) {
           const dayLabel = DAYS.find(d => d.key === day.dayOfWeek)?.label || day.dayOfWeek
-          toast.error(`ביום ${dayLabel}: שעת ההתחלה חייבת להיות לפני שעת הסיום`)
+          showToast.error(`ביום ${dayLabel}: שעת ההתחלה חייבת להיות לפני שעת הסיום`)
           return
         }
       }
@@ -215,12 +216,12 @@ export default function MySchedulePage() {
         }
       }
       
-      toast.success('לוח הזמנים עודכן בהצלחה!')
+      showToast.success('לוח הזמנים עודכן בהצלחה!')
       fetchData()
     } catch (err) {
       console.error('Error saving schedule:', err)
       await report(err, 'Saving barber work days')
-      toast.error('שגיאה בשמירת לוח הזמנים')
+      showToast.error('שגיאה בשמירת לוח הזמנים')
     }
     
     setSavingSchedule(false)
@@ -287,30 +288,25 @@ export default function MySchedulePage() {
                 >
                   <div className="flex items-center gap-3">
                     {/* Toggle working */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleDay(day.key)
-                      }}
-                      disabled={!isShopOpen}
-                      className={cn(
-                        'w-12 h-7 rounded-full transition-colors relative flex-shrink-0',
-                        !isShopOpen
-                          ? 'bg-foreground-muted/20 cursor-not-allowed'
-                          : isWorking
-                            ? 'bg-accent-gold'
-                            : 'bg-white/10'
-                      )}
-                      aria-checked={isWorking}
-                      role="switch"
-                    >
-                      <div
-                        className={cn(
-                          'absolute top-1 w-5 h-5 rounded-full bg-white transition-all',
-                          isWorking ? 'right-1' : 'left-1'
-                        )}
-                      />
-                    </button>
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Switch
+                        isSelected={isWorking}
+                        onChange={() => toggleDay(day.key)}
+                        isDisabled={!isShopOpen}
+                      >
+                        <Switch.Control className={cn(
+                          'w-12 h-7',
+                          !isShopOpen
+                            ? 'bg-foreground-muted/20 cursor-not-allowed'
+                            : isWorking
+                              ? 'bg-accent-gold'
+                              : 'bg-white/10',
+                          !isShopOpen && 'opacity-50 cursor-not-allowed'
+                        )}>
+                          <Switch.Thumb />
+                        </Switch.Control>
+                      </Switch>
+                    </div>
                     
                     <span className={cn(
                       'font-medium',

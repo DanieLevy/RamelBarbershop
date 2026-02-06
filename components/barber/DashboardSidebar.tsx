@@ -6,6 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { cn } from '@/lib/utils'
+import { Button } from '@heroui/react'
 import {
   Home,
   Calendar,
@@ -151,13 +152,15 @@ export function DashboardSidebar({ isMobileOpen, onMobileClose }: DashboardSideb
                 )}
               </div>
             </div>
-            <button
-              onClick={onMobileClose}
-              className="p-2 text-foreground-muted hover:text-foreground-light transition-colors"
+            <Button
+              onPress={onMobileClose}
+              variant="ghost"
+              isIconOnly
               aria-label="סגור תפריט"
+              className="min-w-[40px] w-10 h-10 text-foreground-muted hover:text-foreground-light"
             >
               <X size={20} strokeWidth={1.5} />
-            </button>
+            </Button>
           </div>
 
           {isAdmin && (
@@ -225,11 +228,12 @@ function SidebarContent({
           {navItems.map((item) => {
             const Icon = item.icon
             return (
-              <button
+              <Button
                 key={item.href}
-                onClick={() => onNavigation(item.href)}
+                onPress={() => onNavigation(item.href)}
+                variant={isActive(item.href) ? undefined : 'ghost'}
                 className={cn(
-                  'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all',
+                  'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all justify-start',
                   isActive(item.href)
                     ? 'bg-accent-gold text-background-dark'
                     : 'text-foreground-light hover:bg-white/5'
@@ -237,7 +241,7 @@ function SidebarContent({
               >
                 <Icon size={16} strokeWidth={1.5} />
                 <span>{item.label}</span>
-              </button>
+              </Button>
             )
           })}
         </div>
@@ -253,11 +257,12 @@ function SidebarContent({
               {adminNavItems.map((item) => {
                 const Icon = item.icon
                 return (
-                  <button
+                  <Button
                     key={item.href}
-                    onClick={() => onNavigation(item.href)}
+                    onPress={() => onNavigation(item.href)}
+                    variant={isActive(item.href) ? undefined : 'ghost'}
                     className={cn(
-                      'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all',
+                      'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all justify-start',
                       isActive(item.href)
                         ? 'bg-accent-gold text-background-dark'
                         : 'text-foreground-light hover:bg-white/5'
@@ -265,7 +270,7 @@ function SidebarContent({
                   >
                     <Icon size={16} strokeWidth={1.5} />
                     <span>{item.label}</span>
-                  </button>
+                  </Button>
                 )
               })}
             </div>
@@ -275,13 +280,14 @@ function SidebarContent({
 
       {/* Footer */}
       <div className="p-4 border-t border-white/10">
-        <button
-          onClick={onLogout}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-red-400 hover:bg-red-500/10 transition-all"
+        <Button
+          onPress={onLogout}
+          variant="ghost"
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-red-400 hover:bg-red-500/10 justify-start"
         >
           <LogOut size={16} strokeWidth={1.5} />
           <span>התנתק</span>
-        </button>
+        </Button>
         
         <Link
           href="/"

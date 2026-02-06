@@ -9,6 +9,7 @@
 import { createClient } from '@/lib/supabase/client'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
 import { getSlotKey, timestampToIsraelDate, israelDateToTimestamp, getIsraelDayStart, getDayKeyInIsrael } from '@/lib/utils'
+import { withSupabaseRetry } from '@/lib/utils/retry'
 import type {
   RecurringAppointment,
   RecurringAppointmentWithDetails,
@@ -155,40 +156,44 @@ export const getRecurringByCustomer = async (
   }
 
   try {
-    const supabase = createClient()
-    
-    const { data, error } = await supabase
-      .from('recurring_appointments')
-      .select(`
-        id,
-        day_of_week,
-        time_slot,
-        users!recurring_appointments_barber_id_fkey (fullname),
-        services!recurring_appointments_service_id_fkey (name_he)
-      `)
-      .eq('customer_id', customerId)
-      .eq('is_active', true)
-      .order('day_of_week')
-      .order('time_slot')
-    
-    if (error) {
-      console.error('[RecurringService] Error fetching customer recurring:', error)
-      await reportSupabaseError(error, 'Fetching customer recurring appointments', {
-        table: 'recurring_appointments',
-        operation: 'select',
-      })
-      return []
-    }
-    
-    // Transform to customer-friendly format
-    return (data || []).map((rec) => ({
-      id: rec.id,
-      barber_name: (rec.users as { fullname: string })?.fullname || '',
-      service_name: (rec.services as { name_he: string })?.name_he || '',
-      day_of_week: rec.day_of_week as DayOfWeek,
-      day_of_week_hebrew: DAY_OF_WEEK_HEBREW[rec.day_of_week as DayOfWeek],
-      time_slot: rec.time_slot,
-    }))
+    // Use retry wrapper for resilience against transient network errors
+    // (especially Safari "Load failed" on iOS PWA wake-up)
+    return await withSupabaseRetry(async () => {
+      const supabase = createClient()
+      
+      const { data, error } = await supabase
+        .from('recurring_appointments')
+        .select(`
+          id,
+          day_of_week,
+          time_slot,
+          users!recurring_appointments_barber_id_fkey (fullname),
+          services!recurring_appointments_service_id_fkey (name_he)
+        `)
+        .eq('customer_id', customerId)
+        .eq('is_active', true)
+        .order('day_of_week')
+        .order('time_slot')
+      
+      if (error) {
+        console.error('[RecurringService] Error fetching customer recurring:', error)
+        await reportSupabaseError(error, 'Fetching customer recurring appointments', {
+          table: 'recurring_appointments',
+          operation: 'select',
+        })
+        return []
+      }
+      
+      // Transform to customer-friendly format
+      return (data || []).map((rec) => ({
+        id: rec.id,
+        barber_name: (rec.users as { fullname: string })?.fullname || '',
+        service_name: (rec.services as { name_he: string })?.name_he || '',
+        day_of_week: rec.day_of_week as DayOfWeek,
+        day_of_week_hebrew: DAY_OF_WEEK_HEBREW[rec.day_of_week as DayOfWeek],
+        time_slot: rec.time_slot,
+      }))
+    }, { maxRetries: 2, initialDelayMs: 500 })
   } catch (err) {
     console.error('[RecurringService] Exception fetching customer recurring:', err)
     return []

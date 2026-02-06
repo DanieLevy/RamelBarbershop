@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pushService } from '@/lib/push/push-service'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { reportServerError } from '@/lib/bug-reporter/helpers'
+import { reportApiError } from '@/lib/bug-reporter/helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,7 +64,9 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('[API/notify-blocked-attempt] Error:', error)
-    await reportServerError(error, 'notify-blocked-attempt')
+    await reportApiError(error, request, 'Notify blocked attempt failed', {
+      severity: 'high',
+    })
     
     return NextResponse.json(
       { error: 'Failed to send notification' },

@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { reportServerError } from '@/lib/bug-reporter/helpers'
+import { reportApiError } from '@/lib/bug-reporter/helpers'
 
 const updateSettingsSchema = z.object({
   customerId: z.string().uuid('מזהה לקוח לא תקין'),
@@ -70,8 +70,9 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error(`[${requestId}] Error fetching notification settings:`, error)
     
-    await reportServerError(error, 'GET /api/customers/notification-settings', {
-      route: '/api/customers/notification-settings',
+    await reportApiError(error, request, 'Fetch notification settings failed', {
+      severity: 'medium',
+      additionalData: { requestId },
     })
     
     return NextResponse.json(
@@ -154,8 +155,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error(`[${requestId}] Error updating notification settings:`, error)
     
-    await reportServerError(error, 'POST /api/customers/notification-settings', {
-      route: '/api/customers/notification-settings',
+    await reportApiError(error, request, 'Update notification settings failed', {
       severity: 'medium',
       additionalData: { requestId },
     })

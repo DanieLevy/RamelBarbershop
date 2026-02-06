@@ -6,7 +6,7 @@ import { useAuthStore } from '@/store/useAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { AppHeader } from '@/components/AppHeader'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { 
   User, 
@@ -23,6 +23,7 @@ import { useBugReporter } from '@/hooks/useBugReporter'
 import { useHaptics } from '@/hooks/useHaptics'
 import { NotificationSettings } from '@/components/profile/NotificationSettings'
 import { LogoutModal } from '@/components/profile/LogoutModal'
+import { Button, Avatar } from '@heroui/react'
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -111,7 +112,7 @@ export default function ProfilePage() {
       if (!response.ok || !result.success) {
         console.error('Error updating name:', result.error)
         await report(new Error(result.error || 'Update failed'), 'Updating customer name')
-        toast.error('שגיאה בעדכון השם')
+        showToast.error('שגיאה בעדכון השם')
         return
       }
       
@@ -121,12 +122,12 @@ export default function ProfilePage() {
       })
       
       haptics.success() // Haptic feedback for settings saved
-      toast.success('השם עודכן בהצלחה')
+      showToast.success('השם עודכן בהצלחה')
       setEditingName(false)
     } catch (err) {
       console.error('Error updating name:', err)
       await report(err, 'Updating customer name (exception)')
-      toast.error('שגיאה בעדכון השם')
+      showToast.error('שגיאה בעדכון השם')
     } finally {
       setSavingName(false)
     }
@@ -137,7 +138,7 @@ export default function ProfilePage() {
     await logout()
     haptics.light() // Haptic feedback for logout
     router.replace('/')
-    toast.success('התנתקת בהצלחה')
+    showToast.success('התנתקת בהצלחה')
   }
 
   const formatDate = (dateString: string): string => {
@@ -181,9 +182,11 @@ export default function ProfilePage() {
             <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 mb-4">
               <div className="flex items-center gap-3">
                 {/* Small Avatar */}
-                <div className="w-14 h-14 shrink-0 rounded-full bg-accent-gold/15 flex items-center justify-center border border-accent-gold/30">
-                  <User size={24} strokeWidth={1.5} className="text-accent-gold" />
-                </div>
+                <Avatar size="lg" className="shrink-0 w-14 h-14 border border-accent-gold/30">
+                  <Avatar.Fallback className="bg-accent-gold/15 text-accent-gold">
+                    <User size={24} strokeWidth={1.5} />
+                  </Avatar.Fallback>
+                </Avatar>
                 
                 {/* Name & Info */}
                 <div className="flex-1 min-w-0">
@@ -196,38 +199,42 @@ export default function ProfilePage() {
                         className="flex-1 min-w-0 px-2.5 py-1.5 bg-background-card border border-white/20 rounded-lg text-foreground-light text-sm font-medium outline-none focus:border-accent-gold/50 transition-colors"
                         autoFocus
                       />
-                      <button
-                        onClick={handleSaveName}
-                        disabled={savingName || !newName.trim()}
+                      <Button
+                        variant="ghost"
+                        isIconOnly
+                        onPress={handleSaveName}
+                        isDisabled={savingName || !newName.trim()}
                         className={cn(
-                          'p-1.5 rounded-lg transition-colors',
-                          savingName || !newName.trim()
-                            ? 'bg-foreground-muted/20 text-foreground-muted cursor-not-allowed'
-                            : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                          'min-w-[28px] w-7 h-7',
+                          !savingName && newName.trim() && 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
                         )}
                       >
                         <Check size={14} strokeWidth={2} />
-                      </button>
-                      <button
-                        onClick={handleCancelEdit}
-                        disabled={savingName}
-                        className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        isIconOnly
+                        onPress={handleCancelEdit}
+                        isDisabled={savingName}
+                        className="min-w-[28px] w-7 h-7 bg-red-500/20 text-red-400 hover:bg-red-500/30"
                       >
                         <X size={14} strokeWidth={2} />
-                      </button>
+                      </Button>
                     </div>
                   ) : (
                     <div className="flex items-center gap-1.5">
                       <h1 className="text-lg text-foreground-light font-medium truncate">
                         {customer.fullname}
                       </h1>
-                      <button
-                        onClick={handleEditName}
-                        className="p-1 rounded text-foreground-muted/50 hover:text-accent-gold transition-colors shrink-0"
+                      <Button
+                        variant="ghost"
+                        isIconOnly
+                        onPress={handleEditName}
+                        className="min-w-[24px] w-6 h-6 text-foreground-muted/50 hover:text-accent-gold"
                         aria-label="ערוך שם"
                       >
                         <Edit2 size={12} strokeWidth={1.5} />
-                      </button>
+                      </Button>
                     </div>
                   )}
                   <p className="text-foreground-muted text-xs flex items-center gap-1.5 mt-0.5">
@@ -250,19 +257,20 @@ export default function ProfilePage() {
                 </p>
               </div>
               
-              <button
-                onClick={() => router.push('/my-appointments')}
-                className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 text-center hover:bg-white/[0.04] transition-colors group"
+              <Button
+                variant="ghost"
+                onPress={() => router.push('/my-appointments')}
+                className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 text-center h-auto flex-col"
                 aria-label="צפה בתורים"
               >
                 <div className="flex items-center justify-center gap-1.5 text-foreground-muted text-[10px] mb-1">
                   <History size={10} strokeWidth={1.5} />
                   <span>תורים</span>
                 </div>
-                <p className="text-foreground-light font-medium text-sm group-hover:text-accent-gold transition-colors">
+                <p className="text-foreground-light font-medium text-sm">
                   {loadingStats ? '...' : appointmentCount}
                 </p>
-              </button>
+              </Button>
             </div>
             
             {/* Notification Settings - Compact */}
@@ -270,32 +278,35 @@ export default function ProfilePage() {
             
             {/* Quick Actions */}
             <div className="space-y-2">
-              <button
-                onClick={() => router.push('/my-appointments')}
-                className="w-full flex items-center gap-3 px-4 py-3 bg-accent-gold/10 border border-accent-gold/20 text-accent-gold rounded-xl text-sm font-medium hover:bg-accent-gold/15 transition-all"
+              <Button
+                variant="secondary"
+                onPress={() => router.push('/my-appointments')}
+                className="w-full justify-start gap-3 bg-accent-gold/10 border border-accent-gold/20 text-accent-gold hover:bg-accent-gold/15"
               >
                 <Calendar size={18} strokeWidth={1.5} />
                 <span>התורים שלי</span>
                 <ChevronRight size={14} strokeWidth={1.5} className="mr-auto rotate-180" />
-              </button>
+              </Button>
               
-              <button
-                onClick={() => setShowLogoutModal(true)}
-                className="w-full flex items-center gap-3 px-4 py-3 bg-red-500/5 border border-red-500/10 text-red-400 rounded-xl text-sm font-medium hover:bg-red-500/10 transition-all"
+              <Button
+                variant="danger"
+                onPress={() => setShowLogoutModal(true)}
+                className="w-full justify-start gap-3 bg-red-500/5 border border-red-500/10"
               >
                 <LogOut size={18} strokeWidth={1.5} />
                 <span>התנתק</span>
-              </button>
+              </Button>
             </div>
             
             {/* Back to Home */}
-            <button
-              onClick={() => router.push('/')}
-              className="w-full mt-4 py-2 text-foreground-muted hover:text-foreground-light text-xs transition-colors flex items-center justify-center gap-1"
+            <Button
+              variant="ghost"
+              onPress={() => router.push('/')}
+              className="w-full mt-4 text-foreground-muted text-xs"
             >
               <ChevronRight size={10} strokeWidth={1.5} />
               <span>חזרה לדף הבית</span>
-            </button>
+            </Button>
           </div>
         </div>
       </main>

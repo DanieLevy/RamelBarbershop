@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { Menu, Home } from 'lucide-react'
+import { Button } from '@heroui/react'
 
 interface DashboardMobileHeaderProps {
   barberName?: string
@@ -19,13 +20,15 @@ export function DashboardMobileHeader({ onMenuToggle }: DashboardMobileHeaderPro
     >
       <div className="flex items-center justify-between px-4 h-16">
         {/* Menu button */}
-        <button
-          onClick={onMenuToggle}
-          className="p-2 -mr-2 text-foreground-light hover:text-accent-gold transition-colors flex items-center justify-center"
+        <Button
+          onPress={onMenuToggle}
+          variant="ghost"
+          isIconOnly
           aria-label="פתח תפריט"
+          className="min-w-[40px] w-10 h-10 -mr-2 text-foreground-light hover:text-accent-gold"
         >
           <Menu size={20} strokeWidth={1.5} />
-        </button>
+        </Button>
         
         {/* Logo and title */}
         <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">

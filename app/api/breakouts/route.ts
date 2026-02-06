@@ -12,7 +12,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
-import { reportBug } from '@/lib/bug-reporter'
+import { reportApiError } from '@/lib/bug-reporter/helpers'
 import {
   getIsraelDateString,
   getDayKeyInIsrael,
@@ -236,10 +236,11 @@ export async function GET(request: NextRequest) {
     
     if (error) {
       console.error('[API/Breakouts] GET error:', error)
-      await reportBug(
+      await reportApiError(
         new Error(error.message),
-        'API: Get Breakouts',
-        { additionalData: { barberId, errorCode: error.code } }
+        request,
+        'Get Breakouts failed',
+        { severity: 'medium', additionalData: { barberId, errorCode: error.code } }
       )
       return NextResponse.json(
         { success: false, error: 'DATABASE_ERROR', message: ERROR_MESSAGES.DATABASE_ERROR },
@@ -281,9 +282,11 @@ export async function GET(request: NextRequest) {
     
   } catch (err) {
     console.error('[API/Breakouts] GET exception:', err)
-    await reportBug(
+    await reportApiError(
       err instanceof Error ? err : new Error(String(err)),
-      'API: Get Breakouts - Exception'
+      request,
+      'Get Breakouts exception',
+      { severity: 'high' }
     )
     return NextResponse.json(
       { success: false, error: 'UNKNOWN_ERROR', message: 'שגיאה בלתי צפויה' },
@@ -418,10 +421,11 @@ export async function POST(request: NextRequest) {
       
       if (cancelError) {
         console.error('[API/Breakouts] Cancel conflicts error:', cancelError)
-        await reportBug(
+        await reportApiError(
           new Error(cancelError.message),
-          'API: Cancel Breakout Conflicts',
-          { additionalData: { barberId: body.barberId, conflictIds } }
+          request,
+          'Cancel breakout conflicts failed',
+          { severity: 'high', additionalData: { barberId: body.barberId, conflictIds } }
         )
         return NextResponse.json(
           { success: false, error: 'DATABASE_ERROR', message: ERROR_MESSAGES.DATABASE_ERROR },
@@ -454,10 +458,11 @@ export async function POST(request: NextRequest) {
     
     if (createError) {
       console.error('[API/Breakouts] Create error:', createError)
-      await reportBug(
+      await reportApiError(
         new Error(createError.message),
-        'API: Create Breakout - Database Error',
-        { additionalData: { barberId: body.barberId, errorCode: createError.code } }
+        request,
+        'Create breakout failed',
+        { severity: 'high', additionalData: { barberId: body.barberId, errorCode: createError.code } }
       )
       return NextResponse.json(
         { success: false, error: 'DATABASE_ERROR', message: ERROR_MESSAGES.DATABASE_ERROR },
@@ -475,9 +480,11 @@ export async function POST(request: NextRequest) {
     
   } catch (err) {
     console.error('[API/Breakouts] POST exception:', err)
-    await reportBug(
+    await reportApiError(
       err instanceof Error ? err : new Error(String(err)),
-      'API: Create Breakout - Exception'
+      request,
+      'Create breakout exception',
+      { severity: 'critical' }
     )
     return NextResponse.json(
       { success: false, error: 'UNKNOWN_ERROR', message: 'שגיאה בלתי צפויה. נסה שוב.' },
@@ -547,10 +554,11 @@ export async function DELETE(request: NextRequest) {
     
     if (updateError) {
       console.error('[API/Breakouts] Delete error:', updateError)
-      await reportBug(
+      await reportApiError(
         new Error(updateError.message),
-        'API: Delete Breakout - Database Error',
-        { additionalData: { breakoutId: body.breakoutId, barberId: body.barberId } }
+        request,
+        'Delete breakout failed',
+        { severity: 'high', additionalData: { breakoutId: body.breakoutId, barberId: body.barberId } }
       )
       return NextResponse.json(
         { success: false, error: 'DATABASE_ERROR', message: ERROR_MESSAGES.DATABASE_ERROR },
@@ -564,9 +572,11 @@ export async function DELETE(request: NextRequest) {
     
   } catch (err) {
     console.error('[API/Breakouts] DELETE exception:', err)
-    await reportBug(
+    await reportApiError(
       err instanceof Error ? err : new Error(String(err)),
-      'API: Delete Breakout - Exception'
+      request,
+      'Delete breakout exception',
+      { severity: 'high' }
     )
     return NextResponse.json(
       { success: false, error: 'UNKNOWN_ERROR', message: 'שגיאה בלתי צפויה' },

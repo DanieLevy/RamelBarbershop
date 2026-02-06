@@ -3,11 +3,12 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { Plus, Trash, Calendar, CalendarOff, CalendarX } from 'lucide-react'
 import type { BarberClosure } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { Button } from '@heroui/react'
 
 export default function AbsenceDaysPage() {
   const { barber } = useBarberAuthStore()
@@ -52,7 +53,7 @@ export default function AbsenceDaysPage() {
     if (!barber?.id) return
     
     if (!startDate) {
-      toast.error('נא לבחור תאריך')
+      showToast.error('נא לבחור תאריך')
       return
     }
     
@@ -60,12 +61,12 @@ export default function AbsenceDaysPage() {
     const effectiveEndDate = isSingleDate ? startDate : endDate
     
     if (!isSingleDate && !endDate) {
-      toast.error('נא לבחור תאריך סיום')
+      showToast.error('נא לבחור תאריך סיום')
       return
     }
     
     if (!isSingleDate && new Date(startDate) > new Date(effectiveEndDate)) {
-      toast.error('תאריך התחלה לא יכול להיות אחרי תאריך הסיום')
+      showToast.error('תאריך התחלה לא יכול להיות אחרי תאריך הסיום')
       return
     }
     
@@ -82,9 +83,9 @@ export default function AbsenceDaysPage() {
     if (error) {
       console.error('Error adding closure:', error)
       await report(new Error(error.message), 'Adding barber closure')
-      toast.error('שגיאה בהוספת יום היעדרות')
+      showToast.error('שגיאה בהוספת יום היעדרות')
     } else {
-      toast.success('יום ההיעדרות נוסף בהצלחה!')
+      showToast.success('יום ההיעדרות נוסף בהצלחה!')
       setShowForm(false)
       setStartDate('')
       setEndDate('')
@@ -109,9 +110,9 @@ export default function AbsenceDaysPage() {
     if (error) {
       console.error('Error deleting closure:', error)
       await report(new Error(error.message), 'Deleting barber closure')
-      toast.error('שגיאה במחיקה')
+      showToast.error('שגיאה במחיקה')
     } else {
-      toast.success('נמחק בהצלחה')
+      showToast.success('נמחק בהצלחה')
       fetchClosures()
     }
   }
@@ -162,13 +163,13 @@ export default function AbsenceDaysPage() {
             נהל את ימי ההיעדרות שלך - הלקוחות לא יוכלו לקבוע תורים בימים אלו
           </p>
         </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-background-dark rounded-xl text-sm font-medium hover:bg-accent-gold/90 transition-colors"
+        <Button
+          onPress={() => setShowForm(!showForm)}
+          className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-background-dark rounded-xl text-sm font-medium hover:bg-accent-gold/90"
         >
           <Plus size={16} strokeWidth={2} />
           הוסף יום היעדרות
-        </button>
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -197,9 +198,9 @@ export default function AbsenceDaysPage() {
           
           {/* Date Type Toggle */}
           <div className="flex gap-2 mb-4">
-            <button
-              type="button"
-              onClick={() => setIsSingleDate(true)}
+            <Button
+              onPress={() => setIsSingleDate(true)}
+              variant={isSingleDate ? undefined : 'ghost'}
               className={cn(
                 'flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors',
                 isSingleDate
@@ -208,10 +209,10 @@ export default function AbsenceDaysPage() {
               )}
             >
               יום בודד
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsSingleDate(false)}
+            </Button>
+            <Button
+              onPress={() => setIsSingleDate(false)}
+              variant={!isSingleDate ? undefined : 'ghost'}
               className={cn(
                 'flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors',
                 !isSingleDate
@@ -220,7 +221,7 @@ export default function AbsenceDaysPage() {
               )}
             >
               טווח תאריכים
-            </button>
+            </Button>
           </div>
 
           {/* Date Inputs */}
@@ -265,25 +266,26 @@ export default function AbsenceDaysPage() {
 
           {/* Actions */}
           <div className="flex gap-3">
-            <button
-              onClick={handleAddClosure}
-              disabled={saving}
-              className="flex-1 py-3 bg-accent-gold text-background-dark rounded-xl text-sm font-medium hover:bg-accent-gold/90 disabled:opacity-50 transition-colors"
+            <Button
+              onPress={handleAddClosure}
+              isDisabled={saving}
+              className="flex-1 py-3 bg-accent-gold text-background-dark rounded-xl text-sm font-medium hover:bg-accent-gold/90"
             >
               {saving ? 'שומר...' : 'שמור'}
-            </button>
-            <button
-              onClick={() => {
+            </Button>
+            <Button
+              variant="ghost"
+              onPress={() => {
                 setShowForm(false)
                 setStartDate('')
                 setEndDate('')
                 setReason('')
                 setIsSingleDate(true)
               }}
-              className="px-6 py-3 bg-background-dark border border-white/10 text-foreground-muted rounded-xl text-sm hover:text-foreground-light transition-colors"
+              className="px-6 py-3 bg-background-dark border border-white/10 text-foreground-muted rounded-xl text-sm hover:text-foreground-light"
             >
               ביטול
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -329,13 +331,15 @@ export default function AbsenceDaysPage() {
                     )}
                   </div>
                 </div>
-                <button
-                  onClick={() => handleDeleteClosure(closure.id)}
-                  className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                <Button
+                  variant="ghost"
+                  isIconOnly
+                  onPress={() => handleDeleteClosure(closure.id)}
+                  className="min-w-[36px] w-9 h-9 text-red-400 hover:bg-red-500/10 rounded-lg"
                   aria-label="מחק יום היעדרות"
                 >
                   <Trash size={16} strokeWidth={1.5} />
-                </button>
+                </Button>
               </div>
             ))}
           </div>
@@ -375,13 +379,15 @@ export default function AbsenceDaysPage() {
                     )}
                   </div>
                 </div>
-                <button
-                  onClick={() => handleDeleteClosure(closure.id)}
-                  className="p-1.5 text-foreground-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                <Button
+                  variant="ghost"
+                  isIconOnly
+                  onPress={() => handleDeleteClosure(closure.id)}
+                  className="min-w-[32px] w-8 h-8 text-foreground-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg"
                   aria-label="מחק יום היעדרות"
                 >
                   <Trash size={14} strokeWidth={1.5} />
-                </button>
+                </Button>
               </div>
             ))}
             {pastClosures.length > 5 && (

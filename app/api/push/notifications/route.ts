@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { reportServerError } from '@/lib/bug-reporter/helpers'
+import { reportApiError } from '@/lib/bug-reporter/helpers'
 import type { NotificationLogRecord, NotificationType, RecipientType } from '@/lib/push/types'
 
 export const dynamic = 'force-dynamic'
@@ -135,8 +135,8 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('[API notifications] Error:', error)
-    await reportServerError(error, 'GET /api/push/notifications', {
-      route: '/api/push/notifications'
+    await reportApiError(error, request, 'Get notifications failed', {
+      severity: 'medium',
     })
     return NextResponse.json(
       { success: false, error: 'Internal server error' },

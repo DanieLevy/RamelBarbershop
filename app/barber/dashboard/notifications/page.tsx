@@ -10,7 +10,7 @@ import { useBugReporter } from '@/hooks/useBugReporter'
 import { useHaptics } from '@/hooks/useHaptics'
 import { format } from 'date-fns'
 import { he } from 'date-fns/locale'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 
 type FilterType = 'all' | 'unread' | NotificationType
 
@@ -81,12 +81,12 @@ export default function BarberNotificationsPage() {
       } else {
         console.error('Error fetching notifications:', data.error)
         await report(new Error(data.error || 'Unknown error'), 'Fetching barber notifications')
-        toast.error('שגיאה בטעינת ההתראות')
+        showToast.error('שגיאה בטעינת ההתראות')
       }
     } catch (err) {
       console.error('Error fetching notifications:', err)
       await report(err, 'Fetching barber notifications (exception)')
-      toast.error('שגיאה בטעינת ההתראות')
+      showToast.error('שגיאה בטעינת ההתראות')
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -122,13 +122,13 @@ export default function BarberNotificationsPage() {
         // Update local state
         setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
         setTotalUnread(0)
-        toast.success('כל ההתראות סומנו כנקראו')
+        showToast.success('כל ההתראות סומנו כנקראו')
       } else {
-        toast.error('שגיאה בסימון ההתראות')
+        showToast.error('שגיאה בסימון ההתראות')
       }
     } catch (err) {
       console.error('Error marking all as read:', err)
-      toast.error('שגיאה בסימון ההתראות')
+      showToast.error('שגיאה בסימון ההתראות')
     } finally {
       setMarkingAllRead(false)
     }

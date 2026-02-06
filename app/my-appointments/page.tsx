@@ -8,7 +8,7 @@ import { AppHeader } from '@/components/AppHeader'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { AppointmentDetailModal } from '@/components/barber/AppointmentDetailModal'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn, formatTime as formatTimeUtil, timestampToIsraelDate, nowInIsrael, isSameDayInIsrael, normalizeTimestampFormat } from '@/lib/utils'
 import { Calendar, Scissors, User, X, History, ChevronRight, LogIn, Info, AlertCircle, Repeat, Clock } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -20,6 +20,7 @@ import ErrorBoundary from '@/components/ErrorBoundary'
 import { cancelReservation } from '@/lib/services/booking.service'
 import { CancelBlockedModal } from '@/components/booking/CancelBlockedModal'
 import { getRecurringByCustomer } from '@/lib/services/recurring.service'
+import { Button } from '@heroui/react'
 
 type TabType = 'upcoming' | 'past' | 'cancelled'
 
@@ -101,6 +102,8 @@ function MyAppointmentsContent() {
     } catch (err) {
       console.error('Error fetching recurring appointments:', err)
       // Don't show error toast - recurring is optional display
+      // On mobile Safari "Load failed" is common during app wake-up
+      // The data is non-critical so we silently fail
     }
   }
 
@@ -193,7 +196,7 @@ function MyAppointmentsContent() {
       if (error) {
         console.error('Error fetching reservations:', error)
         await report(new Error(error.message), 'Fetching customer reservations')
-        toast.error('שגיאה בטעינת התורים')
+        showToast.error('שגיאה בטעינת התורים')
         return
       }
       
@@ -201,7 +204,7 @@ function MyAppointmentsContent() {
     } catch (err) {
       console.error('Error fetching reservations:', err)
       await report(err, 'Fetching customer reservations (exception)')
-      toast.error('שגיאה בטעינת התורים')
+      showToast.error('שגיאה בטעינת התורים')
     } finally {
       setLoading(false)
     }
@@ -243,7 +246,7 @@ function MyAppointmentsContent() {
     // Get reservation details before cancelling for notification
     const reservation = reservations.find(r => r.id === reservationId)
     if (!reservation) {
-      toast.error('התור לא נמצא')
+      showToast.error('התור לא נמצא')
       return
     }
     
@@ -291,13 +294,13 @@ function MyAppointmentsContent() {
         console.error('Error cancelling reservation:', result.error)
         
         if (result.concurrencyConflict) {
-          toast.error('התור עודכן על ידי אחר. מרענן...')
+          showToast.error('התור עודכן על ידי אחר. מרענן...')
           await fetchReservations() // Refresh to get latest data
           return
         }
         
         await report(new Error(result.error || 'Unknown cancellation error'), 'Cancelling customer reservation')
-        toast.error(result.error || 'שגיאה בביטול התור')
+        showToast.error(result.error || 'שגיאה בביטול התור')
         return
       }
       
@@ -320,12 +323,12 @@ function MyAppointmentsContent() {
       }
       
       haptics.medium() // Haptic feedback for cancellation
-      toast.success('התור בוטל בהצלחה')
+      showToast.success('התור בוטל בהצלחה')
       await fetchReservations()
     } catch (err) {
       console.error('Error cancelling reservation:', err)
       await report(err, 'Cancelling customer reservation (exception)')
-      toast.error('שגיאה בביטול התור')
+      showToast.error('שגיאה בביטול התור')
     } finally {
       setCancellingId(null)
     }
@@ -418,22 +421,25 @@ function MyAppointmentsContent() {
                   לנהל הזמנות ולקבל תזכורות
                 </p>
                 
-                <button
-                  onClick={() => setShowLoginModal(true)}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-accent-gold text-background-dark rounded-xl font-medium hover:bg-accent-gold/90 transition-all hover:scale-[1.02]"
+                <Button
+                  variant="primary"
+                  onPress={() => setShowLoginModal(true)}
+                  className="w-full"
+                  size="lg"
                 >
                   <LogIn size={20} strokeWidth={2} />
                   <span>התחבר עכשיו</span>
-                </button>
+                </Button>
                 
                 <div className="mt-6 pt-6 border-t border-white/10 flex flex-col items-center">
                   <p className="text-foreground-muted text-sm mb-3">עדיין לא קבעת תור?</p>
-                  <button
-                    onClick={() => router.push('/')}
-                    className="text-accent-gold hover:underline text-sm font-medium"
+                  <Button
+                    variant="ghost"
+                    onPress={() => router.push('/')}
+                    className="text-accent-gold text-sm"
                   >
                     קבע תור חדש ←
-                  </button>
+                  </Button>
                 </div>
               </GlassCard>
             </div>
@@ -464,14 +470,16 @@ function MyAppointmentsContent() {
               </div>
               
               {/* Quick New Appointment Button */}
-              <button
-                onClick={() => router.push('/')}
-                className="flex items-center gap-1.5 px-3 py-2 bg-accent-gold text-background-dark rounded-xl text-sm font-medium hover:bg-accent-gold/90 transition-all hover:scale-[1.02] shrink-0"
+              <Button
+                variant="primary"
+                onPress={() => router.push('/')}
+                className="shrink-0"
+                size="sm"
               >
                 <Calendar size={14} strokeWidth={2} />
                 <span className="hidden sm:inline">תור חדש</span>
                 <span className="sm:hidden">+</span>
-              </button>
+              </Button>
             </div>
             
             {/* Recurring Appointments Section */}
@@ -561,12 +569,12 @@ function MyAppointmentsContent() {
                   {activeTab === 'cancelled' && 'אין תורים מבוטלים'}
                 </p>
                 {activeTab === 'upcoming' && (
-                  <button
-                    onClick={() => router.push('/')}
-                    className="px-6 py-3 bg-accent-gold text-background-dark rounded-xl font-medium hover:bg-accent-gold/90 transition-all hover:scale-[1.02]"
+                  <Button
+                    variant="primary"
+                    onPress={() => router.push('/')}
                   >
                     קבע תור חדש
-                  </button>
+                  </Button>
                 )}
               </GlassCard>
             ) : (
@@ -640,35 +648,31 @@ function MyAppointmentsContent() {
                         {/* Actions */}
                         <div className="flex items-center gap-1 shrink-0">
                           {/* Info */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setDetailModal({ isOpen: true, reservation })
-                            }}
-                            className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/[0.08] transition-colors"
+                          <Button
+                            variant="ghost"
+                            isIconOnly
+                            onPress={() => setDetailModal({ isOpen: true, reservation })}
+                            className="min-w-[40px] w-10 h-10"
                             aria-label="פרטים"
                           >
                             <Info size={16} strokeWidth={1.5} className="text-foreground-muted" />
-                          </button>
+                          </Button>
                           
                           {/* Cancel - only for upcoming */}
                           {upcoming && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleCancelReservation(reservation.id)
-                              }}
-                              disabled={cancellingId === reservation.id}
+                            <Button
+                              variant="ghost"
+                              isIconOnly
+                              onPress={() => handleCancelReservation(reservation.id)}
+                              isDisabled={cancellingId === reservation.id}
                               className={cn(
-                                'w-10 h-10 flex items-center justify-center rounded-lg transition-colors',
-                                cancellingId === reservation.id
-                                  ? 'opacity-50 cursor-not-allowed'
-                                  : 'hover:bg-red-500/10 text-red-400'
+                                'min-w-[40px] w-10 h-10',
+                                cancellingId !== reservation.id && 'hover:bg-red-500/10 text-red-400'
                               )}
                               aria-label="בטל"
                             >
                               <X size={16} strokeWidth={1.5} />
-                            </button>
+                            </Button>
                           )}
                           
                           {/* Cancelled Badge */}
@@ -687,13 +691,14 @@ function MyAppointmentsContent() {
             
             {/* Back Button */}
             <div className="mt-8 text-center">
-              <button
-                onClick={() => router.push('/')}
-                className="inline-flex items-center gap-2 text-foreground-muted hover:text-foreground-light text-sm transition-colors py-2"
+              <Button
+                variant="ghost"
+                onPress={() => router.push('/')}
+                className="text-foreground-muted text-sm"
               >
                 <ChevronRight size={12} strokeWidth={1.5} />
                 <span>חזרה לדף הבית</span>
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pushService } from '@/lib/push/push-service'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { reportServerError } from '@/lib/bug-reporter/helpers'
+import { reportApiError } from '@/lib/bug-reporter/helpers'
 
 export async function POST(request: NextRequest) {
   try {
@@ -110,8 +110,8 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('[API] Error marking notifications as read:', error)
-    await reportServerError(error, 'POST /api/push/mark-read', {
-      route: '/api/push/mark-read'
+    await reportApiError(error, request, 'Mark notifications read failed', {
+      severity: 'medium',
     })
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
@@ -155,8 +155,8 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('[API] Error getting unread count:', error)
-    await reportServerError(error, 'GET /api/push/mark-read', {
-      route: '/api/push/mark-read'
+    await reportApiError(error, request, 'Get unread count failed', {
+      severity: 'low',
     })
     return NextResponse.json(
       { success: false, error: 'Internal server error' },

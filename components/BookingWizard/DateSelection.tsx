@@ -6,6 +6,7 @@ import { useBookingStore } from '@/store/useBookingStore'
 import type { WorkDay, BarbershopSettings, BarbershopClosure, BarberClosure, BarberBookingSettings } from '@/types/database'
 import { cn, nowInIsrael, getIsraelDayStart, getDayIndexInIsrael } from '@/lib/utils'
 import { ChevronRight, ChevronLeft, X } from 'lucide-react'
+import { Button } from '@heroui/react'
 
 /**
  * Monthly Calendar Picker Component
@@ -261,7 +262,8 @@ export function DateSelection({
     return currentMonth.getMonth() > now.getMonth() || currentMonth.getFullYear() > now.getFullYear()
   }, [currentMonth])
 
-  // Keyboard navigation
+  // Keyboard navigation - TODO: Wire up to calendar day buttons
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleKeyDown = useCallback((e: React.KeyboardEvent, index: number) => {
     const cols = 7
     const totalDays = calendarDays.length
@@ -382,19 +384,16 @@ export function DateSelection({
         {/* Month Navigation Header */}
         <div className="flex items-center justify-between mb-4">
           {/* Previous Month Button (Right side in RTL) */}
-          <button
-            onClick={goToPrevMonth}
-            disabled={!canGoPrev}
+          <Button
+            variant="ghost"
+            isIconOnly
+            onPress={goToPrevMonth}
+            isDisabled={!canGoPrev}
             aria-label="חודש קודם"
-            className={cn(
-              'w-10 h-10 rounded-full flex items-center justify-center transition-all',
-              canGoPrev 
-                ? 'bg-white/5 hover:bg-white/10 text-foreground-light active:scale-95'
-                : 'opacity-30 cursor-not-allowed text-foreground-muted'
-            )}
+            className="w-10 h-10"
           >
             <ChevronRight size={20} strokeWidth={1.5} />
-          </button>
+          </Button>
           
           {/* Month + Year Label */}
           <h3 className="text-base sm:text-lg font-medium text-foreground-light">
@@ -402,13 +401,15 @@ export function DateSelection({
           </h3>
           
           {/* Next Month Button (Left side in RTL) */}
-          <button
-            onClick={goToNextMonth}
+          <Button
+            variant="ghost"
+            isIconOnly
+            onPress={goToNextMonth}
             aria-label="חודש הבא"
-            className="w-10 h-10 rounded-full flex items-center justify-center transition-all bg-white/5 hover:bg-white/10 text-foreground-light active:scale-95"
+            className="w-10 h-10"
           >
             <ChevronLeft size={20} strokeWidth={1.5} />
-          </button>
+          </Button>
         </div>
 
         {/* Weekday Labels */}
@@ -455,20 +456,16 @@ export function DateSelection({
                 const hasClosure = isClosure && availability.closureReason
                 
                 return (
-                  <button
+                  <Button
                     key={dayIndex}
-                    ref={el => { cellRefs.current[globalIndex] = el }}
-                    role="gridcell"
-                    aria-selected={isSelected}
-                    aria-disabled={!isClickable}
+                    ref={el => { cellRefs.current[globalIndex] = el as HTMLButtonElement | null }}
                     aria-label={`${day.dayNum} ${HEBREW_MONTHS[day.date.getMonth()]}${isUnavailable ? ` - ${availability.reason}` : ''}`}
-                    tabIndex={isClickable ? 0 : -1}
-                    onClick={() => handleSelect(day, globalIndex)}
-                    onKeyDown={(e) => handleKeyDown(e, globalIndex)}
-                    disabled={!isClickable}
+                    onPress={() => handleSelect(day, globalIndex)}
+                    isDisabled={!isClickable}
+                    variant="ghost"
                     className={cn(
                       // Base styles
-                      'aspect-square rounded-xl flex items-center justify-center',
+                      'aspect-square rounded-lg flex items-center justify-center',
                       'text-sm sm:text-base font-medium',
                       'transition-all duration-200 relative',
                       'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-gold focus-visible:ring-offset-2 focus-visible:ring-offset-background-dark',
@@ -518,7 +515,7 @@ export function DateSelection({
                     {hasClosure && !isOutOfRange && (
                       <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-orange-400" />
                     )}
-                  </button>
+                  </Button>
                 )
               })}
             </div>
@@ -591,24 +588,21 @@ export function DateSelection({
         )}
 
         {/* Continue Button */}
-        <button
-          onClick={handleContinue}
-          disabled={!selectedDate}
-          className={cn(
-            'w-full py-4 rounded-2xl font-medium text-base transition-all',
-            'flex items-center justify-center gap-2',
-            selectedDate
-              ? 'bg-accent-gold text-background-dark shadow-lg shadow-accent-gold/20 hover:shadow-accent-gold/30 active:scale-[0.98]'
-              : 'bg-white/5 text-foreground-muted/50 cursor-not-allowed'
-          )}
+        <Button
+          variant="primary"
+          onPress={handleContinue}
+          isDisabled={!selectedDate}
+          className="w-full py-4"
+          size="lg"
         >
           {selectedDate ? 'המשך לבחירת שעה' : 'בחר תאריך להמשך'}
           {selectedDate && <ChevronLeft size={18} strokeWidth={2} />}
-        </button>
+        </Button>
 
         {/* Back Button - Goes back to barber profile/service selection */}
-        <button
-          onClick={() => {
+        <Button
+          variant="ghost"
+          onPress={() => {
             // Navigate back to barber profile page for service selection
             if (barberId) {
               router.push(`/barber/${barberId}`)
@@ -616,11 +610,11 @@ export function DateSelection({
               router.back()
             }
           }}
-          className="flex items-center justify-center gap-2 text-foreground-muted hover:text-foreground-light transition-colors text-sm py-2"
+          className="flex items-center justify-center gap-2 text-sm w-full"
         >
           <ChevronRight size={14} strokeWidth={1.5} />
           <span>חזרה לבחירת שירות</span>
-        </button>
+        </Button>
       </div>
     </div>
   )

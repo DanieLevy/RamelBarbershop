@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { AppHeader } from '@/components/AppHeader'
 import { cn } from '@/lib/utils'
 import { Check } from 'lucide-react'
+import { Button } from '@heroui/react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -55,28 +56,20 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           {/* Mode Toggle */}
           <div className="flex rounded-xl overflow-hidden border border-white/10 mb-6">
-            <button
-              onClick={() => setMode('login')}
-              className={cn(
-                'flex-1 py-3 text-center transition-all',
-                mode === 'login'
-                  ? 'bg-accent-gold text-background-dark'
-                  : 'bg-background-card text-foreground-light hover:bg-background-card/80'
-              )}
+            <Button
+              variant={mode === 'login' ? 'primary' : 'secondary'}
+              onPress={() => setMode('login')}
+              className="flex-1 rounded-none"
             >
               התחברות
-            </button>
-            <button
-              onClick={() => setMode('signup')}
-              className={cn(
-                'flex-1 py-3 text-center transition-all',
-                mode === 'signup'
-                  ? 'bg-accent-gold text-background-dark'
-                  : 'bg-background-card text-foreground-light hover:bg-background-card/80'
-              )}
+            </Button>
+            <Button
+              variant={mode === 'signup' ? 'primary' : 'secondary'}
+              onPress={() => setMode('signup')}
+              className="flex-1 rounded-none"
             >
               הרשמה
-            </button>
+            </Button>
           </div>
           
           {/* Form */}
@@ -163,27 +156,24 @@ export default function LoginPage() {
               <p className="text-red-400 text-sm text-center">{error}</p>
             )}
             
-            <button
+            <Button
               type="submit"
-              disabled={loading}
-              className={cn(
-                'w-full py-3 px-4 rounded-xl font-medium transition-all mt-2',
-                loading
-                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
-                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
-              )}
+              variant="primary"
+              isDisabled={loading}
+              className="w-full mt-2"
             >
               {loading ? 'מעבד...' : mode === 'login' ? 'התחבר' : 'הירשם'}
-            </button>
+            </Button>
           </form>
           
           {/* Back to Home */}
-          <button
-            onClick={() => router.push('/')}
-            className="w-full text-center text-foreground-muted hover:text-foreground-light transition-colors text-sm mt-6"
+          <Button
+            variant="ghost"
+            onPress={() => router.push('/')}
+            className="w-full text-sm mt-6"
           >
             חזור לדף הבית
-          </button>
+          </Button>
         </div>
       </main>
     </>

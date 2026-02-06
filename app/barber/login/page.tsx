@@ -6,9 +6,27 @@ import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { useAuthStore } from '@/store/useAuthStore'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
-import { Lock, Mail, Eye, EyeOff, ChevronRight, AlertTriangle } from 'lucide-react'
+import { Lock, Mail, Eye, EyeOff, ChevronRight, AlertTriangle, UserX, KeyRound, WifiOff, Info } from 'lucide-react'
+import { Button } from '@heroui/react'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import Image from 'next/image'
+import type { LoginErrorCode } from '@/lib/auth/barber-auth'
+
+// Error display configuration for different error types
+const ERROR_CONFIG: Record<LoginErrorCode, { 
+  icon: typeof AlertTriangle
+  color: string
+  bgColor: string
+  borderColor: string
+}> = {
+  USER_NOT_FOUND: { icon: UserX, color: 'text-amber-400', bgColor: 'bg-amber-500/10', borderColor: 'border-amber-500/30' },
+  WRONG_PASSWORD: { icon: KeyRound, color: 'text-red-400', bgColor: 'bg-red-500/10', borderColor: 'border-red-500/30' },
+  NO_PASSWORD_SET: { icon: Info, color: 'text-blue-400', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/30' },
+  NOT_A_BARBER: { icon: Info, color: 'text-amber-400', bgColor: 'bg-amber-500/10', borderColor: 'border-amber-500/30' },
+  DATABASE_ERROR: { icon: AlertTriangle, color: 'text-red-400', bgColor: 'bg-red-500/10', borderColor: 'border-red-500/30' },
+  NETWORK_ERROR: { icon: WifiOff, color: 'text-orange-400', bgColor: 'bg-orange-500/10', borderColor: 'border-orange-500/30' },
+  INVALID_INPUT: { icon: AlertTriangle, color: 'text-red-400', bgColor: 'bg-red-500/10', borderColor: 'border-red-500/30' },
+}
 
 export default function BarberLoginPage() {
   const router = useRouter()
@@ -25,6 +43,7 @@ export default function BarberLoginPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errorCode, setErrorCode] = useState<LoginErrorCode | null>(null)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -44,13 +63,38 @@ export default function BarberLoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!email.trim() || !password) {
-      setError('נא למלא את כל השדות')
+    // Clear previous errors
+    setError(null)
+    setErrorCode(null)
+    
+    // Client-side validation with specific messages
+    if (!email.trim()) {
+      setError('נא להזין כתובת אימייל')
+      setErrorCode('INVALID_INPUT')
+      return
+    }
+    
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email.trim())) {
+      setError('כתובת האימייל אינה תקינה')
+      setErrorCode('INVALID_INPUT')
+      return
+    }
+    
+    if (!password) {
+      setError('נא להזין סיסמה')
+      setErrorCode('INVALID_INPUT')
+      return
+    }
+    
+    if (password.length < 4) {
+      setError('הסיסמה קצרה מדי')
+      setErrorCode('INVALID_INPUT')
       return
     }
     
     setLoading(true)
-    setError(null)
     
     const result = await login(email, password)
     
@@ -58,6 +102,7 @@ export default function BarberLoginPage() {
       router.push('/barber/dashboard')
     } else {
       setError(result.error || 'שגיאה בהתחברות')
+      setErrorCode(result.errorCode || null)
     }
     
     setLoading(false)
@@ -115,14 +160,15 @@ export default function BarberLoginPage() {
             </div>
             
             <div className="flex flex-col gap-3">
-              <button
-                onClick={() => {
+              <Button
+                variant="danger"
+                onPress={() => {
                   customerLogout()
                 }}
-                className="w-full py-3.5 rounded-xl font-medium transition-all flex items-center justify-center bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
+                className="w-full"
               >
                 התנתק מחשבון הלקוח
-              </button>
+              </Button>
               
               <Link
                 href="/"
@@ -225,32 +271,81 @@ export default function BarberLoginPage() {
                     error ? 'border-red-400' : 'border-white/10'
                   )}
                 />
-                <button
+                <Button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute left-1 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-foreground-muted hover:text-foreground-light transition-colors"
+                  variant="ghost"
+                  isIconOnly
+                  onPress={() => setShowPassword(!showPassword)}
+                  className="absolute left-1 top-1/2 -translate-y-1/2 min-w-[40px] w-10 h-10 text-foreground-muted hover:text-foreground-light"
                   aria-label={showPassword ? 'הסתר סיסמה' : 'הצג סיסמה'}
                 >
                   {showPassword ? <EyeOff size={18} strokeWidth={1.5} /> : <Eye size={18} strokeWidth={1.5} />}
-                </button>
+                </Button>
               </div>
             </div>
             
             {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3">
-                <p className="text-red-400 text-sm text-center">{error}</p>
+              <div className={cn(
+                'rounded-xl p-3 border',
+                errorCode && ERROR_CONFIG[errorCode] 
+                  ? `${ERROR_CONFIG[errorCode].bgColor} ${ERROR_CONFIG[errorCode].borderColor}`
+                  : 'bg-red-500/10 border-red-500/30'
+              )}>
+                <div className="flex items-start gap-2">
+                  {errorCode && ERROR_CONFIG[errorCode] && (
+                    <div className={cn('mt-0.5', ERROR_CONFIG[errorCode].color)}>
+                      {(() => {
+                        const IconComponent = ERROR_CONFIG[errorCode].icon
+                        return <IconComponent size={16} strokeWidth={2} />
+                      })()}
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <p className={cn(
+                      'text-sm',
+                      errorCode && ERROR_CONFIG[errorCode] 
+                        ? ERROR_CONFIG[errorCode].color 
+                        : 'text-red-400'
+                    )}>
+                      {error}
+                    </p>
+                    {/* Additional help text for specific errors */}
+                    {errorCode === 'USER_NOT_FOUND' && (
+                      <p className="text-foreground-muted text-xs mt-1">
+                        ודא שהאימייל שהזנת נכון, או פנה למנהל להוספת חשבון.
+                      </p>
+                    )}
+                    {errorCode === 'WRONG_PASSWORD' && (
+                      <p className="text-foreground-muted text-xs mt-1">
+                        שכחת את הסיסמה? פנה למנהל לאיפוס.
+                      </p>
+                    )}
+                    {errorCode === 'NETWORK_ERROR' && (
+                      <p className="text-foreground-muted text-xs mt-1">
+                        בדוק את חיבור האינטרנט ונסה שוב.
+                      </p>
+                    )}
+                    {errorCode === 'NOT_A_BARBER' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onPress={() => router.push('/')}
+                        className="mt-2 text-xs text-accent-gold"
+                      >
+                        עבור להתחברות כלקוח ←
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
             
-            <button
+            <Button
               type="submit"
-              disabled={loading || isLoading}
-              className={cn(
-                'w-full py-3.5 rounded-xl font-medium transition-all text-base sm:text-lg mt-2 flex items-center justify-center',
-                loading || isLoading
-                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
-                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90 hover:scale-[1.02] active:scale-[0.98]'
-              )}
+              variant="primary"
+              isDisabled={loading || isLoading}
+              className="w-full mt-2"
+              size="lg"
             >
               {loading || isLoading ? (
                 <>
@@ -260,7 +355,7 @@ export default function BarberLoginPage() {
               ) : (
                 'התחבר'
               )}
-            </button>
+            </Button>
           </form>
         </div>
         

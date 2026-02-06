@@ -25,7 +25,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
-import { reportBug } from '@/lib/bug-reporter'
+import { reportApiError, reportServerError } from '@/lib/bug-reporter/helpers'
 import { normalizeToSlotBoundary } from '@/lib/utils'
 import type { DayOfWeek } from '@/types/database'
 
@@ -380,7 +380,12 @@ export async function POST(request: NextRequest) {
     // 3.5 Check working hours
     if (workDaysResult.error) {
       console.error('[API/Create] Work days check error:', workDaysResult.error)
-      // Don't fail - database function will catch this
+      // Report but don't fail - database function will catch this
+      reportServerError(workDaysResult.error, 'Work days check failed', {
+        route: '/api/reservations/create',
+        severity: 'medium',
+        additionalData: { barberId: body.barberId, dayOfWeek },
+      })
     } else if (workDaysResult.data) {
       const workDay = workDaysResult.data
       
@@ -440,7 +445,12 @@ export async function POST(request: NextRequest) {
     // 3.8 Check recurring appointment conflict
     if (recurringResult.error) {
       console.error('[API/Create] Recurring check error:', recurringResult.error)
-      // Don't fail the request, just log and continue
+      // Report but don't fail the request
+      reportServerError(recurringResult.error, 'Recurring appointments check failed', {
+        route: '/api/reservations/create',
+        severity: 'medium',
+        additionalData: { barberId: body.barberId, dayOfWeek, timeSlot },
+      })
     }
     
     if (recurringResult.data) {
@@ -454,7 +464,12 @@ export async function POST(request: NextRequest) {
     // 3.9 Check breakout conflicts
     if (breakoutResult.error) {
       console.error('[API/Create] Breakout check error:', breakoutResult.error)
-      // Don't fail the request, just log and continue
+      // Report but don't fail the request
+      reportServerError(breakoutResult.error, 'Barber breakouts check failed', {
+        route: '/api/reservations/create',
+        severity: 'medium',
+        additionalData: { barberId: body.barberId, dateString },
+      })
     }
     
     if (breakoutResult.data && breakoutResult.data.length > 0) {
@@ -555,16 +570,20 @@ export async function POST(request: NextRequest) {
         )
       }
       
-      // Report unexpected database errors
-      await reportBug(
+      // Report unexpected database errors with full request context
+      await reportApiError(
         new Error(error.message),
-        'API: Create Reservation - Database Error',
+        request,
+        'Database Error',
         {
+          severity: 'critical',
           additionalData: {
             errorCode: error.code,
             barberId: body.barberId,
             customerId: body.customerId,
             serviceId: body.serviceId,
+            dateString,
+            timeSlot,
           }
         }
       )
@@ -585,10 +604,12 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error('[API/Create] Unexpected error:', err)
     
-    // Report unexpected errors
-    await reportBug(
+    // Report unexpected errors with full request context
+    await reportApiError(
       err instanceof Error ? err : new Error(String(err)),
-      'API: Create Reservation - Unexpected Error'
+      request,
+      'Unexpected Error',
+      { severity: 'critical' }
     )
     
     return NextResponse.json(

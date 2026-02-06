@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
+import { Button } from '@heroui/react'
 import { 
   Send, User, Bell, RefreshCw, Users, ArrowRight, AlertCircle, CheckCircle, 
   X, Info, Smartphone, Monitor, Eye, Check
@@ -89,12 +90,15 @@ function SubscriptionDetailModal({
               <p className="text-xs text-foreground-muted">{userType === 'barber' ? 'ספר' : 'לקוח'}</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="w-10 h-10 flex items-center justify-center text-foreground-muted hover:text-foreground-light transition-colors rounded-full hover:bg-white/5"
+          <Button
+            onPress={onClose}
+            isIconOnly
+            variant="ghost"
+            className="min-w-[40px] w-10 h-10 flex items-center justify-center text-foreground-muted hover:text-foreground-light transition-colors rounded-full hover:bg-white/5"
+            aria-label="סגור"
           >
             <X size={20} />
-          </button>
+          </Button>
         </div>
 
         {/* Content */}
@@ -258,7 +262,7 @@ export default function DebugPage() {
     
     if (error) {
       console.error('Error fetching subscriptions:', error)
-      toast.error('שגיאה בטעינת המנויים')
+      showToast.error('שגיאה בטעינת המנויים')
       setLoading(false)
       return
     }
@@ -349,12 +353,12 @@ export default function DebugPage() {
   // Send custom notification
   const handleSendNotification = async () => {
     if (selectedSubscriptions.size === 0) {
-      toast.error('בחר לפחות מנוי אחד לשליחה')
+      showToast.error('בחר לפחות מנוי אחד לשליחה')
       return
     }
     
     if (!form.title.trim() || !form.body.trim()) {
-      toast.error('נדרש כותרת ותוכן')
+      showToast.error('נדרש כותרת ותוכן')
       return
     }
 
@@ -398,10 +402,10 @@ export default function DebugPage() {
         sent,
         failed
       })
-      toast.success(`נשלחו ${sent} הודעות!`)
+      showToast.success(`נשלחו ${sent} הודעות!`)
     } else {
       setSendResult({ success: false, message: errors[0] || 'כל השליחות נכשלו', sent: 0, failed })
-      toast.error('שליחה נכשלה')
+      showToast.error('שליחה נכשלה')
     }
 
     setSending(false)
@@ -437,13 +441,14 @@ export default function DebugPage() {
               שליחת התראות מותאמות אישית למשתמשים רשומים
             </p>
           </div>
-          <button
-            onClick={fetchSubscriptions}
+          <Button
+            onPress={fetchSubscriptions}
+            variant="ghost"
             className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-foreground-light hover:bg-white/10 transition-colors"
           >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             <span>רענן</span>
-          </button>
+          </Button>
         </div>
 
         {/* Stats */}
@@ -500,24 +505,27 @@ export default function DebugPage() {
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <h2 className="text-lg font-medium text-foreground-light">בחר נמענים</h2>
               <div className="flex items-center gap-2 text-xs">
-                <button 
-                  onClick={selectAll}
+                <Button 
+                  onPress={selectAll}
+                  variant="ghost"
                   className="px-3 py-1.5 bg-white/5 rounded-lg hover:bg-white/10 transition-colors text-foreground-muted hover:text-foreground-light"
                 >
                   {selectedSubscriptions.size === subscriptions.length ? 'בטל הכל' : 'בחר הכל'}
-                </button>
-                <button 
-                  onClick={() => selectByType('barber')}
+                </Button>
+                <Button 
+                  onPress={() => selectByType('barber')}
+                  variant="ghost"
                   className="px-3 py-1.5 bg-blue-500/10 rounded-lg hover:bg-blue-500/20 transition-colors text-blue-400"
                 >
                   ספרים
-                </button>
-                <button 
-                  onClick={() => selectByType('customer')}
+                </Button>
+                <Button 
+                  onPress={() => selectByType('customer')}
+                  variant="ghost"
                   className="px-3 py-1.5 bg-green-500/10 rounded-lg hover:bg-green-500/20 transition-colors text-green-400"
                 >
                   לקוחות
-                </button>
+                </Button>
               </div>
             </div>
             
@@ -541,17 +549,20 @@ export default function DebugPage() {
                             : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05]'
                         )}
                       >
-                        <button
-                          onClick={() => toggleSelection(sub.id)}
+                        <Button
+                          onPress={() => toggleSelection(sub.id)}
+                          isIconOnly
+                          variant="ghost"
                           className={cn(
-                            'w-6 h-6 rounded-md border-2 flex items-center justify-center shrink-0 transition-all',
+                            'min-w-[24px] w-6 h-6 rounded-md border-2 flex items-center justify-center shrink-0 transition-all',
                             selectedSubscriptions.has(sub.id)
                               ? 'bg-accent-gold border-accent-gold'
                               : 'border-white/20 hover:border-white/40'
                           )}
+                          aria-label={selectedSubscriptions.has(sub.id) ? 'בטל בחירה' : 'בחר'}
                         >
                           {selectedSubscriptions.has(sub.id) && <Check size={14} className="text-background-dark" />}
-                        </button>
+                        </Button>
                         <div className={cn(
                           'w-8 h-8 rounded-full flex items-center justify-center shrink-0',
                           'bg-blue-500/10'
@@ -569,13 +580,15 @@ export default function DebugPage() {
                             <span>{formatDate(sub.created_at).split(',')[0]}</span>
                           </p>
                         </div>
-                        <button
-                          onClick={() => setDetailSubscription(sub)}
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-foreground-muted hover:text-accent-gold hover:bg-white/5 transition-colors"
-                          title="פרטים נוספים"
+                        <Button
+                          onPress={() => setDetailSubscription(sub)}
+                          isIconOnly
+                          variant="ghost"
+                          className="min-w-[32px] w-8 h-8 rounded-full flex items-center justify-center text-foreground-muted hover:text-accent-gold hover:bg-white/5 transition-colors"
+                          aria-label="פרטים נוספים"
                         >
                           <Eye size={16} />
-                        </button>
+                        </Button>
                       </div>
                     ))}
                   </>
@@ -597,17 +610,20 @@ export default function DebugPage() {
                             : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05]'
                         )}
                       >
-                        <button
-                          onClick={() => toggleSelection(sub.id)}
+                        <Button
+                          onPress={() => toggleSelection(sub.id)}
+                          isIconOnly
+                          variant="ghost"
                           className={cn(
-                            'w-6 h-6 rounded-md border-2 flex items-center justify-center shrink-0 transition-all',
+                            'min-w-[24px] w-6 h-6 rounded-md border-2 flex items-center justify-center shrink-0 transition-all',
                             selectedSubscriptions.has(sub.id)
                               ? 'bg-accent-gold border-accent-gold'
                               : 'border-white/20 hover:border-white/40'
                           )}
+                          aria-label={selectedSubscriptions.has(sub.id) ? 'בטל בחירה' : 'בחר'}
                         >
                           {selectedSubscriptions.has(sub.id) && <Check size={14} className="text-background-dark" />}
-                        </button>
+                        </Button>
                         <div className={cn(
                           'w-8 h-8 rounded-full flex items-center justify-center shrink-0',
                           'bg-green-500/10'
@@ -625,13 +641,15 @@ export default function DebugPage() {
                             <span>{formatDate(sub.created_at).split(',')[0]}</span>
                           </p>
                         </div>
-                        <button
-                          onClick={() => setDetailSubscription(sub)}
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-foreground-muted hover:text-accent-gold hover:bg-white/5 transition-colors"
-                          title="פרטים נוספים"
+                        <Button
+                          onPress={() => setDetailSubscription(sub)}
+                          isIconOnly
+                          variant="ghost"
+                          className="min-w-[32px] w-8 h-8 rounded-full flex items-center justify-center text-foreground-muted hover:text-accent-gold hover:bg-white/5 transition-colors"
+                          aria-label="פרטים נוספים"
                         >
                           <Eye size={16} />
-                        </button>
+                        </Button>
                       </div>
                     ))}
                   </>
@@ -710,9 +728,9 @@ export default function DebugPage() {
                 </div>
               )}
 
-              <button
-                onClick={handleSendNotification}
-                disabled={selectedSubscriptions.size === 0 || sending}
+              <Button
+                onPress={handleSendNotification}
+                isDisabled={selectedSubscriptions.size === 0 || sending}
                 className={cn(
                   'w-full py-3.5 rounded-xl font-medium flex items-center justify-center gap-2 transition-all',
                   selectedSubscriptions.size > 0 && !sending
@@ -736,7 +754,7 @@ export default function DebugPage() {
                     </span>
                   </>
                 )}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -755,13 +773,14 @@ export default function DebugPage() {
 
         {/* Back link */}
         <div className="mt-8 text-center">
-          <button
-            onClick={() => router.push('/barber/dashboard')}
+          <Button
+            onPress={() => router.push('/barber/dashboard')}
+            variant="ghost"
             className="inline-flex items-center gap-2 text-foreground-muted hover:text-accent-gold transition-colors"
           >
             <ArrowRight size={16} />
             <span>חזרה לדאשבורד</span>
-          </button>
+          </Button>
         </div>
       </div>
 

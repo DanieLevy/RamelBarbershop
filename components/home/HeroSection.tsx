@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
+import { Button } from '@heroui/react'
 import { cn } from '@/lib/utils'
 import { ChevronDown } from 'lucide-react'
 
@@ -124,10 +125,10 @@ export const HeroSection = ({
             </div>
           </div>
 
-          {/* Title */}
+          {/* Title - Larger for better readability */}
           <h1 
             className={cn(
-              'text-hero font-bold text-foreground-light mb-4 transition-all duration-1000 ease-reveal',
+              'text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground-light mb-3 sm:mb-4 transition-all duration-1000 ease-reveal',
               isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
             )}
             style={{ transitionDelay: '150ms' }}
@@ -136,10 +137,10 @@ export const HeroSection = ({
             <span className="text-gradient-gold-animated">{restWords}</span>
           </h1>
 
-          {/* Subtitle */}
+          {/* Subtitle - Slightly larger */}
           <p 
             className={cn(
-              'text-hero-sub text-foreground-muted mb-4 sm:mb-6 transition-all duration-1000 ease-reveal',
+              'text-base sm:text-lg lg:text-xl text-foreground-muted mb-4 sm:mb-6 transition-all duration-1000 ease-reveal',
               isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
             )}
             style={{ transitionDelay: '300ms' }}
@@ -193,13 +194,18 @@ export const HeroSection = ({
             )}
             style={{ transitionDelay: '600ms' }}
           >
-            <a
-              href={ctaHref}
-              className="inline-flex items-center gap-3 px-8 py-4 bg-accent-gold text-background-dark font-medium rounded-2xl hover:bg-accent-gold-light transition-all duration-300 hover:scale-105 active:scale-95 shadow-gold btn-press group"
+            <Button
+              onPress={() => {
+                const teamSection = document.getElementById(ctaHref.replace('#', ''))
+                if (teamSection) {
+                  teamSection.scrollIntoView({ behavior: 'smooth' })
+                }
+              }}
+              className="inline-flex items-center gap-2 px-8 py-6 bg-accent-gold text-background-dark font-medium rounded-2xl hover:bg-accent-gold-light transition-all duration-300 hover:scale-105 active:scale-95 shadow-gold btn-press group"
             >
               <ScissorsIcon className="w-5 h-5 transition-transform duration-300 group-hover:rotate-[-20deg]" />
               <span>{ctaText}</span>
-            </a>
+            </Button>
           </div>
         </div>
       </div>
@@ -207,24 +213,24 @@ export const HeroSection = ({
       {/* Scroll indicator - moved up, inside content area */}
       <div 
         className={cn(
-          'relative z-10 mt-8 sm:mt-12 pb-16 transition-all duration-1000 ease-reveal cursor-pointer flex justify-center',
+          'relative z-10 mt-8 sm:mt-12 pb-16 transition-all duration-1000 ease-reveal flex justify-center',
           isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
         )}
         style={{ transitionDelay: '800ms' }}
-        onClick={handleScrollToTeam}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => e.key === 'Enter' && handleScrollToTeam()}
-        aria-label="גלול למטה"
       >
-        <div className="flex flex-col items-center gap-1.5 text-foreground-muted hover:text-accent-gold transition-colors">
+        <Button
+          onPress={handleScrollToTeam}
+          variant="ghost"
+          aria-label="גלול למטה"
+          className="flex flex-col items-center gap-1.5 text-foreground-muted hover:text-accent-gold transition-colors min-w-[auto] w-auto h-auto"
+        >
           <span className="text-xs">גלול למטה</span>
           <ChevronDown 
             size={20} 
             strokeWidth={1.5} 
             className="animate-scroll-hint text-accent-gold" 
           />
-        </div>
+        </Button>
       </div>
 
       {/* Bottom gradient transition to next section */}

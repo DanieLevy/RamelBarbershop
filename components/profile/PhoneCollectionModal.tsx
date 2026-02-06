@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { X, Phone, MessageSquare, Loader2, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { useAuthStore } from '@/store/useAuthStore'
 import { Portal } from '@/components/ui/Portal'
 
@@ -69,7 +69,7 @@ export function PhoneCollectionModal({
       await refreshCustomer()
       
       setSuccess(true)
-      toast.success('מספר הטלפון נשמר בהצלחה!')
+      showToast.success('מספר הטלפון נשמר בהצלחה!')
       
       // Close after showing success
       setTimeout(() => {

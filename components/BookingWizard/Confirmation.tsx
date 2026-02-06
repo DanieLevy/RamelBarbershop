@@ -7,6 +7,7 @@ import { openExternalLink } from '@/lib/utils/external-link'
 import type { User } from '@/types/database'
 import { CheckCircle, Calendar, Clock, Scissors, User as UserIcon, Phone } from 'lucide-react'
 import { Confetti } from '@/components/ui/Confetti'
+import { Button } from '@heroui/react'
 
 // Custom WhatsApp icon
 const WhatsAppIcon = () => (
@@ -102,21 +103,23 @@ export function Confirmation({ barber: _barber }: ConfirmationProps) {
       </div>
       
       {/* WhatsApp Reminder */}
-      <button
-        onClick={sendWhatsAppReminder}
-        className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-green-600 text-white font-medium hover:bg-green-700 transition-all"
+      <Button
+        variant="primary"
+        onPress={sendWhatsAppReminder}
+        className="w-full bg-green-600 hover:bg-green-700"
       >
         <WhatsAppIcon />
         שלח לעצמי תזכורת בוואטסאפ
-      </button>
+      </Button>
       
       {/* Back to Home */}
-      <button
-        onClick={handleBackToHome}
-        className="text-foreground-muted hover:text-foreground-light transition-colors text-sm"
+      <Button
+        variant="ghost"
+        onPress={handleBackToHome}
+        size="sm"
       >
         חזור לדף הבית
-      </button>
+      </Button>
     </div>
   )
 }

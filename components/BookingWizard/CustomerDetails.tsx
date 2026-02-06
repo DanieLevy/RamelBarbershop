@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { TEST_USER } from '@/lib/sms/sms-service'
 import { findCustomerByPhone } from '@/lib/services/customer.service'
 import { Loader2, User, CheckCircle, Check } from 'lucide-react'
+import { Button } from '@heroui/react'
 
 type Step = 'phone' | 'name'
 
@@ -157,15 +158,11 @@ export function CustomerDetails() {
           </div>
         </div>
         
-        <button
-          onClick={handlePhoneSubmit}
-          disabled={loading}
-          className={cn(
-            'w-full py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center',
-            loading
-              ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
-              : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
-          )}
+        <Button
+          variant="primary"
+          onPress={handlePhoneSubmit}
+          isDisabled={loading}
+          className="w-full"
         >
           {loading ? (
             <span className="flex items-center justify-center gap-2">
@@ -175,24 +172,27 @@ export function CustomerDetails() {
           ) : (
             'המשך'
           )}
-        </button>
+        </Button>
         
-        <button
-          onClick={prevStep}
-          disabled={loading}
-          className="w-full text-foreground-muted hover:text-foreground-light transition-colors text-sm flex items-center justify-center"
+        <Button
+          variant="ghost"
+          onPress={prevStep}
+          isDisabled={loading}
+          className="w-full text-sm"
         >
           ← חזור לבחירת שעה
-        </button>
+        </Button>
         
         {/* Dev helper - fill test user phone */}
         {process.env.NODE_ENV === 'development' && (
-          <button
-            onClick={fillTestPhone}
-            className="mt-2 text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center justify-center gap-1"
+          <Button
+            variant="ghost"
+            size="sm"
+            onPress={fillTestPhone}
+            className="mt-2 text-xs text-blue-400 hover:text-blue-300 w-full"
           >
             🧪 מלא טלפון בדיקה
-          </button>
+          </Button>
         )}
       </div>
     )
@@ -284,22 +284,24 @@ export function CustomerDetails() {
         )}
       </div>
       
-      <button
-        onClick={handleNameSubmit}
-        className="w-full py-3 px-4 rounded-xl bg-accent-gold text-background-dark font-medium hover:bg-accent-gold/90 transition-all flex items-center justify-center"
+      <Button
+        variant="primary"
+        onPress={handleNameSubmit}
+        className="w-full"
       >
         המשך לאימות
-      </button>
+      </Button>
       
-      <button
-        onClick={() => {
+      <Button
+        variant="ghost"
+        onPress={() => {
           setStep('phone')
           setError(null)
         }}
-        className="w-full text-foreground-muted hover:text-foreground-light transition-colors text-sm flex items-center justify-center"
+        className="w-full text-sm"
       >
         ← חזור
-      </button>
+      </Button>
     </div>
   )
 }

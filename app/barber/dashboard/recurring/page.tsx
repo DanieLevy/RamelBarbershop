@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { Repeat, Plus, Trash2, User, Scissors, Clock, Calendar } from 'lucide-react'
 import { useBugReporter } from '@/hooks/useBugReporter'
@@ -10,6 +10,7 @@ import { CreateRecurringModal } from '@/components/barber/CreateRecurringModal'
 import { getRecurringByBarber, deleteRecurring } from '@/lib/services/recurring.service'
 import type { RecurringAppointmentWithDetails, DayOfWeek } from '@/types/database'
 import { DAY_OF_WEEK_HEBREW } from '@/types/database'
+import { Button } from '@heroui/react'
 
 // Group recurring by day of week
 const DAY_ORDER: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
@@ -39,7 +40,7 @@ export default function RecurringPage() {
     } catch (err) {
       console.error('Error fetching recurring:', err)
       await report(err instanceof Error ? err : new Error(String(err)), 'Fetching recurring appointments')
-      toast.error('שגיאה בטעינת תורים קבועים')
+      showToast.error('שגיאה בטעינת תורים קבועים')
     } finally {
       setLoading(false)
     }
@@ -60,15 +61,15 @@ export default function RecurringPage() {
       const result = await deleteRecurring(id, barber.id)
       
       if (result.success) {
-        toast.success('התור הקבוע נמחק בהצלחה')
+        showToast.success('התור הקבוע נמחק בהצלחה')
         await fetchRecurring()
       } else {
-        toast.error(result.error || 'שגיאה במחיקת התור הקבוע')
+        showToast.error(result.error || 'שגיאה במחיקת התור הקבוע')
       }
     } catch (err) {
       console.error('Error deleting recurring:', err)
       await report(err instanceof Error ? err : new Error(String(err)), 'Deleting recurring appointment')
-      toast.error('שגיאה במחיקת התור הקבוע')
+      showToast.error('שגיאה במחיקת התור הקבוע')
     } finally {
       setDeletingId(null)
     }
@@ -118,13 +119,13 @@ export default function RecurringPage() {
           </p>
         </div>
         
-        <button
-          onClick={() => setCreateModalOpen(true)}
+        <Button
+          onPress={() => setCreateModalOpen(true)}
           className="flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-gold text-background-dark rounded-xl font-medium hover:bg-accent-gold/90 transition-colors"
         >
           <Plus size={18} />
           <span>הוסף תור קבוע</span>
-        </button>
+        </Button>
       </div>
 
       {/* Stats - Horizontal Row */}
@@ -170,13 +171,13 @@ export default function RecurringPage() {
           <p className="text-sm text-foreground-muted mb-4">
             הוסף תורים קבועים כדי לשמור מקום אוטומטית ללקוחות שמגיעים באותו יום ושעה כל שבוע
           </p>
-          <button
-            onClick={() => setCreateModalOpen(true)}
+          <Button
+            onPress={() => setCreateModalOpen(true)}
             className="inline-flex items-center gap-2 px-4 py-2 bg-accent-gold text-background-dark rounded-xl font-medium hover:bg-accent-gold/90 transition-colors"
           >
             <Plus size={18} />
             <span>הוסף תור קבוע</span>
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="space-y-4">
@@ -220,11 +221,13 @@ export default function RecurringPage() {
                     </div>
                     
                     {/* Delete Button - Compact */}
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      disabled={deletingId === item.id}
+                    <Button
+                      onPress={() => handleDelete(item.id)}
+                      isDisabled={deletingId === item.id}
+                      isIconOnly
+                      variant="ghost"
                       className={cn(
-                        'flex items-center justify-center p-2 rounded-lg transition-colors flex-shrink-0',
+                        'min-w-[32px] w-8 h-8 flex items-center justify-center rounded-sm transition-colors flex-shrink-0',
                         deletingId === item.id
                           ? 'bg-red-500/20 text-red-400 cursor-not-allowed'
                           : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
@@ -236,7 +239,7 @@ export default function RecurringPage() {
                       ) : (
                         <Trash2 size={16} />
                       )}
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>

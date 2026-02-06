@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { AppHeader } from '@/components/AppHeader'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { GlassCard } from '@/components/ui/GlassCard'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { 
   User, 
@@ -73,7 +73,7 @@ export default function BarberProfilePage() {
     setShowLogoutModal(false)
     await logout()
     router.replace('/')
-    toast.success('התנתקת בהצלחה')
+    showToast.success('התנתקת בהצלחה')
   }
 
   const formatDate = (dateString: string): string => {

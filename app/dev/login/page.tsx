@@ -30,8 +30,21 @@ export default function DevLoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!email.trim() || !password) {
-      setError('Please fill in all fields')
+    // Validate email
+    if (!email.trim()) {
+      setError('Please enter your email address')
+      return
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email.trim())) {
+      setError('Please enter a valid email address')
+      return
+    }
+    
+    // Validate password
+    if (!password) {
+      setError('Please enter your password')
       return
     }
     
@@ -46,7 +59,14 @@ export default function DevLoginPage() {
     if (result.success) {
       router.push('/dev')
     } else {
-      setError(result.error || 'Login failed')
+      // More specific error messages
+      if (result.error?.includes('not found') || result.error?.includes('user')) {
+        setError('Email not registered for developer access')
+      } else if (result.error?.includes('password') || result.error?.includes('invalid')) {
+        setError('Incorrect password')
+      } else {
+        setError(result.error || 'Login failed. Please check your credentials.')
+      }
     }
     
     setLoading(false)

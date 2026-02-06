@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { reportBug } from '@/lib/bug-reporter'
+import { reportApiError } from '@/lib/bug-reporter/helpers'
 
 const SALT_ROUNDS = 10
 
@@ -100,10 +100,11 @@ export async function POST(request: NextRequest) {
     
     if (createError) {
       console.error(`[${requestId}] Error creating barber:`, createError)
-      await reportBug(
+      await reportApiError(
         new Error(createError.message),
-        'API: Create Barber - User Creation',
-        { additionalData: { errorCode: createError.code, email: normalizedEmail } }
+        request,
+        'Create barber failed',
+        { severity: 'critical', additionalData: { errorCode: createError.code, email: normalizedEmail, requestId } }
       )
       return NextResponse.json(
         { success: false, error: 'שגיאה ביצירת ספר חדש' },
@@ -172,9 +173,11 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error(`[${requestId}] Unexpected error creating barber:`, error)
     
-    await reportBug(
+    await reportApiError(
       error instanceof Error ? error : new Error(String(error)),
-      'API: Create Barber - Unexpected Error'
+      request,
+      'Create barber exception',
+      { severity: 'critical', additionalData: { requestId } }
     )
     
     return NextResponse.json(

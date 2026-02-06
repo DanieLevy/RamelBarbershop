@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/useAuthStore'
 import { AppHeader } from '@/components/AppHeader'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { GlassCard } from '@/components/ui/GlassCard'
+import { Button, Avatar } from '@heroui/react'
 import { cn, timestampToIsraelDate, formatHebrewMinutes, formatHebrewHours, formatHebrewDays } from '@/lib/utils'
 import { Bell, Calendar, X, Clock, ChevronRight, LogIn, Check, RefreshCw } from 'lucide-react'
 import type { NotificationLogRecord, NotificationType } from '@/lib/push/types'
@@ -15,7 +16,7 @@ import { useHaptics } from '@/hooks/useHaptics'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { format } from 'date-fns'
 import { he } from 'date-fns/locale'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 
 type FilterType = 'all' | 'unread' | NotificationType
 
@@ -95,12 +96,12 @@ function NotificationsContent() {
       } else {
         console.error('Error fetching notifications:', data.error)
         await report(new Error(data.error || 'Unknown error'), 'Fetching notifications')
-        toast.error('שגיאה בטעינת ההתראות')
+        showToast.error('שגיאה בטעינת ההתראות')
       }
     } catch (err) {
       console.error('Error fetching notifications:', err)
       await report(err, 'Fetching notifications (exception)')
-      toast.error('שגיאה בטעינת ההתראות')
+      showToast.error('שגיאה בטעינת ההתראות')
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -136,13 +137,13 @@ function NotificationsContent() {
         // Update local state
         setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
         setTotalUnread(0)
-        toast.success('כל ההתראות סומנו כנקראו')
+        showToast.success('כל ההתראות סומנו כנקראו')
       } else {
-        toast.error('שגיאה בסימון ההתראות')
+        showToast.error('שגיאה בסימון ההתראות')
       }
     } catch (err) {
       console.error('Error marking all as read:', err)
-      toast.error('שגיאה בסימון ההתראות')
+      showToast.error('שגיאה בסימון ההתראות')
     } finally {
       setMarkingAllRead(false)
     }
@@ -225,9 +226,11 @@ function NotificationsContent() {
           <div className="container-mobile py-8 sm:py-12 pb-24">
             <div className="max-w-md mx-auto">
               <GlassCard className="text-center py-12 px-6">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-accent-gold/10 flex items-center justify-center">
-                  <Bell size={40} strokeWidth={1} className="text-accent-gold" />
-                </div>
+                <Avatar size="lg" className="mx-auto mb-6 shrink-0 w-20 h-20">
+                  <Avatar.Fallback className="bg-accent-gold/10">
+                    <Bell size={40} strokeWidth={1} className="text-accent-gold" />
+                  </Avatar.Fallback>
+                </Avatar>
                 
                 <h1 className="text-2xl text-foreground-light font-medium mb-3">
                   התראות
@@ -276,9 +279,10 @@ function NotificationsContent() {
               {/* Actions */}
               <div className="flex items-center gap-2">
                 {totalUnread > 0 && (
-                  <button
-                    onClick={handleMarkAllRead}
-                    disabled={markingAllRead}
+                  <Button
+                    onPress={handleMarkAllRead}
+                    isDisabled={markingAllRead}
+                    variant="ghost"
                     className={cn(
                       'flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all',
                       markingAllRead
@@ -288,7 +292,7 @@ function NotificationsContent() {
                   >
                     <Check size={14} strokeWidth={2} />
                     <span className="hidden sm:inline">סמן הכל כנקרא</span>
-                  </button>
+                  </Button>
                 )}
                 
                 <button
@@ -308,9 +312,9 @@ function NotificationsContent() {
             {/* Filters */}
             <div className="flex gap-1.5 mb-4 p-1 bg-white/[0.03] rounded-xl border border-white/[0.06] overflow-x-auto">
               {filters.map((filter) => (
-                <button
+                <Button
                   key={filter.key}
-                  onClick={() => setActiveFilter(filter.key)}
+                  onPress={() => setActiveFilter(filter.key)}
                   className={cn(
                     'px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap',
                     activeFilter === filter.key
@@ -324,7 +328,7 @@ function NotificationsContent() {
                       {totalUnread}
                     </span>
                   )}
-                </button>
+                </Button>
               ))}
             </div>
             
@@ -335,19 +339,22 @@ function NotificationsContent() {
               </div>
             ) : notifications.length === 0 ? (
               <GlassCard className="flex flex-col items-center text-center py-12">
-                <div className="w-16 h-16 mb-4 rounded-full bg-white/5 flex items-center justify-center">
-                  <Bell size={32} strokeWidth={1} className="text-foreground-muted" />
-                </div>
+                <Avatar size="md" className="mb-4 shrink-0 w-16 h-16">
+                  <Avatar.Fallback className="bg-white/5">
+                    <Bell size={32} strokeWidth={1} className="text-foreground-muted" />
+                  </Avatar.Fallback>
+                </Avatar>
                 <p className="text-foreground-muted mb-4">
                   {activeFilter === 'unread' ? 'אין התראות שלא נקראו' : 'אין התראות להצגה'}
                 </p>
                 {activeFilter !== 'all' && (
-                  <button
-                    onClick={() => setActiveFilter('all')}
+                  <Button
+                    onPress={() => setActiveFilter('all')}
+                    variant="ghost"
                     className="text-accent-gold hover:underline text-sm font-medium"
                   >
                     הצג את כל ההתראות
-                  </button>
+                  </Button>
                 )}
               </GlassCard>
             ) : (
@@ -367,12 +374,13 @@ function NotificationsContent() {
                         )}
                       >
                         {/* Icon */}
-                        <div className={cn(
-                          'w-10 h-10 rounded-full flex items-center justify-center shrink-0',
-                          !notification.is_read ? 'bg-accent-gold/20' : 'bg-white/5'
-                        )}>
-                          <Icon size={18} strokeWidth={1.5} className={typeInfo.color} />
-                        </div>
+                        <Avatar size="md" className="shrink-0 w-10 h-10">
+                          <Avatar.Fallback className={cn(
+                            !notification.is_read ? 'bg-accent-gold/20' : 'bg-white/5'
+                          )}>
+                            <Icon size={18} strokeWidth={1.5} className={typeInfo.color} />
+                          </Avatar.Fallback>
+                        </Avatar>
                         
                         {/* Content */}
                         <div className="flex-1 min-w-0">
@@ -412,9 +420,10 @@ function NotificationsContent() {
                 {/* Load More */}
                 {hasMore && (
                   <div className="p-4 border-t border-white/[0.04]">
-                    <button
-                      onClick={() => fetchNotifications(false)}
-                      disabled={refreshing}
+                    <Button
+                      onPress={() => fetchNotifications(false)}
+                      isDisabled={refreshing}
+                      variant="ghost"
                       className={cn(
                         'w-full py-3 rounded-xl text-sm font-medium transition-all',
                         refreshing
@@ -423,7 +432,7 @@ function NotificationsContent() {
                       )}
                     >
                       {refreshing ? 'טוען...' : 'טען עוד'}
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -431,13 +440,14 @@ function NotificationsContent() {
             
             {/* Back Button */}
             <div className="mt-8 text-center">
-              <button
-                onClick={() => router.push('/')}
+              <Button
+                onPress={() => router.push('/')}
+                variant="ghost"
                 className="inline-flex items-center gap-2 text-foreground-muted hover:text-foreground-light text-sm transition-colors py-2"
               >
                 <ChevronRight size={12} strokeWidth={1.5} />
                 <span>חזרה לדף הבית</span>
-              </button>
+              </Button>
             </div>
           </div>
         </div>

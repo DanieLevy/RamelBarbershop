@@ -35,10 +35,12 @@ const DEFAULT_OPTIONS: Required<RetryOptions> = {
  */
 export function isRetryableError(error: Error): boolean {
   const message = error.message.toLowerCase()
+  const errorName = error.name?.toLowerCase() || ''
   
   // Network errors (including Safari-specific "Load failed")
   // "Load failed" is Safari/WebKit's generic fetch failure error
   // This commonly occurs on iOS PWAs during app wake-up or network transitions
+  // Also check for TypeError with network-related messages (common on iOS)
   if (message.includes('network') || 
       message.includes('timeout') ||
       message.includes('connection') ||
@@ -48,7 +50,10 @@ export function isRetryableError(error: Error): boolean {
       message.includes('fetch failed') ||  // Generic fetch failure
       message.includes('failed to fetch') ||  // Chrome/generic
       message.includes('network request failed') ||  // Various browsers
-      message.includes('the internet connection appears to be offline')) {  // Safari offline
+      message.includes('the internet connection appears to be offline') ||  // Safari offline
+      message.includes('cancelled') ||  // Request was cancelled (iOS background)
+      message.includes('aborted') ||  // Request aborted
+      (errorName === 'typeerror' && (message.includes('load') || message.includes('fetch')))) {  // TypeError: Load failed
     return true
   }
   

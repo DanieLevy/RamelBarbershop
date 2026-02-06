@@ -12,7 +12,7 @@ import {
   type ConflictingReservation,
 } from '@/lib/services/recurring.service'
 import { RecurringConflictModal } from '@/components/barber/RecurringConflictModal'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import type { Customer, Service, WorkDay, DayOfWeek, BarbershopSettings } from '@/types/database'
 import { Portal } from '@/components/ui/Portal'
 import { useBugReporter } from '@/hooks/useBugReporter'
@@ -249,14 +249,14 @@ export function CreateRecurringModal({
   // Handle save - checks for conflicts first
   const handleSave = async () => {
     if (!selectedCustomer || !selectedService || !selectedDay || !selectedTimeSlot) {
-      toast.error('נא למלא את כל השדות')
+      showToast.error('נא למלא את כל השדות')
       return
     }
     
     // Check for recurring conflict (another recurring at same slot)
     const hasRecurringConflict = await checkRecurringConflict(barberId, selectedDay, selectedTimeSlot)
     if (hasRecurringConflict) {
-      toast.error('כבר קיים תור קבוע בשעה זו')
+      showToast.error('כבר קיים תור קבוע בשעה זו')
       return
     }
     
@@ -278,7 +278,7 @@ export function CreateRecurringModal({
     } catch (err) {
       console.error('Save error:', err)
       await report(err instanceof Error ? err : new Error(String(err)), 'Checking conflicts for recurring appointment')
-      toast.error('שגיאה בבדיקת התנגשויות')
+      showToast.error('שגיאה בבדיקת התנגשויות')
       setSaving(false)
     }
   }
@@ -295,14 +295,14 @@ export function CreateRecurringModal({
       const cancelResult = await cancelConflictingReservations(reservationIds, barberId)
       
       if (!cancelResult.success) {
-        toast.error(cancelResult.error || 'שגיאה בביטול התורים המתנגשים')
+        showToast.error(cancelResult.error || 'שגיאה בביטול התורים המתנגשים')
         return
       }
 
       // Verify no more conflicts
       const remainingConflicts = await checkReservationConflicts(barberId, selectedDay, selectedTimeSlot)
       if (remainingConflicts.length > 0) {
-        toast.error('נותרו תורים מתנגשים. נסה שוב.')
+        showToast.error('נותרו תורים מתנגשים. נסה שוב.')
         setConflictingReservations(remainingConflicts)
         return
       }
@@ -315,7 +315,7 @@ export function CreateRecurringModal({
     } catch (err) {
       console.error('Conflict handling error:', err)
       await report(err instanceof Error ? err : new Error(String(err)), 'Handling conflicts for recurring appointment')
-      toast.error('שגיאה בטיפול בהתנגשויות')
+      showToast.error('שגיאה בטיפול בהתנגשויות')
     }
   }
 
@@ -339,15 +339,15 @@ export function CreateRecurringModal({
       })
       
       if (result.success) {
-        toast.success('התור הקבוע נוצר בהצלחה!')
+        showToast.success('התור הקבוע נוצר בהצלחה!')
         onSuccess()
       } else {
-        toast.error(result.message || 'שגיאה ביצירת התור הקבוע')
+        showToast.error(result.message || 'שגיאה ביצירת התור הקבוע')
       }
     } catch (err) {
       console.error('Save error:', err)
       await report(err instanceof Error ? err : new Error(String(err)), 'Creating recurring appointment')
-      toast.error('שגיאה ביצירת התור הקבוע')
+      showToast.error('שגיאה ביצירת התור הקבוע')
     } finally {
       setSaving(false)
     }
@@ -443,8 +443,9 @@ export function CreateRecurringModal({
                           className="w-full px-4 py-3 text-right hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
                         >
                           <div className="font-medium text-foreground-light">{customer.fullname}</div>
+
                           {formatPhone(customer.phone) && (
-                            <div className="text-sm text-foreground-muted">{formatPhone(customer.phone)}</div>
+                            <div className="text-sm text-foreground-muted mr-2">{formatPhone(customer.phone)}</div>
                           )}
                         </button>
                       ))}
@@ -589,7 +590,7 @@ export function CreateRecurringModal({
           <div className="p-4 border-t border-white/10 flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 py-2.5 px-4 rounded-xl border border-white/10 text-foreground-light hover:bg-white/5 transition-colors"
+              className="flex-1 justify-center py-2.5 px-4 rounded-xl border border-white/10 text-foreground-light hover:bg-white/5 transition-colors"
             >
               ביטול
             </button>

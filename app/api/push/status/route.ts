@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { pushService } from '@/lib/push/push-service'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { reportServerError } from '@/lib/bug-reporter/helpers'
+import { reportApiError } from '@/lib/bug-reporter/helpers'
 import type { DeviceInfo, CustomerNotificationSettings } from '@/lib/push/types'
 
 export async function GET(request: NextRequest) {
@@ -67,8 +67,8 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('[API] Error getting push status:', error)
-    await reportServerError(error, 'GET /api/push/status', {
-      route: '/api/push/status'
+    await reportApiError(error, request, 'Get push status failed', {
+      severity: 'medium',
     })
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
@@ -145,8 +145,8 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('[API] Error updating push settings:', error)
-    await reportServerError(error, 'PATCH /api/push/status', {
-      route: '/api/push/status'
+    await reportApiError(error, request, 'Update push settings failed', {
+      severity: 'medium',
     })
     return NextResponse.json(
       { success: false, error: 'Internal server error' },

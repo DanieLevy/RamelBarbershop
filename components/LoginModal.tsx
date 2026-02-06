@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { findCustomerByPhone, getCustomerAuthMethod, checkEmailDuplicate, findCustomerByEmail } from '@/lib/services/customer.service'
@@ -18,13 +18,14 @@ import {
   saveDeviceToken 
 } from '@/lib/services/trusted-device.service'
 import { sendEmailOtp, verifyEmailOtp, isValidEmail } from '@/lib/auth/email-auth'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { X, Scissors, AlertTriangle, Mail, Phone, ArrowRight, MessageSquare } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { Portal } from '@/components/ui/Portal'
 import { useHaptics } from '@/hooks/useHaptics'
+import { Button, InputOTP, REGEXP_ONLY_DIGITS } from '@heroui/react'
 
 interface LoginModalProps {
   isOpen: boolean
@@ -57,7 +58,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [phone, setPhone] = useState('')
   const [fullname, setFullname] = useState('')
   const [email, setEmail] = useState('')
-  const [otp, setOtp] = useState(['', '', '', '', '', ''])
+  const [otp, setOtp] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [isNewUser, setIsNewUser] = useState(false)
@@ -69,7 +70,6 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [existingEmail, setExistingEmail] = useState<string | null>(null) // Email from existing user
   const [customerAuthMethod, setCustomerAuthMethod] = useState<'phone' | 'email' | 'both' | null>(null)
   
-  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   // Check if barber is logged in and show blocked state
   useEffect(() => {
@@ -85,7 +85,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       setPhone('')
       setFullname('')
       setEmail('')
-      setOtp(['', '', '', '', '', ''])
+      setOtp('')
       setError(null)
       setLoading(false)
       setIsNewUser(false)
@@ -120,8 +120,19 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const handlePhoneSubmit = async () => {
     const phoneClean = phone.replace(/\D/g, '')
     
-    if (!phoneClean || phoneClean.length !== 10 || !phoneClean.startsWith('05')) {
-      setError('נא להזין מספר טלפון ישראלי תקין (05XXXXXXXX)')
+    // Detailed validation with specific error messages
+    if (!phoneClean) {
+      setError('נא להזין מספר טלפון')
+      return
+    }
+    
+    if (!phoneClean.startsWith('05')) {
+      setError('מספר הטלפון חייב להתחיל ב-05')
+      return
+    }
+    
+    if (phoneClean.length !== 10) {
+      setError(`מספר הטלפון חייב להכיל 10 ספרות (הזנת ${phoneClean.length})`)
       return
     }
     
@@ -151,7 +162,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             
             if (customer) {
               haptics.success()
-              toast.success(`שלום ${customer.fullname}!`)
+              showToast.success(`שלום ${customer.fullname}!`)
               onClose()
               return
             }
@@ -170,7 +181,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       setCustomerAuthMethod(authMethod)
       
       if (existingCustomer) {
-        // Existing customer
+        // Existing customer - welcome back!
         setFullname(existingCustomer.fullname)
         setExistingEmail(existingCustomer.email || null)
         setIsNewUser(false)
@@ -209,7 +220,16 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     } catch (err) {
       console.error('Phone check error:', err)
       await report(err, 'Customer phone check/lookup')
-      setError('שגיאה בבדיקת המספר')
+      
+      // Provide specific error messages based on error type
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      if (errorMsg.toLowerCase().includes('network') || 
+          errorMsg.toLowerCase().includes('load failed') ||
+          errorMsg.toLowerCase().includes('fetch')) {
+        setError('בעיית תקשורת. בדוק את החיבור לאינטרנט ונסה שוב.')
+      } else {
+        setError('שגיאה בבדיקת המספר. נסה שוב.')
+      }
       setLoading(false)
     }
   }
@@ -261,11 +281,11 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         setSmsError(null)
         haptics.light()
         if (process.env.NODE_ENV === 'development' && result.isTestMode) {
-          toast.success('מצב בדיקה - קוד: ' + TEST_USER.otpCode)
+          showToast.success('מצב בדיקה - קוד: ' + TEST_USER.otpCode)
         } else {
-          toast.success('קוד אימות נשלח!')
+          showToast.success('קוד אימות נשלח!')
         }
-        setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
+        // Focus handled by InputOTP autoFocus
       } else {
         // SMS failed - offer email fallback
         const errorMsg = result.error || 'שגיאה בשליחת הקוד'
@@ -273,7 +293,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         
         // Show email fallback after any SMS failure
         setStep('email-fallback')
-        toast.error('שגיאה בשליחת SMS - נסה באמצעות אימייל')
+        showToast.error('שגיאה בשליחת SMS - נסה באמצעות אימייל')
       }
     } catch (err) {
       console.error('OTP send error:', err)
@@ -293,11 +313,11 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         setStep('email-otp')
         setCountdown(60)
         haptics.light()
-        toast.success('קוד אימות נשלח לאימייל!')
-        setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
+        showToast.success('קוד אימות נשלח לאימייל!')
+        // Focus handled by InputOTP autoFocus
       } else {
         setError(result.error || 'שגיאה בשליחת האימייל')
-        toast.error(result.error || 'שגיאה בשליחת האימייל')
+        showToast.error(result.error || 'שגיאה בשליחת האימייל')
       }
     } catch (err) {
       console.error('Email OTP send error:', err)
@@ -372,65 +392,21 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     await sendEmailOtpToUser(email.trim().toLowerCase())
   }
 
-  const handleOtpChange = (index: number, value: string) => {
-    if (!/^\d*$/.test(value)) return
-    
-    const newOtp = [...otp]
-    newOtp[index] = value.slice(-1)
-    setOtp(newOtp)
-    
-    if (error) setError(null)
-    if (value && index < 5) {
-      otpInputRefs.current[index + 1]?.focus()
-    }
-    
-    // Auto-verify when all 6 digits are entered
-    if (value && index === 5) {
-      const allFilled = newOtp.every(digit => digit !== '')
-      if (allFilled && !loading && confirmation) {
-        // Pass the code directly to avoid race condition with React state updates
-        const code = newOtp.join('')
-        // Small delay to allow UI to update and show the complete code
-        setTimeout(() => handleVerifyOtp(code), 150)
-      }
-    }
-  }
-
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      otpInputRefs.current[index - 1]?.focus()
-    }
-  }
-
-  const handleOtpPaste = (e: React.ClipboardEvent) => {
-    e.preventDefault()
-    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
-    if (pastedData) {
-      const newOtp = [...otp]
-      for (let i = 0; i < 6; i++) {
-        newOtp[i] = pastedData[i] || ''
-      }
-      setOtp(newOtp)
-      const focusIndex = Math.min(pastedData.length, 5)
-      otpInputRefs.current[focusIndex]?.focus()
-      
-      // Auto-verify if full 6-digit code was pasted
-      if (pastedData.length === 6 && !loading && confirmation) {
-        setTimeout(() => handleVerifyOtp(pastedData), 150)
-      }
-    }
-  }
-
   const handleVerifyOtp = async (codeOverride?: string) => {
-    const code = codeOverride || otp.join('')
+    const code = codeOverride || otp
+    
+    if (!code) {
+      setError('נא להזין את קוד האימות')
+      return
+    }
     
     if (code.length !== 6) {
-      setError('נא להזין קוד בן 6 ספרות')
+      setError(`הקוד חייב להכיל 6 ספרות (הזנת ${code.length})`)
       return
     }
     
     if (!confirmation) {
-      setError('נא לבקש קוד חדש')
+      setError('פג תוקף הקוד. נא לבקש קוד חדש.')
       return
     }
     
@@ -468,30 +444,52 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           }
           
           haptics.success()
-          toast.success(`שלום ${customer.fullname}!`)
+          showToast.success(`שלום ${customer.fullname}!`)
           onClose()
         } else {
-          setError('שגיאה בהתחברות')
+          setError('שגיאה בהתחברות. נסה שוב.')
         }
       } else {
-        setError(result.error || 'קוד שגוי')
-        setOtp(['', '', '', '', '', ''])
-        otpInputRefs.current[0]?.focus()
+        // Provide specific error messages based on error type
+        const errorMessage = result.error?.toLowerCase() || ''
+        if (errorMessage.includes('expired') || errorMessage.includes('timeout')) {
+          setError('פג תוקף הקוד. נא לבקש קוד חדש.')
+        } else if (errorMessage.includes('invalid') || errorMessage.includes('wrong') || errorMessage.includes('incorrect')) {
+          setError('הקוד שהוזן שגוי. נסה שוב.')
+        } else if (errorMessage.includes('attempts') || errorMessage.includes('limit') || errorMessage.includes('blocked')) {
+          setError('יותר מדי ניסיונות שגויים. נסה שוב מאוחר יותר.')
+        } else {
+          setError(result.error || 'הקוד שגוי. נסה שוב.')
+        }
+        setOtp('')
+        haptics.light()
       }
     } catch (err) {
       console.error('Verify error:', err)
       await report(err, 'Verifying customer OTP code')
-      setError('שגיאה באימות')
+      
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      if (errorMsg.toLowerCase().includes('network') || 
+          errorMsg.toLowerCase().includes('load failed')) {
+        setError('בעיית תקשורת. בדוק את החיבור לאינטרנט.')
+      } else {
+        setError('שגיאה באימות הקוד. נסה שוב.')
+      }
     }
     
     setLoading(false)
   }
 
-  const handleVerifyEmailOtp = async () => {
-    const code = otp.join('')
+  const handleVerifyEmailOtp = async (codeOverride?: string) => {
+    const code = codeOverride || otp
+    
+    if (!code) {
+      setError('נא להזין את קוד האימות')
+      return
+    }
     
     if (code.length !== 6) {
-      setError('נא להזין קוד בן 6 ספרות')
+      setError(`הקוד חייב להכיל 6 ספרות (הזנת ${code.length})`)
       return
     }
     
@@ -512,20 +510,37 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         
         if (customer) {
           haptics.success()
-          toast.success(`שלום ${customer.fullname}!`)
+          showToast.success(`שלום ${customer.fullname}!`)
           onClose()
         } else {
-          setError('שגיאה בהתחברות')
+          setError('שגיאה בהתחברות. נסה שוב.')
         }
       } else {
-        setError(result.error || 'קוד שגוי')
-        setOtp(['', '', '', '', '', ''])
-        otpInputRefs.current[0]?.focus()
+        // Provide specific error messages
+        const errorMessage = result.error?.toLowerCase() || ''
+        if (errorMessage.includes('expired') || errorMessage.includes('timeout')) {
+          setError('פג תוקף הקוד. נא לבקש קוד חדש.')
+        } else if (errorMessage.includes('invalid') || errorMessage.includes('wrong') || errorMessage.includes('incorrect')) {
+          setError('הקוד שהוזן שגוי. נסה שוב.')
+        } else if (errorMessage.includes('attempts') || errorMessage.includes('limit')) {
+          setError('יותר מדי ניסיונות שגויים. נסה שוב מאוחר יותר.')
+        } else {
+          setError(result.error || 'הקוד שגוי. נסה שוב.')
+        }
+        setOtp('')
+        haptics.light()
       }
     } catch (err) {
       console.error('Email verify error:', err)
       await report(err, 'Verifying customer email OTP code')
-      setError('שגיאה באימות')
+      
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      if (errorMsg.toLowerCase().includes('network') || 
+          errorMsg.toLowerCase().includes('load failed')) {
+        setError('בעיית תקשורת. בדוק את החיבור לאינטרנט.')
+      } else {
+        setError('שגיאה באימות הקוד. נסה שוב.')
+      }
     }
     
     setLoading(false)
@@ -535,7 +550,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     if (countdown > 0) return
     
     setLoading(true)
-    setOtp(['', '', '', '', '', ''])
+    setOtp('')
     await sendOtpToPhone(phone.replace(/\D/g, ''))
   }
 
@@ -543,14 +558,14 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     if (countdown > 0) return
     
     setLoading(true)
-    setOtp(['', '', '', '', '', ''])
+    setOtp('')
     await sendEmailOtpToUser(email)
   }
 
   const handleUseEmailInstead = () => {
     // Navigate to email fallback
     setError(null)
-    setOtp(['', '', '', '', '', ''])
+    setOtp('')
     
     // If existing customer has email, pre-fill it
     if (existingEmail) {
@@ -579,13 +594,15 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
         <div className="relative w-full sm:max-w-md sm:mx-4 bg-background-darker sm:bg-background-dark border-t sm:border border-white/10 sm:rounded-2xl rounded-t-2xl p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto animate-slide-in-up sm:animate-fade-in">
         {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 left-4 w-10 h-10 flex items-center justify-center text-foreground-muted hover:text-foreground-light transition-colors"
+        <Button
+          variant="ghost"
+          isIconOnly
+          onPress={onClose}
+          className="absolute top-4 left-4 w-10 h-10"
           aria-label="סגור"
         >
           <X size={20} strokeWidth={1.5} />
-        </button>
+        </Button>
         
         {/* SMS provider widget container - hidden by default */}
         <div id={SMS_WIDGET_CONTAINER_ID} className="hidden" />
@@ -628,31 +645,29 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               {error && <p className="text-red-400 text-xs">{error}</p>}
             </div>
             
-            <button
-              onClick={handlePhoneSubmit}
-              disabled={loading}
-              className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2',
-                loading
-                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
-                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
-              )}
+            <Button
+              variant="primary"
+              onPress={handlePhoneSubmit}
+              isDisabled={loading}
+              className="w-full"
             >
               <Phone size={18} />
               {loading ? 'בודק...' : 'המשך עם SMS'}
-            </button>
+            </Button>
             
             {/* Dev helper - fill test user */}
             {process.env.NODE_ENV === 'development' && (
-              <button
-                onClick={() => {
+              <Button
+                variant="ghost"
+                size="sm"
+                onPress={() => {
                   setPhone(TEST_USER.phoneRaw)
                   setError(null)
                 }}
-                className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center justify-center gap-1"
+                className="text-xs text-blue-400 hover:text-blue-300 w-full"
               >
                 🧪 מלא טלפון בדיקה
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -686,35 +701,33 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               {error && <p className="text-red-400 text-xs">{error}</p>}
             </div>
             
-            <button
-              onClick={handleNameSubmit}
-              disabled={loading}
-              className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2',
-                loading
-                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
-                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
-              )}
+            <Button
+              variant="primary"
+              onPress={handleNameSubmit}
+              isDisabled={loading}
+              className="w-full"
             >
               <Phone size={18} />
               {loading ? 'שולח קוד...' : 'קבל קוד ב-SMS'}
-            </button>
+            </Button>
             
             {/* Email alternative */}
-            <button
-              onClick={() => setStep('email-signup')}
-              className="w-full py-2.5 text-sm text-foreground-muted hover:text-accent-gold transition-colors flex items-center justify-center gap-2"
+            <Button
+              variant="ghost"
+              onPress={() => setStep('email-signup')}
+              className="w-full text-sm"
             >
               <Mail size={16} />
               העדף הרשמה באימייל
-            </button>
+            </Button>
             
-            <button
-              onClick={() => setStep('phone')}
-              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors flex items-center justify-center"
+            <Button
+              variant="ghost"
+              onPress={() => setStep('phone')}
+              className="w-full text-sm"
             >
               ← חזור
-            </button>
+            </Button>
           </div>
         )}
         
@@ -767,26 +780,23 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               {error && <p className="text-red-400 text-xs">{error}</p>}
             </div>
             
-            <button
-              onClick={handleEmailSignupSubmit}
-              disabled={loading}
-              className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2',
-                loading
-                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
-                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
-              )}
+            <Button
+              variant="primary"
+              onPress={handleEmailSignupSubmit}
+              isDisabled={loading}
+              className="w-full"
             >
               <Mail size={18} />
               {loading ? 'שולח קוד...' : 'קבל קוד לאימייל'}
-            </button>
+            </Button>
             
-            <button
-              onClick={() => setStep('name')}
-              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors flex items-center justify-center"
+            <Button
+              variant="ghost"
+              onPress={() => setStep('name')}
+              className="w-full text-sm"
             >
               ← חזור להרשמה ב-SMS
-            </button>
+            </Button>
           </div>
         )}
         
@@ -806,38 +816,31 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               </p>
             </div>
             
-            <button
-              onClick={() => handleDebugChoice(true)}
-              disabled={loading}
-              className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center',
-                loading
-                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
-                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
-              )}
+            <Button
+              variant="primary"
+              onPress={() => handleDebugChoice(true)}
+              isDisabled={loading}
+              className="w-full"
             >
               {loading ? 'טוען...' : '🧪 השתמש במצב בדיקה'}
-            </button>
+            </Button>
             
-            <button
-              onClick={() => handleDebugChoice(false)}
-              disabled={loading}
-              className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center border',
-                loading
-                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed border-foreground-muted/30'
-                  : 'bg-transparent text-foreground-light border-white/20 hover:border-accent-gold/50'
-              )}
+            <Button
+              variant="secondary"
+              onPress={() => handleDebugChoice(false)}
+              isDisabled={loading}
+              className="w-full"
             >
               {loading ? 'טוען...' : '📱 שלח SMS אמיתי'}
-            </button>
+            </Button>
             
-            <button
-              onClick={() => setStep('phone')}
-              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors flex items-center justify-center"
+            <Button
+              variant="ghost"
+              onPress={() => setStep('phone')}
+              className="w-full text-sm"
             >
               ← חזור
-            </button>
+            </Button>
           </div>
         )}
         
@@ -860,40 +863,32 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             )}
             
             {/* SMS Option */}
-            <button
-              onClick={handleAuthChoiceSms}
-              disabled={loading}
-              className={cn(
-                'w-full py-3.5 rounded-xl font-medium transition-all flex items-center justify-center gap-3 border',
-                loading
-                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed border-foreground-muted/30'
-                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90 border-transparent'
-              )}
+            <Button
+              variant="primary"
+              onPress={handleAuthChoiceSms}
+              isDisabled={loading}
+              className="w-full py-3.5"
             >
               <MessageSquare size={20} />
               <div className="flex flex-col items-start">
                 <span>קוד SMS לטלפון</span>
                 <span className="text-xs opacity-75" dir="ltr">{phone}</span>
               </div>
-            </button>
+            </Button>
             
             {/* Email Option */}
-            <button
-              onClick={handleAuthChoiceEmail}
-              disabled={loading}
-              className={cn(
-                'w-full py-3.5 rounded-xl font-medium transition-all flex items-center justify-center gap-3 border',
-                loading
-                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed border-foreground-muted/30'
-                  : 'bg-transparent text-foreground-light border-white/20 hover:border-accent-gold/50 hover:bg-white/5'
-              )}
+            <Button
+              variant="secondary"
+              onPress={handleAuthChoiceEmail}
+              isDisabled={loading}
+              className="w-full py-3.5"
             >
               <Mail size={20} />
               <div className="flex flex-col items-start">
                 <span>קוד לאימייל</span>
                 <span className="text-xs opacity-75">{email}</span>
               </div>
-            </button>
+            </Button>
             
             {loading && (
               <p className="text-foreground-muted text-xs text-center animate-pulse">
@@ -901,16 +896,17 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               </p>
             )}
             
-            <button
-              onClick={() => {
+            <Button
+              variant="ghost"
+              onPress={() => {
                 setStep('phone')
                 setEmail('')
                 setError(null)
               }}
-              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors flex items-center justify-center"
+              className="w-full text-sm"
             >
               ← חזור
-            </button>
+            </Button>
           </div>
         )}
         
@@ -930,43 +926,51 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               </div>
             )}
             
-            <div className="flex justify-center gap-2 xs:gap-3" dir="ltr">
-              {otp.map((digit, index) => (
-                <input
-                  key={index}
-                  ref={(el) => { otpInputRefs.current[index] = el }}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={1}
-                  value={digit}
-                  onChange={(e) => handleOtpChange(index, e.target.value)}
-                  onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                  onPaste={handleOtpPaste}
-                  disabled={loading}
-                  className={cn(
-                    'w-10 h-12 xs:w-11 xs:h-13 text-center text-lg font-bold rounded-lg bg-background-card border-2 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold transition-all',
-                    error ? 'border-red-400' : digit ? 'border-accent-gold/50' : 'border-white/20'
-                  )}
-                />
-              ))}
+            <div className="flex justify-center" dir="ltr">
+              <InputOTP
+                maxLength={6}
+                value={otp}
+                onChange={(value) => {
+                  setOtp(value)
+                  if (error) setError(null)
+                }}
+                onComplete={(code) => {
+                  if (!loading && confirmation) {
+                    handleVerifyOtp(code)
+                  }
+                }}
+                isDisabled={loading}
+                isInvalid={!!error}
+                pattern={REGEXP_ONLY_DIGITS}
+                autoFocus
+              >
+                <InputOTP.Group className="gap-2">
+                  {[0, 1, 2, 3, 4, 5].map((index) => (
+                    <InputOTP.Slot
+                      key={index}
+                      index={index}
+                      className={cn(
+                        'w-10 h-12 xs:w-11 xs:h-13 text-lg font-bold rounded-lg bg-background-card border-2 text-foreground-light',
+                        error ? 'border-red-400' : 'border-white/20 data-[filled=true]:border-accent-gold/50 data-[active=true]:border-accent-gold data-[active=true]:ring-2 data-[active=true]:ring-accent-gold/30'
+                      )}
+                    />
+                  ))}
+                </InputOTP.Group>
+              </InputOTP>
             </div>
             
             {error && (
               <p className="text-red-400 text-xs text-center">{error}</p>
             )}
             
-            <button
-              onClick={() => handleVerifyOtp()}
-              disabled={loading || otp.join('').length !== 6}
-              className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center',
-                loading || otp.join('').length !== 6
-                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
-                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
-              )}
+            <Button
+              variant="primary"
+              onPress={() => handleVerifyOtp()}
+              isDisabled={loading || otp.length !== 6}
+              className="w-full"
             >
               {loading ? 'מאמת...' : 'התחבר'}
-            </button>
+            </Button>
             
             <div className="text-center">
               {countdown > 0 ? (
@@ -974,33 +978,37 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                   ניתן לשלוח שוב בעוד {countdown} שניות
                 </p>
               ) : (
-                <button
-                  onClick={handleResendOtp}
-                  disabled={loading}
-                  className="text-accent-gold hover:underline text-sm"
+                <Button
+                  variant="ghost"
+                  onPress={handleResendOtp}
+                  isDisabled={loading}
+                  size="sm"
+                  className="text-accent-gold hover:underline"
                 >
                   שלח קוד חדש
-                </button>
+                </Button>
               )}
             </div>
             
             {/* Email fallback option - always visible */}
             <div className="border-t border-white/10 pt-3 mt-2">
-              <button
-                onClick={handleUseEmailInstead}
-                className="w-full text-sm text-foreground-muted hover:text-accent-gold transition-colors flex items-center justify-center gap-2"
+              <Button
+                variant="ghost"
+                onPress={handleUseEmailInstead}
+                className="w-full text-sm"
               >
                 <Mail size={16} />
                 לא מקבל SMS? המשך באימייל
-              </button>
+              </Button>
             </div>
             
-            <button
-              onClick={() => setStep('phone')}
-              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors flex items-center justify-center"
+            <Button
+              variant="ghost"
+              onPress={() => setStep('phone')}
+              className="w-full text-sm"
             >
               ← חזור
-            </button>
+            </Button>
           </div>
         )}
         
@@ -1049,36 +1057,34 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               {error && <p className="text-red-400 text-xs">{error}</p>}
             </div>
             
-            <button
-              onClick={handleEmailFallbackSubmit}
-              disabled={loading}
-              className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2',
-                loading
-                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
-                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
-              )}
+            <Button
+              variant="primary"
+              onPress={handleEmailFallbackSubmit}
+              isDisabled={loading}
+              className="w-full"
             >
               <Mail size={18} />
               {loading ? 'שולח קוד...' : 'שלח קוד לאימייל'}
-            </button>
+            </Button>
             
             {/* Try SMS again option */}
-            <button
-              onClick={handleTrySmsAgain}
-              disabled={loading}
-              className="w-full py-2.5 text-sm text-foreground-muted hover:text-accent-gold transition-colors flex items-center justify-center gap-2"
+            <Button
+              variant="ghost"
+              onPress={handleTrySmsAgain}
+              isDisabled={loading}
+              className="w-full text-sm"
             >
               <Phone size={16} />
               נסה שוב ב-SMS
-            </button>
+            </Button>
             
-            <button
-              onClick={() => setStep('phone')}
-              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors flex items-center justify-center"
+            <Button
+              variant="ghost"
+              onPress={() => setStep('phone')}
+              className="w-full text-sm"
             >
               ← חזור
-            </button>
+            </Button>
           </div>
         )}
         
@@ -1089,43 +1095,51 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               קוד אימות נשלח ל-{email}
             </p>
             
-            <div className="flex justify-center gap-2 xs:gap-3" dir="ltr">
-              {otp.map((digit, index) => (
-                <input
-                  key={index}
-                  ref={(el) => { otpInputRefs.current[index] = el }}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={1}
-                  value={digit}
-                  onChange={(e) => handleOtpChange(index, e.target.value)}
-                  onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                  onPaste={handleOtpPaste}
-                  disabled={loading}
-                  className={cn(
-                    'w-10 h-12 xs:w-11 xs:h-13 text-center text-lg font-bold rounded-lg bg-background-card border-2 text-foreground-light outline-none focus:ring-2 focus:ring-accent-gold transition-all',
-                    error ? 'border-red-400' : digit ? 'border-accent-gold/50' : 'border-white/20'
-                  )}
-                />
-              ))}
+            <div className="flex justify-center" dir="ltr">
+              <InputOTP
+                maxLength={6}
+                value={otp}
+                onChange={(value) => {
+                  setOtp(value)
+                  if (error) setError(null)
+                }}
+                onComplete={(code) => {
+                  if (!loading) {
+                    handleVerifyEmailOtp(code)
+                  }
+                }}
+                isDisabled={loading}
+                isInvalid={!!error}
+                pattern={REGEXP_ONLY_DIGITS}
+                autoFocus
+              >
+                <InputOTP.Group className="gap-2">
+                  {[0, 1, 2, 3, 4, 5].map((index) => (
+                    <InputOTP.Slot
+                      key={index}
+                      index={index}
+                      className={cn(
+                        'w-10 h-12 xs:w-11 xs:h-13 text-lg font-bold rounded-lg bg-background-card border-2 text-foreground-light',
+                        error ? 'border-red-400' : 'border-white/20 data-[filled=true]:border-accent-gold/50 data-[active=true]:border-accent-gold data-[active=true]:ring-2 data-[active=true]:ring-accent-gold/30'
+                      )}
+                    />
+                  ))}
+                </InputOTP.Group>
+              </InputOTP>
             </div>
             
             {error && (
               <p className="text-red-400 text-xs text-center">{error}</p>
             )}
             
-            <button
-              onClick={handleVerifyEmailOtp}
-              disabled={loading || otp.join('').length !== 6}
-              className={cn(
-                'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center',
-                loading || otp.join('').length !== 6
-                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
-                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
-              )}
+            <Button
+              variant="primary"
+              onPress={() => handleVerifyEmailOtp()}
+              isDisabled={loading || otp.length !== 6}
+              className="w-full"
             >
               {loading ? 'מאמת...' : 'התחבר'}
-            </button>
+            </Button>
             
             <div className="text-center">
               {countdown > 0 ? (
@@ -1133,19 +1147,22 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                   ניתן לשלוח שוב בעוד {countdown} שניות
                 </p>
               ) : (
-                <button
-                  onClick={handleResendEmailOtp}
-                  disabled={loading}
-                  className="text-accent-gold hover:underline text-sm"
+                <Button
+                  variant="ghost"
+                  onPress={handleResendEmailOtp}
+                  isDisabled={loading}
+                  size="sm"
+                  className="text-accent-gold hover:underline"
                 >
                   שלח קוד חדש
-                </button>
+                </Button>
               )}
             </div>
             
-            <button
-              onClick={() => {
-                setOtp(['', '', '', '', '', ''])
+            <Button
+              variant="ghost"
+              onPress={() => {
+                setOtp('')
                 setError(null)
                 if (customerAuthMethod === 'email') {
                   setStep('email-fallback')
@@ -1153,10 +1170,10 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                   setStep('otp')
                 }
               }}
-              className="w-full text-foreground-muted hover:text-foreground-light text-sm transition-colors flex items-center justify-center"
+              className="w-full text-sm"
             >
               ← חזור
-            </button>
+            </Button>
           </div>
         )}
         
@@ -1183,39 +1200,42 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               </p>
             </div>
             
-            <button
-              onClick={() => {
+            <Button
+              variant="danger"
+              onPress={() => {
                 barberLogout()
                 setStep('phone')
               }}
-              className="w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
+              className="w-full"
             >
               התנתק מחשבון הספר
-            </button>
+            </Button>
             
-            <button
-              onClick={onClose}
-              className="w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center border border-white/20 text-foreground-light hover:bg-white/5"
+            <Button
+              variant="secondary"
+              onPress={onClose}
+              className="w-full"
             >
               סגור
-            </button>
+            </Button>
           </div>
         )}
         
         {/* Barber Login Link - hide when blocked */}
         {step !== 'blocked' && (
           <div className="mt-6 pt-4 border-t border-white/10">
-            <button
-              onClick={() => {
+            <Button
+              variant="ghost"
+              onPress={() => {
                 onClose()
                 router.push('/barber/login')
               }}
-              className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-foreground-muted hover:text-accent-gold transition-colors"
+              className="w-full text-sm"
             >
               <Scissors size={14} strokeWidth={1.5} />
               <span>כניסה לספרים</span>
               <ArrowRight size={14} strokeWidth={1.5} />
-            </button>
+            </Button>
           </div>
         )}
         </div>

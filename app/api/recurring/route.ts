@@ -12,7 +12,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
-import { reportBug } from '@/lib/bug-reporter'
+import { reportApiError } from '@/lib/bug-reporter/helpers'
 import type { DayOfWeek } from '@/types/database'
 
 // UUID validation
@@ -125,11 +125,8 @@ async function handleCancelConflicts(body: CancelConflictsRequest): Promise<Next
   
   if (updateError) {
     console.error('[API/Recurring] Cancel reservations error:', updateError)
-    await reportBug(
-      new Error(updateError.message),
-      'API: Cancel Conflicting Reservations - Database Error',
-      { additionalData: { barberId, reservationIds } }
-    )
+    // Note: Request not available in helper, using reportServerError pattern
+    console.error('[API/Recurring] Cancel reservations database error:', updateError)
     return NextResponse.json(
       { success: false, error: 'DATABASE_ERROR', message: 'שגיאה בביטול התורים' },
       { status: 500 }
@@ -173,10 +170,11 @@ export async function GET(request: NextRequest) {
     
     if (error) {
       console.error('[API/Recurring] GET error:', error)
-      await reportBug(
+      await reportApiError(
         new Error(error.message),
-        'API: Get Recurring Appointments',
-        { additionalData: { barberId, errorCode: error.code } }
+        request,
+        'Get recurring appointments failed',
+        { severity: 'medium', additionalData: { barberId, errorCode: error.code } }
       )
       return NextResponse.json(
         { success: false, error: 'DATABASE_ERROR', message: ERROR_MESSAGES.DATABASE_ERROR },
@@ -187,9 +185,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, data })
   } catch (err) {
     console.error('[API/Recurring] GET exception:', err)
-    await reportBug(
+    await reportApiError(
       err instanceof Error ? err : new Error(String(err)),
-      'API: Get Recurring Appointments - Exception'
+      request,
+      'Get recurring appointments exception',
+      { severity: 'high' }
     )
     return NextResponse.json(
       { success: false, error: 'UNKNOWN_ERROR', message: 'שגיאה בלתי צפויה' },
@@ -405,10 +405,12 @@ export async function POST(request: NextRequest) {
         )
       }
       
-      await reportBug(
+      await reportApiError(
         new Error(createError.message),
-        'API: Create Recurring Appointment - Database Error',
+        request,
+        'Create recurring appointment failed',
         {
+          severity: 'high',
           additionalData: {
             errorCode: createError.code,
             barberId: createBody.barber_id,
@@ -432,9 +434,11 @@ export async function POST(request: NextRequest) {
     
   } catch (err) {
     console.error('[API/Recurring] POST exception:', err)
-    await reportBug(
+    await reportApiError(
       err instanceof Error ? err : new Error(String(err)),
-      'API: Create Recurring Appointment - Exception'
+      request,
+      'Create recurring appointment exception',
+      { severity: 'critical' }
     )
     return NextResponse.json(
       { success: false, error: 'UNKNOWN_ERROR', message: 'שגיאה בלתי צפויה. נסה שוב.' },
@@ -503,10 +507,11 @@ export async function DELETE(request: NextRequest) {
     
     if (updateError) {
       console.error('[API/Recurring] Delete error:', updateError)
-      await reportBug(
+      await reportApiError(
         new Error(updateError.message),
-        'API: Delete Recurring Appointment - Database Error',
-        { additionalData: { recurringId: body.recurringId, barberId: body.barberId } }
+        request,
+        'Delete recurring appointment failed',
+        { severity: 'high', additionalData: { recurringId: body.recurringId, barberId: body.barberId } }
       )
       return NextResponse.json(
         { success: false, error: 'DATABASE_ERROR', message: ERROR_MESSAGES.DATABASE_ERROR },
@@ -520,9 +525,11 @@ export async function DELETE(request: NextRequest) {
     
   } catch (err) {
     console.error('[API/Recurring] DELETE exception:', err)
-    await reportBug(
+    await reportApiError(
       err instanceof Error ? err : new Error(String(err)),
-      'API: Delete Recurring Appointment - Exception'
+      request,
+      'Delete recurring appointment exception',
+      { severity: 'high' }
     )
     return NextResponse.json(
       { success: false, error: 'UNKNOWN_ERROR', message: 'שגיאה בלתי צפויה' },

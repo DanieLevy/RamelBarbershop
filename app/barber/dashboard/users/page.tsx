@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
 import { he } from 'date-fns/locale'
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import type { Customer } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { Button, Avatar } from '@heroui/react'
 
 interface CustomerWithStats extends Customer {
   reservation_count?: number
@@ -49,7 +50,7 @@ export default function UsersManagementPage() {
   useEffect(() => {
     if (isInitialized && !isAdmin) {
       router.push('/barber/dashboard')
-      toast.error('אין לך הרשאה לצפות בדף זה')
+      showToast.error('אין לך הרשאה לצפות בדף זה')
     }
   }, [isAdmin, isInitialized, router])
 
@@ -75,7 +76,7 @@ export default function UsersManagementPage() {
       if (error) {
         console.error('Error fetching customers:', error)
         await report(new Error(error.message), 'Fetching customers list')
-        toast.error('שגיאה בטעינת הלקוחות')
+        showToast.error('שגיאה בטעינת הלקוחות')
         return
       }
 
@@ -108,7 +109,7 @@ export default function UsersManagementPage() {
     } catch (err) {
       console.error('Error fetching customers:', err)
       await report(err, 'Fetching customers (exception)')
-      toast.error('שגיאה בטעינת הלקוחות')
+      showToast.error('שגיאה בטעינת הלקוחות')
     } finally {
       setLoading(false)
     }
@@ -131,16 +132,16 @@ export default function UsersManagementPage() {
       if (error) {
         console.error('Error updating customer:', error)
         await report(new Error(error.message), `${block ? 'Blocking' : 'Unblocking'} customer`)
-        toast.error(block ? 'שגיאה בחסימת המשתמש' : 'שגיאה בהסרת החסימה')
+        showToast.error(block ? 'שגיאה בחסימת המשתמש' : 'שגיאה בהסרת החסימה')
         return
       }
       
-      toast.success(block ? 'המשתמש נחסם בהצלחה' : 'החסימה הוסרה בהצלחה')
+      showToast.success(block ? 'המשתמש נחסם בהצלחה' : 'החסימה הוסרה בהצלחה')
       setConfirmModal({ isOpen: false, type: 'block', customer: null })
       await fetchCustomers()
     } catch (err) {
       console.error('Error:', err)
-      toast.error('שגיאה בעדכון המשתמש')
+      showToast.error('שגיאה בעדכון המשתמש')
     } finally {
       setActionLoading(null)
     }
@@ -247,9 +248,9 @@ export default function UsersManagementPage() {
         
         // Provide specific error message based on error type
         if (error.message?.includes('active future reservations')) {
-          toast.error('לא ניתן למחוק - יש תורים פעילים. בטל אותם תחילה')
+          showToast.error('לא ניתן למחוק - יש תורים פעילים. בטל אותם תחילה')
         } else {
-          toast.error('שגיאה במחיקת המשתמש')
+          showToast.error('שגיאה במחיקת המשתמש')
         }
         return
       }
@@ -257,11 +258,11 @@ export default function UsersManagementPage() {
       // Check if deletion actually occurred
       if (!count || count === 0) {
         console.error('Customer was not deleted - may have been already removed or RLS blocking')
-        toast.error('לא ניתן למחוק את המשתמש')
+        showToast.error('לא ניתן למחוק את המשתמש')
         return
       }
       
-      toast.success('המשתמש והתורים שלו נמחקו בהצלחה')
+      showToast.success('המשתמש והתורים שלו נמחקו בהצלחה')
       setConfirmModal({ isOpen: false, type: 'delete', customer: null })
       await fetchCustomers()
     } catch (err) {
@@ -271,9 +272,9 @@ export default function UsersManagementPage() {
       // Check for specific error messages
       const errorMessage = err instanceof Error ? err.message : String(err)
       if (errorMessage.includes('active future reservations')) {
-        toast.error('לא ניתן למחוק - יש תורים פעילים. בטל אותם תחילה')
+        showToast.error('לא ניתן למחוק - יש תורים פעילים. בטל אותם תחילה')
       } else {
-        toast.error('שגיאה במחיקת המשתמש')
+        showToast.error('שגיאה במחיקת המשתמש')
       }
     } finally {
       setActionLoading(null)
@@ -373,14 +374,13 @@ export default function UsersManagementPage() {
                 )}
               >
                 {/* Avatar */}
-                <div className={cn(
-                  'w-10 h-10 rounded-full flex items-center justify-center shrink-0',
-                  customer.is_blocked ? 'bg-red-500/20' : 'bg-accent-gold/20'
-                )}>
-                  <User size={18} className={cn(
-                    customer.is_blocked ? 'text-red-400' : 'text-accent-gold'
-                  )} />
-                </div>
+                <Avatar size="md" className="shrink-0 w-10 h-10">
+                  <Avatar.Fallback className={cn(
+                    customer.is_blocked ? 'bg-red-500/20 text-red-400' : 'bg-accent-gold/20 text-accent-gold'
+                  )}>
+                    <User size={18} />
+                  </Avatar.Fallback>
+                </Avatar>
                 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
@@ -435,41 +435,47 @@ export default function UsersManagementPage() {
                 {/* Actions */}
                 <div className="flex items-center gap-1 shrink-0">
                   {customer.is_blocked ? (
-                    <button
-                      onClick={() => setConfirmModal({
+                    <Button
+                      variant="ghost"
+                      isIconOnly
+                      onPress={() => setConfirmModal({
                         isOpen: true,
                         type: 'unblock',
                         customer
                       })}
-                      className="icon-btn p-2 rounded-lg hover:bg-green-500/10 transition-colors"
-                      title="הסר חסימה"
+                      className="icon-btn min-w-[32px] w-8 h-8 p-2 rounded-lg hover:bg-green-500/10 transition-colors"
+                      aria-label="הסר חסימה"
                     >
                       <ShieldOff size={16} className="text-green-400" />
-                    </button>
+                    </Button>
                   ) : (
-                    <button
-                      onClick={() => setConfirmModal({
+                    <Button
+                      variant="ghost"
+                      isIconOnly
+                      onPress={() => setConfirmModal({
                         isOpen: true,
                         type: 'block',
                         customer
                       })}
-                      className="icon-btn p-2 rounded-lg hover:bg-red-500/10 transition-colors"
-                      title="חסום משתמש"
+                      className="icon-btn min-w-[32px] w-8 h-8 p-2 rounded-lg hover:bg-red-500/10 transition-colors"
+                      aria-label="חסום משתמש"
                     >
                       <Shield size={16} className="text-foreground-muted hover:text-red-400 transition-colors" />
-                    </button>
+                    </Button>
                   )}
-                  <button
-                    onClick={() => setConfirmModal({
+                  <Button
+                    variant="ghost"
+                    isIconOnly
+                    onPress={() => setConfirmModal({
                       isOpen: true,
                       type: 'delete',
                       customer
                     })}
-                    className="icon-btn p-2 rounded-lg hover:bg-red-500/10 transition-colors"
-                    title="מחק משתמש"
+                    className="icon-btn min-w-[32px] w-8 h-8 p-2 rounded-lg hover:bg-red-500/10 transition-colors"
+                    aria-label="מחק משתמש"
                   >
                     <Trash2 size={16} className="text-foreground-muted hover:text-red-400 transition-colors" />
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
@@ -479,23 +485,29 @@ export default function UsersManagementPage() {
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-center gap-2 p-4 border-t border-white/[0.06]">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="icon-btn p-2 rounded-lg hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            <Button
+              variant="ghost"
+              isIconOnly
+              onPress={() => setCurrentPage(p => Math.max(1, p - 1))}
+              isDisabled={currentPage === 1}
+              className="icon-btn min-w-[36px] w-9 h-9 p-2 rounded-lg hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              aria-label="עמוד קודם"
             >
               <ChevronRight size={18} className="text-foreground-muted" />
-            </button>
+            </Button>
             <span className="text-foreground-muted text-sm px-3">
               {currentPage} / {totalPages}
             </span>
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="icon-btn p-2 rounded-lg hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            <Button
+              variant="ghost"
+              isIconOnly
+              onPress={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              isDisabled={currentPage === totalPages}
+              className="icon-btn min-w-[36px] w-9 h-9 p-2 rounded-lg hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              aria-label="עמוד הבא"
             >
               <ChevronLeft size={18} className="text-foreground-muted" />
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -506,25 +518,31 @@ export default function UsersManagementPage() {
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmModal({ isOpen: false, type: 'block', customer: null })} />
           
           <div className="relative w-full max-w-sm bg-background-card border border-white/10 rounded-2xl p-6 animate-fade-in-up">
-            <button
-              onClick={() => setConfirmModal({ isOpen: false, type: 'block', customer: null })}
-              className="absolute top-4 left-4 p-1.5 rounded-lg hover:bg-white/10 transition-colors flex items-center justify-center"
+            <Button
+              variant="ghost"
+              isIconOnly
+              onPress={() => setConfirmModal({ isOpen: false, type: 'block', customer: null })}
+              className="absolute top-4 left-4 min-w-[28px] w-7 h-7 p-1.5 rounded-lg hover:bg-white/10 transition-colors flex items-center justify-center"
+              aria-label="סגור"
             >
               <X size={18} className="text-foreground-muted" />
-            </button>
+            </Button>
             
-            <div className={cn(
-              'w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4',
-              confirmModal.type === 'delete' ? 'bg-red-500/20' : confirmModal.type === 'block' ? 'bg-amber-500/20' : 'bg-green-500/20'
-            )}>
-              {confirmModal.type === 'delete' ? (
-                <Trash2 size={24} className="text-red-400" />
-              ) : confirmModal.type === 'block' ? (
-                <Shield size={24} className="text-amber-400" />
-              ) : (
-                <ShieldOff size={24} className="text-green-400" />
-              )}
-            </div>
+            <Avatar size="lg" className="mx-auto mb-4 w-12 h-12">
+              <Avatar.Fallback className={cn(
+                confirmModal.type === 'delete' ? 'bg-red-500/20 text-red-400' : 
+                confirmModal.type === 'block' ? 'bg-amber-500/20 text-amber-400' : 
+                'bg-green-500/20 text-green-400'
+              )}>
+                {confirmModal.type === 'delete' ? (
+                  <Trash2 size={24} />
+                ) : confirmModal.type === 'block' ? (
+                  <Shield size={24} />
+                ) : (
+                  <ShieldOff size={24} />
+                )}
+              </Avatar.Fallback>
+            </Avatar>
             
             <h3 className="text-lg font-medium text-foreground-light text-center mb-2">
               {confirmModal.type === 'delete' && 'מחיקת משתמש'}
@@ -545,21 +563,22 @@ export default function UsersManagementPage() {
             </p>
             
             <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmModal({ isOpen: false, type: 'block', customer: null })}
+              <Button
+                variant="ghost"
+                onPress={() => setConfirmModal({ isOpen: false, type: 'block', customer: null })}
                 className="flex-1 py-2.5 px-4 bg-white/[0.05] hover:bg-white/[0.1] rounded-xl font-medium text-foreground-light transition-colors"
               >
                 ביטול
-              </button>
-              <button
-                onClick={() => {
+              </Button>
+              <Button
+                onPress={() => {
                   if (confirmModal.type === 'delete') {
                     handleDelete(confirmModal.customer!.id)
                   } else {
                     handleBlockUnblock(confirmModal.customer!.id, confirmModal.type === 'block')
                   }
                 }}
-                disabled={actionLoading === confirmModal.customer.id}
+                isDisabled={actionLoading === confirmModal.customer.id}
                 className={cn(
                   'flex-1 py-2.5 px-4 rounded-xl font-medium transition-colors',
                   confirmModal.type === 'delete' || confirmModal.type === 'block'
@@ -573,7 +592,7 @@ export default function UsersManagementPage() {
                 ) : (
                   confirmModal.type === 'delete' ? 'מחק' : confirmModal.type === 'block' ? 'חסום' : 'הסר חסימה'
                 )}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

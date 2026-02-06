@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { LoginModal } from './LoginModal'
 import { User, Calendar, LogOut, Menu, X, Home, Phone, MapPin, Scissors, ChevronDown, LayoutDashboard, Settings } from 'lucide-react'
+import { Button } from '@heroui/react'
 
 interface AppHeaderProps {
   barberImgUrl?: string
@@ -194,21 +195,17 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
   const UserButton = ({ compact = false }: { compact?: boolean }) => {
     if (!isLoggedIn) {
       return (
-        <button
-          onClick={() => setShowLoginModal(true)}
-          disabled={isLoading}
+        <Button
+          onPress={() => setShowLoginModal(true)}
+          isDisabled={isLoading}
           className={cn(
-            'flex items-center gap-2 rounded-full transition-all font-medium',
-            compact
-              ? 'px-3 py-2 text-xs'
-              : 'px-4 py-2.5 text-sm',
-            'bg-accent-gold text-background-dark hover:bg-accent-gold/90',
-            isLoading && 'opacity-50 cursor-not-allowed'
+            'flex items-center gap-2 rounded-full font-medium bg-accent-gold text-background-dark hover:bg-accent-gold/90',
+            compact ? 'px-3 py-2 text-xs min-w-0' : 'px-4 py-2.5 text-sm'
           )}
         >
           <User size={compact ? 14 : 16} strokeWidth={2} />
           <span>{compact ? 'כניסה' : 'התחברות'}</span>
-        </button>
+        </Button>
       )
     }
 
@@ -261,48 +258,52 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
               </div>
 
               <div className="p-2">
-                <button
-                  onClick={() => {
+                <Button
+                  variant="ghost"
+                  onPress={() => {
                     router.push('/barber/dashboard')
                     setShowUserMenu(false)
                   }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-foreground-light hover:bg-white/5 transition-colors"
+                  className="w-full flex items-center justify-start gap-3 px-3 py-2.5 rounded-xl text-foreground-light hover:bg-white/5"
                 >
                   <LayoutDashboard size={18} strokeWidth={1.5} className="text-accent-gold" />
                   <span className="text-sm">לוח בקרה</span>
-                </button>
+                </Button>
 
-                <button
-                  onClick={() => {
+                <Button
+                  variant="ghost"
+                  onPress={() => {
                     router.push('/barber/dashboard/reservations')
                     setShowUserMenu(false)
                   }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-foreground-light hover:bg-white/5 transition-colors"
+                  className="w-full flex items-center justify-start gap-3 px-3 py-2.5 rounded-xl text-foreground-light hover:bg-white/5"
                 >
                   <Calendar size={18} strokeWidth={1.5} className="text-accent-gold" />
                   <span className="text-sm">תורים קרובים</span>
-                </button>
+                </Button>
 
                 {isAdmin && (
-                  <button
-                    onClick={() => {
+                  <Button
+                    variant="ghost"
+                    onPress={() => {
                       router.push('/barber/dashboard/settings')
                       setShowUserMenu(false)
                     }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-foreground-light hover:bg-white/5 transition-colors"
+                    className="w-full flex items-center justify-start gap-3 px-3 py-2.5 rounded-xl text-foreground-light hover:bg-white/5"
                   >
                     <Settings size={18} strokeWidth={1.5} className="text-accent-gold" />
                     <span className="text-sm">הגדרות</span>
-                  </button>
+                  </Button>
                 )}
 
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors"
+                <Button
+                  variant="ghost"
+                  onPress={handleLogout}
+                  className="w-full flex items-center justify-start gap-3 px-3 py-2.5 rounded-xl text-red-400 hover:bg-red-500/10"
                 >
                   <LogOut size={18} strokeWidth={1.5} />
                   <span className="text-sm">התנתק</span>
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -353,21 +354,23 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
               </div>
 
               <div className="p-2">
-                <button
-                  onClick={handleMyAppointments}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-foreground-light hover:bg-white/5 transition-colors"
+                <Button
+                  variant="ghost"
+                  onPress={handleMyAppointments}
+                  className="w-full flex items-center justify-start gap-3 px-3 py-2.5 rounded-xl text-foreground-light hover:bg-white/5"
                 >
                   <Calendar size={18} strokeWidth={1.5} className="text-accent-gold" />
                   <span className="text-sm">התורים שלי</span>
-                </button>
+                </Button>
 
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors"
+                <Button
+                  variant="ghost"
+                  onPress={handleLogout}
+                  className="w-full flex items-center justify-start gap-3 px-3 py-2.5 rounded-xl text-red-400 hover:bg-red-500/10"
                 >
                   <LogOut size={18} strokeWidth={1.5} />
                   <span className="text-sm">התנתק</span>
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -407,9 +410,9 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
       <header
         className="fixed left-0 right-0 z-50 transition-all duration-500"
         style={{
-          backgroundColor: `rgba(8, 11, 13, ${scrollProgress * 0.95})`,
-          backdropFilter: `blur(${scrollProgress * 20}px)`,
-          WebkitBackdropFilter: `blur(${scrollProgress * 20}px)`,
+          backgroundColor: `rgba(5, 7, 8, ${0.7 + scrollProgress * 0.28})`,
+          backdropFilter: `blur(${8 + scrollProgress * 12}px)`,
+          WebkitBackdropFilter: `blur(${8 + scrollProgress * 12}px)`,
           top: 'var(--header-top-offset, 0px)',
         }}
       >
@@ -431,13 +434,15 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
           {isHomePage && (
             <nav className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setShowMobileMenu(true)}
-                  className="md:hidden w-10 h-10 -ml-2 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors"
+                <Button
+                  variant="ghost"
+                  isIconOnly
+                  onPress={() => setShowMobileMenu(true)}
+                  className="md:hidden w-10 h-10 min-w-[40px] -ml-2 rounded-full"
                   aria-label="פתח תפריט"
                 >
                   <Menu size={22} strokeWidth={1.5} className="text-foreground-light" />
-                </button>
+                </Button>
                 
                 <div className="hidden md:flex items-center gap-6">
                   <button
@@ -552,13 +557,15 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
             style={{ paddingTop: 'var(--header-top-offset, 0px)' }}
           >
             <div className="relative p-5 border-b border-white/10 bg-gradient-to-br from-accent-gold/10 via-transparent to-accent-orange/5">
-              <button
-                onClick={() => setShowMobileMenu(false)}
-                className="icon-btn absolute top-4 left-4 p-2 rounded-full bg-white/10 text-foreground-light hover:bg-white/20 transition-colors"
-                aria-label="סגור תפריט"
-              >
-                <X size={18} strokeWidth={2} />
-              </button>
+                <Button
+                  variant="ghost"
+                  isIconOnly
+                  onPress={() => setShowMobileMenu(false)}
+                  className="absolute top-4 left-4 min-w-[36px] w-9 h-9 rounded-full bg-white/10 text-foreground-light hover:bg-white/20"
+                  aria-label="סגור תפריט"
+                >
+                  <X size={18} strokeWidth={2} />
+                </Button>
               
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-accent-gold/40 shadow-lg">
@@ -638,32 +645,34 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
                 </div>
               ) : isLoggedIn && userType === 'customer' ? (
                 <div className="space-y-1">
-                  <button
-                    onClick={handleMyAppointments}
-                    className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-foreground-light hover:bg-white/5 transition-colors"
+                  <Button
+                    variant="ghost"
+                    onPress={handleMyAppointments}
+                    className="w-full flex items-center justify-start gap-4 px-4 py-3.5 rounded-xl text-foreground-light hover:bg-white/5"
                   >
                     <Calendar size={20} strokeWidth={1.5} className="text-accent-gold" />
                     <span className="text-sm font-medium">התורים שלי</span>
-                  </button>
-                  <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors"
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onPress={handleLogout}
+                    className="w-full flex items-center justify-start gap-4 px-4 py-3.5 rounded-xl text-red-400 hover:bg-red-500/10"
                   >
                     <LogOut size={20} strokeWidth={1.5} />
                     <span className="text-sm font-medium">התנתק</span>
-                  </button>
+                  </Button>
                 </div>
               ) : (
-                <button
-                  onClick={() => {
+                <Button
+                  onPress={() => {
                     setShowMobileMenu(false)
                     setShowLoginModal(true)
                   }}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-accent-gold text-background-dark font-medium text-sm transition-colors hover:bg-accent-gold/90"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-accent-gold text-background-dark font-medium text-sm hover:bg-accent-gold/90"
                 >
                   <User size={18} strokeWidth={2} />
                   <span>התחברות</span>
-                </button>
+                </Button>
               )}
             </nav>
             

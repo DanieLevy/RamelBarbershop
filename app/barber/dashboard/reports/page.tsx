@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { ChevronRight, ChevronLeft, Calendar, TrendingUp, Users, Scissors, DollarSign, XCircle, CheckCircle, BarChart3, Star, ChevronDown, ChevronUp } from 'lucide-react'
 import type { Reservation, Service } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { Button } from '@heroui/react'
 
 const HEBREW_MONTHS = [
   'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
@@ -241,13 +242,15 @@ export default function ReportsPage() {
         </div>
         
         <div className="flex items-center gap-2">
-          <button
-            onClick={handlePrevMonth}
-            className="p-2 rounded-lg bg-background-card border border-white/10 text-foreground-light hover:bg-white/5 transition-colors"
+          <Button
+            variant="ghost"
+            isIconOnly
+            onPress={handlePrevMonth}
+            className="p-2 bg-background-card border border-white/10"
             aria-label="חודש קודם"
           >
             <ChevronRight size={20} />
-          </button>
+          </Button>
           
           <div className="px-4 py-2 bg-background-card border border-white/10 rounded-lg min-w-[140px] text-center">
             <span className="text-foreground-light font-medium">
@@ -255,19 +258,16 @@ export default function ReportsPage() {
             </span>
           </div>
           
-          <button
-            onClick={handleNextMonth}
-            disabled={isCurrentMonth()}
-            className={cn(
-              'p-2 rounded-lg bg-background-card border border-white/10 transition-colors',
-              isCurrentMonth()
-                ? 'text-foreground-muted cursor-not-allowed opacity-50'
-                : 'text-foreground-light hover:bg-white/5'
-            )}
+          <Button
+            variant="ghost"
+            isIconOnly
+            onPress={handleNextMonth}
+            isDisabled={isCurrentMonth()}
+            className="p-2 bg-background-card border border-white/10"
             aria-label="חודש הבא"
           >
             <ChevronLeft size={20} />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -414,9 +414,10 @@ export default function ReportsPage() {
             </div>
             
             {customerStats.length > 3 && (
-              <button
-                onClick={() => setShowAllCustomers(!showAllCustomers)}
-                className="w-full mt-4 py-2 text-accent-gold text-sm hover:text-accent-gold/80 transition-colors flex items-center justify-center gap-1"
+              <Button
+                variant="ghost"
+                onPress={() => setShowAllCustomers(!showAllCustomers)}
+                className="w-full mt-4 text-accent-gold text-sm hover:text-accent-gold/80"
               >
                 {showAllCustomers ? (
                   <>
@@ -429,7 +430,7 @@ export default function ReportsPage() {
                     הצג את כל {customerStats.length} הלקוחות
                   </>
                 )}
-              </button>
+              </Button>
             )}
           </>
         )}

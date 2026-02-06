@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import type { BarberWithWorkDays } from '@/types/database'
 import { cn, formatTime, formatDateHebrew } from '@/lib/utils'
 import { Check, Calendar, Clock, Scissors, User, Phone } from 'lucide-react'
+import { Button } from '@heroui/react'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { useHaptics } from '@/hooks/useHaptics'
 import { BlockedUserModal } from './BlockedUserModal'
@@ -65,7 +66,7 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
       
       if (!eligibility.eligible) {
         setError(eligibility.limits.message || 'לא ניתן לקבוע תור כרגע')
-        toast.error(eligibility.limits.message || 'הגעת למקסימום התורים המותרים')
+        showToast.error(eligibility.limits.message || 'הגעת למקסימום התורים המותרים')
         hasCreatedRef.current = false
         setIsCreating(false)
         return
@@ -87,7 +88,7 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
       if (!result.success) {
         console.error('[Booking] Creation failed:', result.error)
         setError(result.message || 'שגיאה ביצירת התור')
-        toast.error(result.message || 'שגיאה ביצירת התור')
+        showToast.error(result.message || 'שגיאה ביצירת התור')
         hasCreatedRef.current = false
         setIsCreating(false)
         return
@@ -112,7 +113,7 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
       
       setIsCreated(true)
       haptics.success() // Haptic feedback for successful booking
-      toast.success('התור נקבע בהצלחה!')
+      showToast.success('התור נקבע בהצלחה!')
     } catch (err) {
       console.error('Unexpected error creating reservation:', err)
       await report(err, 'Creating reservation (exception)')
@@ -145,22 +146,24 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
           <p className="text-red-400">{error}</p>
         </div>
         
-        <button
-          onClick={() => {
+        <Button
+          variant="primary"
+          onPress={() => {
             hasCreatedRef.current = false
             handleCreateReservation()
           }}
-          className="w-full py-3 bg-accent-gold text-background-dark rounded-xl font-medium hover:bg-accent-gold/90 transition-colors"
+          className="w-full"
         >
           נסה שוב
-        </button>
+        </Button>
         
-        <button
-          onClick={prevStep}
-          className="text-foreground-muted hover:text-foreground-light text-sm transition-colors"
+        <Button
+          variant="ghost"
+          onPress={prevStep}
+          className="text-sm"
         >
           ← חזור
-        </button>
+        </Button>
       </div>
     )
   }
@@ -254,15 +257,16 @@ export function LoggedInConfirmation({ barber }: LoggedInConfirmationProps) {
           צפה בכל התורים שלי
         </a>
         
-        <button
-          onClick={() => {
+        <Button
+          variant="primary"
+          onPress={() => {
             reset()
             window.scrollTo({ top: 0, behavior: 'smooth' })
           }}
-          className="w-full py-3 px-4 rounded-xl font-medium bg-accent-gold text-background-dark hover:bg-accent-gold/90 transition-colors flex items-center justify-center"
+          className="w-full"
         >
           הזמן תור נוסף
-        </button>
+        </Button>
       </div>
     </div>
   )

@@ -24,56 +24,181 @@ export async function comparePassword(password: string, hash: string): Promise<b
 }
 
 /**
+ * Login error codes for specific error handling
+ */
+export type LoginErrorCode = 
+  | 'USER_NOT_FOUND'
+  | 'WRONG_PASSWORD'
+  | 'NO_PASSWORD_SET'
+  | 'NOT_A_BARBER'
+  | 'DATABASE_ERROR'
+  | 'NETWORK_ERROR'
+  | 'INVALID_INPUT'
+
+/**
+ * Login result with detailed error information
+ */
+export interface LoginResult {
+  success: boolean
+  user?: User
+  error?: string
+  errorCode?: LoginErrorCode
+}
+
+/**
  * Login barber with email and password
+ * Returns detailed error codes for informative UI feedback
  */
 export async function loginBarber(
   email: string,
   password: string
-): Promise<{ success: boolean; user?: User; error?: string }> {
-  const supabase = createClient()
+): Promise<LoginResult> {
+  // Validate input
+  if (!email?.trim()) {
+    return { 
+      success: false, 
+      error: 'נא להזין כתובת אימייל',
+      errorCode: 'INVALID_INPUT'
+    }
+  }
   
+  if (!password) {
+    return { 
+      success: false, 
+      error: 'נא להזין סיסמה',
+      errorCode: 'INVALID_INPUT'
+    }
+  }
+  
+  const supabase = createClient()
   const normalizedEmail = email.toLowerCase().trim()
   
-  // Find user by email - use maybeSingle to handle not found gracefully
-  // Note: We do NOT filter by is_active here - paused barbers should still be able to log in
-  // The is_active flag only controls visibility for public booking, not dashboard access
-  const { data: user, error } = await supabase
-    .from('users')
-    .select('id, username, fullname, email, phone, role, is_barber, is_active, img_url, img_position_x, img_position_y, password_hash, name_en, instagram_url, created_at, updated_at')
-    .eq('email', normalizedEmail)
-    .eq('is_barber', true)
-    .maybeSingle()
-  
-  if (error) {
-    console.error('Login error:', error)
-    await reportSupabaseError(error, 'Barber Login - Database Query', {
-      table: 'users',
-      operation: 'select',
-    })
-    return { success: false, error: 'שגיאה בהתחברות. נסה שוב.' }
+  try {
+    // First, check if email exists at all (any user)
+    const { data: anyUser, error: checkError } = await supabase
+      .from('users')
+      .select('id, is_barber')
+      .eq('email', normalizedEmail)
+      .maybeSingle()
+    
+    if (checkError) {
+      console.error('[BarberLogin] Database check error:', checkError)
+      await reportSupabaseError(checkError, 'Barber Login - Email Check', {
+        table: 'users',
+        operation: 'select',
+      })
+      return { 
+        success: false, 
+        error: 'שגיאה בבדיקת החשבון. נסה שוב.',
+        errorCode: 'DATABASE_ERROR'
+      }
+    }
+    
+    // Email not found at all
+    if (!anyUser) {
+      console.log('[BarberLogin] Email not found:', normalizedEmail)
+      return { 
+        success: false, 
+        error: 'כתובת האימייל לא רשומה במערכת',
+        errorCode: 'USER_NOT_FOUND'
+      }
+    }
+    
+    // Email exists but not a barber account
+    if (!anyUser.is_barber) {
+      console.log('[BarberLogin] User exists but is not a barber:', normalizedEmail)
+      return { 
+        success: false, 
+        error: 'חשבון זה אינו חשבון ספר. האם התכוונת להתחבר כלקוח?',
+        errorCode: 'NOT_A_BARBER'
+      }
+    }
+    
+    // User is a barber - now get full details
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, username, fullname, email, phone, role, is_barber, is_active, img_url, img_position_x, img_position_y, password_hash, name_en, instagram_url, created_at, updated_at')
+      .eq('email', normalizedEmail)
+      .eq('is_barber', true)
+      .maybeSingle()
+    
+    if (error) {
+      console.error('[BarberLogin] Database query error:', error)
+      await reportSupabaseError(error, 'Barber Login - Fetch User', {
+        table: 'users',
+        operation: 'select',
+      })
+      return { 
+        success: false, 
+        error: 'שגיאה בהתחברות. נסה שוב.',
+        errorCode: 'DATABASE_ERROR'
+      }
+    }
+    
+    if (!user) {
+      return { 
+        success: false, 
+        error: 'שגיאה בטעינת פרטי המשתמש',
+        errorCode: 'DATABASE_ERROR'
+      }
+    }
+    
+    const barber = user as User
+    
+    // Check if password is set
+    if (!barber.password_hash) {
+      console.log('[BarberLogin] No password set for barber:', normalizedEmail)
+      return { 
+        success: false, 
+        error: 'טרם הוגדרה סיסמה לחשבון זה. פנה למנהל המערכת להגדרת סיסמה.',
+        errorCode: 'NO_PASSWORD_SET'
+      }
+    }
+    
+    // Verify password
+    const isValid = await comparePassword(password, barber.password_hash)
+    
+    if (!isValid) {
+      console.log('[BarberLogin] Wrong password for barber:', normalizedEmail)
+      return { 
+        success: false, 
+        error: 'הסיסמה שהוזנה שגויה. נסה שוב.',
+        errorCode: 'WRONG_PASSWORD'
+      }
+    }
+    
+    // Save session
+    saveBarberSession(barber)
+    
+    return { success: true, user: barber }
+    
+  } catch (err) {
+    console.error('[BarberLogin] Unexpected error:', err)
+    
+    // Check if it's a network error
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    if (errorMessage.toLowerCase().includes('network') || 
+        errorMessage.toLowerCase().includes('load failed') ||
+        errorMessage.toLowerCase().includes('fetch')) {
+      return {
+        success: false,
+        error: 'בעיית תקשורת. בדוק את החיבור לאינטרנט ונסה שוב.',
+        errorCode: 'NETWORK_ERROR'
+      }
+    }
+    
+    await reportSupabaseError(
+      { message: errorMessage, code: 'LOGIN_EXCEPTION' },
+      'Barber Login - Unexpected Error',
+      { table: 'users', operation: 'select' }
+    )
+    
+    return { 
+      success: false, 
+      error: 'שגיאה בלתי צפויה. נסה שוב.',
+      errorCode: 'DATABASE_ERROR'
+    }
   }
-  
-  if (!user) {
-    return { success: false, error: 'אימייל או סיסמה שגויים' }
-  }
-  
-  const barber = user as User
-  
-  if (!barber.password_hash) {
-    return { success: false, error: 'חשבון לא מאותחל - פנה למנהל' }
-  }
-  
-  // Verify password
-  const isValid = await comparePassword(password, barber.password_hash)
-  
-  if (!isValid) {
-    return { success: false, error: 'אימייל או סיסמה שגויים' }
-  }
-  
-  // Save session
-  saveBarberSession(barber)
-  
-  return { success: true, user: barber }
 }
 
 /**
@@ -181,8 +306,27 @@ export async function validateBarberSession(): Promise<User | null> {
     
     return result as User
   } catch (error) {
-    const err = error instanceof Error ? error : new Error(String(error))
-    console.error('[BarberAuth] Session validation failed:', err.message)
+    // Properly serialize error message to avoid [object Object]
+    const getErrorMessage = (e: unknown): string => {
+      if (e instanceof Error) return e.message
+      if (typeof e === 'string') return e
+      if (e && typeof e === 'object') {
+        // Handle Supabase/PostgrestError objects
+        const obj = e as Record<string, unknown>
+        if (typeof obj.message === 'string') return obj.message
+        if (typeof obj.error === 'string') return obj.error
+        try {
+          return JSON.stringify(e)
+        } catch {
+          return 'Unknown error object'
+        }
+      }
+      return String(e)
+    }
+    
+    const errorMessage = getErrorMessage(error)
+    const err = error instanceof Error ? error : new Error(errorMessage)
+    console.error('[BarberAuth] Session validation failed:', errorMessage)
     
     // Determine if this is a network error vs. an auth error
     const isNetworkError = isRetryableError(err)
@@ -192,7 +336,7 @@ export async function validateBarberSession(): Promise<User | null> {
       // Return null to indicate validation failed, but preserve the session for retry
       console.warn('[BarberAuth] Network error during session validation - session preserved for retry')
       await reportSupabaseError(
-        { message: err.message, code: 'NETWORK_ERROR', details: 'Transient network failure - session preserved' },
+        { message: errorMessage, code: 'NETWORK_ERROR', details: 'Transient network failure - session preserved' },
         'Barber Session Validation - Network Error',
         { table: 'users', operation: 'select' }
       )
@@ -202,7 +346,7 @@ export async function validateBarberSession(): Promise<User | null> {
       // Non-network error (auth issue, etc.) - clear session and report
       console.error('[BarberAuth] Auth error - clearing session')
       await reportSupabaseError(
-        { message: err.message, code: 'AUTH_ERROR' },
+        { message: errorMessage, code: 'AUTH_ERROR' },
         'Barber Session Validation - Auth Error',
         { table: 'users', operation: 'select' }
       )

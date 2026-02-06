@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { X, Download, Share, Smartphone, Monitor, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from '@heroui/react'
 import { useNotificationManager, useNotificationTiming } from '@/components/NotificationManager'
 
 interface InstallBannerProps {
@@ -114,29 +115,33 @@ export function InstallBanner({
           {/* Actions */}
           <div className="flex items-center gap-2">
             {isInstallable ? (
-              <button
-                onClick={handleInstall}
-                className="px-4 py-2 bg-accent-gold text-background-dark rounded-xl text-sm font-medium hover:bg-accent-gold/90 transition-colors"
+              <Button
+                variant="primary"
+                size="sm"
+                onPress={handleInstall}
               >
                 התקן
-              </button>
+              </Button>
             ) : (
-              <button
-                onClick={() => {/* Will trigger modal */}}
-                className="px-3 py-2 bg-white/10 text-foreground-light rounded-xl text-sm font-medium hover:bg-white/20 transition-colors flex items-center gap-1"
+              <Button
+                variant="secondary"
+                size="sm"
+                onPress={() => {/* Will trigger modal */}}
               >
                 <ChevronDown size={16} />
                 איך?
-              </button>
+              </Button>
             )}
             
-            <button
-              onClick={handleClose}
-              className="p-2 text-foreground-muted hover:text-foreground-light transition-colors"
+            <Button
+              variant="ghost"
+              isIconOnly
+              onPress={handleClose}
               aria-label="לא עכשיו"
+              className="min-w-[36px] w-9 h-9"
             >
               <X size={18} />
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -172,13 +177,15 @@ export function InstallBanner({
         )}
       >
         {/* Close Button */}
-        <button
-          onClick={handleClose}
-          className="absolute top-4 left-4 p-2 text-foreground-muted hover:text-foreground-light transition-colors rounded-full hover:bg-white/10 flex items-center justify-center"
+        <Button
+          variant="ghost"
+          isIconOnly
+          onPress={handleClose}
+          className="absolute top-4 left-4 min-w-[40px] w-10 h-10"
           aria-label="סגור"
         >
           <X size={20} />
-        </button>
+        </Button>
 
         {/* App Icon */}
         <div className="mx-auto w-20 h-20 rounded-2xl bg-accent-gold/20 shadow-gold flex items-center justify-center mb-4">
@@ -208,21 +215,23 @@ export function InstallBanner({
 
         {/* Actions */}
         <div className="flex gap-3">
-          <button
-            onClick={handleClose}
-            className="flex-1 py-3 px-4 rounded-xl bg-white/10 text-foreground-light font-medium hover:bg-white/20 transition-colors flex items-center justify-center"
+          <Button
+            variant="secondary"
+            onPress={handleClose}
+            className="flex-1"
           >
             לא עכשיו
-          </button>
+          </Button>
           
           {isInstallable && (
-            <button
-              onClick={handleInstall}
-              className="flex-1 py-3 px-4 rounded-xl bg-accent-gold text-background-dark font-bold hover:bg-accent-gold/90 transition-colors flex items-center justify-center gap-2"
+            <Button
+              variant="primary"
+              onPress={handleInstall}
+              className="flex-1"
             >
               <Download size={18} />
               התקן עכשיו
-            </button>
+            </Button>
           )}
         </div>
       </div>

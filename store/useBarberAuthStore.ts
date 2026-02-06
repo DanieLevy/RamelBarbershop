@@ -4,7 +4,8 @@ import {
   loginBarber, 
   clearBarberSession, 
   validateBarberSession,
-  getBarberSession
+  getBarberSession,
+  type LoginErrorCode
 } from '@/lib/auth/barber-auth'
 
 interface BarberAuthState {
@@ -15,7 +16,7 @@ interface BarberAuthState {
   isAdmin: boolean
   
   // Actions
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; errorCode?: LoginErrorCode }>
   logout: () => Promise<void>
   checkSession: () => Promise<void>
   setBarber: (barber: User) => void
@@ -45,11 +46,22 @@ export const useBarberAuthStore = create<BarberAuthState>((set, get) => ({
       }
       
       set({ isLoading: false })
-      return { success: false, error: result.error }
+      return { success: false, error: result.error, errorCode: result.errorCode }
     } catch (error) {
       console.error('Login error:', error)
       set({ isLoading: false })
-      return { success: false, error: 'שגיאה בהתחברות' }
+      
+      // Determine error type for better UX
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      const isNetworkError = errorMsg.toLowerCase().includes('network') || 
+                             errorMsg.toLowerCase().includes('load failed') ||
+                             errorMsg.toLowerCase().includes('fetch')
+      
+      return { 
+        success: false, 
+        error: isNetworkError ? 'בעיית תקשורת. בדוק את החיבור לאינטרנט.' : 'שגיאה בהתחברות',
+        errorCode: isNetworkError ? 'NETWORK_ERROR' : 'DATABASE_ERROR'
+      }
     }
   },
 

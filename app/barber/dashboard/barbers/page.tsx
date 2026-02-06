@@ -5,12 +5,13 @@ import { useRouter } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { getAllBarbers, createBarber, updateBarber, setBarberPassword } from '@/lib/auth/barber-auth'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { Plus, Pencil, User, Phone, Crown, GripVertical, Trash2, AlertTriangle, X, Loader2 } from 'lucide-react'
 import type { User as UserType } from '@/types/database'
 import Image from 'next/image'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { Button } from '@heroui/react'
 
 export default function BarbersPage() {
   const router = useRouter()
@@ -60,7 +61,7 @@ export default function BarbersPage() {
     } catch (error) {
       console.error('Error fetching barbers:', error)
       await report(error, 'Fetching all barbers list')
-      toast.error('שגיאה בטעינת הספרים')
+      showToast.error('שגיאה בטעינת הספרים')
     } finally {
       setLoading(false)
     }
@@ -90,11 +91,11 @@ export default function BarbersPage() {
       )
       
       await Promise.all(updates)
-      toast.success('סדר הספרים עודכן')
+      showToast.success('סדר הספרים עודכן')
     } catch (error) {
       console.error('Error saving order:', error)
       await report(error, 'Saving barbers display order')
-      toast.error('שגיאה בשמירת הסדר')
+      showToast.error('שגיאה בשמירת הסדר')
     }
   }, [report])
 
@@ -150,17 +151,17 @@ export default function BarbersPage() {
       if (userError) {
         console.error('Error deleting barber:', userError)
         await report(new Error(userError.message), 'Deleting barber from users table')
-        toast.error('שגיאה במחיקת הספר')
+        showToast.error('שגיאה במחיקת הספר')
         return
       }
       
-      toast.success('הספר הוסר בהצלחה')
+      showToast.success('הספר הוסר בהצלחה')
       setBarbers(prev => prev.filter(b => b.id !== barberId))
       setDeleteModal({ isOpen: false, step: 1, barber: null, confirmName: '' })
     } catch (error) {
       console.error('Error deleting barber:', error)
       await report(error, 'Deleting barber (exception)')
-      toast.error('שגיאה במחיקת הספר')
+      showToast.error('שגיאה במחיקת הספר')
     } finally {
       setDeleting(false)
     }
@@ -259,12 +260,12 @@ export default function BarbersPage() {
 
   const handleSubmit = async () => {
     if (!fullname.trim() || !email.trim()) {
-      toast.error('נא למלא שם ואימייל')
+      showToast.error('נא למלא שם ואימייל')
       return
     }
     
     if (!editingId && !password) {
-      toast.error('נא להזין סיסמה למשתמש חדש')
+      showToast.error('נא להזין סיסמה למשתמש חדש')
       return
     }
     
@@ -283,11 +284,11 @@ export default function BarbersPage() {
         if (password) {
           await setBarberPassword(editingId, password)
         }
-        toast.success('הספר עודכן בהצלחה!')
+        showToast.success('הספר עודכן בהצלחה!')
         resetForm()
         fetchBarbers()
       } else {
-        toast.error(result.error || 'שגיאה בעדכון')
+        showToast.error(result.error || 'שגיאה בעדכון')
       }
     } else {
       // Create new barber
@@ -301,11 +302,11 @@ export default function BarbersPage() {
       })
       
       if (result.success) {
-        toast.success('הספר נוסף בהצלחה!')
+        showToast.success('הספר נוסף בהצלחה!')
         resetForm()
         fetchBarbers()
       } else {
-        toast.error(result.error || 'שגיאה בהוספה')
+        showToast.error(result.error || 'שגיאה בהוספה')
       }
     }
     
@@ -325,10 +326,10 @@ export default function BarbersPage() {
     const result = await updateBarber(barber.id, { is_active: !barber.is_active })
     
     if (result.success) {
-      toast.success(barber.is_active ? 'הספר הושבת' : 'הספר הופעל')
+      showToast.success(barber.is_active ? 'הספר הושבת' : 'הספר הופעל')
       fetchBarbers()
     } else {
-      toast.error('שגיאה בעדכון')
+      showToast.error('שגיאה בעדכון')
     }
   }
   
@@ -342,11 +343,11 @@ export default function BarbersPage() {
     const result = await updateBarber(currentBarber.id, { is_active: newActiveState })
     
     if (result.success) {
-      toast.success(newActiveState ? 'החשבון שלך הופעל מחדש' : 'החשבון שלך הושבת - לקוחות לא יוכלו לקבוע תורים אצלך')
+      showToast.success(newActiveState ? 'החשבון שלך הופעל מחדש' : 'החשבון שלך הושבת - לקוחות לא יוכלו לקבוע תורים אצלך')
       fetchBarbers()
       setSelfPauseModal({ isOpen: false, action: 'pause' })
     } else {
-      toast.error('שגיאה בעדכון')
+      showToast.error('שגיאה בעדכון')
     }
     
     setSelfPausing(false)
@@ -369,13 +370,13 @@ export default function BarbersPage() {
           <h1 className="text-2xl font-medium text-foreground-light">ניהול ספרים</h1>
           <p className="text-foreground-muted mt-1">הוסף ונהל את צוות הספרים. גרור לשינוי סדר</p>
         </div>
-        <button
-          onClick={() => { resetForm(); setShowForm(true) }}
-          className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-background-dark rounded-lg font-medium hover:bg-accent-gold/90 transition-colors"
+        <Button
+          onPress={() => { resetForm(); setShowForm(true) }}
+          className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-background-dark rounded-lg font-medium hover:bg-accent-gold/90"
         >
           <Plus size={16} strokeWidth={1.5} />
           הוסף ספר
-        </button>
+        </Button>
       </div>
 
       {/* Add/Edit Form - Mobile-friendly stacked layout */}
@@ -437,24 +438,25 @@ export default function BarbersPage() {
           </div>
 
           <div className="flex gap-3">
-            <button
-              onClick={handleSubmit}
-              disabled={saving}
+            <Button
+              onPress={handleSubmit}
+              isDisabled={saving}
               className={cn(
-                'flex-1 py-3 rounded-xl font-medium transition-all text-sm sm:text-base',
+                'flex-1 py-3 rounded-xl font-medium text-sm sm:text-base',
                 saving
-                  ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
+                  ? 'bg-foreground-muted/30 text-foreground-muted'
                   : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
               )}
             >
               {saving ? 'שומר...' : editingId ? 'עדכן' : 'הוסף'}
-            </button>
-            <button
-              onClick={resetForm}
-              className="px-4 sm:px-6 py-3 rounded-xl bg-background-dark border border-white/10 text-foreground-muted hover:text-foreground-light transition-colors text-sm sm:text-base"
+            </Button>
+            <Button
+              variant="ghost"
+              onPress={resetForm}
+              className="px-4 sm:px-6 py-3 rounded-xl bg-background-dark border border-white/10 text-foreground-muted hover:text-foreground-light text-sm sm:text-base"
             >
               ביטול
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -550,34 +552,40 @@ export default function BarbersPage() {
                   
                   {/* Action Buttons */}
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleEdit(barber)}
-                      className="icon-btn p-2 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition-colors"
-                      title="ערוך"
+                    <Button
+                      variant="ghost"
+                      isIconOnly
+                      onPress={() => handleEdit(barber)}
+                      className="min-w-[32px] w-8 h-8 text-foreground-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg"
+                      aria-label="ערוך"
                     >
                       <Pencil size={14} strokeWidth={1.5} />
-                    </button>
+                    </Button>
                     {/* Pause/Unpause button - shown for all barbers including self */}
-                    <button
-                      onClick={() => handleToggleActive(barber)}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => handleToggleActive(barber)}
                       className={cn(
-                        'px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-medium transition-colors',
+                        'px-2.5 py-1 min-w-0 h-auto rounded-lg text-[10px] sm:text-xs font-medium',
                         barber.is_active
                           ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
                           : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
                       )}
                     >
                       {barber.is_active ? 'השבת' : 'הפעל'}
-                    </button>
+                    </Button>
                     {/* Delete button - only for other barbers, not self */}
                     {barber.id !== currentBarber?.id && (
-                      <button
-                        onClick={() => setDeleteModal({ isOpen: true, step: 1, barber, confirmName: '' })}
-                        className="icon-btn p-2 text-foreground-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                        title="מחק ספר"
+                      <Button
+                        variant="ghost"
+                        isIconOnly
+                        onPress={() => setDeleteModal({ isOpen: true, step: 1, barber, confirmName: '' })}
+                        className="min-w-[32px] w-8 h-8 text-foreground-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg"
+                        aria-label="מחק ספר"
                       >
                         <Trash2 size={14} strokeWidth={1.5} />
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -599,12 +607,14 @@ export default function BarbersPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div className="relative w-full max-w-md bg-background-darker border border-white/10 rounded-2xl p-6 shadow-2xl animate-slide-in-up">
             {/* Close button */}
-            <button
-              onClick={() => setDeleteModal({ isOpen: false, step: 1, barber: null, confirmName: '' })}
-              className="absolute top-4 left-4 p-2 rounded-full hover:bg-white/5 transition-colors flex items-center justify-center"
+            <Button
+              variant="ghost"
+              isIconOnly
+              onPress={() => setDeleteModal({ isOpen: false, step: 1, barber: null, confirmName: '' })}
+              className="absolute top-4 left-4 min-w-[36px] w-9 h-9 rounded-full hover:bg-white/5"
             >
               <X size={18} className="text-foreground-muted" />
-            </button>
+            </Button>
 
             {/* Step 1: Initial Confirmation */}
             {deleteModal.step === 1 && (
@@ -635,18 +645,19 @@ export default function BarbersPage() {
                 </div>
 
                 <div className="flex gap-3">
-                  <button
-                    onClick={() => setDeleteModal(prev => ({ ...prev, step: 2 }))}
-                    className="flex-1 py-3 rounded-xl font-medium bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors text-center"
+                  <Button
+                    onPress={() => setDeleteModal(prev => ({ ...prev, step: 2 }))}
+                    className="flex-1 py-3 rounded-xl font-medium bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
                   >
                     המשך למחיקה
-                  </button>
-                  <button
-                    onClick={() => setDeleteModal({ isOpen: false, step: 1, barber: null, confirmName: '' })}
-                    className="flex-1 py-3 rounded-xl font-medium border border-white/20 text-foreground-light hover:bg-white/5 transition-colors text-center"
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onPress={() => setDeleteModal({ isOpen: false, step: 1, barber: null, confirmName: '' })}
+                    className="flex-1 py-3 rounded-xl font-medium border border-white/20 text-foreground-light hover:bg-white/5"
                   >
                     ביטול
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -683,14 +694,14 @@ export default function BarbersPage() {
                 </div>
 
                 <div className="flex gap-3">
-                  <button
-                    onClick={handleDeleteBarber}
-                    disabled={deleteModal.confirmName !== deleteModal.barber.fullname || deleting}
+                  <Button
+                    onPress={handleDeleteBarber}
+                    isDisabled={deleteModal.confirmName !== deleteModal.barber.fullname || deleting}
                     className={cn(
-                      'flex-1 py-3 rounded-xl font-medium transition-colors text-center',
+                      'flex-1 py-3 rounded-xl font-medium',
                       deleteModal.confirmName === deleteModal.barber.fullname && !deleting
                         ? 'bg-red-500 text-white hover:bg-red-600'
-                        : 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
+                        : 'bg-foreground-muted/30 text-foreground-muted'
                     )}
                   >
                     {deleting ? (
@@ -701,14 +712,15 @@ export default function BarbersPage() {
                     ) : (
                       'מחק לצמיתות'
                     )}
-                  </button>
-                  <button
-                    onClick={() => setDeleteModal(prev => ({ ...prev, step: 1, confirmName: '' }))}
-                    disabled={deleting}
-                    className="px-6 py-3 rounded-xl font-medium border border-white/20 text-foreground-light hover:bg-white/5 transition-colors text-center"
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onPress={() => setDeleteModal(prev => ({ ...prev, step: 1, confirmName: '' }))}
+                    isDisabled={deleting}
+                    className="px-6 py-3 rounded-xl font-medium border border-white/20 text-foreground-light hover:bg-white/5"
                   >
                     חזור
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -721,12 +733,14 @@ export default function BarbersPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div className="relative w-full max-w-md bg-background-darker border border-white/10 rounded-2xl p-6 shadow-2xl animate-slide-in-up">
             {/* Close button */}
-            <button
-              onClick={() => setSelfPauseModal({ isOpen: false, action: 'pause' })}
-              className="absolute top-4 left-4 p-2 rounded-full hover:bg-white/5 transition-colors flex items-center justify-center"
+            <Button
+              variant="ghost"
+              isIconOnly
+              onPress={() => setSelfPauseModal({ isOpen: false, action: 'pause' })}
+              className="absolute top-4 left-4 min-w-[36px] w-9 h-9 rounded-full hover:bg-white/5"
             >
               <X size={18} className="text-foreground-muted" />
-            </button>
+            </Button>
 
             <div className="flex flex-col gap-5">
               <div className="flex items-center gap-3">
@@ -781,13 +795,13 @@ export default function BarbersPage() {
               </div>
 
               <div className="flex gap-3">
-                <button
-                  onClick={handleSelfPauseConfirm}
-                  disabled={selfPausing}
+                <Button
+                  onPress={handleSelfPauseConfirm}
+                  isDisabled={selfPausing}
                   className={cn(
-                    'flex-1 py-3 rounded-xl font-medium transition-colors text-center',
+                    'flex-1 py-3 rounded-xl font-medium',
                     selfPausing
-                      ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
+                      ? 'bg-foreground-muted/30 text-foreground-muted'
                       : selfPauseModal.action === 'pause'
                         ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30'
                         : 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30'
@@ -801,14 +815,15 @@ export default function BarbersPage() {
                   ) : (
                     selfPauseModal.action === 'pause' ? 'השבת את החשבון' : 'הפעל את החשבון'
                   )}
-                </button>
-                <button
-                  onClick={() => setSelfPauseModal({ isOpen: false, action: 'pause' })}
-                  disabled={selfPausing}
-                  className="px-6 py-3 rounded-xl font-medium border border-white/20 text-foreground-light hover:bg-white/5 transition-colors text-center"
+                </Button>
+                <Button
+                  variant="ghost"
+                  onPress={() => setSelfPauseModal({ isOpen: false, action: 'pause' })}
+                  isDisabled={selfPausing}
+                  className="px-6 py-3 rounded-xl font-medium border border-white/20 text-foreground-light hover:bg-white/5"
                 >
                   ביטול
-                </button>
+                </Button>
               </div>
             </div>
           </div>

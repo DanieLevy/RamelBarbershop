@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createTrustedDevice } from '@/lib/services/trusted-device.service'
-import { reportServerError } from '@/lib/bug-reporter/helpers'
+import { reportApiError } from '@/lib/bug-reporter/helpers'
 
 /**
  * Trust Device API
@@ -58,9 +58,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error(`[${requestId}] Error creating trusted device:`, error)
     
-    await reportServerError(error, 'POST /api/auth/trust-device', {
-      route: '/api/auth/trust-device',
-      severity: 'medium',
+    await reportApiError(error, request, 'Trust device failed', {
+      severity: 'high',
       additionalData: { requestId },
     })
     

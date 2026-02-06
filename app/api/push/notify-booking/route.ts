@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { pushService } from '@/lib/push/push-service'
 import { validateRequestBody, NotifyBookingSchema } from '@/lib/validation/api-schemas'
 import type { ReminderContext } from '@/lib/push/types'
-import { reportServerError } from '@/lib/bug-reporter/helpers'
+import { reportApiError } from '@/lib/bug-reporter/helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,9 +59,8 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('[API notify-booking] Error:', error)
-    await reportServerError(error, 'POST /api/push/notify-booking', {
-      route: '/api/push/notify-booking',
-      severity: 'high'
+    await reportApiError(error, request, 'Notify booking failed', {
+      severity: 'high',
     })
     return NextResponse.json(
       { success: false, error: 'Internal server error' },

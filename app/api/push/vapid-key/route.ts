@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import { pushService } from '@/lib/push/push-service'
+import { reportServerError } from '@/lib/bug-reporter/helpers'
 
 export async function GET() {
   try {
@@ -24,6 +25,10 @@ export async function GET() {
     })
   } catch (error) {
     console.error('[API] Error getting VAPID key:', error)
+    await reportServerError(error, 'Get VAPID key failed', {
+      route: '/api/push/vapid-key',
+      severity: 'high',
+    })
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

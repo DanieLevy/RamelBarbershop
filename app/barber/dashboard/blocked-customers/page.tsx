@@ -3,11 +3,12 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { UserX, Search, Trash, ShieldOff, ShieldAlert, User } from 'lucide-react'
 import type { Customer } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { Button, Avatar } from '@heroui/react'
 
 interface BlockedCustomerInfo {
   phone: string
@@ -70,7 +71,7 @@ export default function BlockedCustomersPage() {
     if (!barber?.id) return
     
     if (blockedPhones.includes(customer.phone)) {
-      toast.error('הלקוח כבר חסום')
+      showToast.error('הלקוח כבר חסום')
       return
     }
     
@@ -87,9 +88,9 @@ export default function BlockedCustomersPage() {
     if (error) {
       console.error('Error blocking customer:', error)
       await report(new Error(error.message), 'Blocking customer')
-      toast.error('שגיאה בחסימת הלקוח')
+      showToast.error('שגיאה בחסימת הלקוח')
     } else {
-      toast.success(`${customer.fullname} נחסם בהצלחה`)
+      showToast.success(`${customer.fullname} נחסם בהצלחה`)
       setBlockedPhones(newBlockedList)
       setShowAddModal(false)
       setSelectedCustomer(null)
@@ -120,9 +121,9 @@ export default function BlockedCustomersPage() {
     if (error) {
       console.error('Error unblocking customer:', error)
       await report(new Error(error.message), 'Unblocking customer')
-      toast.error('שגיאה בהסרת החסימה')
+      showToast.error('שגיאה בהסרת החסימה')
     } else {
-      toast.success('החסימה הוסרה בהצלחה')
+      showToast.success('החסימה הוסרה בהצלחה')
       setBlockedPhones(newBlockedList)
     }
   }
@@ -169,13 +170,13 @@ export default function BlockedCustomersPage() {
             לקוחות חסומים לא יוכלו לקבוע תורים אצלך
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
+        <Button
+          onPress={() => setShowAddModal(true)}
           className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition-colors"
         >
           <ShieldOff size={16} strokeWidth={2} />
           חסום לקוח
-        </button>
+        </Button>
       </div>
 
       {/* Stats */}
@@ -215,9 +216,11 @@ export default function BlockedCustomersPage() {
                   className="flex items-center justify-between p-4 rounded-xl bg-red-500/5 border border-red-500/20"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
-                      <UserX size={20} strokeWidth={1.5} className="text-red-400" />
-                    </div>
+                    <Avatar size="md" className="w-10 h-10">
+                      <Avatar.Fallback className="bg-red-500/20 text-red-400">
+                        <UserX size={20} strokeWidth={1.5} />
+                      </Avatar.Fallback>
+                    </Avatar>
                     <div>
                       <p className="text-foreground-light font-medium">
                         {info.customer?.fullname || 'לקוח לא ידוע'}
@@ -225,13 +228,14 @@ export default function BlockedCustomersPage() {
                       <p className="text-foreground-muted text-sm">{maskPhone(phone)}</p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleUnblockCustomer(phone)}
+                  <Button
+                    onPress={() => handleUnblockCustomer(phone)}
+                    variant="ghost"
                     className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-foreground-light text-sm hover:bg-white/10 transition-colors flex items-center gap-2"
                   >
                     <Trash size={14} />
                     הסר חסימה
-                  </button>
+                  </Button>
                 </div>
               )
             })}
@@ -280,9 +284,10 @@ export default function BlockedCustomersPage() {
               ) : (
                 <div className="space-y-2">
                   {filteredCustomers.slice(0, 20).map((customer) => (
-                    <button
+                    <Button
                       key={customer.id}
-                      onClick={() => setSelectedCustomer(customer)}
+                      onPress={() => setSelectedCustomer(customer)}
+                      variant="ghost"
                       className={cn(
                         'w-full flex items-center gap-3 p-3 rounded-xl text-right transition-colors',
                         selectedCustomer?.id === customer.id
@@ -290,9 +295,11 @@ export default function BlockedCustomersPage() {
                           : 'bg-background-dark border border-white/5 hover:border-white/10'
                       )}
                     >
-                      <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-                        <User size={18} className="text-foreground-muted" />
-                      </div>
+                      <Avatar size="md" className="w-10 h-10">
+                        <Avatar.Fallback className="bg-white/5 text-foreground-muted">
+                          <User size={18} />
+                        </Avatar.Fallback>
+                      </Avatar>
                       <div className="flex-1">
                         <p className="text-foreground-light font-medium">{customer.fullname}</p>
                         <p className="text-foreground-muted text-xs">{customer.phone}</p>
@@ -302,7 +309,7 @@ export default function BlockedCustomersPage() {
                           <span className="text-white text-xs">✓</span>
                         </div>
                       )}
-                    </button>
+                    </Button>
                   ))}
                   {filteredCustomers.length > 20 && (
                     <p className="text-foreground-muted text-xs text-center py-2">
@@ -315,23 +322,24 @@ export default function BlockedCustomersPage() {
             
             {/* Actions */}
             <div className="p-4 border-t border-white/10 flex gap-3">
-              <button
-                onClick={() => {
+              <Button
+                onPress={() => {
                   setShowAddModal(false)
                   setSelectedCustomer(null)
                   setSearchQuery('')
                 }}
+                variant="ghost"
                 className="flex-1 py-3 bg-background-dark border border-white/10 rounded-xl text-foreground-muted text-sm hover:text-foreground-light transition-colors"
               >
                 ביטול
-              </button>
-              <button
-                onClick={() => selectedCustomer && handleBlockCustomer(selectedCustomer)}
-                disabled={!selectedCustomer || saving}
+              </Button>
+              <Button
+                onPress={() => selectedCustomer && handleBlockCustomer(selectedCustomer)}
+                isDisabled={!selectedCustomer || saving}
                 className="flex-1 py-3 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {saving ? 'חוסם...' : 'חסום לקוח'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

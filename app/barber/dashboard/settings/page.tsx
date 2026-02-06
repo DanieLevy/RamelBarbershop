@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { 
@@ -18,6 +18,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react'
+import { Button } from '@heroui/react'
 import type { BarbershopSettings } from '@/types/database'
 
 type SectionKey = 'basic' | 'hero' | 'location' | 'contact' | 'booking'
@@ -80,7 +81,7 @@ export default function SettingsPage() {
     if (error) {
       console.error('Error fetching settings:', error)
       await report(new Error(error.message), 'Fetching barbershop settings')
-      toast.error('שגיאה בטעינת ההגדרות')
+      showToast.error('שגיאה בטעינת ההגדרות')
       return
     }
     
@@ -195,9 +196,9 @@ export default function SettingsPage() {
     if (error) {
       console.error('Error saving settings:', error)
       await report(new Error(error.message), 'Saving barbershop settings')
-      toast.error('שגיאה בשמירת ההגדרות')
+      showToast.error('שגיאה בשמירת ההגדרות')
     } else {
-      toast.success('ההגדרות נשמרו בהצלחה!')
+      showToast.success('ההגדרות נשמרו בהצלחה!')
     }
     
     setSaving(false)
@@ -210,9 +211,9 @@ export default function SettingsPage() {
       const lng = addressLng
       setWazeLink(`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`)
       setGoogleMapsLink(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`)
-      toast.success('קישורי ניווט נוצרו אוטומטית')
+      showToast.success('קישורי ניווט נוצרו אוטומטית')
     } else {
-      toast.error('יש להזין קואורדינטות קודם')
+      showToast.error('יש להזין קואורדינטות קודם')
     }
   }
 
@@ -248,8 +249,9 @@ export default function SettingsPage() {
             className="bg-background-card border border-white/10 rounded-2xl overflow-hidden"
           >
             {/* Section header */}
-            <button
-              onClick={() => toggleSection(section.key)}
+            <Button
+              variant="ghost"
+              onPress={() => toggleSection(section.key)}
               className="w-full flex items-center justify-between p-5 hover:bg-white/5 transition-colors"
             >
               <div className="flex items-center gap-4">
@@ -266,7 +268,7 @@ export default function SettingsPage() {
               ) : (
                 <ChevronDown size={20} className="text-foreground-muted" />
               )}
-            </button>
+            </Button>
             
             {/* Section content */}
             {expandedSections.includes(section.key) && (
@@ -330,13 +332,13 @@ export default function SettingsPage() {
                       />
                     </div>
                     
-                    <button
-                      type="button"
-                      onClick={generateNavigationLinks}
-                      className="text-sm text-accent-gold hover:underline"
+                    <Button
+                      variant="ghost"
+                      onPress={generateNavigationLinks}
+                      className="text-sm text-accent-gold hover:underline h-auto p-0 min-w-0"
                     >
                       יצירת קישורי ניווט אוטומטית מהקואורדינטות →
-                    </button>
+                    </Button>
                     
                     <InputField 
                       label="קישור Waze" 
@@ -467,9 +469,9 @@ export default function SettingsPage() {
 
       {/* Save button - fixed at bottom on mobile */}
       <div className="mt-6 sticky bottom-4">
-        <button
-          onClick={handleSave}
-          disabled={saving}
+        <Button
+          onPress={handleSave}
+          isDisabled={saving}
           className={cn(
             'w-full py-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 shadow-lg',
             saving
@@ -479,7 +481,7 @@ export default function SettingsPage() {
         >
           <Save size={18} strokeWidth={2} />
           {saving ? 'שומר...' : 'שמור שינויים'}
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -565,11 +567,11 @@ function ToggleableField({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <label className="text-foreground-light text-sm">{label}</label>
-        <button
-          type="button"
-          onClick={() => onToggle(!visible)}
+        <Button
+          variant="ghost"
+          onPress={() => onToggle(!visible)}
           className={cn(
-            'flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg transition-colors',
+            'flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg transition-colors h-auto min-w-0',
             visible 
               ? 'bg-green-500/20 text-green-400'
               : 'bg-red-500/20 text-red-400'
@@ -577,7 +579,7 @@ function ToggleableField({
         >
           {visible ? <Eye size={14} /> : <EyeOff size={14} />}
           {visible ? 'מוצג' : 'מוסתר'}
-        </button>
+        </Button>
       </div>
       <input
         type="text"

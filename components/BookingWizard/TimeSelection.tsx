@@ -289,8 +289,9 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
         <div className="text-center py-8">
           <p className="text-red-400 mb-4">{error}</p>
           <button
+            type="button"
             onClick={() => window.location.reload()}
-            className="text-accent-gold hover:underline text-sm"
+            className="text-accent-gold hover:underline text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-gold rounded"
           >
             נסה שוב
           </button>
@@ -309,18 +310,20 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
                 שעות פנויות ({availableSlots.length})
               </p>
               {/* Mobile: 3 columns, Tablet: 4 columns, Desktop: 5 columns */}
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+              <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-5 gap-2">
                 {availableSlots.map((slot) => (
                   <button
                     key={slot.time_timestamp}
+                    type="button"
                     onClick={() => handleSelect(slot.time_timestamp)}
                     className={cn(
-                      'py-3 px-2 rounded-xl text-sm font-medium transition-all cursor-pointer',
+                      'py-3 px-2 rounded-lg text-sm font-medium transition-all w-full',
                       'flex items-center justify-center',
                       'active:scale-95 hover:scale-[1.02]',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-gold focus-visible:ring-offset-2 focus-visible:ring-offset-background-dark',
                       timeTimestamp === slot.time_timestamp
                         ? 'bg-accent-gold text-background-dark shadow-gold'
-                        : 'bg-background-card border border-white/10 text-foreground-light hover:border-accent-gold'
+                        : 'bg-background-card border border-white/10 text-foreground-light hover:border-accent-gold hover:bg-white/5'
                     )}
                     dir="ltr"
                   >
@@ -339,13 +342,14 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
           {tooSoonSlots.length > 0 && (
             <div className="mt-2">
               <button
+                type="button"
                 onClick={() => setShowTooSoon(!showTooSoon)}
-                className="flex items-center gap-2 text-sm text-foreground-muted hover:text-foreground-light transition-colors py-2"
+                className="flex items-center gap-2 text-sm hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 rounded px-1"
               >
                 {showTooSoon ? (
-                  <ChevronUp size={12} strokeWidth={1.5} />
+                  <ChevronUp size={12} strokeWidth={1.5} className="text-orange-400" />
                 ) : (
-                  <ChevronDown size={12} strokeWidth={1.5} />
+                  <ChevronDown size={12} strokeWidth={1.5} className="text-orange-400" />
                 )}
                 <Clock size={12} strokeWidth={1.5} className="text-orange-400" />
                 <span className="text-orange-400/80">
@@ -373,8 +377,9 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
           {reservedSlots.length > 0 && (
             <div className="mt-2">
               <button
+                type="button"
                 onClick={() => setShowReserved(!showReserved)}
-                className="flex items-center gap-2 text-sm text-foreground-muted hover:text-foreground-light transition-colors py-2"
+                className="flex items-center gap-2 text-sm text-foreground-muted hover:text-foreground-light transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded px-1"
               >
                 {showReserved ? (
                   <ChevronUp size={12} strokeWidth={1.5} />
@@ -418,10 +423,11 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
       
       {/* Back button */}
       <button
+        type="button"
         onClick={prevStep}
-        className="flex items-center justify-center gap-2 text-foreground-muted hover:text-foreground-light transition-colors text-sm py-2"
+        className="flex items-center justify-center gap-2 text-sm text-foreground-muted hover:text-foreground-light transition-colors py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded"
       >
-        <ChevronRight size={12} strokeWidth={1.5} />
+        <ChevronRight size={14} strokeWidth={1.5} />
         <span>חזור לבחירת תאריך</span>
       </button>
     </div>

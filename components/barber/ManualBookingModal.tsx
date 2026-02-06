@@ -7,9 +7,10 @@ import { createClient } from '@/lib/supabase/client'
 import { createReservation } from '@/lib/services/booking.service'
 import { getOrCreateCustomer } from '@/lib/services/customer.service'
 import { format, addDays, isSameDay } from 'date-fns'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import type { Customer, BarbershopSettings, Service, WorkDay } from '@/types/database'
 import { Portal } from '@/components/ui/Portal'
+import { Button } from '@heroui/react'
 
 interface ManualBookingModalProps {
   isOpen: boolean
@@ -324,31 +325,31 @@ export function ManualBookingModal({
     
     // Validation
     if (!finalTime) {
-      toast.error('נא לבחור שעה')
+      showToast.error('נא לבחור שעה')
       return
     }
     if (!selectedService) {
-      toast.error('נא לבחור שירות')
+      showToast.error('נא לבחור שירות')
       return
     }
     if (mode === 'existing' && !selectedCustomer) {
-      toast.error('נא לבחור לקוח')
+      showToast.error('נא לבחור לקוח')
       return
     }
     if (mode === 'walkin' && !walkinName.trim()) {
-      toast.error('נא להזין שם הלקוח')
+      showToast.error('נא להזין שם הלקוח')
       return
     }
     
     // Out-of-hours specific validations
     if (isOutOfHours) {
       if (isCustomTimeReserved) {
-        toast.error('השעה כבר תפוסה')
+        showToast.error('השעה כבר תפוסה')
         return
       }
       // Validate time is not in the past for today
       if (isSameDay(selectedDate, israelNow) && finalTime < Date.now()) {
-        toast.error('לא ניתן לקבוע תור בשעה שעברה')
+        showToast.error('לא ניתן לקבוע תור בשעה שעברה')
         return
       }
     }
@@ -379,7 +380,7 @@ export function ManualBookingModal({
         
         if (!newCustomer) {
           console.error('Error creating walkin customer')
-          toast.error('שגיאה ביצירת לקוח')
+          showToast.error('שגיאה ביצירת לקוח')
           setSaving(false)
           return
         }
@@ -417,7 +418,7 @@ export function ManualBookingModal({
       
       if (!result.success) {
         console.error('Error creating reservation:', result.error)
-        toast.error(result.message || 'שגיאה ביצירת התור')
+        showToast.error(result.message || 'שגיאה ביצירת התור')
         
         // Refresh available slots if slot was taken
         if (result.error === 'SLOT_ALREADY_TAKEN' || result.error === 'CUSTOMER_DOUBLE_BOOKING') {
@@ -454,7 +455,7 @@ export function ManualBookingModal({
         }
       }
       
-      toast.success(isOutOfHours 
+      showToast.success(isOutOfHours 
         ? 'התור מחוץ לשעות נוצר בהצלחה!' 
         : 'התור נוצר בהצלחה'
       )
@@ -462,7 +463,7 @@ export function ManualBookingModal({
       onClose()
     } catch (err) {
       console.error('Error creating reservation:', err)
-      toast.error('שגיאה ביצירת התור')
+      showToast.error('שגיאה ביצירת התור')
     } finally {
       setSaving(false)
     }
@@ -495,13 +496,15 @@ export function ManualBookingModal({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-full hover:bg-white/5 transition-colors flex items-center justify-center"
+          <Button
+            variant="ghost"
+            isIconOnly
+            onPress={onClose}
+            className="min-w-[40px] w-10 h-10 rounded-full hover:bg-white/5"
             aria-label="סגור"
           >
             <X size={20} className="text-foreground-muted" />
-          </button>
+          </Button>
         </div>
         
         {/* Scrollable Content */}
@@ -604,12 +607,14 @@ export function ManualBookingModal({
                     <p className="text-foreground-light text-sm">{selectedCustomer.fullname}</p>
                     <p className="text-foreground-muted text-xs" dir="ltr">{selectedCustomer.phone}</p>
                   </div>
-                  <button
-                    onClick={() => setSelectedCustomer(null)}
-                    className="p-1 rounded-full hover:bg-white/10 transition-colors flex items-center justify-center"
+                  <Button
+                    variant="ghost"
+                    isIconOnly
+                    onPress={() => setSelectedCustomer(null)}
+                    className="min-w-[28px] w-7 h-7 rounded-full hover:bg-white/10"
                   >
                     <X size={14} className="text-foreground-muted" />
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -881,13 +886,13 @@ export function ManualBookingModal({
 
         {/* Actions - Sticky Footer */}
         <div className="flex gap-3 p-5 sm:p-6 pt-4 border-t border-white/5 flex-shrink-0 bg-background-darker sm:bg-background-dark">
-          <button
-            onClick={handleSubmit}
-            disabled={saving || loadingServices || services.length === 0}
+          <Button
+            onPress={handleSubmit}
+            isDisabled={saving || loadingServices || services.length === 0}
             className={cn(
-              'flex-1 py-3 rounded-xl font-medium transition-all flex items-center justify-center',
+              'flex-1 py-3 rounded-xl font-medium',
               saving || loadingServices || services.length === 0
-                ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
+                ? 'bg-foreground-muted/30 text-foreground-muted'
                 : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
             )}
           >
@@ -899,14 +904,15 @@ export function ManualBookingModal({
             ) : (
               'צור תור'
             )}
-          </button>
-          <button
-            onClick={onClose}
-            disabled={saving}
-            className="px-6 py-3 rounded-xl font-medium border border-white/20 text-foreground-light hover:bg-white/5 transition-colors flex items-center justify-center"
+          </Button>
+          <Button
+            variant="ghost"
+            onPress={onClose}
+            isDisabled={saving}
+            className="px-6 py-3 rounded-xl font-medium border border-white/20 text-foreground-light hover:bg-white/5"
           >
             ביטול
-          </button>
+          </Button>
         </div>
         </div>
       </div>

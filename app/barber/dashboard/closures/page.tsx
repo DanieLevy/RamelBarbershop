@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { Plus, Trash, Calendar } from 'lucide-react'
 import type { BarbershopClosure } from '@/types/database'
@@ -51,12 +51,12 @@ export default function ClosuresPage() {
 
   const handleAdd = async () => {
     if (!startDate || !endDate) {
-      toast.error('נא לבחור תאריכי התחלה וסיום')
+      showToast.error('נא לבחור תאריכי התחלה וסיום')
       return
     }
     
     if (new Date(startDate) > new Date(endDate)) {
-      toast.error('תאריך התחלה לא יכול להיות אחרי תאריך הסיום')
+      showToast.error('תאריך התחלה לא יכול להיות אחרי תאריך הסיום')
       return
     }
     
@@ -73,9 +73,9 @@ export default function ClosuresPage() {
     if (error) {
       console.error('Error adding closure:', error)
       await report(new Error(error.message), 'Adding barbershop closure')
-      toast.error('שגיאה בהוספת יום סגירה')
+      showToast.error('שגיאה בהוספת יום סגירה')
     } else {
-      toast.success('יום הסגירה נוסף בהצלחה!')
+      showToast.success('יום הסגירה נוסף בהצלחה!')
       setShowForm(false)
       setStartDate('')
       setEndDate('')
@@ -99,9 +99,9 @@ export default function ClosuresPage() {
     if (error) {
       console.error('Error deleting closure:', error)
       await report(new Error(error.message), 'Deleting barbershop closure')
-      toast.error('שגיאה במחיקה')
+      showToast.error('שגיאה במחיקה')
     } else {
-      toast.success('נמחק בהצלחה')
+      showToast.success('נמחק בהצלחה')
       fetchClosures()
     }
   }

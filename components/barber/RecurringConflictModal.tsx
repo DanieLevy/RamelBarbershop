@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { X, AlertTriangle, Calendar, Clock, User, Loader2, Trash2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { Portal } from '@/components/ui/Portal'
+import { Button } from '@heroui/react'
 import type { ConflictingReservation } from '@/lib/services/recurring.service'
 
 interface RecurringConflictModalProps {
@@ -64,14 +64,15 @@ export function RecurringConflictModal({
                 </p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              disabled={loading}
-              className="p-2 rounded-full hover:bg-white/10 transition-colors"
+            <Button
+              variant="ghost"
+              isIconOnly
+              onPress={onClose}
+              isDisabled={loading}
               aria-label="סגור"
             >
               <X size={20} className="text-foreground-muted" />
-            </button>
+            </Button>
           </div>
 
           {/* Content */}
@@ -128,22 +129,19 @@ export function RecurringConflictModal({
 
           {/* Footer */}
           <div className="flex gap-3 px-5 py-4 border-t border-white/5 bg-background-dark/30">
-            <button
-              onClick={onClose}
-              disabled={loading}
-              className="flex-1 py-3 px-4 rounded-xl font-medium text-foreground-muted bg-white/5 hover:bg-white/10 transition-colors"
+            <Button
+              variant="secondary"
+              onPress={onClose}
+              isDisabled={loading}
+              className="flex-1"
             >
               ביטול
-            </button>
-            <button
-              onClick={handleConfirm}
-              disabled={loading}
-              className={cn(
-                'flex-1 py-3 px-4 rounded-xl font-medium transition-colors flex items-center justify-center gap-2',
-                loading
-                  ? 'bg-red-500/50 text-red-200 cursor-not-allowed'
-                  : 'bg-red-500 text-white hover:bg-red-600'
-              )}
+            </Button>
+            <Button
+              variant="danger"
+              onPress={handleConfirm}
+              isDisabled={loading}
+              className="flex-1"
             >
               {loading ? (
                 <>
@@ -156,7 +154,7 @@ export function RecurringConflictModal({
                   <span>בטל וצור קבוע</span>
                 </>
               )}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

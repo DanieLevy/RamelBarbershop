@@ -3,12 +3,13 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { Calendar, Clock, BellRing, XCircle, CalendarPlus, Loader2, Save } from 'lucide-react'
 import type { BarberNotificationSettings } from '@/lib/push/types'
 import type { BarberBookingSettings } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { Switch } from '@heroui/react'
 
 export default function PreferencesPage() {
   const { barber } = useBarberAuthStore()
@@ -141,15 +142,15 @@ export default function PreferencesPage() {
       if (notifError || bookingError) {
         console.error('Error saving settings:', notifError || bookingError)
         await report(new Error((notifError || bookingError)?.message || 'Unknown error'), 'Saving preferences')
-        toast.error('שגיאה בשמירת ההגדרות')
+        showToast.error('שגיאה בשמירת ההגדרות')
         return
       }
       
-      toast.success('ההגדרות נשמרו בהצלחה')
+      showToast.success('ההגדרות נשמרו בהצלחה')
     } catch (err) {
       console.error('Error saving settings:', err)
       await report(err, 'Saving preferences (exception)')
-      toast.error('שגיאה בשמירת ההגדרות')
+      showToast.error('שגיאה בשמירת ההגדרות')
     } finally {
       setSaving(false)
     }
@@ -279,20 +280,17 @@ export default function PreferencesPage() {
                   <CalendarPlus size={14} className="text-green-400" />
                   קבלת התראה על תור חדש
                 </label>
-                <button
-                  onClick={() => setNotifyOnNewBooking(!notifyOnNewBooking)}
-                  className={cn(
-                    'w-11 h-6 rounded-full transition-colors relative flex-shrink-0',
-                    notifyOnNewBooking ? 'bg-accent-gold' : 'bg-white/10'
-                  )}
-                  aria-checked={notifyOnNewBooking}
-                  role="switch"
+                <Switch
+                  isSelected={notifyOnNewBooking}
+                  onChange={setNotifyOnNewBooking}
                 >
-                  <div className={cn(
-                    'absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all',
-                    notifyOnNewBooking ? 'right-0.5' : 'left-0.5'
-                  )} />
-                </button>
+                  <Switch.Control className={cn(
+                    'w-11 h-6',
+                    notifyOnNewBooking ? 'bg-accent-gold' : 'bg-white/10'
+                  )}>
+                    <Switch.Thumb />
+                  </Switch.Control>
+                </Switch>
               </div>
 
               {/* Notify on Cancel - Compact Toggle */}
@@ -301,20 +299,17 @@ export default function PreferencesPage() {
                   <XCircle size={14} className="text-red-400" />
                   קבלת התראה על ביטול לקוח
                 </label>
-                <button
-                  onClick={() => setNotifyOnCancel(!notifyOnCancel)}
-                  className={cn(
-                    'w-11 h-6 rounded-full transition-colors relative flex-shrink-0',
-                    notifyOnCancel ? 'bg-accent-gold' : 'bg-white/10'
-                  )}
-                  aria-checked={notifyOnCancel}
-                  role="switch"
+                <Switch
+                  isSelected={notifyOnCancel}
+                  onChange={setNotifyOnCancel}
                 >
-                  <div className={cn(
-                    'absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all',
-                    notifyOnCancel ? 'right-0.5' : 'left-0.5'
-                  )} />
-                </button>
+                  <Switch.Control className={cn(
+                    'w-11 h-6',
+                    notifyOnCancel ? 'bg-accent-gold' : 'bg-white/10'
+                  )}>
+                    <Switch.Thumb />
+                  </Switch.Control>
+                </Switch>
               </div>
             </div>
           </div>

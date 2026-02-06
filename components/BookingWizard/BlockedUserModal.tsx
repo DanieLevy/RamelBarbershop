@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { AlertCircle, Home } from 'lucide-react'
+import { Button, Modal } from '@heroui/react'
 
 interface BlockedUserModalProps {
   isOpen: boolean
@@ -10,42 +11,48 @@ interface BlockedUserModalProps {
 export function BlockedUserModal({ isOpen }: BlockedUserModalProps) {
   const router = useRouter()
 
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-
-      {/* Modal */}
-      <div className="relative w-full max-w-sm bg-background-card border border-white/10 rounded-2xl p-6 text-center animate-fade-in-up">
-        {/* Icon */}
-        <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
-          <AlertCircle size={32} className="text-red-400" />
-        </div>
-
-        {/* Title */}
-        <h2 className="text-xl font-medium text-foreground-light mb-3">
-          לא ניתן לבצע הזמנה
-        </h2>
-
-        {/* Message */}
-        <p className="text-foreground-muted mb-6">
-          לא ניתן לבצע הזמנה כרגע.
-          <br />
-          אנא פנה לצוות הברברשופ לקבלת מידע נוסף.
-        </p>
-
-        {/* Action */}
-        <button
-          onClick={() => router.push('/')}
-          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-accent-gold hover:bg-accent-gold/90 rounded-xl font-medium text-background-dark transition-colors"
-        >
-          <Home size={18} />
-          חזרה לדף הבית
-        </button>
-      </div>
-    </div>
+    <Modal>
+      <Modal.Backdrop
+        variant="blur"
+        isOpen={isOpen}
+        isDismissable={false}
+        isKeyboardDismissDisabled={true}
+        className="z-50"
+      >
+        <Modal.Container placement="center" size="sm">
+          <Modal.Dialog className="bg-background-card border border-white/10 rounded-2xl text-center">
+            <Modal.Header className="flex flex-col items-center justify-center">
+              <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
+                <AlertCircle size={32} className="text-red-400" />
+              </div>
+              <Modal.Heading className="text-xl font-medium text-foreground-light">
+                לא ניתן לבצע הזמנה
+              </Modal.Heading>
+            </Modal.Header>
+            
+            <Modal.Body>
+              <p className="text-foreground-muted">
+                לא ניתן לבצע הזמנה כרגע.
+                <br />
+                אנא פנה לצוות הברברשופ לקבלת מידע נוסף.
+              </p>
+            </Modal.Body>
+            
+            <Modal.Footer className="justify-center">
+              <Button
+                variant="primary"
+                onPress={() => router.push('/')}
+                className="w-full"
+              >
+                <Home size={18} />
+                חזרה לדף הבית
+              </Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
   )
 }
 

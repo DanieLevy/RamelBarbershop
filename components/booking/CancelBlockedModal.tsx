@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { X, AlertTriangle, Send, Loader2, Clock } from 'lucide-react'
-import { cn, formatHebrewMinutes, formatHebrewHours, formatHebrewDays } from '@/lib/utils'
-import { toast } from 'sonner'
+import { formatHebrewMinutes, formatHebrewHours, formatHebrewDays } from '@/lib/utils'
+import { Button } from '@heroui/react'
+import { showToast } from '@/lib/toast'
 import { useBugReporter } from '@/hooks/useBugReporter'
 
 interface CancelBlockedModalProps {
@@ -59,16 +60,16 @@ export function CancelBlockedModal({
       
       if (result.success) {
         setSent(true)
-        toast.success('הבקשה נשלחה לספר')
+        showToast.success('הבקשה נשלחה לספר')
       } else {
         console.error('Request cancel failed:', result)
         await report(new Error(result.error || 'Request cancel failed'), 'Sending cancel request to barber')
-        toast.error(result.error || 'שגיאה בשליחת הבקשה')
+        showToast.error(result.error || 'שגיאה בשליחת הבקשה')
       }
     } catch (err) {
       console.error('Error sending cancel request:', err)
       await report(err, 'Sending cancel request (exception)')
-      toast.error('שגיאה בשליחת הבקשה')
+      showToast.error('שגיאה בשליחת הבקשה')
     } finally {
       setSending(false)
     }
@@ -116,13 +117,14 @@ export function CancelBlockedModal({
               <p className="text-foreground-muted text-xs">התור קרוב מדי</p>
             </div>
           </div>
-          <button
-            onClick={handleClose}
-            className="p-2 rounded-full hover:bg-white/5 transition-colors flex items-center justify-center"
+          <Button
+            variant="ghost"
+            isIconOnly
+            onPress={handleClose}
             aria-label="סגור"
           >
             <X size={20} className="text-foreground-muted" />
-          </button>
+          </Button>
         </div>
         
         {/* Content */}
@@ -192,23 +194,20 @@ export function CancelBlockedModal({
         {/* Actions */}
         <div className="flex gap-3 p-5 border-t border-white/5 flex-shrink-0">
           {sent ? (
-            <button
-              onClick={handleClose}
-              className="flex-1 py-3 rounded-xl font-medium bg-accent-gold text-background-dark hover:bg-accent-gold/90 transition-all flex items-center justify-center"
+            <Button
+              variant="primary"
+              onPress={handleClose}
+              className="flex-1"
             >
               סגור
-            </button>
+            </Button>
           ) : (
             <>
-              <button
-                onClick={handleAskBarber}
-                disabled={sending}
-                className={cn(
-                  'flex-1 py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2',
-                  sending
-                    ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
-                    : 'bg-orange-500 text-white hover:bg-orange-500/90'
-                )}
+              <Button
+                variant="primary"
+                onPress={handleAskBarber}
+                isDisabled={sending}
+                className="flex-1 bg-orange-500 hover:bg-orange-500/90"
               >
                 {sending ? (
                   <>
@@ -221,14 +220,14 @@ export function CancelBlockedModal({
                     בקש מהספר לבטל
                   </>
                 )}
-              </button>
-              <button
-                onClick={handleClose}
-                disabled={sending}
-                className="px-6 py-3 rounded-xl font-medium border border-white/20 text-foreground-light hover:bg-white/5 transition-colors flex items-center justify-center"
+              </Button>
+              <Button
+                variant="secondary"
+                onPress={handleClose}
+                isDisabled={sending}
               >
                 סגור
-              </button>
+              </Button>
             </>
           )}
         </div>

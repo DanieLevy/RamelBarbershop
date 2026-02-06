@@ -327,12 +327,12 @@ export function MobileBottomNav() {
             // Desktop: Full width bar
             'md:w-full md:rounded-none md:px-0 md:py-0',
             'md:justify-center md:gap-0',
-            // Dark glassmorphism background
-            'bg-[#1a1a1a]/95 backdrop-blur-xl',
+            // Darker solid background for better visibility
+            'bg-[#0a0c0e] backdrop-blur-xl',
             // Subtle border and shadow
-            'border border-white/10',
+            'border border-white/[0.08]',
             'md:border-x-0 md:border-b-0',
-            'shadow-[0_8px_32px_rgba(0,0,0,0.4)] md:shadow-[0_-4px_20px_rgba(0,0,0,0.3)]'
+            'shadow-[0_8px_32px_rgba(0,0,0,0.6)] md:shadow-[0_-4px_20px_rgba(0,0,0,0.4)]'
           )}
           role="navigation"
           aria-label="תפריט ניווט ראשי"

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { RefreshCw, Sparkles, Scissors, Check, AlertTriangle, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from '@heroui/react'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 
@@ -347,54 +348,35 @@ export function UpdateModal({ onUpdate, version }: UpdateModalProps) {
 
         {/* Action Buttons */}
         {stage === 'ready' && (
-          <button
-            onClick={handleUpdate}
-            className={cn(
-              'w-full py-4 px-6 rounded-2xl',
-              'font-bold text-lg',
-              'transition-all duration-300',
-              'flex items-center justify-center gap-3',
-              'hover:scale-[1.02] active:scale-[0.98]',
-              isCritical 
-                ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
-                : 'bg-accent-gold text-background-dark shadow-gold hover:shadow-gold-lg'
-            )}
+          <Button
+            variant={isCritical ? 'danger' : 'primary'}
+            onPress={handleUpdate}
+            className="w-full py-4 text-lg font-bold"
+            size="lg"
           >
             <RefreshCw size={22} />
             {content.buttonText}
-          </button>
+          </Button>
         )}
 
         {stage === 'error' && (
           <div className="space-y-3">
-            <button
-              onClick={handleRetry}
-              className={cn(
-                'w-full py-4 px-6 rounded-2xl',
-                'bg-accent-gold text-background-dark',
-                'font-bold text-lg',
-                'shadow-gold',
-                'transition-all duration-300',
-                'flex items-center justify-center gap-3',
-                'hover:scale-[1.02] active:scale-[0.98]'
-              )}
+            <Button
+              variant="primary"
+              onPress={handleRetry}
+              className="w-full py-4 text-lg font-bold"
+              size="lg"
             >
               <RefreshCw size={22} />
               נסה שוב
-            </button>
-            <button
-              onClick={handleForceReload}
-              className={cn(
-                'w-full py-3 px-6 rounded-xl',
-                'bg-white/10 text-foreground-light',
-                'font-medium text-sm',
-                'transition-all duration-300',
-                'flex items-center justify-center gap-2',
-                'hover:bg-white/20'
-              )}
+            </Button>
+            <Button
+              variant="secondary"
+              onPress={handleForceReload}
+              className="w-full text-sm"
             >
               רענן את הדף ידנית
-            </button>
+            </Button>
           </div>
         )}
 

@@ -6,7 +6,7 @@ import { usePWA } from '@/hooks/usePWA'
 import { useAuthStore } from '@/store/useAuthStore'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { cn } from '@/lib/utils'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import {
   Bell,
   BellOff,
@@ -114,10 +114,10 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
       }
 
       setReminderSettings(newSettings)
-      toast.success('ההגדרות נשמרו')
+      showToast.success('ההגדרות נשמרו')
     } catch (err) {
       console.error('Error updating reminder settings:', err)
-      toast.error('שגיאה בשמירת ההגדרות')
+      showToast.error('שגיאה בשמירת ההגדרות')
     } finally {
       setSavingSettings(false)
     }
@@ -131,9 +131,9 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
     setIsEnabling(true)
     const success = await push.subscribe()
     if (success) {
-      toast.success('התראות הופעלו בהצלחה!')
+      showToast.success('התראות הופעלו בהצלחה!')
     } else if (push.error) {
-      toast.error(push.error)
+      showToast.error(push.error)
     }
     setIsEnabling(false)
   }
@@ -153,18 +153,18 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
     
     if (currentPermission === 'granted') {
       // Permission granted in settings! Auto-subscribe
-      toast.success('הרשאה זוהתה! מפעיל התראות...')
+      showToast.success('הרשאה זוהתה! מפעיל התראות...')
       const success = await push.subscribe()
       if (success) {
-        toast.success('התראות הופעלו בהצלחה!')
+        showToast.success('התראות הופעלו בהצלחה!')
       }
     } else if (currentPermission === 'default') {
       // Permission reset to default - user can now request again
-      toast.success('ההרשאה אופסה! כעת ניתן להפעיל התראות')
+      showToast.success('ההרשאה אופסה! כעת ניתן להפעיל התראות')
       setShowHelp(false)
     } else {
       // Still denied
-      toast.error('ההתראות עדיין חסומות. יש לשנות בהגדרות המכשיר.')
+      showToast.error('ההתראות עדיין חסומות. יש לשנות בהגדרות המכשיר.')
     }
     
     setIsRecheckingPermission(false)
@@ -173,9 +173,9 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
   const handleDisableNotifications = async () => {
     const success = await push.unsubscribe()
     if (success) {
-      toast.success('התראות בוטלו')
+      showToast.success('התראות בוטלו')
     } else if (push.error) {
-      toast.error(push.error)
+      showToast.error(push.error)
     }
   }
 
@@ -184,9 +184,9 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
     setRemovingDeviceId(deviceToRemove.id)
     const success = await push.removeDevice(deviceToRemove.id)
     if (success) {
-      toast.success('המכשיר הוסר בהצלחה')
+      showToast.success('המכשיר הוסר בהצלחה')
     } else if (push.error) {
-      toast.error(push.error)
+      showToast.error(push.error)
     }
     setRemovingDeviceId(null)
     setDeviceToRemove(null)

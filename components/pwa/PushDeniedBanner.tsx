@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/useAuthStore'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { cn } from '@/lib/utils'
 import { BellOff, X, Settings, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
+import { Button } from '@heroui/react'
 
 const BANNER_DISMISSED_KEY = 'push_denied_banner_dismissed'
 const BANNER_COOLDOWN_HOURS = 24 // Don't re-show for 24 hours after dismissal
@@ -160,24 +161,27 @@ export function PushDeniedBanner() {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowInstructions(!showInstructions)}
-              className="px-3 py-2 bg-amber-500/20 text-amber-300 rounded-xl text-sm font-medium hover:bg-amber-500/30 transition-colors flex items-center gap-1"
+            <Button
+              variant="secondary"
+              size="sm"
+              onPress={() => setShowInstructions(!showInstructions)}
               aria-expanded={showInstructions}
               aria-label="הצג הוראות להפעלת התראות"
+              className="bg-amber-500/20 text-amber-300 hover:bg-amber-500/30"
             >
               <Settings size={16} />
               <span className="hidden sm:inline">הפעל</span>
               {showInstructions ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            </button>
+            </Button>
             
-            <button
-              onClick={handleDismiss}
-              className="p-2 text-foreground-muted hover:text-foreground-light transition-colors"
+            <Button
+              variant="ghost"
+              isIconOnly
+              onPress={handleDismiss}
               aria-label="סגור"
             >
               <X size={18} />
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -205,15 +209,11 @@ export function PushDeniedBanner() {
             </ol>
 
             {/* Retry Button */}
-            <button
-              onClick={handleRetry}
-              disabled={isRetrying}
-              className={cn(
-                'w-full py-2.5 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2',
-                isRetrying
-                  ? 'bg-accent-gold/50 text-background-dark cursor-not-allowed'
-                  : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
-              )}
+            <Button
+              variant="primary"
+              onPress={handleRetry}
+              isDisabled={isRetrying}
+              className="w-full"
             >
               {isRetrying ? (
                 <>
@@ -226,7 +226,7 @@ export function PushDeniedBanner() {
                   <span>נסה שוב</span>
                 </>
               )}
-            </button>
+            </Button>
 
             <p className="text-xs text-foreground-muted text-center mt-3">
               לאחר שינוי ההגדרות, לחצו &quot;נסה שוב&quot;

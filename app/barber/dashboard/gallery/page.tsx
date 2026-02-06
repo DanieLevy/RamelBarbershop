@@ -4,12 +4,13 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
 import { uploadGalleryImage, deleteGalleryImage } from '@/lib/storage/upload'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { Images, Upload, Trash2, GripVertical, Plus, Info, Loader2, Move, X, Check, RotateCcw } from 'lucide-react'
 import Image from 'next/image'
 import type { BarberGalleryImage } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
+import { Button } from '@heroui/react'
 
 const MAX_GALLERY_IMAGES = 10
 
@@ -53,7 +54,7 @@ export default function GalleryPage() {
     if (error) {
       console.error('Error fetching gallery:', error)
       await report(new Error(error.message), 'Fetching gallery images')
-      toast.error('שגיאה בטעינת הגלריה')
+      showToast.error('שגיאה בטעינת הגלריה')
     } else {
       setImages(data || [])
     }
@@ -66,7 +67,7 @@ export default function GalleryPage() {
     if (!files || files.length === 0 || !barber?.id) return
     
     if (images.length + files.length > MAX_GALLERY_IMAGES) {
-      toast.error(`ניתן להעלות עד ${MAX_GALLERY_IMAGES} תמונות`)
+      showToast.error(`ניתן להעלות עד ${MAX_GALLERY_IMAGES} תמונות`)
       return
     }
     
@@ -80,13 +81,13 @@ export default function GalleryPage() {
       
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        toast.error(`${file.name} אינו קובץ תמונה`)
+        showToast.error(`${file.name} אינו קובץ תמונה`)
         continue
       }
       
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        toast.error(`${file.name} גדול מדי (מקסימום 5MB)`)
+        showToast.error(`${file.name} גדול מדי (מקסימום 5MB)`)
         continue
       }
       
@@ -107,18 +108,18 @@ export default function GalleryPage() {
         if (error) {
           console.error('Error saving gallery image:', error)
           await report(new Error(error.message), 'Saving gallery image to database')
-          toast.error('שגיאה בשמירת התמונה')
+          showToast.error('שגיאה בשמירת התמונה')
         } else if (data) {
           newImages.push(data)
         }
       } else {
-        toast.error(result.error || 'שגיאה בהעלאת התמונה')
+        showToast.error(result.error || 'שגיאה בהעלאת התמונה')
       }
     }
     
     if (newImages.length > 0) {
       setImages([...images, ...newImages])
-      toast.success(`${newImages.length} תמונות הועלו בהצלחה!`)
+      showToast.success(`${newImages.length} תמונות הועלו בהצלחה!`)
     }
     
     setUploading(false)
@@ -147,7 +148,7 @@ export default function GalleryPage() {
     if (error) {
       console.error('Error deleting image:', error)
       await report(new Error(error.message), 'Deleting gallery image from database')
-      toast.error('שגיאה במחיקת התמונה')
+      showToast.error('שגיאה במחיקת התמונה')
       return
     }
     
@@ -167,7 +168,7 @@ export default function GalleryPage() {
     }
     
     setImages(images.filter(img => img.id !== imageId))
-    toast.success('התמונה נמחקה')
+    showToast.success('התמונה נמחקה')
   }
 
   const handleDragStart = (index: number) => {
@@ -289,7 +290,7 @@ export default function GalleryPage() {
     if (error) {
       console.error('Error saving position:', error)
       await report(new Error(error.message), 'Saving gallery image position')
-      toast.error('שגיאה בשמירת המיקום')
+      showToast.error('שגיאה בשמירת המיקום')
     } else {
       // Update local state
       setImages(images.map(img => 
@@ -297,7 +298,7 @@ export default function GalleryPage() {
           ? { ...img, position_x: positionModal.posX, position_y: positionModal.posY }
           : img
       ))
-      toast.success('מיקום התמונה נשמר!')
+      showToast.success('מיקום התמונה נשמר!')
       closePositionEditor()
     }
     
@@ -351,9 +352,9 @@ export default function GalleryPage() {
           <h3 className="text-lg font-medium text-foreground-light">
             תמונות ({images.length}/{MAX_GALLERY_IMAGES})
           </h3>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading || images.length >= MAX_GALLERY_IMAGES}
+          <Button
+            onPress={() => fileInputRef.current?.click()}
+            isDisabled={uploading || images.length >= MAX_GALLERY_IMAGES}
             className={cn(
               'flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all',
               uploading || images.length >= MAX_GALLERY_IMAGES
@@ -367,7 +368,7 @@ export default function GalleryPage() {
               <Plus size={18} />
             )}
             {uploading ? 'מעלה...' : 'הוסף תמונות'}
-          </button>
+          </Button>
         </div>
 
         {/* Hidden file input */}
@@ -424,26 +425,24 @@ export default function GalleryPage() {
                   </div>
                   
                   {/* Position button */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      openPositionEditor(image)
-                    }}
-                    className="p-2 bg-accent-gold text-background-dark rounded-lg hover:bg-accent-gold/90 transition-colors"
-                    aria-label="כוון מיקום"
-                    title="כוון מיקום התמונה"
+                  <Button
+                    onPress={() => openPositionEditor(image)}
+                    isIconOnly
+                    className="min-w-[36px] w-9 h-9 p-2 bg-accent-gold text-background-dark rounded-lg hover:bg-accent-gold/90 transition-colors"
+                    aria-label="כוון מיקום התמונה"
                   >
                     <Move size={18} />
-                  </button>
+                  </Button>
                   
                   {/* Delete button */}
-                  <button
-                    onClick={() => handleDeleteImage(image.id)}
-                    className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                  <Button
+                    onPress={() => handleDeleteImage(image.id)}
+                    isIconOnly
+                    className="min-w-[36px] w-9 h-9 p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
                     aria-label="מחק תמונה"
                   >
                     <Trash2 size={18} />
-                  </button>
+                  </Button>
                 </div>
                 
                 {/* Order number + position indicator */}
@@ -462,9 +461,10 @@ export default function GalleryPage() {
             
             {/* Add more button */}
             {images.length < MAX_GALLERY_IMAGES && (
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
+              <Button
+                onPress={() => fileInputRef.current?.click()}
+                isDisabled={uploading}
+                variant="ghost"
                 className="aspect-square rounded-xl border-2 border-dashed border-white/10 hover:border-accent-gold/30 transition-colors flex flex-col items-center justify-center gap-2 text-foreground-muted hover:text-accent-gold"
               >
                 {uploading ? (
@@ -473,7 +473,7 @@ export default function GalleryPage() {
                   <Plus size={24} />
                 )}
                 <span className="text-xs">הוסף</span>
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -505,13 +505,15 @@ export default function GalleryPage() {
                 <Move size={18} className="text-accent-gold" />
                 מיקום התמונה
               </h3>
-              <button
-                onClick={closePositionEditor}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              <Button
+                onPress={closePositionEditor}
+                isIconOnly
+                variant="ghost"
+                className="min-w-[36px] w-9 h-9 p-2 hover:bg-white/10 rounded-lg transition-colors"
                 aria-label="סגור"
               >
                 <X size={20} className="text-foreground-muted" />
-              </button>
+              </Button>
             </div>
             
             {/* Instructions */}
@@ -601,10 +603,10 @@ export default function GalleryPage() {
             
             {/* Action Buttons */}
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleResetPosition}
-                disabled={positionModal.posX === 50 && positionModal.posY === 50}
+              <Button
+                onPress={handleResetPosition}
+                isDisabled={positionModal.posX === 50 && positionModal.posY === 50}
+                variant="ghost"
                 className={cn(
                   'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all',
                   'bg-white/5 text-foreground-muted hover:bg-white/10 hover:text-foreground-light',
@@ -613,12 +615,11 @@ export default function GalleryPage() {
               >
                 <RotateCcw size={14} />
                 איפוס
-              </button>
+              </Button>
               
-              <button
-                type="button"
-                onClick={handleSavePosition}
-                disabled={savingPosition}
+              <Button
+                onPress={handleSavePosition}
+                isDisabled={savingPosition}
                 className={cn(
                   'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all',
                   'bg-accent-gold text-background-dark hover:bg-accent-gold/90',
@@ -631,7 +632,7 @@ export default function GalleryPage() {
                   <Check size={14} />
                 )}
                 {savingPosition ? 'שומר...' : 'שמור מיקום'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

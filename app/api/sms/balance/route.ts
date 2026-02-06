@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { validateDevToken, unauthorizedResponse } from '@/lib/auth/dev-auth'
+import { reportApiError } from '@/lib/bug-reporter/helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -139,6 +140,11 @@ export async function GET(request: NextRequest) {
     
   } catch (error) {
     console.error(`[${requestId}] Error fetching SMS balance:`, error)
+    
+    await reportApiError(error, request, 'Get SMS balance failed', {
+      severity: 'low',
+      additionalData: { requestId },
+    })
     
     return NextResponse.json(
       { 

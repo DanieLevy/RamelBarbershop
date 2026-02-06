@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { validateTrustedDevice, extendDeviceExpiration } from '@/lib/services/trusted-device.service'
-import { reportServerError } from '@/lib/bug-reporter/helpers'
+import { reportApiError } from '@/lib/bug-reporter/helpers'
 
 /**
  * Validate Device API
@@ -65,9 +65,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error(`[${requestId}] Error validating device:`, error)
     
-    await reportServerError(error, 'POST /api/auth/validate-device', {
-      route: '/api/auth/validate-device',
-      severity: 'medium',
+    await reportApiError(error, request, 'Validate device failed', {
+      severity: 'high',
       additionalData: { requestId },
     })
     

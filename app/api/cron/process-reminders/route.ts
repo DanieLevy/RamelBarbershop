@@ -23,7 +23,7 @@ import {
   isValidIsraeliMobile,
   extractFirstName
 } from '@/lib/sms/sms-reminder-service'
-import { reportServerError } from '@/lib/bug-reporter/helpers'
+import { reportApiError } from '@/lib/bug-reporter/helpers'
 import { getIsraelDayStart, getIsraelDayEnd, nowInIsraelMs, getDayKeyInIsrael, parseTimeString, israelDateToTimestamp, timestampToIsraelDate } from '@/lib/utils'
 import type { DayOfWeek } from '@/types/database'
 
@@ -725,9 +725,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[ProcessReminders] Fatal error:', error)
     
-    // Report the error to bug tracking
-    await reportServerError(error, 'POST /api/cron/process-reminders', {
-      route: '/api/cron/process-reminders',
+    // Report the error to bug tracking with full request context
+    await reportApiError(error, request, 'Reminder processing failed', {
       severity: 'critical',
       additionalData: { 
         triggerSource,

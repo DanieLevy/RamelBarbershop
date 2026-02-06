@@ -12,7 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { reportServerError } from '@/lib/bug-reporter/helpers'
+import { reportApiError } from '@/lib/bug-reporter/helpers'
 import { getO19ErrorMessage } from '@/lib/sms/error-codes'
 
 export const dynamic = 'force-dynamic'
@@ -167,10 +167,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error(`[${requestId}] Error verifying OTP:`, error)
     
-    await reportServerError(error, 'POST /api/sms/verify-otp', {
-      route: '/api/sms/verify-otp',
-      severity: 'high',
-      additionalData: { requestId }
+    await reportApiError(error, request, 'Verify OTP failed', {
+      severity: 'critical',
+      additionalData: { requestId },
     })
     
     return NextResponse.json(

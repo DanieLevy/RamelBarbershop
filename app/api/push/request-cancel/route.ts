@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { pushService } from '@/lib/push/push-service'
-import { reportServerError } from '@/lib/bug-reporter/helpers'
+import { reportApiError } from '@/lib/bug-reporter/helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -88,9 +88,8 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('[Request Cancel] Error:', error)
-    await reportServerError(error, 'POST /api/push/request-cancel', {
-      route: '/api/push/request-cancel',
-      severity: 'high'
+    await reportApiError(error, request, 'Request cancel failed', {
+      severity: 'high',
     })
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Unknown error' },

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import type { BarbershopSettings } from '@/types/database'
 import { useBugReporter } from '@/hooks/useBugReporter'
@@ -50,7 +50,7 @@ export default function GlobalSchedulePage() {
     if (error) {
       console.error('Error fetching settings:', error)
       await report(new Error(error.message), 'Fetching barbershop schedule settings')
-      toast.error('שגיאה בטעינת ההגדרות')
+      showToast.error('שגיאה בטעינת ההגדרות')
       return
     }
     
@@ -97,9 +97,9 @@ export default function GlobalSchedulePage() {
     if (error) {
       console.error('Error saving schedule:', error)
       await report(new Error(error.message), 'Saving barbershop schedule settings')
-      toast.error('שגיאה בשמירת שעות הפתיחה')
+      showToast.error('שגיאה בשמירת שעות הפתיחה')
     } else {
-      toast.success('שעות הפתיחה נשמרו בהצלחה!')
+      showToast.success('שעות הפתיחה נשמרו בהצלחה!')
     }
     
     setSaving(false)

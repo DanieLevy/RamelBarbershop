@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { cn, nowInIsraelMs } from '@/lib/utils'
 import { getExternalLinkProps } from '@/lib/utils/external-link'
 import { 
@@ -108,7 +108,7 @@ export default function MyCustomersPage() {
       if (resError) {
         console.error('Error fetching reservations:', resError)
         await report(new Error(resError.message), 'Fetching customer reservations')
-        toast.error('שגיאה בטעינת הנתונים')
+        showToast.error('שגיאה בטעינת הנתונים')
         setLoading(false)
         return
       }
@@ -131,7 +131,7 @@ export default function MyCustomersPage() {
       if (custError) {
         console.error('Error fetching customers:', custError)
         await report(new Error(custError.message), 'Fetching customer details')
-        toast.error('שגיאה בטעינת פרטי הלקוחות')
+        showToast.error('שגיאה בטעינת פרטי הלקוחות')
         setLoading(false)
         return
       }
@@ -217,7 +217,7 @@ export default function MyCustomersPage() {
     } catch (err) {
       console.error('Error in fetchCustomers:', err)
       await report(err, 'Fetching customers (exception)')
-      toast.error('שגיאה בטעינת הלקוחות')
+      showToast.error('שגיאה בטעינת הלקוחות')
     } finally {
       setLoading(false)
     }
@@ -262,7 +262,7 @@ export default function MyCustomersPage() {
   // Handle sending push notification
   const handleSendPush = async () => {
     if (!selectedCustomer || !pushTitle.trim() || !pushBody.trim()) {
-      toast.error('נא למלא כותרת ותוכן ההודעה')
+      showToast.error('נא למלא כותרת ותוכן ההודעה')
       return
     }
     
@@ -285,17 +285,17 @@ export default function MyCustomersPage() {
       const result = await response.json()
       
       if (result.success) {
-        toast.success('ההודעה נשלחה בהצלחה!')
+        showToast.success('ההודעה נשלחה בהצלחה!')
         closePushModal()
       } else {
         console.error('Push send failed:', result)
         await report(new Error(result.error || 'Push send failed'), 'Sending push notification')
-        toast.error(result.error || 'שגיאה בשליחת ההודעה')
+        showToast.error(result.error || 'שגיאה בשליחת ההודעה')
       }
     } catch (err) {
       console.error('Error sending push:', err)
       await report(err, 'Sending push notification (exception)')
-      toast.error('שגיאה בשליחת ההודעה')
+      showToast.error('שגיאה בשליחת ההודעה')
     } finally {
       setSendingPush(false)
     }

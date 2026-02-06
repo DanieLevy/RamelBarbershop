@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { reportServerError } from '@/lib/bug-reporter/helpers'
+import { reportApiError } from '@/lib/bug-reporter/helpers'
 
 const getOrCreateSchema = z.object({
   phone: z.string().min(9, 'מספר טלפון לא תקין').max(15),
@@ -132,8 +132,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error(`[${requestId}] Error in get-or-create customer:`, error)
     
-    await reportServerError(error, 'POST /api/customers/get-or-create', {
-      route: '/api/customers/get-or-create',
+    await reportApiError(error, request, 'Get or create customer failed', {
       severity: 'high',
       additionalData: { requestId },
     })

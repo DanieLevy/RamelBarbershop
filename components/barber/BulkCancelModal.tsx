@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { X, AlertTriangle, Calendar, Users } from 'lucide-react'
-import { cn, formatDateHebrew } from '@/lib/utils'
+import { formatDateHebrew } from '@/lib/utils'
 import { Portal } from '@/components/ui/Portal'
+import { Button } from '@heroui/react'
 
 interface ReservationSummary {
   id: string
@@ -64,13 +65,14 @@ export function BulkCancelModal({
             </div>
             <h2 className="text-lg font-medium text-foreground-light">ביטול כל התורים ביום</h2>
           </div>
-          <button
-            onClick={handleClose}
-            className="icon-btn p-2 rounded-full hover:bg-white/10 transition-colors"
+          <Button
+            variant="ghost"
+            isIconOnly
+            onPress={handleClose}
             aria-label="סגור"
           >
             <X size={20} strokeWidth={1.5} className="text-foreground-muted" />
-          </button>
+          </Button>
         </div>
         
         {/* Content */}
@@ -150,22 +152,19 @@ export function BulkCancelModal({
         
         {/* Actions */}
         <div className="flex gap-3 p-4 border-t border-white/10 bg-background-dark/50">
-          <button
-            onClick={handleClose}
-            disabled={isLoading}
-            className="flex-1 py-3 px-4 rounded-xl border border-white/10 text-foreground-light font-medium hover:bg-white/5 transition-colors disabled:opacity-50 flex items-center justify-center"
+          <Button
+            variant="secondary"
+            onPress={handleClose}
+            isDisabled={isLoading}
+            className="flex-1"
           >
             ביטול
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={isLoading}
-            className={cn(
-              'flex-1 py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center',
-              isLoading
-                ? 'bg-red-500/30 text-red-300 cursor-not-allowed'
-                : 'bg-red-500 text-white hover:bg-red-600'
-            )}
+          </Button>
+          <Button
+            variant="danger"
+            onPress={handleConfirm}
+            isDisabled={isLoading}
+            className="flex-1"
           >
             {isLoading ? (
               <span className="flex items-center justify-center gap-2">
@@ -175,7 +174,7 @@ export function BulkCancelModal({
             ) : (
               `אישור - בטל ${reservations.length} תורים`
             )}
-          </button>
+          </Button>
         </div>
         </div>
       </div>

@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { reportServerError } from '@/lib/bug-reporter/helpers'
+import { reportApiError } from '@/lib/bug-reporter/helpers'
 
 const updateSchema = z.object({
   customerId: z.string().uuid('מזהה לקוח לא תקין'),
@@ -105,8 +105,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error(`[${requestId}] Error updating customer:`, error)
     
-    await reportServerError(error, 'POST /api/customers/update', {
-      route: '/api/customers/update',
+    await reportApiError(error, request, 'Update customer failed', {
       severity: 'medium',
       additionalData: { requestId },
     })

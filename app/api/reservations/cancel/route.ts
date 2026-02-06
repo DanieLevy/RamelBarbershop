@@ -8,7 +8,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
-import { reportBug } from '@/lib/bug-reporter'
+import { reportApiError } from '@/lib/bug-reporter/helpers'
 
 // UUID validation
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -62,11 +62,13 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('[API/Cancel] Database error:', error)
       
-      // Report database errors
-      await reportBug(
+      // Report database errors with full request context
+      await reportApiError(
         new Error(error.message),
-        'API: Cancel Reservation - Database Error',
+        request,
+        'Database Error during cancellation',
         {
+          severity: 'high',
           additionalData: {
             errorCode: error.code,
             reservationId: body.reservationId,
@@ -104,10 +106,12 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error('[API/Cancel] Unexpected error:', err)
     
-    // Report unexpected errors
-    await reportBug(
+    // Report unexpected errors with full request context
+    await reportApiError(
       err instanceof Error ? err : new Error(String(err)),
-      'API: Cancel Reservation - Unexpected Error'
+      request,
+      'Unexpected Error during cancellation',
+      { severity: 'critical' }
     )
     
     return NextResponse.json(
