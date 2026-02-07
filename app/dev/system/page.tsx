@@ -362,8 +362,8 @@ export default function DevSystemPage() {
               className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-lg hover:bg-zinc-800 transition-colors"
             >
               <div>
-                <p className="text-sm text-white">Toast Comparison</p>
-                <p className="text-[10px] text-zinc-500">Compare Sonner vs React Hot Toast</p>
+                <p className="text-sm text-white">Toast Testing</p>
+                <p className="text-[10px] text-zinc-500">Test react-hot-toast notifications</p>
               </div>
               <Globe size={14} className="text-zinc-500" />
             </a>

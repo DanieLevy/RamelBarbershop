@@ -1,5 +1,5 @@
 /**
- * Enhanced Toast Utility
+ * Toast Utility - Powered by react-hot-toast
  * 
  * Single source of truth for all toast notifications in the application.
  * Mobile-optimized with beautiful design, Hebrew RTL support, and consistent API.
@@ -11,14 +11,6 @@
  * showToast.error('שגיאה בביצוע הפעולה')
  * showToast.info('מידע חשוב')
  * showToast.warning('שים לב!')
- * 
- * @example With description:
- * showToast.success('הצלחה!', { description: 'התור נקבע לשעה 10:00' })
- * 
- * @example With action:
- * showToast.success('התור בוטל', {
- *   action: { label: 'בטל', onClick: () => undoCancel() }
- * })
  * 
  * @example Loading toast:
  * const id = showToast.loading('שומר...')
@@ -34,7 +26,7 @@
  * })
  */
 
-import { toast, ExternalToast } from 'sonner'
+import toast, { type Renderable } from 'react-hot-toast'
 
 // ============================================================================
 // Types
@@ -52,18 +44,18 @@ export interface ToastOptions {
   description?: string
   /** Duration in milliseconds (default: 4000, use Infinity for persistent) */
   duration?: number
-  /** Action button configuration */
+  /** Action button configuration (ignored in react-hot-toast) */
   action?: ToastAction
   /** Custom toast ID (for updating/dismissing specific toasts) */
-  id?: string | number
+  id?: string
   /** Whether the toast is dismissible (default: true) */
   dismissible?: boolean
   /** Callback when toast is dismissed */
   onDismiss?: () => void
   /** Callback when toast auto-closes */
   onAutoClose?: () => void
-  /** Custom icon (React node) */
-  icon?: React.ReactNode
+  /** Custom icon (JSX Element, string, or null) */
+  icon?: Renderable
   /** Custom class name for the toast */
   className?: string
   /** Position override for this specific toast */
@@ -77,47 +69,25 @@ export interface PromiseOptions<T> {
 }
 
 // ============================================================================
-// Icon Components (SVG strings for performance)
+// Shared Style Constants
 // ============================================================================
 
-const icons = {
-  success: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
-  error: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
-  warning: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
-  info: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
-  loading: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>`,
-}
+const VARIANT_STYLES = {
+  success: { borderColor: 'rgba(52,211,153,0.3)' },
+  error: { borderColor: 'rgba(244,63,94,0.3)' },
+  warning: { borderColor: 'rgba(245,158,11,0.3)' },
+  info: { borderColor: 'rgba(56,189,248,0.3)' },
+  loading: { borderColor: 'rgba(212,175,55,0.3)' },
+  default: {},
+} as const
 
 // ============================================================================
-// Utility Functions
+// Helper to build toast message with optional description
 // ============================================================================
 
-/**
- * Convert ToastOptions to Sonner's ExternalToast format
- */
-const toSonnerOptions = (options?: ToastOptions): ExternalToast => {
-  if (!options) return {}
-  
-  const sonnerOptions: ExternalToast = {}
-  
-  if (options.description) sonnerOptions.description = options.description
-  if (options.duration !== undefined) sonnerOptions.duration = options.duration
-  if (options.id !== undefined) sonnerOptions.id = options.id
-  if (options.dismissible !== undefined) sonnerOptions.dismissible = options.dismissible
-  if (options.onDismiss) sonnerOptions.onDismiss = options.onDismiss
-  if (options.onAutoClose) sonnerOptions.onAutoClose = options.onAutoClose
-  if (options.icon) sonnerOptions.icon = options.icon
-  if (options.className) sonnerOptions.className = options.className
-  if (options.position) sonnerOptions.position = options.position
-  
-  if (options.action) {
-    sonnerOptions.action = {
-      label: options.action.label,
-      onClick: options.action.onClick,
-    }
-  }
-  
-  return sonnerOptions
+const buildMessage = (message: string, description?: string): string => {
+  if (!description) return message
+  return `${message}\n${description}`
 }
 
 // ============================================================================
@@ -127,50 +97,77 @@ const toSonnerOptions = (options?: ToastOptions): ExternalToast => {
 /**
  * Show a success toast
  */
-const success = (message: string, options?: ToastOptions): string | number => {
-  return toast.success(message, toSonnerOptions(options))
+const success = (message: string, options?: ToastOptions): string => {
+  return toast.success(buildMessage(message, options?.description), {
+    id: options?.id,
+    duration: options?.duration ?? 4000,
+    icon: options?.icon,
+    style: VARIANT_STYLES.success,
+    position: options?.position,
+  })
 }
 
 /**
  * Show an error toast
  */
-const error = (message: string, options?: ToastOptions): string | number => {
-  return toast.error(message, {
-    ...toSonnerOptions(options),
+const error = (message: string, options?: ToastOptions): string => {
+  return toast.error(buildMessage(message, options?.description), {
+    id: options?.id,
     duration: options?.duration ?? 5000, // Errors stay longer
+    icon: options?.icon,
+    style: VARIANT_STYLES.error,
+    position: options?.position,
   })
 }
 
 /**
  * Show a warning toast
  */
-const warning = (message: string, options?: ToastOptions): string | number => {
-  return toast.warning(message, toSonnerOptions(options))
+const warning = (message: string, options?: ToastOptions): string => {
+  return toast(buildMessage(message, options?.description), {
+    id: options?.id,
+    duration: options?.duration ?? 4000,
+    icon: options?.icon ?? '⚠️',
+    style: VARIANT_STYLES.warning,
+    position: options?.position,
+  })
 }
 
 /**
  * Show an info toast
  */
-const info = (message: string, options?: ToastOptions): string | number => {
-  return toast.info(message, toSonnerOptions(options))
+const info = (message: string, options?: ToastOptions): string => {
+  return toast(buildMessage(message, options?.description), {
+    id: options?.id,
+    duration: options?.duration ?? 4000,
+    icon: options?.icon ?? 'ℹ️',
+    style: VARIANT_STYLES.info,
+    position: options?.position,
+  })
 }
 
 /**
  * Show a loading toast (persistent by default)
  * Returns toast ID for later dismissal
  */
-const loading = (message: string, options?: Omit<ToastOptions, 'duration'>): string | number => {
-  return toast.loading(message, {
-    ...toSonnerOptions(options),
-    duration: Infinity, // Loading toasts don't auto-dismiss
+const loading = (message: string, options?: Omit<ToastOptions, 'duration'>): string => {
+  return toast.loading(buildMessage(message, options?.description), {
+    id: options?.id,
+    style: VARIANT_STYLES.loading,
+    position: options?.position,
   })
 }
 
 /**
  * Show a default/neutral toast
  */
-const show = (message: string, options?: ToastOptions): string | number => {
-  return toast(message, toSonnerOptions(options))
+const show = (message: string, options?: ToastOptions): string => {
+  return toast(buildMessage(message, options?.description), {
+    id: options?.id,
+    duration: options?.duration ?? 4000,
+    icon: options?.icon,
+    position: options?.position,
+  })
 }
 
 /**
@@ -178,7 +175,7 @@ const show = (message: string, options?: ToastOptions): string | number => {
  */
 const dismiss = (id?: string | number): void => {
   if (id !== undefined) {
-    toast.dismiss(id)
+    toast.dismiss(String(id))
   } else {
     toast.dismiss()
   }
@@ -200,38 +197,46 @@ const promise = <T>(
 }
 
 /**
- * Update an existing toast
+ * Update an existing toast by showing a new one with the same ID
  */
 const update = (
   id: string | number,
   message: string,
   options?: ToastOptions & { variant?: ToastVariant }
 ): void => {
+  const toastId = String(id)
   const variant = options?.variant || 'default'
   
   switch (variant) {
     case 'success':
-      toast.success(message, { ...toSonnerOptions(options), id })
+      toast.success(buildMessage(message, options?.description), { id: toastId, ...VARIANT_STYLES.success })
       break
     case 'error':
-      toast.error(message, { ...toSonnerOptions(options), id })
+      toast.error(buildMessage(message, options?.description), { id: toastId, ...VARIANT_STYLES.error })
       break
     case 'warning':
-      toast.warning(message, { ...toSonnerOptions(options), id })
+      toast(buildMessage(message, options?.description), { id: toastId, icon: '⚠️', ...VARIANT_STYLES.warning })
       break
     case 'info':
-      toast.info(message, { ...toSonnerOptions(options), id })
+      toast(buildMessage(message, options?.description), { id: toastId, icon: 'ℹ️', ...VARIANT_STYLES.info })
       break
     default:
-      toast(message, { ...toSonnerOptions(options), id })
+      toast(buildMessage(message, options?.description), { id: toastId })
   }
 }
 
 /**
- * Show a custom toast with full control
+ * Show a custom toast with JSX content
  */
-const custom = (content: React.ReactNode, options?: ToastOptions): string | number => {
-  return toast.custom(() => content as React.ReactElement, toSonnerOptions(options))
+const custom = (content: React.ReactNode, options?: ToastOptions): string => {
+  return toast.custom(
+    () => content as React.ReactElement,
+    {
+      id: options?.id,
+      duration: options?.duration ?? 4000,
+      position: options?.position,
+    }
+  )
 }
 
 // ============================================================================
@@ -268,8 +273,6 @@ export const showToast = {
   update,
   /** Custom toast component */
   custom,
-  /** SVG icons for custom toasts */
-  icons,
 }
 
 // ============================================================================

@@ -1276,8 +1276,6 @@ button, [role="button"], a {
   filter: invert(100%) hue-rotate(180deg) brightness(1.1) contrast(1.1);
 }
 
-/* Toast and Sonner styles moved to components/ui/toast-styles.css */
-
 /* Mobile drawer overlay */
 .drawer-overlay {
   @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-40;

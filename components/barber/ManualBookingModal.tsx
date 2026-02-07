@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { X, Loader2, Search, User, Calendar, Clock, UserPlus, Scissors, AlertTriangle } from 'lucide-react'
-import { cn, generateTimeSlots, parseTimeString, nowInIsrael, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael, getSlotKey } from '@/lib/utils'
+import { cn, generateTimeSlots, parseTimeString, nowInIsrael, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael, getSlotKey, getIsraelDateString } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { createReservation } from '@/lib/services/booking.service'
 import { getOrCreateCustomer } from '@/lib/services/customer.service'
+import { getBreakoutsForDate, isSlotInBreakout } from '@/lib/services/breakout.service'
 import { format, addDays, isSameDay } from 'date-fns'
 import { showToast } from '@/lib/toast'
-import type { Customer, BarbershopSettings, Service, WorkDay } from '@/types/database'
+import type { Customer, BarbershopSettings, Service, WorkDay, BarberBreakout, BarbershopClosure, BarberClosure } from '@/types/database'
 import { Portal } from '@/components/ui/Portal'
 import { Button } from '@heroui/react'
 
@@ -59,6 +60,9 @@ export function ManualBookingModal({
   const [loadingServices, setLoadingServices] = useState(true)
   const [reservedSlots, setReservedSlots] = useState<number[]>([])
   const [barberWorkDays, setBarberWorkDays] = useState<WorkDay[]>([])
+  const [breakouts, setBreakouts] = useState<BarberBreakout[]>([])
+  const [barberClosures, setBarberClosures] = useState<BarberClosure[]>([])
+  const [shopClosures, setShopClosures] = useState<BarbershopClosure[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [saving, setSaving] = useState(false)
   
@@ -141,6 +145,7 @@ export function ManualBookingModal({
       setCustomMinute('00')
       fetchServices()
       fetchBarberWorkDays()
+      fetchClosures()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, preselectedDate, preselectedTime])
@@ -155,10 +160,11 @@ export function ManualBookingModal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOutOfHours, selectedDate, barberWorkDays])
 
-  // Fetch available time slots when date changes
+  // Fetch available time slots and breakouts when date changes
   useEffect(() => {
     if (isOpen && selectedDate) {
       fetchReservedSlots()
+      fetchBreakoutsForSelectedDate()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, selectedDate])
@@ -173,6 +179,32 @@ export function ManualBookingModal({
     if (data) {
       setBarberWorkDays(data as WorkDay[])
     }
+  }
+
+  const fetchBreakoutsForSelectedDate = async () => {
+    const dateBreakouts = await getBreakoutsForDate(barberId, selectedDate.getTime())
+    setBreakouts(dateBreakouts)
+  }
+
+  const fetchClosures = async () => {
+    const supabase = createClient()
+    const todayStr = getIsraelDateString(Date.now())
+    
+    // Fetch barber closures and shop closures in parallel
+    const [barberRes, shopRes] = await Promise.all([
+      supabase
+        .from('barber_closures')
+        .select('*')
+        .eq('barber_id', barberId)
+        .gte('end_date', todayStr),
+      supabase
+        .from('barbershop_closures')
+        .select('*')
+        .gte('end_date', todayStr),
+    ])
+    
+    if (barberRes.data) setBarberClosures(barberRes.data as BarberClosure[])
+    if (shopRes.data) setShopClosures(shopRes.data as BarbershopClosure[])
   }
 
   const fetchServices = async () => {
@@ -267,8 +299,31 @@ export function ManualBookingModal({
     return reservedSlots.some(reserved => getSlotKey(reserved) === customSlotKey)
   }, [customTimeTimestamp, reservedSlots])
 
-  // Generate available time slots using barber's day-specific hours
-  const availableSlots = useMemo(() => {
+  // Check if the selected date is closed (shop or barber closure)
+  const dateClosureReason = useMemo(() => {
+    const dateStr = getIsraelDateString(selectedDate.getTime())
+    
+    // Check shop closures
+    const shopClosure = shopClosures.find(c => dateStr >= c.start_date && dateStr <= c.end_date)
+    if (shopClosure) return shopClosure.reason || 'המספרה סגורה בתאריך זה'
+    
+    // Check barber closures
+    const barberClosure = barberClosures.find(c => dateStr >= c.start_date && dateStr <= c.end_date)
+    if (barberClosure) return barberClosure.reason || 'הספר לא זמין בתאריך זה'
+    
+    return null
+  }, [selectedDate, shopClosures, barberClosures])
+
+  // Generate ALL time slots with availability status and reason
+  type SlotStatus = 'available' | 'reserved' | 'breakout' | 'past'
+  interface EnhancedSlot {
+    timestamp: number
+    time: string
+    status: SlotStatus
+    reason?: string
+  }
+
+  const { availableSlots, allSlotsWithStatus } = useMemo(() => {
     // Get the day of week for the selected date
     const dayKey = getDayKeyInIsrael(selectedDate.getTime())
     
@@ -280,16 +335,19 @@ export function ManualBookingModal({
     let workEnd: string
     
     if (barberDaySettings && barberDaySettings.is_working && barberDaySettings.start_time && barberDaySettings.end_time) {
-      // Use barber's day-specific hours
       workStart = barberDaySettings.start_time
       workEnd = barberDaySettings.end_time
     } else if (barberDaySettings && !barberDaySettings.is_working) {
-      // Barber doesn't work on this day - return empty slots
-      return []
+      // Barber doesn't work on this day
+      return { availableSlots: [], allSlotsWithStatus: [] }
     } else {
-      // Fall back to shop settings
       workStart = shopSettings?.work_hours_start || '09:00'
       workEnd = shopSettings?.work_hours_end || '19:00'
+    }
+    
+    // If date is closed, return empty
+    if (dateClosureReason) {
+      return { availableSlots: [], allSlotsWithStatus: [] }
     }
     
     const { hour: startHour, minute: startMinute } = parseTimeString(workStart)
@@ -306,18 +364,33 @@ export function ManualBookingModal({
     
     // Build set of reserved slot keys for fast lookup
     const reservedSlotKeys = new Set(reservedSlots.map(ts => getSlotKey(ts)))
-    
-    // Filter out reserved and past slots
     const now = Date.now()
-    return allSlots.filter(slot => {
-      // Skip past slots for today
+    
+    // Classify each slot
+    const enhancedSlots: EnhancedSlot[] = allSlots.map(slot => {
+      // Check past slots for today
       if (isSameDay(selectedDate, israelNow) && slot.timestamp < now) {
-        return false
+        return { ...slot, status: 'past' as SlotStatus, reason: 'עבר' }
       }
-      // Skip reserved slots using slot key comparison
-      return !reservedSlotKeys.has(getSlotKey(slot.timestamp))
+      
+      // Check reserved slots
+      if (reservedSlotKeys.has(getSlotKey(slot.timestamp))) {
+        return { ...slot, status: 'reserved' as SlotStatus, reason: 'תפוס' }
+      }
+      
+      // Check breakout slots
+      const breakoutCheck = isSlotInBreakout(slot.timestamp, breakouts, workEnd)
+      if (breakoutCheck.blocked) {
+        return { ...slot, status: 'breakout' as SlotStatus, reason: breakoutCheck.reason || 'הפסקה' }
+      }
+      
+      return { ...slot, status: 'available' as SlotStatus }
     })
-  }, [selectedDate, shopSettings, reservedSlots, israelNow, barberWorkDays])
+    
+    const available = enhancedSlots.filter(s => s.status === 'available')
+    
+    return { availableSlots: available, allSlotsWithStatus: enhancedSlots }
+  }, [selectedDate, shopSettings, reservedSlots, israelNow, barberWorkDays, breakouts, dateClosureReason])
 
   const handleSubmit = async () => {
     // Determine the final time to use
@@ -847,10 +920,23 @@ export function ManualBookingModal({
                   <div className="flex items-center justify-center py-4">
                     <Loader2 size={20} className="text-accent-gold animate-spin" />
                   </div>
-                ) : availableSlots.length === 0 ? (
+                ) : dateClosureReason ? (
+                  <div className="text-center py-4">
+                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 mb-2">
+                      <p className="text-red-400 text-sm">{dateClosureReason}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsOutOfHours(true)}
+                      className="text-orange-400 text-xs underline hover:text-orange-300"
+                    >
+                      קבע תור מחוץ לשעות העבודה
+                    </button>
+                  </div>
+                ) : allSlotsWithStatus.length === 0 ? (
                   <div className="text-center py-4">
                     <p className="text-foreground-muted text-sm mb-2">
-                      אין משבצות פנויות ביום זה
+                      אין משבצות ביום זה
                     </p>
                     <button
                       type="button"
@@ -861,21 +947,84 @@ export function ManualBookingModal({
                     </button>
                   </div>
                 ) : (
-                  <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto pb-2">
-                    {availableSlots.map(slot => (
-                      <button
-                        key={slot.timestamp}
-                        onClick={() => setSelectedTime(slot.timestamp)}
-                        className={cn(
-                          'px-3 py-1.5 rounded-lg text-sm font-medium transition-all tabular-nums',
-                          selectedTime === slot.timestamp
-                            ? 'bg-accent-gold text-background-dark'
-                            : 'bg-white/[0.05] text-foreground-muted hover:bg-white/[0.1] border border-white/[0.08]'
+                  <div className="space-y-2">
+                    {/* Available count info */}
+                    <p className="text-foreground-muted text-xs">
+                      {availableSlots.length} פנויות מתוך {allSlotsWithStatus.length} משבצות
+                    </p>
+                    <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto pb-2">
+                      {allSlotsWithStatus.map(slot => {
+                        const isUnavailable = slot.status !== 'available'
+                        const isSelected = selectedTime === slot.timestamp && !isUnavailable
+                        
+                        return (
+                          <button
+                            key={slot.timestamp}
+                            onClick={() => {
+                              if (!isUnavailable) setSelectedTime(slot.timestamp)
+                            }}
+                            disabled={isUnavailable}
+                            title={isUnavailable ? `${slot.time} - ${slot.reason}` : slot.time}
+                            className={cn(
+                              'px-3 py-1.5 rounded-lg text-sm font-medium transition-all tabular-nums relative',
+                              isSelected
+                                ? 'bg-accent-gold text-background-dark'
+                                : isUnavailable
+                                  ? 'bg-white/[0.02] text-foreground-muted/30 border border-white/[0.04] cursor-not-allowed line-through'
+                                  : 'bg-white/[0.05] text-foreground-muted hover:bg-white/[0.1] border border-white/[0.08]'
+                            )}
+                            aria-label={isUnavailable ? `${slot.time} - ${slot.reason}` : `בחר שעה ${slot.time}`}
+                            tabIndex={isUnavailable ? -1 : 0}
+                          >
+                            {slot.time}
+                            {isUnavailable && slot.status === 'breakout' && (
+                              <span className="absolute -top-1 -left-1 w-3 h-3 rounded-full bg-orange-500/60 flex items-center justify-center">
+                                <AlertTriangle size={7} className="text-white" />
+                              </span>
+                            )}
+                            {isUnavailable && slot.status === 'reserved' && (
+                              <span className="absolute -top-1 -left-1 w-3 h-3 rounded-full bg-red-500/60 flex items-center justify-center">
+                                <X size={7} className="text-white" />
+                              </span>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    
+                    {/* Legend */}
+                    {allSlotsWithStatus.some(s => s.status !== 'available') && (
+                      <div className="flex flex-wrap gap-3 pt-1">
+                        {allSlotsWithStatus.some(s => s.status === 'reserved') && (
+                          <div className="flex items-center gap-1.5 text-[10px] text-foreground-muted/60">
+                            <span className="w-2 h-2 rounded-full bg-red-500/60" />
+                            תפוס
+                          </div>
                         )}
+                        {allSlotsWithStatus.some(s => s.status === 'breakout') && (
+                          <div className="flex items-center gap-1.5 text-[10px] text-foreground-muted/60">
+                            <span className="w-2 h-2 rounded-full bg-orange-500/60" />
+                            הפסקה
+                          </div>
+                        )}
+                        {allSlotsWithStatus.some(s => s.status === 'past') && (
+                          <div className="flex items-center gap-1.5 text-[10px] text-foreground-muted/60">
+                            <span className="w-2 h-2 rounded-full bg-zinc-500/60" />
+                            עבר
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {availableSlots.length === 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setIsOutOfHours(true)}
+                        className="text-orange-400 text-xs underline hover:text-orange-300 w-full text-center py-1"
                       >
-                        {slot.time}
+                        קבע תור מחוץ לשעות העבודה
                       </button>
-                    ))}
+                    )}
                   </div>
                 )}
               </>
