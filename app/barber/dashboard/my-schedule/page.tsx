@@ -177,47 +177,32 @@ export default function MySchedulePage() {
     }
     
     setSavingSchedule(true)
-    const supabase = createClient()
     
     try {
-      // Update each day's work hours
-      for (const day of workDays) {
-        if (day.id) {
-          // Update existing record
-          const { error } = await supabase
-            .from('work_days')
-            .update({
-              is_working: day.isWorking,
-              start_time: day.isWorking ? day.startTime : null,
-              end_time: day.isWorking ? day.endTime : null,
-            })
-            .eq('id', day.id)
-          
-          if (error) {
-            console.error(`Error updating ${day.dayOfWeek}:`, error)
-            throw error
-          }
-        } else {
-          // Insert new record (shouldn't happen normally)
-          const { error } = await supabase
-            .from('work_days')
-            .insert({
-              user_id: barber.id,
-              day_of_week: day.dayOfWeek,
-              is_working: day.isWorking,
-              start_time: day.isWorking ? day.startTime : null,
-              end_time: day.isWorking ? day.endTime : null,
-            })
-          
-          if (error) {
-            console.error(`Error inserting ${day.dayOfWeek}:`, error)
-            throw error
-          }
-        }
-      }
+      const res = await fetch('/api/barber/work-days', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          barberId: barber.id,
+          days: workDays.map(day => ({
+            id: day.id || undefined,
+            dayOfWeek: day.dayOfWeek,
+            isWorking: day.isWorking,
+            startTime: day.isWorking ? day.startTime : null,
+            endTime: day.isWorking ? day.endTime : null,
+          })),
+        }),
+      })
+      const result = await res.json()
       
-      showToast.success('לוח הזמנים עודכן בהצלחה!')
-      fetchData()
+      if (!result.success) {
+        console.error('Error saving schedule:', result.message)
+        await report(new Error(result.message || 'Schedule save failed'), 'Saving barber work days')
+        showToast.error('שגיאה בשמירת לוח הזמנים')
+      } else {
+        showToast.success('לוח הזמנים עודכן בהצלחה!')
+        fetchData()
+      }
     } catch (err) {
       console.error('Error saving schedule:', err)
       await report(err, 'Saving barber work days')

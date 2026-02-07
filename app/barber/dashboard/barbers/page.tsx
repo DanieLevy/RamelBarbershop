@@ -4,7 +4,6 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { getAllBarbers, createBarber, updateBarber, setBarberPassword } from '@/lib/auth/barber-auth'
-import { createClient } from '@/lib/supabase/client'
 import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { Plus, Pencil, User, Phone, Crown, GripVertical, Trash2, AlertTriangle, X, Loader2 } from 'lucide-react'
@@ -75,31 +74,35 @@ export default function BarbersPage() {
     fetchBarbers()
   }, [isAdmin, router, fetchBarbers])
 
-  // Save new order to database
+  // Save new order to database via API route
   const saveOrder = useCallback(async (newOrder: UserType[]) => {
     try {
-      const supabase = createClient()
+      const res = await fetch('/api/barber/manage', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          barberId: currentBarber?.id,
+          barbers: newOrder.map((b, index) => ({
+            id: b.id,
+            display_order: index,
+          })),
+        }),
+      })
+      const result = await res.json()
       
-      // Update each barber's display_order
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any
-      const updates = newOrder.map((barber, index) => 
-        db
-          .from('users')
-          .update({ display_order: index })
-          .eq('id', barber.id)
-      )
+      if (!result.success) {
+        throw new Error(result.message || 'Order update failed')
+      }
       
-      await Promise.all(updates)
       showToast.success('סדר הספרים עודכן')
     } catch (error) {
       console.error('Error saving order:', error)
       await report(error, 'Saving barbers display order')
       showToast.error('שגיאה בשמירת הסדר')
     }
-  }, [report])
+  }, [currentBarber?.id, report])
 
-  // Handle delete barber
+  // Handle delete barber via API route (cascade delete)
   const handleDeleteBarber = useCallback(async () => {
     if (!deleteModal.barber) return
     
@@ -107,50 +110,19 @@ export default function BarbersPage() {
     setDeleting(true)
     
     try {
-      const supabase = createClient()
+      const res = await fetch('/api/barber/manage', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          barberId: currentBarber?.id,
+          targetBarberId: barberId,
+        }),
+      })
+      const result = await res.json()
       
-      // Delete in correct order to respect foreign key constraints
-      // 1. Cancel/delete reservations
-      const { error: resError } = await supabase
-        .from('reservations')
-        .update({ 
-          status: 'cancelled', 
-          cancelled_by: 'barber',
-          cancellation_reason: 'הספר הוסר מהמערכת'
-        })
-        .eq('barber_id', barberId)
-      
-      if (resError) {
-        console.error('Error cancelling reservations:', resError)
-      }
-      
-      // 2. Delete barber_notification_settings
-      await supabase.from('barber_notification_settings').delete().eq('barber_id', barberId)
-      
-      // 2b. Delete barber_booking_settings
-      await supabase.from('barber_booking_settings').delete().eq('barber_id', barberId)
-      
-      // 3. Delete barber_closures
-      await supabase.from('barber_closures').delete().eq('barber_id', barberId)
-      
-      // 5. Delete barber_messages
-      await supabase.from('barber_messages').delete().eq('barber_id', barberId)
-      
-      // 6. Delete work_days
-      await supabase.from('work_days').delete().eq('user_id', barberId)
-      
-      // 7. Delete push_subscriptions
-      await supabase.from('push_subscriptions').delete().eq('barber_id', barberId)
-      
-      // 8. Delete services
-      await supabase.from('services').delete().eq('barber_id', barberId)
-      
-      // 9. Finally delete the user
-      const { error: userError } = await supabase.from('users').delete().eq('id', barberId)
-      
-      if (userError) {
-        console.error('Error deleting barber:', userError)
-        await report(new Error(userError.message), 'Deleting barber from users table')
+      if (!result.success) {
+        console.error('Error deleting barber:', result.message)
+        await report(new Error(result.message || 'Barber delete failed'), 'Deleting barber')
         showToast.error('שגיאה במחיקת הספר')
         return
       }
@@ -165,7 +137,7 @@ export default function BarbersPage() {
     } finally {
       setDeleting(false)
     }
-  }, [deleteModal.barber, report])
+  }, [deleteModal.barber, currentBarber?.id, report])
 
   // Handle drag start
   const handleDragStart = useCallback((index: number, e: React.MouseEvent | React.TouchEvent) => {

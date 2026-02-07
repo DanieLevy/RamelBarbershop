@@ -11,12 +11,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pushService } from '@/lib/push/push-service'
 import { reportApiError } from '@/lib/bug-reporter/helpers'
+import { verifyBarber } from '@/lib/auth/barber-api-auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    
+    // Only barbers can send custom push notifications
+    const auth = await verifyBarber(request, body)
+    if (!auth.success) return auth.response
+    
     const { 
       subscriptionId, 
       customerId, 

@@ -114,25 +114,25 @@ describe('withRetry', () => {
   })
 
   it('exhausts retries and throws last error', async () => {
+    // Use real timers with tiny delays to avoid unhandled rejection issues with fake timers
+    vi.useRealTimers()
+    
     const fn = vi.fn().mockRejectedValue(new Error('Load failed'))
     
-    const resultPromise = withRetry(fn, {
-      maxRetries: 3,
-      shouldRetry: isRetryableError,
-    })
+    await expect(
+      withRetry(fn, {
+        maxRetries: 3,
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+        shouldRetry: isRetryableError,
+      })
+    ).rejects.toThrow('Load failed')
     
-    // Fast-forward through all retries
-    await vi.runAllTimersAsync()
-    
-    // Properly await the rejection to avoid unhandled rejection warning
-    try {
-      await resultPromise
-      expect.fail('Should have thrown')
-    } catch (err) {
-      expect((err as Error).message).toBe('Load failed')
-    }
     // maxRetries: 3 means 1 initial attempt + 3 retries = 4 total calls
     expect(fn).toHaveBeenCalledTimes(4)
+    
+    // Restore fake timers for other tests
+    vi.useFakeTimers()
   })
 
   it('calls onRetry callback on each retry', async () => {
@@ -162,30 +162,28 @@ describe('withRetry', () => {
   })
 
   it('uses exponential backoff', async () => {
+    // Use real timers with tiny delays to avoid unhandled rejection issues with fake timers
+    vi.useRealTimers()
+    
     const fn = vi.fn().mockRejectedValue(new Error('Load failed'))
     const onRetry = vi.fn()
     
-    const resultPromise = withRetry(fn, {
-      maxRetries: 4,
-      initialDelayMs: 100,
-      maxDelayMs: 10000,
-      shouldRetry: isRetryableError,
-      onRetry,
-    })
-    
-    // Fast-forward through all retries
-    await vi.runAllTimersAsync()
-    
-    // Properly await the rejection to avoid unhandled rejection warning
-    try {
-      await resultPromise
-    } catch {
-      // Expected to fail - this prevents unhandled rejection warning
-    }
+    await expect(
+      withRetry(fn, {
+        maxRetries: 4,
+        initialDelayMs: 1,
+        maxDelayMs: 10,
+        shouldRetry: isRetryableError,
+        onRetry,
+      })
+    ).rejects.toThrow('Load failed')
     
     // Verify increasing delays (excluding jitter variation)
     const delays = onRetry.mock.calls.map(call => call[2] as number)
     expect(delays.length).toBeGreaterThan(0)
+    
+    // Restore fake timers for other tests
+    vi.useFakeTimers()
   })
 })
 

@@ -93,47 +93,63 @@ export default function ServicesPage() {
     }
     
     setSaving(true)
-    const supabase = createClient()
     
-    const serviceData = {
-      name: name || nameHe,
-      name_he: nameHe,
-      description: description || null,
-      duration,
-      price,
-      barber_id: barber?.id,
-      is_active: true,
-    }
-    
-    if (editingId) {
-      // Update existing service
-      const { error } = await supabase.from('services')
-        .update(serviceData)
-        .eq('id', editingId)
-        .select()
-      
-      if (error) {
-        console.error('Error updating service:', error)
-        showToast.error(`שגיאה בעדכון השירות: ${error.message || 'שגיאה לא ידועה'}`)
+    try {
+      if (editingId) {
+        // Update existing service
+        const res = await fetch('/api/barber/services', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            barberId: barber?.id,
+            serviceId: editingId,
+            name: name || nameHe,
+            name_he: nameHe,
+            description: description || null,
+            duration,
+            price,
+            is_active: true,
+          }),
+        })
+        const result = await res.json()
+        
+        if (!result.success) {
+          console.error('Error updating service:', result.message)
+          showToast.error(`שגיאה בעדכון השירות: ${result.message || 'שגיאה לא ידועה'}`)
+        } else {
+          showToast.success('השירות עודכן בהצלחה!')
+          resetForm()
+          fetchServices()
+        }
       } else {
-        showToast.success('השירות עודכן בהצלחה!')
-        resetForm()
-        fetchServices()
+        // Create new service
+        const res = await fetch('/api/barber/services', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            barberId: barber?.id,
+            name: name || nameHe,
+            name_he: nameHe,
+            description: description || null,
+            duration,
+            price,
+            is_active: true,
+          }),
+        })
+        const result = await res.json()
+        
+        if (!result.success) {
+          console.error('Error creating service:', result.message)
+          showToast.error(`שגיאה ביצירת השירות: ${result.message || 'שגיאה לא ידועה'}`)
+        } else {
+          showToast.success('השירות נוסף בהצלחה!')
+          resetForm()
+          fetchServices()
+        }
       }
-    } else {
-      // Create new service
-      const { error } = await supabase.from('services')
-        .insert(serviceData)
-        .select()
-      
-      if (error) {
-        console.error('Error creating service:', error)
-        showToast.error(`שגיאה ביצירת השירות: ${error.message || 'שגיאה לא ידועה'}`)
-      } else {
-        showToast.success('השירות נוסף בהצלחה!')
-        resetForm()
-        fetchServices()
-      }
+    } catch (err) {
+      console.error('Error in service operation:', err)
+      showToast.error('שגיאה בלתי צפויה')
     }
     
     setSaving(false)
@@ -142,19 +158,24 @@ export default function ServicesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('האם למחוק את השירות?')) return
     
-    const supabase = createClient()
-    
-    const { error } = await supabase
-      .from('services')
-      .delete()
-      .eq('id', id)
-    
-    if (error) {
-      console.error('Error deleting service:', error)
+    try {
+      const res = await fetch('/api/barber/services', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barberId: barber?.id, serviceId: id }),
+      })
+      const result = await res.json()
+      
+      if (!result.success) {
+        console.error('Error deleting service:', result.message)
+        showToast.error('שגיאה במחיקה')
+      } else {
+        showToast.success('השירות נמחק בהצלחה!')
+        fetchServices()
+      }
+    } catch (err) {
+      console.error('Error deleting service:', err)
       showToast.error('שגיאה במחיקה')
-    } else {
-      showToast.success('השירות נמחק בהצלחה!')
-      fetchServices()
     }
   }
 

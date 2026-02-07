@@ -153,8 +153,8 @@ export async function GET(request: NextRequest) {
         note: 'Run SQL query on Supabase dashboard for detailed index stats',
         optimizedIndexes: [
           'idx_users_active_barbers',
-          'idx_services_barber_active_cover',
           'idx_reservations_date_barber_status',
+          'idx_services_barber_id_fk',
         ],
       },
     })

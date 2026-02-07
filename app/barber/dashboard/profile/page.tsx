@@ -260,83 +260,108 @@ export default function ProfilePage() {
     }
     
     setSavingMessage(true)
-    const supabase = createClient()
     
-    if (editingMessageId) {
-      const { data, error } = await supabase
-        .from('barber_messages')
-        .update({ message: messageText, updated_at: new Date().toISOString() })
-        .eq('id', editingMessageId)
-        .select()
-      
-      if (error || !data || data.length === 0) {
-        console.error('Error updating message:', error)
-        await report(new Error(error?.message || 'Message update failed'), 'Updating barber message')
-        showToast.error('שגיאה בעדכון ההודעה')
-      } else {
-        showToast.success('ההודעה עודכנה!')
-        resetMessageForm()
-        fetchMessages()
-      }
-    } else {
-      const { data, error } = await supabase
-        .from('barber_messages')
-        .insert({
-          barber_id: barber.id,
-          message: messageText,
-          is_active: true,
+    try {
+      if (editingMessageId) {
+        const res = await fetch('/api/barber/messages', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            barberId: barber.id,
+            messageId: editingMessageId,
+            message: messageText,
+          }),
         })
-        .select()
-      
-      if (error || !data || data.length === 0) {
-        console.error('Error creating message:', error)
-        await report(new Error(error?.message || 'Message creation failed'), 'Creating barber message')
-        showToast.error('שגיאה ביצירת ההודעה')
+        const result = await res.json()
+        
+        if (!result.success) {
+          console.error('Error updating message:', result.message)
+          await report(new Error(result.message || 'Message update failed'), 'Updating barber message')
+          showToast.error('שגיאה בעדכון ההודעה')
+        } else {
+          showToast.success('ההודעה עודכנה!')
+          resetMessageForm()
+          fetchMessages()
+        }
       } else {
-        showToast.success('ההודעה נוספה!')
-        resetMessageForm()
-        fetchMessages()
+        const res = await fetch('/api/barber/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            barberId: barber.id,
+            message: messageText,
+            is_active: true,
+          }),
+        })
+        const result = await res.json()
+        
+        if (!result.success) {
+          console.error('Error creating message:', result.message)
+          await report(new Error(result.message || 'Message creation failed'), 'Creating barber message')
+          showToast.error('שגיאה ביצירת ההודעה')
+        } else {
+          showToast.success('ההודעה נוספה!')
+          resetMessageForm()
+          fetchMessages()
+        }
       }
+    } catch (err) {
+      console.error('Error saving message:', err)
+      await report(err, 'Saving barber message')
+      showToast.error('שגיאה בשמירת ההודעה')
     }
     
     setSavingMessage(false)
   }
 
   const handleToggleMessage = async (id: string, isActive: boolean) => {
-    const supabase = createClient()
-    
-    const { data, error } = await supabase
-      .from('barber_messages')
-      .update({ is_active: !isActive })
-      .eq('id', id)
-      .select()
-    
-    if (error || !data || data.length === 0) {
-      console.error('Error toggling message:', error)
-      await report(new Error(error?.message || 'Message toggle failed'), 'Toggling barber message visibility')
+    try {
+      const res = await fetch('/api/barber/messages', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          barberId: barber?.id,
+          messageId: id,
+          is_active: !isActive,
+        }),
+      })
+      const result = await res.json()
+      
+      if (!result.success) {
+        console.error('Error toggling message:', result.message)
+        await report(new Error(result.message || 'Message toggle failed'), 'Toggling barber message visibility')
+        showToast.error('שגיאה בעדכון')
+      } else {
+        fetchMessages()
+      }
+    } catch (err) {
+      console.error('Error toggling message:', err)
       showToast.error('שגיאה בעדכון')
-    } else {
-      fetchMessages()
     }
   }
 
   const handleDeleteMessage = async (id: string) => {
     if (!confirm('האם למחוק את ההודעה?')) return
     
-    const supabase = createClient()
-    
-    const { error } = await supabase
-      .from('barber_messages')
-      .delete()
-      .eq('id', id)
-    
-    if (error) {
-      console.error('Error deleting message:', error)
-      await report(new Error(error.message), 'Deleting barber message')
+    try {
+      const res = await fetch('/api/barber/messages', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barberId: barber?.id, messageId: id }),
+      })
+      const result = await res.json()
+      
+      if (!result.success) {
+        console.error('Error deleting message:', result.message)
+        await report(new Error(result.message || 'Message delete failed'), 'Deleting barber message')
+        showToast.error('שגיאה במחיקה')
+      } else {
+        showToast.success('ההודעה נמחקה')
+        fetchMessages()
+      }
+    } catch (err) {
+      console.error('Error deleting message:', err)
       showToast.error('שגיאה במחיקה')
-    } else {
-      showToast.success('ההודעה נמחקה')
-      fetchMessages()
     }
   }
 

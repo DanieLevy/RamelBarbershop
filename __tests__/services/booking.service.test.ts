@@ -33,6 +33,8 @@ const mockFrom = vi.fn()
 const mockSelect = vi.fn()
 const mockEq = vi.fn()
 const mockGt = vi.fn()
+const mockGte = vi.fn()
+const mockLte = vi.fn()
 const mockUpdate = vi.fn()
 const mockMaybeSingle = vi.fn()
 const mockSingle = vi.fn()
@@ -67,6 +69,7 @@ describe('Booking Service', () => {
     mockSelect.mockReturnValue({
       eq: mockEq,
       gt: mockGt,
+      gte: mockGte,
       maybeSingle: mockMaybeSingle,
       single: mockSingle,
     })
@@ -79,6 +82,8 @@ describe('Booking Service', () => {
     mockEq.mockReturnValue({
       eq: mockEq,
       gt: mockGt,
+      gte: mockGte,
+      lte: mockLte,
       select: mockSelect,
       maybeSingle: mockMaybeSingle,
       single: mockSingle,
@@ -86,6 +91,17 @@ describe('Booking Service', () => {
     
     mockGt.mockReturnValue({
       eq: mockEq,
+    })
+    
+    mockGte.mockReturnValue({
+      lte: mockLte,
+      eq: mockEq,
+      maybeSingle: mockMaybeSingle,
+    })
+    
+    mockLte.mockReturnValue({
+      eq: mockEq,
+      maybeSingle: mockMaybeSingle,
     })
   })
 

@@ -48,7 +48,7 @@ export default function PreferencesPage() {
         .single()
     ])
     
-    // Handle notification settings
+    // Handle notification settings (read is fine via anon client)
     if (notifResult.data) {
       const settings = notifResult.data as BarberNotificationSettings
       setNotifSettings(settings)
@@ -56,20 +56,19 @@ export default function PreferencesPage() {
       setNotifyOnCancel(settings.notify_on_customer_cancel)
       setNotifyOnNewBooking(settings.notify_on_new_booking)
     } else if (!notifResult.error || notifResult.error.code === 'PGRST116') {
-      // Create default notification settings
-      const { data: newSettings } = await supabase.from('barber_notification_settings')
-        .insert({ 
-          barber_id: barber.id,
-          reminder_hours_before: 3,
-          notify_on_customer_cancel: true,
-          notify_on_new_booking: true,
-          broadcast_enabled: true
-        })
-        .select()
-        .single()
-      
-      if (newSettings) {
-        setNotifSettings(newSettings as BarberNotificationSettings)
+      // Create defaults via API route
+      try {
+        const res = await fetch(`/api/barber/preferences?barberId=${barber.id}`)
+        const result = await res.json()
+        if (result.success && result.data?.notification) {
+          const settings = result.data.notification as BarberNotificationSettings
+          setNotifSettings(settings)
+          setReminderHours(settings.reminder_hours_before)
+          setNotifyOnCancel(settings.notify_on_customer_cancel)
+          setNotifyOnNewBooking(settings.notify_on_new_booking)
+        }
+      } catch (err) {
+        console.error('Error creating default notification settings:', err)
       }
     }
     
@@ -81,19 +80,19 @@ export default function PreferencesPage() {
       setMinHoursBeforeBooking(settings.min_hours_before_booking)
       setMinCancelHours(settings.min_cancel_hours)
     } else if (!bookingResult.error || bookingResult.error.code === 'PGRST116') {
-      // Create default booking settings
-      const { data: newSettings } = await supabase.from('barber_booking_settings')
-        .insert({ 
-          barber_id: barber.id,
-          max_booking_days_ahead: 15,
-          min_hours_before_booking: 1,
-          min_cancel_hours: 2
-        })
-        .select()
-        .single()
-      
-      if (newSettings) {
-        setBookingSettings(newSettings as BarberBookingSettings)
+      // Create defaults via API route (same endpoint already created them)
+      try {
+        const res = await fetch(`/api/barber/preferences?barberId=${barber.id}`)
+        const result = await res.json()
+        if (result.success && result.data?.booking) {
+          const settings = result.data.booking as BarberBookingSettings
+          setBookingSettings(settings)
+          setMaxBookingDaysAhead(settings.max_booking_days_ahead)
+          setMinHoursBeforeBooking(settings.min_hours_before_booking)
+          setMinCancelHours(settings.min_cancel_hours)
+        }
+      } catch (err) {
+        console.error('Error creating default booking settings:', err)
       }
     }
     
@@ -112,36 +111,24 @@ export default function PreferencesPage() {
     setSaving(true)
     
     try {
-      const supabase = createClient()
-      const now = new Date().toISOString()
+      const res = await fetch('/api/barber/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          barberId: barber.id,
+          reminder_hours_before: reminderHours,
+          notify_on_customer_cancel: notifyOnCancel,
+          notify_on_new_booking: notifyOnNewBooking,
+          max_booking_days_ahead: maxBookingDaysAhead,
+          min_hours_before_booking: minHoursBeforeBooking,
+          min_cancel_hours: minCancelHours,
+        }),
+      })
+      const result = await res.json()
       
-      // Save both settings in parallel
-      const [notifError, bookingError] = await Promise.all([
-        // Update notification settings
-        supabase.from('barber_notification_settings')
-          .update({
-            reminder_hours_before: reminderHours,
-            notify_on_customer_cancel: notifyOnCancel,
-            notify_on_new_booking: notifyOnNewBooking,
-            updated_at: now
-          })
-          .eq('barber_id', barber.id)
-          .then(r => r.error),
-        // Update booking settings
-        supabase.from('barber_booking_settings')
-          .update({
-            max_booking_days_ahead: maxBookingDaysAhead,
-            min_hours_before_booking: minHoursBeforeBooking,
-            min_cancel_hours: minCancelHours,
-            updated_at: now
-          })
-          .eq('barber_id', barber.id)
-          .then(r => r.error)
-      ])
-      
-      if (notifError || bookingError) {
-        console.error('Error saving settings:', notifError || bookingError)
-        await report(new Error((notifError || bookingError)?.message || 'Unknown error'), 'Saving preferences')
+      if (!result.success) {
+        console.error('Error saving settings:', result.message)
+        await report(new Error(result.message || 'Preferences save failed'), 'Saving preferences')
         showToast.error('שגיאה בשמירת ההגדרות')
         return
       }

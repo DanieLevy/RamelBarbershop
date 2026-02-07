@@ -25,7 +25,7 @@ type SectionKey = 'basic' | 'hero' | 'location' | 'contact' | 'booking'
 
 export default function SettingsPage() {
   const router = useRouter()
-  const { isAdmin } = useBarberAuthStore()
+  const { barber, isAdmin } = useBarberAuthStore()
   const { report } = useBugReporter('SettingsPage')
   
   const [settings, setSettings] = useState<BarbershopSettings | null>(null)
@@ -148,57 +148,54 @@ export default function SettingsPage() {
     if (!settings?.id) return
     
     setSaving(true)
-    const supabase = createClient()
     
-    const { error } = await supabase.from('barbershop_settings')
-      .update({
-        // Basic
-        name,
-        phone: phone || null,
-        address: address || null,
-        description: description || null,
-        
-        // Hero
-        hero_title: heroTitle || null,
-        hero_subtitle: heroSubtitle || null,
-        hero_description: heroDescription || null,
-        
-        // Location
-        address_text: addressText || null,
-        address_lat: addressLat ? parseFloat(addressLat) : null,
-        address_lng: addressLng ? parseFloat(addressLng) : null,
-        waze_link: wazeLink || null,
-        google_maps_link: googleMapsLink || null,
-        
-        // Contact
-        contact_phone: contactPhone || null,
-        contact_email: contactEmail || null,
-        contact_whatsapp: contactWhatsapp || null,
-        social_instagram: socialInstagram || null,
-        social_facebook: socialFacebook || null,
-        social_tiktok: socialTiktok || null,
-        
-        // Visibility
-        show_phone: showPhone,
-        show_email: showEmail,
-        show_whatsapp: showWhatsapp,
-        show_instagram: showInstagram,
-        show_facebook: showFacebook,
-        show_tiktok: showTiktok,
-        
-        // Booking settings
-        max_booking_days_ahead: maxBookingDaysAhead,
-        
-        updated_at: new Date().toISOString(),
+    try {
+      const res = await fetch('/api/barber/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          barberId: barber?.id,
+          settingsId: settings.id,
+          name,
+          phone: phone || null,
+          address: address || null,
+          description: description || null,
+          hero_title: heroTitle || null,
+          hero_subtitle: heroSubtitle || null,
+          hero_description: heroDescription || null,
+          address_text: addressText || null,
+          address_lat: addressLat ? parseFloat(addressLat) : null,
+          address_lng: addressLng ? parseFloat(addressLng) : null,
+          waze_link: wazeLink || null,
+          google_maps_link: googleMapsLink || null,
+          contact_phone: contactPhone || null,
+          contact_email: contactEmail || null,
+          contact_whatsapp: contactWhatsapp || null,
+          social_instagram: socialInstagram || null,
+          social_facebook: socialFacebook || null,
+          social_tiktok: socialTiktok || null,
+          show_phone: showPhone,
+          show_email: showEmail,
+          show_whatsapp: showWhatsapp,
+          show_instagram: showInstagram,
+          show_facebook: showFacebook,
+          show_tiktok: showTiktok,
+          max_booking_days_ahead: maxBookingDaysAhead,
+        }),
       })
-      .eq('id', settings.id)
-    
-    if (error) {
-      console.error('Error saving settings:', error)
-      await report(new Error(error.message), 'Saving barbershop settings')
+      const result = await res.json()
+      
+      if (!result.success) {
+        console.error('Error saving settings:', result.message)
+        await report(new Error(result.message || 'Settings save failed'), 'Saving barbershop settings')
+        showToast.error('שגיאה בשמירת ההגדרות')
+      } else {
+        showToast.success('ההגדרות נשמרו בהצלחה!')
+      }
+    } catch (err) {
+      console.error('Error saving settings:', err)
+      await report(err, 'Saving barbershop settings')
       showToast.error('שגיאה בשמירת ההגדרות')
-    } else {
-      showToast.success('ההגדרות נשמרו בהצלחה!')
     }
     
     setSaving(false)

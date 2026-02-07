@@ -21,7 +21,7 @@ const DAYS = [
 
 export default function GlobalSchedulePage() {
   const router = useRouter()
-  const { isAdmin } = useBarberAuthStore()
+  const { barber, isAdmin } = useBarberAuthStore()
   const { report } = useBugReporter('GlobalSchedulePage')
   
   const [settings, setSettings] = useState<BarbershopSettings | null>(null)
@@ -83,23 +83,32 @@ export default function GlobalSchedulePage() {
     if (!settings?.id) return
     
     setSaving(true)
-    const supabase = createClient()
     
-    const { error } = await supabase.from('barbershop_settings')
-      .update({
-        open_days: openDays,
-        work_hours_start: startTime,
-        work_hours_end: endTime,
-        updated_at: new Date().toISOString(),
+    try {
+      const res = await fetch('/api/barber/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          barberId: barber?.id,
+          settingsId: settings.id,
+          open_days: openDays,
+          work_hours_start: startTime,
+          work_hours_end: endTime,
+        }),
       })
-      .eq('id', settings.id)
-    
-    if (error) {
-      console.error('Error saving schedule:', error)
-      await report(new Error(error.message), 'Saving barbershop schedule settings')
+      const result = await res.json()
+      
+      if (!result.success) {
+        console.error('Error saving schedule:', result.message)
+        await report(new Error(result.message || 'Schedule save failed'), 'Saving barbershop schedule settings')
+        showToast.error('שגיאה בשמירת שעות הפתיחה')
+      } else {
+        showToast.success('שעות הפתיחה נשמרו בהצלחה!')
+      }
+    } catch (err) {
+      console.error('Error saving schedule:', err)
+      await report(err, 'Saving barbershop schedule settings')
       showToast.error('שגיאה בשמירת שעות הפתיחה')
-    } else {
-      showToast.success('שעות הפתיחה נשמרו בהצלחה!')
     }
     
     setSaving(false)

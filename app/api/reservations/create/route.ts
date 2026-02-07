@@ -312,7 +312,10 @@ export async function POST(request: NextRequest) {
       try {
         fetch(`${request.nextUrl.origin}/api/push/notify-blocked-attempt`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Internal-Secret': process.env.INTERNAL_API_SECRET || '',
+          },
           body: JSON.stringify({
             barberId: body.barberId,
             customerName: body.customerName,

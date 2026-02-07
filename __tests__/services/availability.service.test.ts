@@ -9,6 +9,7 @@
 import { describe, it, expect } from 'vitest'
 import { isDateAvailable, getWorkHours, workDaysToMap, type DayWorkHours } from '@/lib/services/availability.service'
 import type { BarbershopSettings, BarbershopClosure, BarberClosure } from '@/types/database'
+import { getIsraelDateString, getDayKeyInIsrael, israelDateToTimestamp } from '@/lib/utils'
 
 // ============================================================
 // Mock Data Factories
@@ -60,21 +61,42 @@ const createBarberWorkDays = (): DayWorkHours => ({
   saturday: { isWorking: false, startTime: null, endTime: null },
 })
 
-// Helper to get a date for a specific day of week
+// Helper to get a date for a specific day of week (Israel-timezone aware)
+const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
 const getDateForDayOfWeek = (dayIndex: number): number => {
+  const targetDay = dayNames[dayIndex]
   const now = new Date()
-  const currentDay = now.getDay()
-  const daysToAdd = (dayIndex - currentDay + 7) % 7 || 7 // Always future
-  const targetDate = new Date(now)
-  targetDate.setDate(now.getDate() + daysToAdd)
-  targetDate.setHours(10, 0, 0, 0)
-  return targetDate.getTime()
+  // Search forward up to 7 days for the target day in Israel timezone
+  for (let offset = 1; offset <= 7; offset++) {
+    const candidate = new Date(now.getTime() + offset * 86400000)
+    const ts = candidate.getTime()
+    if (getDayKeyInIsrael(ts) === targetDay) {
+      // Return a timestamp at 10:00 Israel time for this date
+      const dateStr = getIsraelDateString(ts)
+      const [year, month, day] = dateStr.split('-').map(Number)
+      return israelDateToTimestamp(year, month, day, 10, 0)
+    }
+  }
+  return now.getTime()
 }
 
-// Get timestamp for a specific date string (YYYY-MM-DD)
-const getTimestampForDate = (dateStr: string): number => {
-  const [year, month, day] = dateStr.split('-').map(Number)
-  return new Date(year, month - 1, day, 10, 0, 0).getTime()
+// Helper to get a timestamp for a future weekday (guaranteed to be in open_days Sun-Fri)
+const getFutureWeekdayTimestamp = (): { timestamp: number; dateStr: string } => {
+  const now = new Date()
+  for (let offset = 1; offset <= 7; offset++) {
+    const candidate = new Date(now.getTime() + offset * 86400000)
+    const ts = candidate.getTime()
+    const day = getDayKeyInIsrael(ts)
+    if (day !== 'saturday') {
+      const dateStr = getIsraelDateString(ts)
+      const [year, month, dayNum] = dateStr.split('-').map(Number)
+      return {
+        timestamp: israelDateToTimestamp(year, month, dayNum, 10, 0),
+        dateStr,
+      }
+    }
+  }
+  return { timestamp: now.getTime(), dateStr: getIsraelDateString(now.getTime()) }
 }
 
 describe('Availability Service', () => {
@@ -122,24 +144,26 @@ describe('Availability Service', () => {
 
     describe('Shop Closures', () => {
       it('should return unavailable during shop closure period', () => {
-        const shopSettings = createShopSettings()
-        const today = new Date()
-        const tomorrow = new Date(today)
-        tomorrow.setDate(today.getDate() + 1)
+        // Use all 7 days open so the open_days check doesn't interfere
+        const shopSettings = createShopSettings({
+          open_days: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
+        })
+        const { timestamp, dateStr } = getFutureWeekdayTimestamp()
         
-        const closureStart = today.toISOString().split('T')[0]
-        const closureEnd = tomorrow.toISOString().split('T')[0]
+        // Create closure range that covers our test date
+        const nextDay = new Date(timestamp + 86400000)
+        const closureEnd = getIsraelDateString(nextDay.getTime())
         
         const shopClosures: BarbershopClosure[] = [{
           id: 'closure-1',
-          start_date: closureStart,
+          start_date: dateStr,
           end_date: closureEnd,
           reason: 'Holiday',
           created_at: new Date().toISOString(),
         }]
         
         const result = isDateAvailable(
-          today.getTime(),
+          timestamp,
           shopSettings,
           shopClosures,
           []
@@ -150,21 +174,23 @@ describe('Availability Service', () => {
       })
 
       it('should use default message when closure has no reason', () => {
-        const shopSettings = createShopSettings()
-        const today = new Date()
-        const tomorrow = new Date(today)
-        tomorrow.setDate(today.getDate() + 1)
+        const shopSettings = createShopSettings({
+          open_days: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
+        })
+        const { timestamp, dateStr } = getFutureWeekdayTimestamp()
+        const nextDay = new Date(timestamp + 86400000)
+        const closureEnd = getIsraelDateString(nextDay.getTime())
         
         const shopClosures: BarbershopClosure[] = [{
           id: 'closure-1',
-          start_date: today.toISOString().split('T')[0],
-          end_date: tomorrow.toISOString().split('T')[0],
+          start_date: dateStr,
+          end_date: closureEnd,
           reason: null,
           created_at: new Date().toISOString(),
         }]
         
         const result = isDateAvailable(
-          today.getTime(),
+          timestamp,
           shopSettings,
           shopClosures,
           []
@@ -219,23 +245,35 @@ describe('Availability Service', () => {
 
     describe('Barber Closures', () => {
       it('should return unavailable during barber closure period', () => {
-        const shopSettings = createShopSettings()
-        const barberWorkDays = createBarberWorkDays()
-        const today = new Date()
-        const nextWeek = new Date(today)
-        nextWeek.setDate(today.getDate() + 7)
+        // Use all 7 days open so the open_days check doesn't interfere
+        const shopSettings = createShopSettings({
+          open_days: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
+        })
+        // Use barber work days where all 7 days are working
+        const barberWorkDays: DayWorkHours = {
+          sunday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+          monday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+          tuesday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+          wednesday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+          thursday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+          friday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+          saturday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+        }
+        const { timestamp, dateStr } = getFutureWeekdayTimestamp()
+        const nextWeek = new Date(timestamp + 7 * 86400000)
+        const closureEnd = getIsraelDateString(nextWeek.getTime())
         
         const barberClosures: BarberClosure[] = [{
           id: 'barber-closure-1',
           barber_id: 'barber-id',
-          start_date: today.toISOString().split('T')[0],
-          end_date: nextWeek.toISOString().split('T')[0],
+          start_date: dateStr,
+          end_date: closureEnd,
           reason: 'בחופשה',
           created_at: new Date().toISOString(),
         }]
         
         const result = isDateAvailable(
-          today.getTime(),
+          timestamp,
           shopSettings,
           [],
           barberClosures,
@@ -247,23 +285,33 @@ describe('Availability Service', () => {
       })
 
       it('should use default message when barber closure has no reason', () => {
-        const shopSettings = createShopSettings()
-        const barberWorkDays = createBarberWorkDays()
-        const today = new Date()
-        const tomorrow = new Date(today)
-        tomorrow.setDate(today.getDate() + 1)
+        const shopSettings = createShopSettings({
+          open_days: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
+        })
+        const barberWorkDays: DayWorkHours = {
+          sunday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+          monday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+          tuesday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+          wednesday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+          thursday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+          friday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+          saturday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+        }
+        const { timestamp, dateStr } = getFutureWeekdayTimestamp()
+        const nextDay = new Date(timestamp + 86400000)
+        const closureEnd = getIsraelDateString(nextDay.getTime())
         
         const barberClosures: BarberClosure[] = [{
           id: 'barber-closure-1',
           barber_id: 'barber-id',
-          start_date: today.toISOString().split('T')[0],
-          end_date: tomorrow.toISOString().split('T')[0],
+          start_date: dateStr,
+          end_date: closureEnd,
           reason: null,
           created_at: new Date().toISOString(),
         }]
         
         const result = isDateAvailable(
-          today.getTime(),
+          timestamp,
           shopSettings,
           [],
           barberClosures,
@@ -277,16 +325,27 @@ describe('Availability Service', () => {
 
     describe('Combined Scenarios', () => {
       it('should check shop closure before barber closure', () => {
-        const shopSettings = createShopSettings()
-        const barberWorkDays = createBarberWorkDays()
-        const today = new Date()
-        const tomorrow = new Date(today)
-        tomorrow.setDate(today.getDate() + 1)
+        // Use all 7 days open so the open_days check doesn't interfere
+        const shopSettings = createShopSettings({
+          open_days: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
+        })
+        const barberWorkDays: DayWorkHours = {
+          sunday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+          monday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+          tuesday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+          wednesday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+          thursday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+          friday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+          saturday: { isWorking: true, startTime: '10:00', endTime: '18:00' },
+        }
+        const { timestamp, dateStr } = getFutureWeekdayTimestamp()
+        const nextDay = new Date(timestamp + 86400000)
+        const closureEnd = getIsraelDateString(nextDay.getTime())
         
         const shopClosures: BarbershopClosure[] = [{
           id: 'shop-closure-1',
-          start_date: today.toISOString().split('T')[0],
-          end_date: tomorrow.toISOString().split('T')[0],
+          start_date: dateStr,
+          end_date: closureEnd,
           reason: 'Shop Holiday',
           created_at: new Date().toISOString(),
         }]
@@ -294,14 +353,14 @@ describe('Availability Service', () => {
         const barberClosures: BarberClosure[] = [{
           id: 'barber-closure-1',
           barber_id: 'barber-id',
-          start_date: today.toISOString().split('T')[0],
-          end_date: tomorrow.toISOString().split('T')[0],
+          start_date: dateStr,
+          end_date: closureEnd,
           reason: 'Barber Vacation',
           created_at: new Date().toISOString(),
         }]
         
         const result = isDateAvailable(
-          today.getTime(),
+          timestamp,
           shopSettings,
           shopClosures,
           barberClosures,

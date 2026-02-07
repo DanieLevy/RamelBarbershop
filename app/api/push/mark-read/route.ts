@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { pushService } from '@/lib/push/push-service'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { reportApiError } from '@/lib/bug-reporter/helpers'
+import { verifyPushCaller } from '@/lib/auth/push-api-auth'
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,6 +26,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Verify the caller is a legitimate user
+    const auth = await verifyPushCaller(request, body)
+    if (!auth.success) return auth.response
 
     // Determine recipient type and ID
     const recipientType = customerId ? 'customer' : 'barber'

@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { AppHeader } from '@/components/AppHeader'
 import { HeroSection } from '@/components/home/HeroSection'
@@ -9,13 +8,16 @@ import { ContactSection } from '@/components/ContactSection'
 import { Footer } from '@/components/Footer'
 import { UpcomingAppointmentBanner } from '@/components/UpcomingAppointmentBanner'
 import { buildBarberProfileUrl } from '@/lib/utils'
-import { getCachedShopSettings, getCachedProducts } from '@/lib/data/cached-queries'
-import type { BarberWithWorkDays } from '@/types/database'
+import { getCachedShopSettings, getCachedProducts, getCachedBarbers } from '@/lib/data/cached-queries'
+import { createAdminClient } from '@/lib/supabase/admin'
 
-// Force dynamic rendering - barber availability (work_days, is_active) must be fresh
-// This ensures the homepage always shows current barber status
-// Note: Products and shop settings are cached separately for 10 minutes
-export const dynamic = 'force-dynamic'
+// ISR: Revalidate every 30 seconds for near-real-time barber availability
+// All data queries use unstable_cache with their own TTLs:
+// - Barbers: 30s cache (short for near-real-time availability)
+// - Settings: 10min cache (rarely changes)
+// - Products: 10min cache (rarely changes)
+// This replaces force-dynamic for significantly faster page loads
+export const revalidate = 30
 
 interface HomePageProps {
   searchParams: Promise<{ barber?: string }>
@@ -33,11 +35,11 @@ interface HomePageProps {
  */
 export default async function HomePage({ searchParams }: HomePageProps) {
   const { barber: barberSlug } = await searchParams
-  const supabase = await createClient()
   
   // If a barber slug is provided, redirect to their profile page
   if (barberSlug) {
-    // Verify the barber exists and is active before redirecting
+    // Use admin client for slug lookup (no cookies needed for redirect check)
+    const supabase = createAdminClient()
     const { data: barberCheck } = await supabase
       .from('users')
       .select('username, is_active')
@@ -52,25 +54,15 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     // (don't redirect to error page from homepage link)
   }
   
-  // Fetch data in parallel for better performance
-  // - Barbers: ALWAYS fresh (real-time availability)
-  // - Settings: Cached for 10 minutes (rarely changes)
-  // - Products: Cached for 10 minutes (rarely changes)
-  const [barbersResult, settings, products] = await Promise.all([
-    // Barbers - always fresh from database
-    supabase
-      .from('users')
-      .select('*, work_days(*)')
-      .eq('is_barber', true)
-      .eq('is_active', true)
-      .order('display_order', { ascending: true }),
-    // Settings - cached for 10 minutes
+  // Fetch all data in parallel using cached queries
+  // - Barbers: 30s cache (near-real-time availability)
+  // - Settings: 10min cache (rarely changes)
+  // - Products: 10min cache (rarely changes)
+  const [barbers, settings, products] = await Promise.all([
+    getCachedBarbers(),
     getCachedShopSettings(),
-    // Products - cached for 10 minutes
     getCachedProducts()
   ])
-  
-  const barbers = barbersResult.data as BarberWithWorkDays[] | null
 
   return (
     <>

@@ -3,14 +3,15 @@
  * 
  * Uses Next.js unstable_cache for selective caching of data that doesn't change frequently.
  * 
- * IMPORTANT: Only cache data that can tolerate being slightly stale:
- * - Shop settings (rarely change)
- * - Products (rarely change)
+ * CACHING STRATEGY:
+ * - Barbers (with work_days): 30 seconds - tolerable for homepage display,
+ *   barber status changes are infrequent (activating/deactivating a barber)
+ * - Shop settings: 10 minutes - rarely change
+ * - Products: 10 minutes - rarely change
  * 
  * NEVER cache:
- * - Barber availability/status (must be real-time)
- * - Reservation data (must be real-time)
- * - User-specific data
+ * - Reservation data (must be real-time for booking flow)
+ * - User-specific data (customer profiles, sessions)
  * 
  * NOTE: We use createAdminClient() instead of createClient() because:
  * - unstable_cache cannot use dynamic functions like cookies()
@@ -20,7 +21,7 @@
 
 import { unstable_cache } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
-import type { BarbershopSettings, Product } from '@/types/database'
+import type { BarbershopSettings, Product, BarberWithWorkDays } from '@/types/database'
 
 /**
  * Get cached barbershop settings
@@ -82,6 +83,38 @@ export const getCachedProducts = unstable_cache(
 )
 
 /**
+ * Get cached active barbers with work days
+ * Cached for 30 seconds
+ * 
+ * Barber status rarely changes (activating/deactivating a barber is an infrequent admin action).
+ * A 30-second cache is acceptable for homepage display while dramatically reducing DB load.
+ * The booking flow itself fetches fresh data independently.
+ */
+export const getCachedBarbers = unstable_cache(
+  async (): Promise<BarberWithWorkDays[]> => {
+    const supabase = createAdminClient()
+    const { data, error } = await supabase
+      .from('users')
+      .select('*, work_days(*)')
+      .eq('is_barber', true)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+    
+    if (error) {
+      console.error('[CachedQueries] Failed to fetch barbers:', error)
+      return []
+    }
+    
+    return (data as BarberWithWorkDays[]) || []
+  },
+  ['active-barbers'], // Cache key
+  { 
+    revalidate: 30, // 30 seconds - short cache for near-real-time barber availability
+    tags: ['barbers'] 
+  }
+)
+
+/**
  * Revalidation Notes:
  * 
  * To manually invalidate these caches (e.g., when admin updates settings):
@@ -89,6 +122,7 @@ export const getCachedProducts = unstable_cache(
  * import { revalidateTag } from 'next/cache'
  * 
  * // In API route or server action:
- * revalidateTag('shop-settings')
- * revalidateTag('products')
+ * revalidateTag('shop-settings', 'max')
+ * revalidateTag('products', 'max')
+ * revalidateTag('barbers', 'max')
  */

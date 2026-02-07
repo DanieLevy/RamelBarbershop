@@ -1,15 +1,19 @@
 /**
- * Next.js Proxy for Rate Limiting and Security
+ * Next.js Proxy for Rate Limiting and Security (Next.js 16+ convention)
  * 
- * Implements in-memory rate limiting for critical API endpoints.
+ * Implements in-memory rate limiting for API endpoints.
  * Includes:
  * - Per-endpoint rate limits
  * - Exponential backoff for repeated violations
  * - Suspicious activity detection and logging
  * 
- * For production with multiple instances, consider using Redis (e.g., Upstash).
+ * LIMITATIONS:
+ * - In-memory storage resets on serverless cold starts
+ * - Not shared across multiple instances
+ * - For production with high traffic, consider Redis (e.g., Upstash)
  * 
- * Note: Migrated from middleware.ts to proxy.ts per Next.js 16+ convention.
+ * For this barbershop app (single instance, moderate traffic), in-memory
+ * rate limiting provides effective protection against abuse and spam.
  */
 
 import { NextResponse } from 'next/server'
@@ -32,6 +36,9 @@ const RATE_LIMITS: Record<string, { requests: number; windowMs: number }> = {
   
   // Bug report endpoint
   '/api/bug-report': { requests: 10, windowMs: 60000 },
+  
+  // Reservation creation - limit to prevent booking abuse
+  '/api/reservations/create': { requests: 20, windowMs: 60000 },
   
   // Health check - allow more
   '/api/health': { requests: 60, windowMs: 60000 },
@@ -70,7 +77,7 @@ interface ViolationEntry {
 // ============================================================
 
 // Note: These reset on serverless function cold starts
-// For production with high traffic, use Redis (Upstash)
+// For a single-instance barbershop app, this provides sufficient protection
 const rateLimitStore = new Map<string, RateLimitEntry>()
 const violationStore = new Map<string, ViolationEntry>()
 
@@ -85,7 +92,7 @@ let lastCleanup = Date.now()
 /**
  * Clean up expired entries from stores
  */
-function cleanupStores() {
+const cleanupStores = () => {
   const now = Date.now()
   if (now - lastCleanup < CLEANUP_INTERVAL) return
   
@@ -113,22 +120,17 @@ function cleanupStores() {
 /**
  * Extract client IP from request headers
  */
-function getClientIP(request: NextRequest): string {
-  // Try various headers for client IP
+const getClientIP = (request: NextRequest): string => {
   const forwardedFor = request.headers.get('x-forwarded-for')
   if (forwardedFor) {
     return forwardedFor.split(',')[0].trim()
   }
   
   const realIP = request.headers.get('x-real-ip')
-  if (realIP) {
-    return realIP
-  }
+  if (realIP) return realIP
   
   const cfConnectingIP = request.headers.get('cf-connecting-ip')
-  if (cfConnectingIP) {
-    return cfConnectingIP
-  }
+  if (cfConnectingIP) return cfConnectingIP
   
   // Fallback for development
   return 'unknown-ip'
@@ -137,13 +139,11 @@ function getClientIP(request: NextRequest): string {
 /**
  * Get rate limit config for a pathname
  */
-function getRateLimitConfig(pathname: string): { requests: number; windowMs: number } {
-  // Check for exact match first
+const getRateLimitConfig = (pathname: string): { requests: number; windowMs: number } => {
   if (RATE_LIMITS[pathname]) {
     return RATE_LIMITS[pathname]
   }
   
-  // Check for prefix matches
   for (const [path, config] of Object.entries(RATE_LIMITS)) {
     if (path !== 'default' && pathname.startsWith(path)) {
       return config
@@ -156,7 +156,7 @@ function getRateLimitConfig(pathname: string): { requests: number; windowMs: num
 /**
  * Check if an IP is currently blocked
  */
-function isBlocked(ip: string): boolean {
+const isBlocked = (ip: string): boolean => {
   const entry = violationStore.get(ip)
   if (!entry) return false
   
@@ -180,7 +180,7 @@ function isBlocked(ip: string): boolean {
 /**
  * Record a rate limit violation for an IP
  */
-function recordViolation(ip: string) {
+const recordViolation = (ip: string) => {
   const now = Date.now()
   const entry = violationStore.get(ip)
   
@@ -218,12 +218,12 @@ function recordViolation(ip: string) {
 /**
  * Check rate limit and return status
  */
-function checkRateLimit(ip: string, pathname: string): { 
+const checkRateLimit = (ip: string, pathname: string): { 
   allowed: boolean
   remaining: number
   resetAt: number
   reason?: string 
-} {
+} => {
   // First check if IP is blocked
   if (isBlocked(ip)) {
     const entry = violationStore.get(ip)!
@@ -272,7 +272,7 @@ function checkRateLimit(ip: string, pathname: string): {
 }
 
 // ============================================================
-// Proxy Handler
+// Proxy Handler (Next.js 16+ convention)
 // ============================================================
 
 export function proxy(request: NextRequest) {
@@ -283,8 +283,8 @@ export function proxy(request: NextRequest) {
     return NextResponse.next()
   }
   
-  // Skip rate limiting for cron jobs (they have their own auth)
-  if (pathname.startsWith('/api/cron/')) {
+  // Skip rate limiting for cron jobs and dev endpoints (they have their own auth)
+  if (pathname.startsWith('/api/cron/') || pathname.startsWith('/api/dev/')) {
     return NextResponse.next()
   }
   
@@ -319,7 +319,7 @@ export function proxy(request: NextRequest) {
   return response
 }
 
-// Configure which paths the proxy runs on
+// Configure which paths the middleware runs on
 export const config = {
   matcher: [
     // Match all API routes

@@ -11,6 +11,7 @@ import { pushService } from '@/lib/push/push-service'
 import { validateRequestBody, NotifyCancellationSchema } from '@/lib/validation/api-schemas'
 import type { CancellationContext } from '@/lib/push/types'
 import { reportApiError } from '@/lib/bug-reporter/helpers'
+import { verifyPushCallerOrInternal } from '@/lib/auth/push-api-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,6 +36,10 @@ export async function POST(request: NextRequest) {
       reason
     } = validation.data
     
+    // Verify caller is a legitimate user or internal API call
+    const auth = await verifyPushCallerOrInternal(request, { customerId, barberId })
+    if (!auth.success) return auth.response
+
     // When barber cancels, customerId is required to notify the customer
     if (cancelledBy === 'barber' && !customerId) {
       console.log('[API notify-cancellation] Barber cancelled but no customerId provided')

@@ -1,29 +1,25 @@
 /**
  * Database Types - Auto-generated from Supabase schema
  * 
- * INDEX MONITORING (Added: 2026-01-27)
- * =====================================
- * The following indexes have 0 scans as of this date and should be monitored
- * for 30 days before considering removal. Check usage with:
- * 
- * SELECT indexrelname, idx_scan FROM pg_stat_user_indexes 
- * WHERE indexrelname IN (...) ORDER BY idx_scan;
- * 
- * Indexes to monitor (review after 2026-02-27):
+ * INDEX STATUS (Updated: 2026-02-07)
+ * ===================================
+ * Active indexes (verified in use):
+ * - idx_users_active_barbers (users) - homepage barber queries
+ * - idx_reservations_date_barber_status (reservations) - composite for date range queries
  * - idx_reservations_date (reservations)
  * - idx_reservations_barber_id (reservations)
  * - idx_reservations_service_id (reservations)
  * - idx_reservations_reminder_window (reservations)
- * - idx_notification_logs_unread (notification_logs)
  * - idx_notification_logs_recipient (notification_logs)
  * - idx_notification_logs_type (notification_logs)
- * - idx_services_barber_id (services)
  * - idx_users_is_barber (users)
+ * - idx_services_barber_id_fk (services) - FK coverage
  * 
- * New indexes added (2026-01-27):
- * - idx_users_active_barbers (users) - for barber homepage queries
- * - idx_services_barber_active_cover (services) - covering index for service lookups
- * - idx_reservations_date_barber_status (reservations) - composite for date range queries
+ * Dropped (confirmed unused, removed 2026-02-07):
+ * idx_services_active, idx_services_barber_active_cover, idx_services_barber_id,
+ * idx_push_subscriptions_active, idx_notification_logs_unread, idx_customers_supabase_uid,
+ * idx_trusted_devices_phone, idx_barber_breakouts_dates, idx_barber_breakouts_day_of_week,
+ * idx_recurring_barber_active
  */
 
 export type Json =

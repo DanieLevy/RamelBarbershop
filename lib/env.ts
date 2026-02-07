@@ -42,6 +42,10 @@ const serverEnvSchema = z.object({
   // Vercel Cron - required in production for secure cron job execution
   CRON_SECRET: z.string().min(32, 'CRON_SECRET should be at least 32 characters').optional(),
   
+  // Internal API secret for server-to-server calls between API routes
+  // Used to authenticate internal push notification calls (e.g., from /api/reservations/create)
+  INTERNAL_API_SECRET: z.string().min(32, 'INTERNAL_API_SECRET should be at least 32 characters').optional(),
+  
   // App info
   NEXT_PUBLIC_APP_VERSION: z.string().optional().default('2.0.0'),
   

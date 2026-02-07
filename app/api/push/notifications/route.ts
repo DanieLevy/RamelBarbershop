@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { reportApiError } from '@/lib/bug-reporter/helpers'
 import type { NotificationLogRecord, NotificationType, RecipientType } from '@/lib/push/types'
+import { verifyPushCaller } from '@/lib/auth/push-api-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,6 +53,10 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Verify the caller is a legitimate user
+    const auth = await verifyPushCaller(request)
+    if (!auth.success) return auth.response
 
     // Parse pagination params
     const limit = Math.min(Math.max(parseInt(limitParam || '20', 10) || 20, 1), 100)

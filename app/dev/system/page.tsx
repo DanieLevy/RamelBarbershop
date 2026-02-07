@@ -351,6 +351,24 @@ export default function DevSystemPage() {
             <p className="text-zinc-600 text-[10px] mt-3">{dbHealth.indexes.note}</p>
           </div>
 
+          {/* Dev Tools */}
+          <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800">
+            <div className="flex items-center gap-2 mb-4">
+              <MessageSquare size={18} className="text-zinc-400" />
+              <h2 className="text-sm font-medium text-white">Dev Tools</h2>
+            </div>
+            <a
+              href="/dev/toasts"
+              className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-lg hover:bg-zinc-800 transition-colors"
+            >
+              <div>
+                <p className="text-sm text-white">Toast Comparison</p>
+                <p className="text-[10px] text-zinc-500">Compare Sonner vs React Hot Toast</p>
+              </div>
+              <Globe size={14} className="text-zinc-500" />
+            </a>
+          </div>
+
           {/* Environment */}
           <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800">
             <div className="flex items-center gap-2 mb-4">

@@ -71,27 +71,37 @@ export default function AbsenceDaysPage() {
     }
     
     setSaving(true)
-    const supabase = createClient()
     
-    const { error } = await supabase.from('barber_closures').insert({
-      barber_id: barber.id,
-      start_date: startDate,
-      end_date: effectiveEndDate,
-      reason: reason || null,
-    })
-    
-    if (error) {
-      console.error('Error adding closure:', error)
-      await report(new Error(error.message), 'Adding barber closure')
+    try {
+      const res = await fetch('/api/barber/closures', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          barberId: barber.id,
+          start_date: startDate,
+          end_date: effectiveEndDate,
+          reason: reason || null,
+        }),
+      })
+      const result = await res.json()
+      
+      if (!result.success) {
+        console.error('Error adding closure:', result.message)
+        await report(new Error(result.message || 'Closure add failed'), 'Adding barber closure')
+        showToast.error('שגיאה בהוספת יום היעדרות')
+      } else {
+        showToast.success('יום ההיעדרות נוסף בהצלחה!')
+        setShowForm(false)
+        setStartDate('')
+        setEndDate('')
+        setReason('')
+        setIsSingleDate(true)
+        fetchClosures()
+      }
+    } catch (err) {
+      console.error('Error adding closure:', err)
+      await report(err, 'Adding barber closure')
       showToast.error('שגיאה בהוספת יום היעדרות')
-    } else {
-      showToast.success('יום ההיעדרות נוסף בהצלחה!')
-      setShowForm(false)
-      setStartDate('')
-      setEndDate('')
-      setReason('')
-      setIsSingleDate(true)
-      fetchClosures()
     }
     
     setSaving(false)
@@ -100,20 +110,25 @@ export default function AbsenceDaysPage() {
   const handleDeleteClosure = async (id: string) => {
     if (!confirm('האם למחוק את יום ההיעדרות?')) return
     
-    const supabase = createClient()
-    
-    const { error } = await supabase
-      .from('barber_closures')
-      .delete()
-      .eq('id', id)
-    
-    if (error) {
-      console.error('Error deleting closure:', error)
-      await report(new Error(error.message), 'Deleting barber closure')
+    try {
+      const res = await fetch('/api/barber/closures', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barberId: barber?.id, closureId: id }),
+      })
+      const result = await res.json()
+      
+      if (!result.success) {
+        console.error('Error deleting closure:', result.message)
+        await report(new Error(result.message || 'Closure delete failed'), 'Deleting barber closure')
+        showToast.error('שגיאה במחיקה')
+      } else {
+        showToast.success('נמחק בהצלחה')
+        fetchClosures()
+      }
+    } catch (err) {
+      console.error('Error deleting closure:', err)
       showToast.error('שגיאה במחיקה')
-    } else {
-      showToast.success('נמחק בהצלחה')
-      fetchClosures()
     }
   }
 

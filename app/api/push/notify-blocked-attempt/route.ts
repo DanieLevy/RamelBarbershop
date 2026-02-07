@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { pushService } from '@/lib/push/push-service'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { reportApiError } from '@/lib/bug-reporter/helpers'
+import { verifyInternalCall } from '@/lib/auth/push-api-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +21,14 @@ interface BlockedAttemptRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    // This route is only called server-to-server
+    if (!verifyInternalCall(request)) {
+      return NextResponse.json(
+        { error: 'Unauthorized: internal access only' },
+        { status: 401 }
+      )
+    }
+
     const body: BlockedAttemptRequest = await request.json()
     const { barberId, customerName, customerPhone } = body
 

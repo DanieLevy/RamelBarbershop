@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { pushService } from '@/lib/push/push-service'
 import { reportApiError } from '@/lib/bug-reporter/helpers'
+import { verifyPushCaller } from '@/lib/auth/push-api-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +31,10 @@ export async function POST(request: NextRequest) {
       serviceName, 
       appointmentTime 
     } = body
+
+    // Verify the caller is a legitimate customer
+    const auth = await verifyPushCaller(request, body)
+    if (!auth.success) return auth.response
 
     // Validate required fields
     if (!reservationId || !barberId || !customerName || !appointmentTime) {

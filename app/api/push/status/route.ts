@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { reportApiError } from '@/lib/bug-reporter/helpers'
 import type { DeviceInfo, CustomerNotificationSettings } from '@/lib/push/types'
+import { verifyPushCaller } from '@/lib/auth/push-api-auth'
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,6 +23,10 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Verify the caller is a legitimate user
+    const auth = await verifyPushCaller(request)
+    if (!auth.success) return auth.response
 
     // Get subscriptions
     let subscriptions

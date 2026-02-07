@@ -26,7 +26,7 @@ import { Button, Switch } from '@heroui/react'
 
 export default function ProductsPage() {
   const router = useRouter()
-  const { isAdmin } = useBarberAuthStore()
+  const { isAdmin, barber } = useBarberAuthStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { report } = useBugReporter('ProductsPage')
   
@@ -141,7 +141,6 @@ export default function ProductsPage() {
     setSaving(true)
     
     try {
-      const supabase = createClient()
       let imageUrl = formData.image_url
       
       // Upload new image if selected
@@ -161,31 +160,32 @@ export default function ProductsPage() {
         setUploading(false)
       }
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any
-      
       if (editingProduct) {
-        // Update existing product
-        const { error } = await db
-          .from('products')
-          .update({
+        // Update existing product via API route
+        const res = await fetch('/api/barber/products', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            barberId: barber?.id,
+            productId: editingProduct.id,
             name: formData.name || formData.name_he,
             name_he: formData.name_he,
             description: formData.description || null,
             price,
             image_url: imageUrl || null,
             is_active: formData.is_active,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', editingProduct.id)
-        
-        if (error) throw error
+          }),
+        })
+        const result = await res.json()
+        if (!result.success) throw new Error(result.message || 'Update failed')
         showToast.success('המוצר עודכן בהצלחה!')
       } else {
-        // Create new product
-        const { error } = await db
-          .from('products')
-          .insert({
+        // Create new product via API route
+        const res = await fetch('/api/barber/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            barberId: barber?.id,
             name: formData.name || formData.name_he,
             name_he: formData.name_he,
             description: formData.description || null,
@@ -193,9 +193,10 @@ export default function ProductsPage() {
             image_url: imageUrl || null,
             is_active: formData.is_active,
             display_order: products.length,
-          })
-        
-        if (error) throw error
+          }),
+        })
+        const result = await res.json()
+        if (!result.success) throw new Error(result.message || 'Create failed')
         showToast.success('המוצר נוסף בהצלחה!')
       }
       
@@ -214,23 +215,21 @@ export default function ProductsPage() {
     if (!confirm(`האם למחוק את "${product.name_he}"?`)) return
     
     try {
-      const supabase = createClient()
-      
       // Delete image from storage if exists
       if (product.image_url) {
-        // Extract path from URL
         const urlParts = product.image_url.split('/products/')
         if (urlParts[1]) {
           await deleteProductImage(urlParts[1])
         }
       }
       
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', product.id)
-      
-      if (error) throw error
+      const res = await fetch('/api/barber/products', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barberId: barber?.id, productId: product.id }),
+      })
+      const result = await res.json()
+      if (!result.success) throw new Error(result.message || 'Delete failed')
       
       showToast.success('המוצר נמחק בהצלחה')
       fetchProducts()
@@ -243,13 +242,17 @@ export default function ProductsPage() {
 
   const handleToggleActive = async (product: Product) => {
     try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from('products')
-        .update({ is_active: !product.is_active })
-        .eq('id', product.id)
-      
-      if (error) throw error
+      const res = await fetch('/api/barber/products', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          barberId: barber?.id,
+          productId: product.id,
+          is_active: !product.is_active,
+        }),
+      })
+      const result = await res.json()
+      if (!result.success) throw new Error(result.message || 'Toggle failed')
       
       showToast.success(product.is_active ? 'המוצר הוסתר' : 'המוצר הופעל')
       fetchProducts()

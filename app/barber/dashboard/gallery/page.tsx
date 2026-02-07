@@ -74,7 +74,6 @@ export default function GalleryPage() {
     setUploading(true)
     
     const newImages: BarberGalleryImage[] = []
-    const supabase = createClient()
     
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
@@ -94,23 +93,30 @@ export default function GalleryPage() {
       const result = await uploadGalleryImage(file, barber.id)
       
       if (result.success && result.url) {
-        // Save to database
-        const { data, error } = await supabase
-          .from('barber_gallery')
-          .insert({
-            barber_id: barber.id,
-            image_url: result.url,
-            display_order: images.length + newImages.length,
+        // Save to database via API route
+        try {
+          const res = await fetch('/api/barber/gallery', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              barberId: barber.id,
+              image_url: result.url,
+              display_order: images.length + newImages.length,
+            }),
           })
-          .select()
-          .single()
-        
-        if (error) {
-          console.error('Error saving gallery image:', error)
-          await report(new Error(error.message), 'Saving gallery image to database')
+          const apiResult = await res.json()
+          
+          if (!apiResult.success) {
+            console.error('Error saving gallery image:', apiResult.message)
+            await report(new Error(apiResult.message || 'Gallery save failed'), 'Saving gallery image to database')
+            showToast.error('שגיאה בשמירת התמונה')
+          } else if (apiResult.data) {
+            newImages.push(apiResult.data)
+          }
+        } catch (err) {
+          console.error('Error saving gallery image:', err)
+          await report(err, 'Saving gallery image to database')
           showToast.error('שגיאה בשמירת התמונה')
-        } else if (data) {
-          newImages.push(data)
         }
       } else {
         showToast.error(result.error || 'שגיאה בהעלאת התמונה')
@@ -137,17 +143,24 @@ export default function GalleryPage() {
     const imageToDelete = images.find(img => img.id === imageId)
     if (!imageToDelete) return
     
-    const supabase = createClient()
-    
-    // Delete from database first
-    const { error } = await supabase
-      .from('barber_gallery')
-      .delete()
-      .eq('id', imageId)
-    
-    if (error) {
-      console.error('Error deleting image:', error)
-      await report(new Error(error.message), 'Deleting gallery image from database')
+    // Delete from database first via API route
+    try {
+      const res = await fetch('/api/barber/gallery', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barberId: barber?.id, imageId }),
+      })
+      const result = await res.json()
+      
+      if (!result.success) {
+        console.error('Error deleting image:', result.message)
+        await report(new Error(result.message || 'Gallery delete failed'), 'Deleting gallery image from database')
+        showToast.error('שגיאה במחיקת התמונה')
+        return
+      }
+    } catch (err) {
+      console.error('Error deleting image:', err)
+      await report(err, 'Deleting gallery image from database')
       showToast.error('שגיאה במחיקת התמונה')
       return
     }
@@ -191,15 +204,20 @@ export default function GalleryPage() {
   const handleDragEnd = async () => {
     setDraggedIndex(null)
     
-    // Update display order in database
-    const supabase = createClient()
-    
-    for (let i = 0; i < images.length; i++) {
-      if (images[i].display_order !== i) {
-        await supabase
-          .from('barber_gallery')
-          .update({ display_order: i })
-          .eq('id', images[i].id)
+    // Update display order in database via API route
+    const changedImages = images
+      .map((img, i) => ({ id: img.id, display_order: i }))
+      .filter((img, i) => images[i].display_order !== i)
+
+    if (changedImages.length > 0) {
+      try {
+        await fetch('/api/barber/gallery', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ barberId: barber?.id, images: changedImages }),
+        })
+      } catch (err) {
+        console.error('Error updating gallery order:', err)
       }
     }
   }
@@ -277,29 +295,38 @@ export default function GalleryPage() {
     if (!positionModal.image) return
     
     setSavingPosition(true)
-    const supabase = createClient()
     
-    const { error } = await supabase
-      .from('barber_gallery')
-      .update({
-        position_x: positionModal.posX,
-        position_y: positionModal.posY,
+    try {
+      const res = await fetch('/api/barber/gallery', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          barberId: barber?.id,
+          imageId: positionModal.image.id,
+          position_x: positionModal.posX,
+          position_y: positionModal.posY,
+        }),
       })
-      .eq('id', positionModal.image.id)
-    
-    if (error) {
-      console.error('Error saving position:', error)
-      await report(new Error(error.message), 'Saving gallery image position')
+      const result = await res.json()
+      
+      if (!result.success) {
+        console.error('Error saving position:', result.message)
+        await report(new Error(result.message || 'Position save failed'), 'Saving gallery image position')
+        showToast.error('שגיאה בשמירת המיקום')
+      } else {
+        // Update local state
+        setImages(images.map(img => 
+          img.id === positionModal.image?.id 
+            ? { ...img, position_x: positionModal.posX, position_y: positionModal.posY }
+            : img
+        ))
+        showToast.success('מיקום התמונה נשמר!')
+        closePositionEditor()
+      }
+    } catch (err) {
+      console.error('Error saving position:', err)
+      await report(err, 'Saving gallery image position')
       showToast.error('שגיאה בשמירת המיקום')
-    } else {
-      // Update local state
-      setImages(images.map(img => 
-        img.id === positionModal.image?.id 
-          ? { ...img, position_x: positionModal.posX, position_y: positionModal.posY }
-          : img
-      ))
-      showToast.success('מיקום התמונה נשמר!')
-      closePositionEditor()
     }
     
     setSavingPosition(false)

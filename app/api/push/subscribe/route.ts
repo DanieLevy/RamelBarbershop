@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { pushService } from '@/lib/push/push-service'
 import type { DeviceType } from '@/lib/push/types'
 import { reportApiError } from '@/lib/bug-reporter/helpers'
+import { verifyPushCaller } from '@/lib/auth/push-api-auth'
 
 // Detect device type from user agent
 function detectDeviceType(userAgent: string): DeviceType {
@@ -41,6 +42,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Verify user exists in database
+    const auth = await verifyPushCaller(request, body)
+    if (!auth.success) return auth.response
 
     // Get user agent for device detection
     const userAgent = request.headers.get('user-agent') || ''

@@ -14,6 +14,7 @@
  */
 
 import { Toaster as SonnerToaster } from 'sonner'
+import './toast-styles.css'
 
 /**
  * Enhanced Toaster with dark theme and mobile-optimized styling

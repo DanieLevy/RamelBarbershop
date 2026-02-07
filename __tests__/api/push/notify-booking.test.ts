@@ -23,6 +23,14 @@ vi.mock('@/lib/push/push-service', () => ({
   },
 }))
 
+// Mock push auth to always succeed (auth is tested separately)
+vi.mock('@/lib/auth/push-api-auth', () => ({
+  verifyPushCallerOrInternal: vi.fn().mockResolvedValue({
+    success: true,
+    internal: true,
+  }),
+}))
+
 // Test data
 const VALID_UUID = '550e8400-e29b-41d4-a716-446655440001'
 const CUSTOMER_UUID = 'd2f078fd-c497-40f5-824d-7fe0ef4b2d25'

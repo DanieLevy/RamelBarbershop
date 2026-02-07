@@ -9,6 +9,7 @@ import { pushService } from '@/lib/push/push-service'
 import { validateRequestBody, NotifyBookingSchema } from '@/lib/validation/api-schemas'
 import type { ReminderContext } from '@/lib/push/types'
 import { reportApiError } from '@/lib/bug-reporter/helpers'
+import { verifyPushCallerOrInternal } from '@/lib/auth/push-api-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +31,10 @@ export async function POST(request: NextRequest) {
       serviceName, 
       appointmentTime 
     } = validation.data
+
+    // Verify caller is a legitimate user or internal API call
+    const auth = await verifyPushCallerOrInternal(request, { customerId, barberId })
+    if (!auth.success) return auth.response
     
     console.log('[API notify-booking] Sending notification:', {
       reservationId,

@@ -12,7 +12,7 @@ import { useBugReporter } from '@/hooks/useBugReporter'
 
 export default function ClosuresPage() {
   const router = useRouter()
-  const { isAdmin } = useBarberAuthStore()
+  const { barber, isAdmin } = useBarberAuthStore()
   const { report } = useBugReporter('ClosuresPage')
   
   const [closures, setClosures] = useState<BarbershopClosure[]>([])
@@ -61,26 +61,36 @@ export default function ClosuresPage() {
     }
     
     setSaving(true)
-    const supabase = createClient()
     
-    const { error } = await supabase.from('barbershop_closures')
-      .insert({
-        start_date: startDate,
-        end_date: endDate,
-        reason: reason || null,
+    try {
+      const res = await fetch('/api/barber/shop-closures', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          barberId: barber?.id,
+          start_date: startDate,
+          end_date: endDate,
+          reason: reason || null,
+        }),
       })
-    
-    if (error) {
-      console.error('Error adding closure:', error)
-      await report(new Error(error.message), 'Adding barbershop closure')
+      const result = await res.json()
+      
+      if (!result.success) {
+        console.error('Error adding closure:', result.message)
+        await report(new Error(result.message || 'Shop closure add failed'), 'Adding barbershop closure')
+        showToast.error('שגיאה בהוספת יום סגירה')
+      } else {
+        showToast.success('יום הסגירה נוסף בהצלחה!')
+        setShowForm(false)
+        setStartDate('')
+        setEndDate('')
+        setReason('')
+        fetchClosures()
+      }
+    } catch (err) {
+      console.error('Error adding closure:', err)
+      await report(err, 'Adding barbershop closure')
       showToast.error('שגיאה בהוספת יום סגירה')
-    } else {
-      showToast.success('יום הסגירה נוסף בהצלחה!')
-      setShowForm(false)
-      setStartDate('')
-      setEndDate('')
-      setReason('')
-      fetchClosures()
     }
     
     setSaving(false)
@@ -89,20 +99,25 @@ export default function ClosuresPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('האם למחוק את יום הסגירה?')) return
     
-    const supabase = createClient()
-    
-    const { error } = await supabase
-      .from('barbershop_closures')
-      .delete()
-      .eq('id', id)
-    
-    if (error) {
-      console.error('Error deleting closure:', error)
-      await report(new Error(error.message), 'Deleting barbershop closure')
+    try {
+      const res = await fetch('/api/barber/shop-closures', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barberId: barber?.id, closureId: id }),
+      })
+      const result = await res.json()
+      
+      if (!result.success) {
+        console.error('Error deleting closure:', result.message)
+        await report(new Error(result.message || 'Shop closure delete failed'), 'Deleting barbershop closure')
+        showToast.error('שגיאה במחיקה')
+      } else {
+        showToast.success('נמחק בהצלחה')
+        fetchClosures()
+      }
+    } catch (err) {
+      console.error('Error deleting closure:', err)
       showToast.error('שגיאה במחיקה')
-    } else {
-      showToast.success('נמחק בהצלחה')
-      fetchClosures()
     }
   }
 

@@ -18,7 +18,6 @@ import {
 } from '@/lib/utils'
 import type {
   BarberBreakout,
-  BarberBreakoutInsert,
   BreakoutType,
   DayOfWeek,
 } from '@/types/database'
@@ -38,14 +37,6 @@ export interface CreateBreakoutData {
   reason?: string
 }
 
-export interface CreateBreakoutResult {
-  success: boolean
-  breakout?: BarberBreakout
-  error?: BreakoutErrorCode
-  message?: string
-  conflicts?: ConflictingReservation[]
-}
-
 export interface ConflictingReservation {
   id: string
   customerName: string
@@ -55,55 +46,11 @@ export interface ConflictingReservation {
   timeTimestamp: number
 }
 
-export interface DeactivateBreakoutResult {
-  success: boolean
-  error?: string
-}
-
-export type BreakoutErrorCode =
-  | 'CONFLICTS_EXIST'
-  | 'INVALID_TIME_RANGE'
-  | 'INVALID_DATE_RANGE'
-  | 'INVALID_DAY_OF_WEEK'
-  | 'VALIDATION_ERROR'
-  | 'DATABASE_ERROR'
-  | 'UNKNOWN_ERROR'
-
 // ============================================================
-// Error Messages (Hebrew)
+// Validation & Helpers
 // ============================================================
-
-const ERROR_MESSAGES: Record<BreakoutErrorCode, string> = {
-  CONFLICTS_EXIST: 'קיימים תורים בזמנים אלו. יש לבטלם לפני יצירת ההפסקה.',
-  INVALID_TIME_RANGE: 'טווח השעות אינו תקין.',
-  INVALID_DATE_RANGE: 'טווח התאריכים אינו תקין.',
-  INVALID_DAY_OF_WEEK: 'יום השבוע אינו תקין.',
-  VALIDATION_ERROR: 'חסרים נתונים ליצירת הפסקה.',
-  DATABASE_ERROR: 'שגיאה ביצירת הפסקה. נסה שוב.',
-  UNKNOWN_ERROR: 'שגיאה בלתי צפויה. נסה שוב.',
-}
-
-// ============================================================
-// Validation
-// ============================================================
-
-const TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/
-
-const isValidTime = (value: string): boolean => {
-  return TIME_REGEX.test(value)
-}
-
-const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
-
-const isValidDate = (value: string): boolean => {
-  return DATE_REGEX.test(value)
-}
 
 const VALID_DAYS: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-
-const isValidDayOfWeek = (value: string): value is DayOfWeek => {
-  return VALID_DAYS.includes(value as DayOfWeek)
-}
 
 /**
  * Parse time string (HH:MM) to minutes since midnight
@@ -405,209 +352,6 @@ export async function checkBreakoutConflicts(
   }
   
   return conflicts
-}
-
-/**
- * Create a new breakout with validation and optional conflict resolution
- */
-export async function createBreakout(
-  data: CreateBreakoutData,
-  cancelConflicts = false
-): Promise<CreateBreakoutResult> {
-  const supabase = createClient()
-  
-  // Validation
-  if (!data.barberId) {
-    return {
-      success: false,
-      error: 'VALIDATION_ERROR',
-      message: ERROR_MESSAGES.VALIDATION_ERROR,
-    }
-  }
-  
-  if (!isValidTime(data.startTime)) {
-    return {
-      success: false,
-      error: 'INVALID_TIME_RANGE',
-      message: ERROR_MESSAGES.INVALID_TIME_RANGE,
-    }
-  }
-  
-  if (data.endTime && !isValidTime(data.endTime)) {
-    return {
-      success: false,
-      error: 'INVALID_TIME_RANGE',
-      message: ERROR_MESSAGES.INVALID_TIME_RANGE,
-    }
-  }
-  
-  // Validate time range
-  if (data.endTime) {
-    const startMinutes = parseTimeToMinutes(data.startTime)
-    const endMinutes = parseTimeToMinutes(data.endTime)
-    if (endMinutes <= startMinutes) {
-      return {
-        success: false,
-        error: 'INVALID_TIME_RANGE',
-        message: ERROR_MESSAGES.INVALID_TIME_RANGE,
-      }
-    }
-  }
-  
-  // Type-specific validation
-  switch (data.breakoutType) {
-    case 'single':
-      if (!data.startDate || !isValidDate(data.startDate)) {
-        return {
-          success: false,
-          error: 'VALIDATION_ERROR',
-          message: ERROR_MESSAGES.VALIDATION_ERROR,
-        }
-      }
-      break
-    
-    case 'date_range':
-      if (!data.startDate || !data.endDate || !isValidDate(data.startDate) || !isValidDate(data.endDate)) {
-        return {
-          success: false,
-          error: 'VALIDATION_ERROR',
-          message: ERROR_MESSAGES.VALIDATION_ERROR,
-        }
-      }
-      if (data.endDate < data.startDate) {
-        return {
-          success: false,
-          error: 'INVALID_DATE_RANGE',
-          message: ERROR_MESSAGES.INVALID_DATE_RANGE,
-        }
-      }
-      break
-    
-    case 'recurring':
-      if (!data.dayOfWeek || !isValidDayOfWeek(data.dayOfWeek)) {
-        return {
-          success: false,
-          error: 'INVALID_DAY_OF_WEEK',
-          message: ERROR_MESSAGES.INVALID_DAY_OF_WEEK,
-        }
-      }
-      break
-    
-    default:
-      return {
-        success: false,
-        error: 'VALIDATION_ERROR',
-        message: ERROR_MESSAGES.VALIDATION_ERROR,
-      }
-  }
-  
-  // Check for conflicts
-  const conflicts = await checkBreakoutConflicts(data.barberId, data)
-  
-  if (conflicts.length > 0 && !cancelConflicts) {
-    return {
-      success: false,
-      error: 'CONFLICTS_EXIST',
-      message: ERROR_MESSAGES.CONFLICTS_EXIST,
-      conflicts,
-    }
-  }
-  
-  // Cancel conflicting reservations if requested
-  if (conflicts.length > 0 && cancelConflicts) {
-    const conflictIds = conflicts.map(c => c.id)
-    
-    const { error: cancelError } = await supabase
-      .from('reservations')
-      .update({
-        status: 'cancelled',
-        cancellation_reason: 'בוטל עקב הפסקה של הספר',
-        cancelled_at: new Date().toISOString(),
-      })
-      .in('id', conflictIds)
-    
-    if (cancelError) {
-      console.error('Error cancelling conflicting reservations:', cancelError)
-      await reportSupabaseError(cancelError, 'Cancelling conflicts for breakout', {
-        table: 'reservations',
-        operation: 'update',
-      })
-      return {
-        success: false,
-        error: 'DATABASE_ERROR',
-        message: ERROR_MESSAGES.DATABASE_ERROR,
-      }
-    }
-  }
-  
-  // Build insert data
-  const insertData: BarberBreakoutInsert = {
-    barber_id: data.barberId,
-    breakout_type: data.breakoutType,
-    start_time: data.startTime,
-    end_time: data.endTime,
-    start_date: data.breakoutType === 'recurring' ? null : data.startDate,
-    end_date: data.breakoutType === 'date_range' ? data.endDate : null,
-    day_of_week: data.breakoutType === 'recurring' ? data.dayOfWeek : null,
-    reason: data.reason || null,
-    is_active: true,
-  }
-  
-  // Insert breakout
-  const { data: breakout, error } = await supabase
-    .from('barber_breakouts')
-    .insert(insertData)
-    .select()
-    .single()
-  
-  if (error) {
-    console.error('Error creating breakout:', error)
-    await reportSupabaseError(error, 'Creating barber breakout', {
-      table: 'barber_breakouts',
-      operation: 'insert',
-    })
-    return {
-      success: false,
-      error: 'DATABASE_ERROR',
-      message: ERROR_MESSAGES.DATABASE_ERROR,
-    }
-  }
-  
-  return {
-    success: true,
-    breakout: breakout as BarberBreakout,
-  }
-}
-
-/**
- * Deactivate (soft delete) a breakout
- */
-export async function deactivateBreakout(
-  breakoutId: string
-): Promise<DeactivateBreakoutResult> {
-  const supabase = createClient()
-  
-  const { error } = await supabase
-    .from('barber_breakouts')
-    .update({
-      is_active: false,
-      deactivated_at: new Date().toISOString(),
-    })
-    .eq('id', breakoutId)
-  
-  if (error) {
-    console.error('Error deactivating breakout:', error)
-    await reportSupabaseError(error, 'Deactivating barber breakout', {
-      table: 'barber_breakouts',
-      operation: 'update',
-    })
-    return {
-      success: false,
-      error: 'שגיאה בביטול ההפסקה. נסה שוב.',
-    }
-  }
-  
-  return { success: true }
 }
 
 // ============================================================
