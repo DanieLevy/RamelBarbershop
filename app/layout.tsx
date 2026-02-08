@@ -57,11 +57,23 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="he" dir="rtl" data-theme="dark" className="dark" data-scroll-behavior="smooth" suppressHydrationWarning>
+    <html
+      lang="he"
+      dir="rtl"
+      data-theme="dark"
+      className="dark"
+      data-scroll-behavior="smooth"
+      style={{ backgroundColor: '#080b0d' }}
+      suppressHydrationWarning
+    >
       <head>
         <PWAHead />
       </head>
-      <body className="min-h-screen bg-background text-foreground font-ploni" suppressHydrationWarning>
+      <body
+        className="min-h-screen bg-background text-foreground font-ploni"
+        style={{ backgroundColor: '#080b0d' }}
+        suppressHydrationWarning
+      >
         <SkipLink />
         <Providers>
           <NotificationManagerProvider>

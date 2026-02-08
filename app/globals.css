@@ -173,6 +173,17 @@
   --pattern-grid: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h40v40H0V0zm1 1v38h38V1H1z' fill='%23ffffff' fill-opacity='0.02'/%3E%3C/svg%3E");
 }
 
+/* ============================================
+   iOS Notch / Safe Area — Background Color Fix
+   iOS 26 derives forehead/chin tint from body's
+   computed background-color. We pin it to the
+   exact hex value so iOS can always resolve it.
+   ============================================ */
+html,
+body {
+  background-color: #080b0d !important;
+}
+
 /* Safe Area for iOS 11.2+ */
 @supports (padding-top: env(safe-area-inset-top)) {
   :root {
@@ -253,6 +264,10 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    /* Hardcoded hex — iOS 26 derives notch/forehead/chin tint from computed bg.
+       Using hsl(var(--background)) was invalid because --background is oklch(). */
+    background-color: #080b0d;
+    color: #F2F2F2;
   }
 
   body {
@@ -1000,6 +1015,7 @@
   /* Notch area background - fills the safe area inset */
   /* z-index is BELOW header (50) but above content */
   /* Default: show the dark notch overlay */
+  /* iOS 26: Prevents fixed-element tinting bug from affecting the forehead */
   body::before {
     content: '';
     position: fixed;
@@ -1007,14 +1023,37 @@
     left: 0;
     right: 0;
     height: env(safe-area-inset-top, 0);
-    background: #080b0d;
+    background-color: #080b0d !important;
     z-index: 40; /* Below header z-50, above content */
     pointer-events: none;
+    /* Prevent iOS from treating this pseudo-element as a "fixed element" for tinting */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+  
+  /* Bottom chin area background for consistency */
+  body::after {
+    content: '';
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-bottom, 0);
+    background-color: #080b0d !important;
+    z-index: 40;
+    pointer-events: none;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
   }
   
   /* Hide the notch overlay when page uses edge-to-edge hero mode */
   /* Fallback class set via JS - works in all browsers */
   body.hero-edge-to-edge-active::before {
+    display: none !important;
+  }
+  
+  /* Also hide chin overlay for edge-to-edge hero pages if needed */
+  body.hero-edge-to-edge-active::after {
     display: none !important;
   }
   

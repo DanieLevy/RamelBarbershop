@@ -356,10 +356,12 @@ export function MobileBottomNav() {
           ref={navRef}
           className={cn(
             'pointer-events-auto relative',
-            'w-full max-w-[420px]',
+            'w-[280px] max-w-[300px]',
             'h-[60px] rounded-2xl',
             'flex items-center',
-            'bg-[#0d0f11] backdrop-blur-xl',
+            // iOS 26: fixed elements' bg-color affects forehead/chin tint.
+            // Using #080b0d (same as body) prevents tint mismatch in notch area.
+            'bg-[#080b0d] backdrop-blur-xl',
             'border border-white/[0.06]',
             'shadow-[0_4px_24px_rgba(0,0,0,0.6)]',
             // Padding for pill vertical inset

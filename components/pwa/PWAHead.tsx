@@ -8,7 +8,13 @@
 export function PWAHead() {
   return (
     <>
+      {/* iOS Notch Background — Synchronous inline style for Safari first-paint.
+          Safari/iOS 26 requires background-color to be available synchronously
+          (before external CSS loads) to properly tint the forehead/chin areas. */}
+      <style dangerouslySetInnerHTML={{ __html: `html,body{background-color:#080b0d!important}` }} />
+      
       {/* Standard PWA Meta Tags */}
+      
       <meta name="mobile-web-app-capable" content="yes" />
       <meta name="apple-touch-fullscreen" content="yes" />
       <meta name="apple-mobile-web-app-title" content="רם אל ברברשופ" />
