@@ -229,7 +229,7 @@ export function UnifiedProfilePage({
     <>
       <AppHeader />
 
-      <main id="main-content" tabIndex={-1} className="bg-background-dark outline-none pb-24">
+      <main id="main-content" tabIndex={-1} className="main-content-offset min-h-screen bg-background-dark outline-none">
         <div className="px-4 py-6 pb-24">
           <div className="max-w-md mx-auto">
 

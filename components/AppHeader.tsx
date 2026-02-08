@@ -329,7 +329,7 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
               'rounded-full bg-accent-gold/25 backdrop-blur-sm flex items-center justify-center',
               compact ? 'w-6 h-6' : 'w-7 h-7'
             )}>
-              <User size={compact ? 12 : 14} strokeWidth={1.5} className="text-accent-gold" />
+                <User size={compact ? 12 : 14} strokeWidth={1.5} className="text-accent-gold" />
             </div>
             <span className={cn(
               'max-w-[70px] truncate text-foreground-light',
@@ -433,7 +433,11 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
             style={{ width: `${pageScrollProgress}%` }}
           />
         </div>
-        <div>
+        
+        <div className={cn(
+          'mx-auto transition-all duration-500 px-4 sm:px-6',
+          isScrolled ? 'py-2 sm:py-3' : 'py-3 sm:py-4'
+        )}>
           {isHomePage && (
             <nav className="flex items-center justify-between">
               <div className="flex items-center gap-4">

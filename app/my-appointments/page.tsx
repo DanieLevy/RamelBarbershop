@@ -455,7 +455,7 @@ function MyAppointmentsContent() {
     <>
       <AppHeader />
       
-      <main id="main-content" tabIndex={-1} className="bg-background-dark outline-none pb-24">
+      <main id="main-content" tabIndex={-1} className="main-content-offset min-h-screen bg-background-dark outline-none pb-24">
         <div className="container-mobile py-6 sm:py-8 pb-24">
           <div className="max-w-2xl mx-auto">
             {/* Header with New Appointment Button */}
