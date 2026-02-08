@@ -123,7 +123,7 @@ export function BarberProfileClient({
           </div>
           
           {/* Minimal Name Overlay - Only name, clean design */}
-          <div className="absolute bottom-0 left-0 right-0 pb-6 pt-16 bg-gradient-to-t from-background-dark via-background-dark/80 to-transparent">
+          <div className=" absolute bottom-0 left-0 right-0 pb-6 pt-16 bg-gradient-to-t from-background-dark via-background-dark/80 to-transparent">
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground-light text-center">
               {barber.fullname}
             </h1>

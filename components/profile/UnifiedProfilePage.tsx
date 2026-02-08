@@ -336,33 +336,43 @@ export function UnifiedProfilePage({
               </div>
             </div>
 
-            {/* ── Stats ── */}
-            <div className="grid grid-cols-2 gap-2 mb-5">
+            {/* ── סטטיסטיקות משתמש ── */}
+            <div className="flex gap-2 mb-5">
               {/* Registration Date */}
-              <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 text-center">
-                <div className="flex items-center justify-center gap-1.5 text-foreground-muted text-[10px] mb-1">
-                  <Calendar size={10} strokeWidth={1.5} />
-                  <span>תאריך הרשמה</span>
+              <div className="flex-1 bg-white/[0.02] border border-white/[0.06] rounded-xl px-4 py-3 flex flex-col items-center justify-center">
+                <div className="flex items-center gap-1 text-foreground-muted text-[11px] mb-1">
+                  <Calendar size={12} strokeWidth={1.5} />
+                  <span>הצטרפות</span>
                 </div>
-                <p className="text-foreground-light font-medium text-sm">
+                <div className="text-foreground-light font-medium text-sm leading-5">
                   {user.created_at ? formatDate(user.created_at) : '-'}
-                </p>
+                </div>
               </div>
 
-              {/* Appointments Count - Full width tappable */}
+              {/* Appointments Count */}
               <button
                 onClick={() => router.push(appointmentsPath)}
-                className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 text-center hover:bg-white/[0.04] transition-colors"
+                className="flex-1 bg-white/[0.02] border border-white/[0.06] rounded-xl px-4 py-3 flex flex-col items-center justify-center outline-none hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors focus-visible:ring-2 focus-visible:ring-accent-gold"
                 aria-label="צפה בתורים"
                 tabIndex={0}
+                type="button"
               >
-                <div className="flex items-center justify-center gap-1.5 text-foreground-muted text-[10px] mb-1">
-                  <History size={10} strokeWidth={1.5} />
-                  <span>{appointmentsLabel}</span>
+                <div className="flex items-center gap-1 text-foreground-muted text-[11px] mb-1">
+                  <History size={12} strokeWidth={1.5} />
+                  <span>סה"כ תורים</span>
                 </div>
-                <p className="text-foreground-light font-medium text-sm">
-                  {loadingStats ? '...' : `${appointmentCount} תורים`}
-                </p>
+                <div className="text-foreground-light font-semibold text-base leading-5">
+                  {loadingStats ? (
+                    <span className="text-foreground-muted">--</span>
+                  ) : (
+                    <>
+                      <span className="text-accent-gold">{appointmentCount}</span>
+                      {/* add space between the number and the text */}
+                      <span className="text-xs text-foreground-muted ml-1"> </span>
+                      <span className="text-xs text-foreground-muted ml-1">תורים</span>
+                    </>
+                  )}
+                </div>
               </button>
             </div>
 

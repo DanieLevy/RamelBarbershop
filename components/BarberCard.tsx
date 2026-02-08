@@ -119,7 +119,7 @@ export const BarberCard = ({ barber, index = 0 }: BarberCardProps) => {
       ref={cardRef}
       className={cn(
         'group relative flex-shrink-0 w-[220px] rounded-[18px] overflow-hidden',
-        'bg-[#141414] border border-white/[0.06]',
+        'bg-[#141414]',
         'shadow-[0_6px_20px_rgba(0,0,0,0.3)]',
         'transition-all duration-250 ease-out',
         'hover:shadow-[0_12px_32px_rgba(0,0,0,0.45)] hover:scale-[1.02]',
@@ -153,16 +153,16 @@ export const BarberCard = ({ barber, index = 0 }: BarberCardProps) => {
           alt={barber.fullname}
           fill
           className={cn(
-            'object-cover transition-transform duration-300 ease-out',
+            'object-cover transition-transform duration-300 ease-out ',
             isImageHovered && 'scale-105'
           )}
           style={{ objectPosition: `${imgX}% ${imgY}%` }}
           sizes="220px"
         />
-
+        
         {/* ── Top-left (visual left in RTL): Instagram icon ── */}
         {instagramUrl && (
-          <div className="absolute top-2 left-2">
+          <div className="absolute top-2 left-2 z-10">
             <button
               type="button"
               onClick={handleInstagramClick}
@@ -183,9 +183,21 @@ export const BarberCard = ({ barber, index = 0 }: BarberCardProps) => {
       </Link>
 
       {/* ── Content Section ── */}
-      <div className="px-3 pt-2.5 pb-0">
+      <div
+        className="px-3 pt-2.5 pb-0"
+        style={{
+          background: '#141414',
+          borderTopLeftRadius: '18px',
+          borderTopRightRadius: '18px',
+          borderBottomLeftRadius: '0px',
+          borderBottomRightRadius: '0px',
+          marginTop: '-18px', // Go up substantially over the image, enough for status/name
+          position: 'relative',
+          zIndex: 3,
+        }}
+      >
         {/* Status indicator + Working hours */}
-        <div className="flex items-center gap-1.5 mb-0.5 rounded-[14px]">
+        <div className="flex items-center gap-1.5 mb-0.5">
           <span
             className={cn(
               'inline-flex items-center gap-1 text-[10px] font-medium',

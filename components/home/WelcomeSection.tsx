@@ -171,11 +171,11 @@ export const WelcomeSection = ({
         />
       </div>
 
-      <div className="relative z-10 px-5 pt-2 pb-8">
+      <div className="relative z-10 px-5 pt-2">
         {/* ── Greeting / Title - RTL aligned ── */}
         <div
           className={cn(
-            'transition-all duration-700 ease-out',
+            'transition-all duration-700 ease-out bg',
             isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
           )}
         >

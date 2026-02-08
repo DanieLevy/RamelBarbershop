@@ -356,7 +356,8 @@ export function MobileBottomNav() {
           ref={navRef}
           className={cn(
             'pointer-events-auto relative',
-            'w-[280px] max-w-[300px]',
+// calc the best width for the bottom nav bar based on the screen width
+            'w-[calc(100%-100px)] max-w-[calc(100%-50px)]',
             'h-[60px] rounded-2xl',
             'flex items-center',
             // iOS 26: fixed elements' bg-color affects forehead/chin tint.
@@ -378,7 +379,7 @@ export function MobileBottomNav() {
                 'absolute h-[calc(100%-12px)] top-[6px]',
                 'bg-accent-gold',
                 'transition-all duration-300 ease-out',
-                'md:hidden'
+                'md:hidden',
               )}
               style={{
                 left: pillStyle.left,
@@ -401,15 +402,18 @@ export function MobileBottomNav() {
                   'relative z-10 flex-1 flex items-center justify-center',
                   'min-w-[44px] min-h-[44px]',
                   'transition-all duration-200 ease-out',
+                  
                   // Active: horizontal icon + label, inactive: icon + small label below
                   isActive
                     ? 'flex-row gap-1.5'
                     : 'flex-col gap-0.5',
                   'md:max-w-[200px] md:h-full md:flex-col md:gap-0.5',
+                  
                   // Colors: active = dark on gold, inactive = muted
                   isActive
                     ? 'text-background-dark font-semibold'
                     : 'text-foreground-muted hover:text-foreground-light',
+                    
                   // Touch
                   'active:scale-95 md:active:scale-100',
                   // Focus

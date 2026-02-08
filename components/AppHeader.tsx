@@ -8,6 +8,8 @@ import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { LoginModal } from './LoginModal'
 import { User, Calendar, LogOut, Menu, X, Home, Phone, MapPin, Scissors, ChevronDown, LayoutDashboard, Settings } from 'lucide-react'
 import { Button } from '@heroui/react'
+import { motion } from 'framer-motion'
+
 
 interface AppHeaderProps {
   barberImgUrl?: string
@@ -316,11 +318,11 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
             className={cn(
-              'flex items-center gap-2 rounded-full transition-all',
-              'bg-white/5 hover:bg-white/10',
-              'backdrop-blur-md border border-white/15',
+              'flex items-center gap-2 rounded-lg transition-all',
+              'bg-dark hover:bg-white/10',
+              'backdrop-blur-md border border-white/10',
               'shadow-[0_2px_12px_rgba(0,0,0,0.15)]',
-              compact ? 'px-2.5 py-1.5' : 'px-3 py-2'
+              compact ? 'px-2 py-1' : 'px-2 py-1'
             )}
           >
             <div className={cn(
