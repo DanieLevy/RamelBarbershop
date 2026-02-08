@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Home, Search, Calendar, User, LayoutDashboard, LogIn, Scissors } from 'lucide-react'
@@ -12,93 +12,89 @@ import { usePWA } from '@/hooks/usePWA'
 import { LoginModal } from '@/components/LoginModal'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/store/useAuthStore'
+import { useHaptics } from '@/hooks/useHaptics'
+
+// ============================================================================
+// Types
+// ============================================================================
 
 interface NavItem {
   id: string
   label: string
-  labelActive?: string
   href?: string
   icon: LucideIcon
   action?: () => void
 }
 
+// ============================================================================
+// Component
+// ============================================================================
+
 export function MobileBottomNav() {
   const pathname = usePathname()
   const router = useRouter()
-  
-  // Use unified auth hook
+  const haptics = useHaptics()
+
+  // Auth
   const { type: userRole, isInitialized } = useCurrentUser()
-  
-  // Push notifications state for badge - use shared store for real-time sync
+
+  // Push notifications state for badge
   const push = usePushNotifications()
   const pushStore = usePushStore()
   const pwa = usePWA()
-  
-  // Show badge on profile when notifications need setup
-  // Use shared store for real-time sync, but fallback to hook state
+
   const isSubscribedRealtime = pushStore.isSubscribed || push.isSubscribed
   const isSupportedRealtime = pushStore.isSupported || push.isSupported
   const permissionRealtime = pushStore.permission !== 'unavailable' ? pushStore.permission : push.permission
-  
-  // Get customer from auth store for fetching appointments and checking phone
+
   const { customer } = useAuthStore()
-  
-  // Show badge when: user is logged in (customer or barber), in PWA, push supported but not subscribed
-  // This covers all cases where user should enable notifications
+
   const isLoggedInUser = userRole === 'customer' || userRole === 'barber'
   const isCustomer = userRole === 'customer'
-  
-  // Check for various notification issues
   const hasPermissionIssue = permissionRealtime === 'denied'
   const needsSubscription = isSupportedRealtime && !isSubscribedRealtime
-  
-  // Check if customer is missing phone number
   const isMissingPhone = isCustomer && customer && !customer.phone
-  
-  // Show notification badge for:
-  // 1. PWA users who haven't enabled notifications
-  // 2. Users with denied permission (they need to fix this in settings)
-  const showNotificationBadge = 
-    isLoggedInUser && 
-    pwa.isStandalone && 
-    (needsSubscription || hasPermissionIssue)
-  
-  // Show phone badge when customer is logged in but has no phone number
-  // This encourages them to add phone for SMS reminders
+
+  const showNotificationBadge =
+    isLoggedInUser && pwa.isStandalone && (needsSubscription || hasPermissionIssue)
   const showPhoneBadge = isMissingPhone
-  
-  // Different badge style for denied permission (more urgent)
   const isUrgentBadge = hasPermissionIssue
-  
+
   // UI State
   const [isVisible, setIsVisible] = useState(true)
   const [showLoginDropup, setShowLoginDropup] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [upcomingCount, setUpcomingCount] = useState(0)
-  
+
   // Scroll tracking
   const lastScrollY = useRef(0)
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null)
   const dropupRef = useRef<HTMLDivElement>(null)
-  
-  // Fetch upcoming appointments count for customers
+  const navRef = useRef<HTMLElement>(null)
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
+
+  // Active pill position - measured from DOM for RTL correctness
+  const [pillStyle, setPillStyle] = useState<{ left: number; width: number } | null>(null)
+
+  // ── Fetch upcoming appointments count ──
+
   const fetchUpcomingCount = useCallback(async () => {
     if (userRole !== 'customer' || !customer?.id) {
       setUpcomingCount(0)
       return
     }
-    
+
     try {
       const supabase = createClient()
       const now = Date.now()
-      
+
       const { count, error } = await supabase
         .from('reservations')
         .select('*', { count: 'exact', head: true })
         .eq('customer_id', customer.id)
         .eq('status', 'confirmed')
         .gt('time_timestamp', now)
-      
+
       if (!error && count !== null) {
         setUpcomingCount(count)
       }
@@ -106,50 +102,45 @@ export function MobileBottomNav() {
       console.error('Error fetching upcoming appointments count:', err)
     }
   }, [userRole, customer?.id])
-  
-  // Fetch count on mount and when customer changes
+
   useEffect(() => {
     fetchUpcomingCount()
-    
-    // Refetch every 30 seconds
     const interval = setInterval(fetchUpcomingCount, 30000)
     return () => clearInterval(interval)
   }, [fetchUpcomingCount])
 
-  // Don't show on dashboard pages, barber booking wizard, barber profile pages, or dev console
-  const shouldHide = pathname.startsWith('/barber/dashboard') || 
-                     pathname.includes('/book') ||
-                     pathname.startsWith('/dev') ||
-                     pathname.match(/^\/barber\/[^/]+$/) // Hide on barber profile pages like /barber/asaf.ohana
+  // ── Page visibility rules ──
 
-  
-  // Scroll-based hide/show logic
+  const shouldHide =
+    pathname.startsWith('/barber/dashboard') ||
+    pathname.includes('/book') ||
+    pathname.startsWith('/dev') ||
+    !!pathname.match(/^\/barber\/[^/]+$/)
+
+  // ── Scroll-based visibility ──
+
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY
       const isScrollingDown = currentScrollY > lastScrollY.current
       const isNearBottom = window.innerHeight + currentScrollY >= document.body.scrollHeight - 100
-      
-      // Hide when scrolling down, show when scrolling up or near bottom
+
       if (isScrollingDown && currentScrollY > 100) {
         setIsVisible(false)
       } else {
         setIsVisible(true)
       }
-      
-      // Always show when near bottom
+
       if (isNearBottom) {
         setIsVisible(true)
       }
-      
+
       lastScrollY.current = currentScrollY
-      
-      // Clear existing timeout
+
       if (scrollTimeout.current) {
         clearTimeout(scrollTimeout.current)
       }
-      
-      // Show after user stops scrolling
+
       scrollTimeout.current = setTimeout(() => {
         setIsVisible(true)
       }, 300)
@@ -164,14 +155,13 @@ export function MobileBottomNav() {
     }
   }, [])
 
-  // Close dropup when clicking outside
+  // Close dropup on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropupRef.current && !dropupRef.current.contains(event.target as Node)) {
         setShowLoginDropup(false)
       }
     }
-
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
@@ -181,26 +171,16 @@ export function MobileBottomNav() {
     setShowLoginDropup(false)
   }, [pathname])
 
-  // Fallback: show nav after timeout even if auth isn't initialized
+  // Fallback: show nav after timeout
   const [forceShow, setForceShow] = useState(false)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setForceShow(true)
-    }, 2000) // 2 second fallback
+    const timer = setTimeout(() => setForceShow(true), 2000)
     return () => clearTimeout(timer)
   }, [])
 
-  if (shouldHide) {
-    return null
-  }
+  // ── Navigation ──
 
-  // Wait for auth to initialize (with fallback)
-  const isReady = isInitialized || forceShow
-  if (!isReady) {
-    return null
-  }
-
-  const scrollToTeam = () => {
+  const scrollToTeam = useCallback(() => {
     if (pathname !== '/') {
       router.push('/')
       setTimeout(() => {
@@ -211,39 +191,40 @@ export function MobileBottomNav() {
       const el = document.querySelector('.index-body')
       el?.scrollIntoView({ behavior: 'smooth' })
     }
-  }
+  }, [pathname, router])
 
-  // Navigation items based on role
-  const getNavItems = (role: UserType): NavItem[] => {
-    switch (role) {
-      case 'barber':
-        // Barber-specific navigation with quick access to their upcoming customer appointments
-        return [
-          { id: 'home', label: 'בית', href: '/', icon: Home },
-          { id: 'dashboard', label: 'לוח בקרה', href: '/barber/dashboard', icon: LayoutDashboard },
-          { id: 'upcoming', label: 'יומן', labelActive: 'יומן', href: '/barber/dashboard/reservations', icon: Calendar },
-          { id: 'profile', label: 'פרופיל', href: '/barber/profile', icon: User },
-        ]
-      case 'customer':
-        return [
-          { id: 'home', label: 'בית', href: '/', icon: Home },
-          { id: 'search', label: 'חיפוש', icon: Search, action: scrollToTeam },
-          { id: 'calendar', label: 'התורים שלי', labelActive: 'תורים', href: '/my-appointments', icon: Calendar },
-          { id: 'profile', label: 'פרופיל', href: '/profile', icon: User },
-        ]
-      default: // guest
-        return [
-          { id: 'home', label: 'בית', href: '/', icon: Home },
-          { id: 'search', label: 'חיפוש', icon: Search, action: scrollToTeam },
-          { id: 'calendar', label: 'תורים', href: '/my-appointments', icon: Calendar },
-          { id: 'login', label: 'התחברות', icon: LogIn, action: () => setShowLoginDropup(true) },
-        ]
-    }
-  }
+  const getNavItems = useCallback(
+    (role: UserType): NavItem[] => {
+      switch (role) {
+        case 'barber':
+          return [
+            { id: 'home', label: 'בית', href: '/', icon: Home },
+            { id: 'dashboard', label: 'לוח בקרה', href: '/barber/dashboard', icon: LayoutDashboard },
+            { id: 'upcoming', label: 'יומן', href: '/barber/dashboard/reservations', icon: Calendar },
+            { id: 'profile', label: 'פרופיל', href: '/barber/profile', icon: User },
+          ]
+        case 'customer':
+          return [
+            { id: 'home', label: 'בית', href: '/', icon: Home },
+            { id: 'search', label: 'חיפוש', icon: Search, action: scrollToTeam },
+            { id: 'calendar', label: 'תורים', href: '/my-appointments', icon: Calendar },
+            { id: 'profile', label: 'פרופיל', href: '/profile', icon: User },
+          ]
+        default:
+          return [
+            { id: 'home', label: 'בית', href: '/', icon: Home },
+            { id: 'search', label: 'חיפוש', icon: Search, action: scrollToTeam },
+            { id: 'calendar', label: 'תורים', href: '/my-appointments', icon: Calendar },
+            { id: 'login', label: 'כניסה', icon: LogIn, action: () => setShowLoginDropup(true) },
+          ]
+      }
+    },
+    [scrollToTeam]
+  )
 
-  const navItems = getNavItems(userRole)
+  const navItems = useMemo(() => getNavItems(userRole), [getNavItems, userRole])
 
-  const getActiveItem = (): string => {
+  const activeItem = useMemo((): string => {
     if (pathname === '/my-appointments') return 'calendar'
     if (pathname === '/profile') return 'profile'
     if (pathname === '/barber/dashboard/profile') return 'profile'
@@ -252,53 +233,106 @@ export function MobileBottomNav() {
     if (pathname.startsWith('/barber/')) return 'login'
     if (pathname === '/') return 'home'
     return 'home'
-  }
+  }, [pathname])
 
-  const activeItem = getActiveItem()
+  const activeIndex = useMemo(
+    () => navItems.findIndex((item) => item.id === activeItem),
+    [navItems, activeItem]
+  )
 
-  const handleClick = (item: NavItem) => {
-    setShowLoginDropup(false)
-    if (item.action) {
-      item.action()
-    } else if (item.href) {
-      router.push(item.href)
+  // ── Measure active item position for pill indicator ──
+  useEffect(() => {
+    if (activeIndex < 0 || !navRef.current) return
+
+    const measure = () => {
+      const activeBtn = itemRefs.current[activeIndex]
+      const navEl = navRef.current
+      if (!activeBtn || !navEl) return
+
+      const navRect = navEl.getBoundingClientRect()
+      const btnRect = activeBtn.getBoundingClientRect()
+
+      setPillStyle({
+        left: btnRect.left - navRect.left,
+        width: btnRect.width,
+      })
     }
-  }
 
-  const handleCustomerLogin = () => {
+    requestAnimationFrame(measure)
+  }, [activeIndex, navItems])
+
+  // Determine pill border-radius based on position (edge-matching)
+  const pillBorderRadius = useMemo(() => {
+    const navRadius = 16 // matches rounded-2xl (16px)
+    const innerRadius = 12
+    const isFirst = activeIndex === 0
+    const isLast = activeIndex === navItems.length - 1
+
+    // RTL: first item is on the RIGHT, last item is on the LEFT
+    return {
+      borderTopRightRadius: isFirst ? navRadius : innerRadius,
+      borderBottomRightRadius: isFirst ? navRadius : innerRadius,
+      borderTopLeftRadius: isLast ? navRadius : innerRadius,
+      borderBottomLeftRadius: isLast ? navRadius : innerRadius,
+    }
+  }, [activeIndex, navItems.length])
+
+  const handleClick = useCallback(
+    (item: NavItem) => {
+      setShowLoginDropup(false)
+      haptics.light()
+      if (item.action) {
+        item.action()
+      } else if (item.href) {
+        router.push(item.href)
+      }
+    },
+    [haptics, router]
+  )
+
+  const handleCustomerLogin = useCallback(() => {
     setShowLoginDropup(false)
     setShowLoginModal(true)
-  }
+  }, [])
 
-  const handleBarberLogin = () => {
+  const handleBarberLogin = useCallback(() => {
     setShowLoginDropup(false)
     router.push('/barber/login')
-  }
+  }, [router])
+
+  // ── Early returns ──
+
+  if (shouldHide) return null
+
+  const isReady = isInitialized || forceShow
+  if (!isReady) return null
+
+  // ── Render ──
 
   return (
     <>
-      <div 
+      <div
         className={cn(
           'fixed bottom-0 left-0 right-0 z-50 pointer-events-none',
           'transition-all duration-300 ease-out',
-          // Mobile: centered floating pill with padding
-          'flex justify-center pb-6 px-4',
-          // Desktop: full width bar at bottom
-          'md:pb-0 md:px-0',
+          'flex justify-center',
+          'px-3 md:px-0',
           isVisible ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
         )}
+        style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 10px)' }}
       >
-        {/* Login Dropup Menu */}
+        {/* Login Dropup */}
         {showLoginDropup && (
-          <div 
+          <div
             ref={dropupRef}
-            className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 pointer-events-auto animate-fade-in md:mb-4"
+            className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 pointer-events-auto animate-fade-in"
           >
             <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[200px]">
               <div className="p-1">
                 <button
                   onClick={handleCustomerLogin}
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-foreground-light hover:bg-white/5 transition-colors"
+                  tabIndex={0}
                 >
                   <User size={20} strokeWidth={1.5} className="text-accent-gold" />
                   <span className="text-sm font-medium">כניסה כלקוח</span>
@@ -306,123 +340,139 @@ export function MobileBottomNav() {
                 <button
                   onClick={handleBarberLogin}
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-foreground-light hover:bg-white/5 transition-colors"
+                  tabIndex={0}
                 >
                   <Scissors size={20} strokeWidth={1.5} className="text-accent-gold" />
                   <span className="text-sm font-medium">כניסה כספר</span>
                 </button>
               </div>
             </div>
-            {/* Arrow pointing down */}
             <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-[#1a1a1a] border-r border-b border-white/10 rotate-45" />
           </div>
         )}
 
+        {/* ── Bottom Navigation Bar ── */}
         <nav
+          ref={navRef}
           className={cn(
-            'pointer-events-auto',
-            // Mobile: Floating pill shape with labels
-            'inline-flex items-center gap-0',
-            'px-2 py-1.5',
-            'rounded-full',
-            // Desktop: Full width bar
-            'md:w-full md:rounded-none md:px-0 md:py-0',
-            'md:justify-center md:gap-0',
-            // Darker solid background for better visibility
-            'bg-[#0a0c0e] backdrop-blur-xl',
-            // Subtle border and shadow
-            'border border-white/[0.08]',
-            'md:border-x-0 md:border-b-0',
-            'shadow-[0_8px_32px_rgba(0,0,0,0.6)] md:shadow-[0_-4px_20px_rgba(0,0,0,0.4)]'
+            'pointer-events-auto relative',
+            'w-full max-w-[420px]',
+            'h-[60px] rounded-2xl',
+            'flex items-center',
+            'bg-[#0d0f11] backdrop-blur-xl',
+            'border border-white/[0.06]',
+            'shadow-[0_4px_24px_rgba(0,0,0,0.6)]',
+            // Padding for pill vertical inset
+            'py-[6px] px-[6px]',
+            'md:max-w-none md:w-full md:rounded-none md:h-14 md:py-0 md:px-0'
           )}
-          role="navigation"
+          role="tablist"
           aria-label="תפריט ניווט ראשי"
         >
-          {navItems.map((item) => {
+          {/* Animated active pill - solid gold, DOM-measured for RTL */}
+          {pillStyle && activeIndex >= 0 && (
+            <div
+              className={cn(
+                'absolute h-[calc(100%-12px)] top-[6px]',
+                'bg-accent-gold',
+                'transition-all duration-300 ease-out',
+                'md:hidden'
+              )}
+              style={{
+                left: pillStyle.left,
+                width: pillStyle.width,
+                ...pillBorderRadius,
+              }}
+            />
+          )}
+
+          {navItems.map((item, idx) => {
             const Icon = item.icon
             const isActive = activeItem === item.id
-            const displayLabel = isActive && item.labelActive ? item.labelActive : item.label
-            
+
             return (
               <button
                 key={item.id}
+                ref={(el) => { itemRefs.current[idx] = el }}
                 onClick={() => handleClick(item)}
                 className={cn(
-                  // Base styles - vertical stack
-                  'relative flex flex-col items-center justify-center gap-0.5',
+                  'relative z-10 flex-1 flex items-center justify-center',
+                  'min-w-[44px] min-h-[44px]',
                   'transition-all duration-200 ease-out',
-                  // Mobile: padding for each item
-                  'px-3.5 py-1.5',
-                  'rounded-full',
-                  // Desktop: Square items in row
-                  'md:rounded-none md:flex-1 md:max-w-[200px]',
-                  'md:px-6 md:py-3',
-                  // Active state
-                  isActive 
-                    ? 'text-accent-gold md:border-b-2 md:border-accent-gold' 
-                    : 'text-foreground-muted/70 hover:text-foreground-light md:border-b-2 md:border-transparent',
-                  // Touch feedback
+                  // Active: horizontal icon + label, inactive: icon + small label below
+                  isActive
+                    ? 'flex-row gap-1.5'
+                    : 'flex-col gap-0.5',
+                  'md:max-w-[200px] md:h-full md:flex-col md:gap-0.5',
+                  // Colors: active = dark on gold, inactive = muted
+                  isActive
+                    ? 'text-background-dark font-semibold'
+                    : 'text-foreground-muted hover:text-foreground-light',
+                  // Touch
                   'active:scale-95 md:active:scale-100',
-                  // Focus styles
-                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-gold/50'
+                  // Focus
+                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-gold/50 focus-visible:rounded-lg'
                 )}
+                role="tab"
+                aria-selected={isActive}
                 aria-label={item.label}
                 aria-current={isActive ? 'page' : undefined}
+                tabIndex={0}
               >
-                {/* Icon container with optional badge */}
-                <div className="relative flex-shrink-0">
-                  <Icon
-                    size={20}
-                    strokeWidth={isActive ? 2 : 1.5}
-                  />
-                  
-                  {/* Badge for profile tab: notification issues or missing phone */}
+                {/* Icon with optional badge */}
+                <div className="relative shrink-0">
+                  <Icon size={isActive ? 22 : 20} strokeWidth={isActive ? 2.5 : 1.5} />
+
+                  {/* Profile badge */}
                   {item.id === 'profile' && (showNotificationBadge || showPhoneBadge) && (
-                    <div className="absolute -top-1 -right-1 flex items-center justify-center">
+                    <div className="absolute -top-1 -right-1">
                       <span className="relative flex h-2 w-2">
-                        {showNotificationBadge ? (
-                          // Notification badge (red or amber based on urgency)
-                          isUrgentBadge ? (
-                            <>
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
-                            </>
-                          ) : (
-                            <>
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
-                            </>
-                          )
-                        ) : (
-                          // Phone missing badge (orange)
-                          <>
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
-                          </>
-                        )}
+                        <span
+                          className={cn(
+                            'animate-ping absolute inline-flex h-full w-full rounded-full opacity-75',
+                            showNotificationBadge
+                              ? isUrgentBadge ? 'bg-amber-400' : 'bg-red-400'
+                              : 'bg-orange-400'
+                          )}
+                        />
+                        <span
+                          className={cn(
+                            'relative inline-flex rounded-full h-2 w-2',
+                            showNotificationBadge
+                              ? isUrgentBadge ? 'bg-amber-500' : 'bg-red-500'
+                              : 'bg-orange-500'
+                          )}
+                        />
                       </span>
                     </div>
                   )}
-                  
-                  {/* Upcoming appointments count badge for calendar tab */}
+
+                  {/* Calendar count badge */}
                   {item.id === 'calendar' && upcomingCount > 0 && (
-                    <div className="absolute -top-1.5 -right-2.5 flex items-center justify-center">
-                      <span className={cn(
-                        'inline-flex items-center justify-center min-w-[16px] h-[16px] px-0.5',
-                        'text-[9px] font-bold rounded-full',
-                        'bg-accent-gold text-background-dark'
-                      )}>
+                    <div className="absolute -top-1.5 -right-2.5">
+                      <span
+                        className={cn(
+                          'inline-flex items-center justify-center min-w-[16px] h-[16px] px-0.5',
+                          'text-[9px] font-bold rounded-full',
+                          'bg-red-500 text-white'
+                        )}
+                      >
                         {upcomingCount > 9 ? '9+' : upcomingCount}
                       </span>
                     </div>
                   )}
                 </div>
-                
-                {/* Label - Always visible, small */}
-                <span className={cn(
-                  'text-[10px] font-medium whitespace-nowrap leading-tight',
-                  isActive ? 'opacity-100' : 'opacity-60'
-                )}>
-                  {displayLabel}
+
+                {/* Label */}
+                <span
+                  className={cn(
+                    'font-semibold whitespace-nowrap leading-tight',
+                    isActive
+                      ? 'text-[12px] md:text-[10px]'
+                      : 'text-[10px] opacity-50'
+                  )}
+                >
+                  {item.label}
                 </span>
               </button>
             )
@@ -431,10 +481,7 @@ export function MobileBottomNav() {
       </div>
 
       {/* Login Modal */}
-      <LoginModal 
-        isOpen={showLoginModal} 
-        onClose={() => setShowLoginModal(false)} 
-      />
+      <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
     </>
   )
 }

@@ -84,11 +84,13 @@ export const getCachedProducts = unstable_cache(
 
 /**
  * Get cached active barbers with work days
- * Cached for 30 seconds
+ * Cached for 1 day (86400 seconds)
  * 
  * Barber status rarely changes (activating/deactivating a barber is an infrequent admin action).
- * A 30-second cache is acceptable for homepage display while dramatically reducing DB load.
- * The booking flow itself fetches fresh data independently.
+ * Manual invalidation via revalidateTag('barbers') is triggered by:
+ * - app/api/barber/manage/route.ts (create/update/deactivate barber)
+ * This ensures the cache is fresh when barber data actually changes.
+ * The booking flow fetches fresh data independently.
  */
 export const getCachedBarbers = unstable_cache(
   async (): Promise<BarberWithWorkDays[]> => {
@@ -109,7 +111,7 @@ export const getCachedBarbers = unstable_cache(
   },
   ['active-barbers'], // Cache key
   { 
-    revalidate: 30, // 30 seconds - short cache for near-real-time barber availability
+    revalidate: 86400, // 1 day - tag-invalidated on barber changes
     tags: ['barbers'] 
   }
 )

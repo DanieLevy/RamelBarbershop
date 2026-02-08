@@ -116,9 +116,41 @@ export function Footer({ settings }: FooterProps) {
 
       {/* Bottom bar */}
       <div className="border-t border-white/5">
-        <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-foreground-muted">
-          {/* Hidden dev access: tap 5 times quickly to access /dev/login */}
-          <div className="order-3 sm:order-1 flex flex-col items-center sm:items-start gap-1">
+        <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-4 flex flex-col items-center gap-3 text-xs text-foreground-muted">
+          {/* Legal + User Links */}
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+            <Link href="/faq" className="hover:text-accent-gold transition-colors">
+              שאלות נפוצות
+            </Link>
+            <Link href="/terms" className="hover:text-accent-gold transition-colors">
+              תקנון
+            </Link>
+            <Link href="/privacy-policy" className="hover:text-accent-gold transition-colors">
+              פרטיות
+            </Link>
+            <Link href="/accessibility" className="hover:text-accent-gold transition-colors">
+              נגישות
+            </Link>
+            <Link href="/my-appointments" className="hover:text-accent-gold transition-colors">
+              התורים שלי
+            </Link>
+            <Link href="/profile" className="hover:text-accent-gold transition-colors">
+              הפרופיל שלי
+            </Link>
+            {showDebugLink && (
+              <Link
+                href="/debug"
+                className="hover:text-accent-gold transition-colors flex items-center gap-1"
+                title="Debug Console"
+              >
+                <Settings size={12} />
+                <span>Debug</span>
+              </Link>
+            )}
+          </div>
+          
+          {/* Copyright + Version */}
+          <div className="flex flex-col items-center gap-1">
             <Button
               onPress={handleCopyrightTap}
               variant="ghost"
@@ -127,51 +159,12 @@ export function Footer({ settings }: FooterProps) {
             >
               © {currentYear} {shopName}. כל הזכויות שמורות.
             </Button>
-            <span 
+            <span
               className="text-[10px] text-foreground-muted/50 font-mono"
               suppressHydrationWarning
             >
               v{APP_VERSION}
             </span>
-          </div>
-          
-          {/* Legal Links - nowrap to prevent breaking */}
-          <div className="order-1 sm:order-2 flex items-start justify-start whitespace-nowrap h-[22px]">
-            <Link href="/faq" className="hover:text-accent-gold transition-colors px-1.5">
-              שאלות נפוצות
-            </Link>
-            <span className="text-white/30 mx-1">|</span>
-            <Link href="/terms" className="hover:text-accent-gold transition-colors px-1.5">
-              תקנון
-            </Link>
-            <span className="text-white/30 mx-1">|</span>
-            <Link href="/privacy-policy" className="hover:text-accent-gold transition-colors px-1.5">
-              פרטיות
-            </Link>
-            <span className="text-white/30 mx-1">|</span>
-            <Link href="/accessibility" className="hover:text-accent-gold transition-colors px-1.5">
-              נגישות
-            </Link>
-          </div>
-          
-          {/* User Links */}
-          <div className="order-2 sm:order-3 flex items-center gap-4">
-            <Link href="/my-appointments" className="hover:text-accent-gold transition-colors">
-              התורים שלי
-            </Link>
-            <Link href="/profile" className="hover:text-accent-gold transition-colors">
-              הפרופיל שלי
-            </Link>
-            {showDebugLink && (
-              <Link 
-                href="/debug" 
-                className="hover:text-accent-gold transition-colors flex items-center gap-1"
-                title="Debug Console"
-              >
-                <Settings size={12} />
-                <span>Debug</span>
-              </Link>
-            )}
           </div>
         </div>
       </div>

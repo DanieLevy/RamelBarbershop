@@ -190,7 +190,6 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
   }
 
   const isScrolled = scrollProgress > 0.3
-  const showHeaderLogo = scrollProgress > 0.5
 
   const UserButton = ({ compact = false }: { compact?: boolean }) => {
     if (!isLoggedIn) {
@@ -410,9 +409,15 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
       <header
         className="fixed left-0 right-0 z-50 transition-all duration-500"
         style={{
-          backgroundColor: `rgba(5, 7, 8, ${0.7 + scrollProgress * 0.28})`,
-          backdropFilter: `blur(${8 + scrollProgress * 12}px)`,
-          WebkitBackdropFilter: `blur(${8 + scrollProgress * 12}px)`,
+          backgroundColor: isHomePage
+            ? `rgba(5, 7, 8, ${scrollProgress * 0.95})`
+            : `rgba(5, 7, 8, ${0.7 + scrollProgress * 0.28})`,
+          backdropFilter: isHomePage
+            ? `blur(${scrollProgress * 20}px)`
+            : `blur(${8 + scrollProgress * 12}px)`,
+          WebkitBackdropFilter: isHomePage
+            ? `blur(${scrollProgress * 20}px)`
+            : `blur(${8 + scrollProgress * 12}px)`,
           top: 'var(--header-top-offset, 0px)',
         }}
       >
@@ -466,32 +471,37 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
                 </div>
               </div>
               
-              <div 
+              {/* Logo - hidden at top on homepage, animated in on scroll */}
+              <div
                 className={cn(
-                  'absolute left-1/2 -translate-x-1/2 transition-all duration-500',
-                  showHeaderLogo ? 'opacity-100 scale-100' : 'opacity-0 scale-75 pointer-events-none'
+                  'absolute left-1/2 -translate-x-1/2 transition-all duration-500 ease-out',
+                  isHomePage && !isScrolled
+                    ? 'opacity-0 translate-y-3 pointer-events-none'
+                    : 'opacity-100 translate-y-0'
                 )}
               >
                 <button
                   onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                  className="flex items-center gap-3 group"
+                  className="flex items-center gap-2.5 group"
+                  aria-label="חזרה לראש הדף"
+                  tabIndex={isHomePage && !isScrolled ? -1 : 0}
                 >
                   <div className={cn(
-                    'rounded-full overflow-hidden border-2 border-accent-gold/40 shadow-lg transition-all duration-300 group-hover:border-accent-gold/60',
-                    isScrolled ? 'w-10 h-10 sm:w-11 sm:h-11' : 'w-12 h-12 sm:w-14 sm:h-14'
+                    'overflow-hidden transition-all duration-300',
+                    isScrolled ? 'w-9 h-9 sm:w-10 sm:h-10' : 'w-10 h-10 sm:w-11 sm:h-11'
                   )}>
                     <Image
-                      src="/icon.png"
-                      alt="Ramel Barbershop"
-                      width={56}
-                      height={56}
-                      className="w-full h-full object-cover"
+                      src="/logo_bg_tran.png"
+                      alt="רם אל ברברשופ"
+                      width={44}
+                      height={44}
+                      className="w-full h-full object-contain"
                       priority
                     />
                   </div>
                   <span className={cn(
-                    'font-medium text-foreground-light block transition-all duration-300',
-                    isScrolled ? 'text-sm sm:text-base' : 'text-base sm:text-lg'
+                    'font-medium text-foreground-light transition-all duration-300 hidden sm:block',
+                    isScrolled ? 'text-sm' : 'text-base'
                   )}>
                     רם אל <span className="text-accent-gold">ברברשופ</span>
                   </span>
@@ -568,13 +578,13 @@ export function AppHeader({ barberImgUrl, isWizardPage = false }: AppHeaderProps
                 </Button>
               
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-accent-gold/40 shadow-lg">
+                <div className="w-12 h-12 overflow-hidden">
                   <Image
-                    src="/icon.png"
-                    alt="Ramel Barbershop"
+                    src="/logo_bg_tran.png"
+                    alt="רם אל ברברשופ"
                     width={48}
                     height={48}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                   />
                 </div>
                 <div>

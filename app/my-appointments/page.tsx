@@ -473,7 +473,7 @@ function MyAppointmentsContent() {
               <Button
                 variant="primary"
                 onPress={() => router.push('/')}
-                className="shrink-0"
+                className="shrink-0 w-10 h-10 rounded-sm"
                 size="sm"
               >
                 <Calendar size={14} strokeWidth={2} />
