@@ -370,7 +370,7 @@ export async function checkCustomerEligibility(
     }
     
     const currentCount = futureBookingsCount || 0
-    const maxBookings = 5
+    const maxBookings = 10
     const hasReachedLimit = currentCount >= maxBookings
     
     return {

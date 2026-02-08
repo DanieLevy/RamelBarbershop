@@ -38,7 +38,7 @@ export default function MyAppointmentsPage() {
       <Suspense fallback={
         <>
           <AppHeader />
-          <main className="relative top-24 min-h-screen px-4 py-8">
+          <main className="main-content-offset min-h-screen px-4 py-8">
             <div className="flex flex-col items-center justify-center py-20">
               <ScissorsLoader size="lg" text="טוען..." />
             </div>
@@ -389,7 +389,7 @@ function MyAppointmentsContent() {
     return (
       <>
         <AppHeader />
-        <main className="relative top-24 min-h-screen px-4 py-8">
+        <main className="main-content-offset min-h-screen px-4 py-8">
           <div className="flex flex-col items-center justify-center py-20">
             <ScissorsLoader size="lg" text="טוען..." />
           </div>
@@ -403,7 +403,7 @@ function MyAppointmentsContent() {
     return (
       <>
         <AppHeader />
-        <main className="relative top-20 sm:top-24 min-h-screen bg-background-dark">
+        <main className="main-content-offset min-h-screen bg-background-dark">
           <div className="container-mobile py-8 sm:py-12 pb-24">
             <div className="max-w-md mx-auto">
               <GlassCard className="text-center py-12 px-6">
@@ -455,7 +455,7 @@ function MyAppointmentsContent() {
     <>
       <AppHeader />
       
-      <main id="main-content" tabIndex={-1} className="relative top-20 sm:top-24 min-h-screen bg-background-dark outline-none">
+      <main id="main-content" tabIndex={-1} className="main-content-offset min-h-screen bg-background-dark outline-none">
         <div className="container-mobile py-6 sm:py-8 pb-24">
           <div className="max-w-2xl mx-auto">
             {/* Header with New Appointment Button */}

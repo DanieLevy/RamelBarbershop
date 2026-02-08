@@ -1,6 +1,6 @@
 'use client'
 
-import { Phone, Mail, Clock, ArrowUpRight } from 'lucide-react'
+import { Phone, Mail, Clock } from 'lucide-react'
 import { SectionContainer, SectionHeader, SectionContent } from './home/SectionContainer'
 import { cn, formatOpeningHours, isTimeWithinBusinessHours } from '@/lib/utils'
 import { openExternalLink } from '@/lib/utils/external-link'
@@ -31,93 +31,34 @@ const TikTokIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
-// Reusable Contact Card Component for complex layouts
-interface ContactCardProps {
-  onClick: () => void
-  icon: React.ReactNode
-  title: string
-  subtitle: string
-  variant: 'gold' | 'whatsapp'
-  className?: string
-}
-
-const ContactCard = ({ onClick, icon, title, subtitle, variant, className }: ContactCardProps) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={cn(
-      'group relative w-full overflow-hidden rounded-xl p-3 sm:p-4',
-      'flex items-center gap-3',
-      'transition-all duration-200 ease-out',
-      'hover:scale-[1.01] active:scale-[0.99]',
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background-dark',
-      variant === 'gold' && 'bg-white/[0.04] border border-accent-gold/20 hover:border-accent-gold/40 focus-visible:ring-accent-gold',
-      variant === 'whatsapp' && 'bg-white/[0.04] border border-green-500/20 hover:border-green-500/40 focus-visible:ring-green-500',
-      className
-    )}
-  >
-    {/* Icon container - compact */}
-    <div className={cn(
-      'relative z-10 shrink-0 w-10 h-10 rounded-xl flex items-center justify-center',
-      'transition-all duration-200',
-      variant === 'gold' && 'bg-accent-gold/10',
-      variant === 'whatsapp' && 'bg-green-500/10'
-    )}>
-      {icon}
-    </div>
-    
-    {/* Text content - compact */}
-    <div className="relative z-10 flex-1 text-right min-w-0">
-      <p className="text-foreground-muted text-xs">{title}</p>
-      <p className={cn(
-        'font-medium text-sm truncate',
-        variant === 'gold' && 'text-accent-gold',
-        variant === 'whatsapp' && 'text-green-400'
-      )} dir="ltr">
-        {subtitle}
-      </p>
-    </div>
-    
-    {/* Arrow indicator */}
-    <ArrowUpRight className={cn(
-      'relative z-10 w-4 h-4 opacity-40 group-hover:opacity-70',
-      'transition-opacity duration-200',
-      variant === 'gold' && 'text-accent-gold',
-      variant === 'whatsapp' && 'text-green-400'
-    )} />
-  </button>
-)
-
-// Social Button Component
-interface SocialButtonProps {
+// Squared Contact Button Component - unified style for all CTAs
+interface ContactButtonProps {
   onClick: () => void
   icon: React.ReactNode
   label: string
-  hoverColor: string
   className?: string
 }
 
-const SocialButton = ({ onClick, icon, label, className }: SocialButtonProps) => (
+const ContactButton = ({ onClick, icon, label, className }: ContactButtonProps) => (
   <button
     type="button"
     onClick={onClick}
     className={cn(
-      'group relative w-16 h-16 rounded-xl overflow-hidden',
+      'group relative w-[72px] h-[72px] rounded-xl overflow-hidden',
       'bg-white/[0.03] border border-white/[0.06]',
-      'flex flex-col items-center justify-center gap-1',
+      'flex flex-col items-center justify-center gap-1.5',
       'transition-all duration-200 ease-out',
       'hover:border-white/10 hover:bg-white/[0.05] active:scale-[0.98]',
       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background-dark',
       className
     )}
+    tabIndex={0}
+    aria-label={label}
   >
-    {/* Icon */}
     <div className="relative z-10 transition-transform duration-200 group-hover:scale-105">
       {icon}
     </div>
-    
-    {/* Label */}
-    <span className="relative z-10 text-[9px] font-medium text-foreground-muted group-hover:text-foreground-light transition-colors duration-200">
+    <span className="relative z-10 text-[10px] font-medium text-foreground-muted group-hover:text-foreground-light transition-colors duration-200">
       {label}
     </span>
   </button>
@@ -130,11 +71,8 @@ interface ContactSectionProps {
 /**
  * Contact Section - Unified communication hub
  * 
- * Features:
- * - Primary CTA: Call/WhatsApp buttons
- * - Social media grid
- * - Integrated opening hours with status
- * - Clean, unified design
+ * All contact methods use consistent squared button layout.
+ * Includes integrated opening hours with live status.
  */
 export function ContactSection({ settings }: ContactSectionProps) {
   const phone = settings?.contact_phone || '052-384-0981'
@@ -188,66 +126,53 @@ export function ContactSection({ settings }: ContactSectionProps) {
           subtitle="נשמח לשמוע ממך"
         />
 
-        {/* Primary CTAs - Call and WhatsApp */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+        {/* All Contact Buttons - Unified squared layout */}
+        <div className="flex flex-wrap justify-center gap-3 mb-6">
           {showPhone && (
-            <ContactCard
+            <ContactButton
               onClick={openPhone}
-              icon={<Phone size={18} strokeWidth={1.5} className="text-accent-gold" />}
-              title="התקשר עכשיו"
-              subtitle={phone}
-              variant="gold"
+              icon={<Phone size={22} strokeWidth={1.5} className="text-foreground-muted group-hover:text-accent-gold transition-colors duration-200" />}
+              label="התקשר"
             />
           )}
 
           {showWhatsapp && (
-            <ContactCard
+            <ContactButton
               onClick={openWhatsApp}
-              icon={<WhatsAppIcon className="w-[18px] h-[18px] text-green-400" />}
-              title="שלח הודעה"
-              subtitle="WhatsApp"
-              variant="whatsapp"
+              icon={<WhatsAppIcon className="w-[22px] h-[22px] text-foreground-muted group-hover:text-green-400 transition-colors duration-200" />}
+              label="WhatsApp"
             />
           )}
-        </div>
 
-        {/* Secondary - Email and Social - Compact horizontal */}
-        <div className={cn(
-          'flex justify-center gap-2 mb-6',
-        )}>
           {showEmail && email && (
-            <SocialButton
+            <ContactButton
               onClick={openEmail}
-              icon={<Mail size={20} strokeWidth={1.5} className="text-foreground-muted group-hover:text-accent-gold transition-colors duration-200" />}
+              icon={<Mail size={22} strokeWidth={1.5} className="text-foreground-muted group-hover:text-accent-gold transition-colors duration-200" />}
               label="אימייל"
-              hoverColor=""
             />
           )}
 
           {showInstagram && instagramUrl && (
-            <SocialButton
+            <ContactButton
               onClick={() => openExternalLink(instagramUrl)}
-              icon={<InstagramIcon className="w-5 h-5 text-foreground-muted group-hover:text-pink-400 transition-colors duration-200" />}
+              icon={<InstagramIcon className="w-[22px] h-[22px] text-foreground-muted group-hover:text-pink-400 transition-colors duration-200" />}
               label="Instagram"
-              hoverColor=""
             />
           )}
 
           {showFacebook && facebookUrl && (
-            <SocialButton
+            <ContactButton
               onClick={() => openExternalLink(facebookUrl)}
-              icon={<FacebookIcon className="w-5 h-5 text-foreground-muted group-hover:text-blue-400 transition-colors duration-200" />}
+              icon={<FacebookIcon className="w-[22px] h-[22px] text-foreground-muted group-hover:text-blue-400 transition-colors duration-200" />}
               label="Facebook"
-              hoverColor=""
             />
           )}
 
           {showTiktok && tiktokUrl && (
-            <SocialButton
+            <ContactButton
               onClick={() => openExternalLink(tiktokUrl)}
-              icon={<TikTokIcon className="w-5 h-5 text-foreground-muted group-hover:text-white transition-colors duration-200" />}
+              icon={<TikTokIcon className="w-[22px] h-[22px] text-foreground-muted group-hover:text-white transition-colors duration-200" />}
               label="TikTok"
-              hoverColor=""
             />
           )}
         </div>

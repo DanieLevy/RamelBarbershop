@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { barberId: _barberId, name, name_he, description, price, image_url, is_active, display_order } = parsed.data
     const supabase = createAdminClient()
 
@@ -110,6 +111,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { barberId: _barberId, productId, ...updateFields } = parsed.data
     const supabase = createAdminClient()
 

@@ -787,6 +787,18 @@
     padding-top: max(var(--safe-area-inset-top), 8px);
   }
 
+  /* Main content offset - accounts for fixed AppHeader + safe area inset */
+  /* Use this on <main> elements that sit below the fixed AppHeader */
+  .main-content-offset {
+    padding-top: calc(var(--safe-area-inset-top, 0px) + 5rem); /* 80px header + safe area */
+  }
+
+  @media (min-width: 640px) {
+    .main-content-offset {
+      padding-top: calc(var(--safe-area-inset-top, 0px) + 6rem); /* 96px header + safe area */
+    }
+  }
+
   /* Text gradients */
   .text-gradient-gold {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-accent-gold via-accent-gold-light to-accent-gold;
