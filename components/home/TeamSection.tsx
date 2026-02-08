@@ -188,7 +188,6 @@ export const TeamSection = ({ barbers }: TeamSectionProps) => {
               // Hide scrollbar
               'scrollbar-hide',
               // RTL: items flow right-to-left naturally
-              'px-4'
             )}
             style={{
               WebkitOverflowScrolling: 'touch',

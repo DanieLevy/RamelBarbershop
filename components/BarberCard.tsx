@@ -167,7 +167,7 @@ export const BarberCard = ({ barber, index = 0 }: BarberCardProps) => {
               type="button"
               onClick={handleInstagramClick}
               className={cn(
-                'min-w-6 min-h-6 rounded-lg flex items-center justify-center',
+                'min-w-6 min-h-6 rounded-sm flex items-center justify-center',
                 'bg-black/30 backdrop-blur-sm',
                 'border border-white/10',
                 'transition-all duration-200',
@@ -176,14 +176,14 @@ export const BarberCard = ({ barber, index = 0 }: BarberCardProps) => {
               aria-label={`עקוב אחרי ${barber.fullname} באינסטגרם`}
               tabIndex={0}
             >
-              <Instagram size={12} strokeWidth={1.5} className="text-white/80" />
+              <Instagram size={16} strokeWidth={1.5} className="text-white/80" />
             </button>
           </div>
         )}
       </Link>
 
       {/* ── Content Section ── */}
-      <div className="px-3 pt-2.5 pb-0 rounded-[14px] bg-background-card-solid">
+      <div className="px-3 pt-2.5 pb-0">
         {/* Status indicator + Working hours */}
         <div className="flex items-center gap-1.5 mb-0.5 rounded-[14px]">
           <span
