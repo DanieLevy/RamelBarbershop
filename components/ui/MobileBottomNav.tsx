@@ -61,7 +61,7 @@ export function MobileBottomNav() {
   const isUrgentBadge = hasPermissionIssue
 
   // UI State
-  const [isVisible, setIsVisible] = useState(false)
+  const [isVisible, setIsVisible] = useState(true)
   const [showLoginDropup, setShowLoginDropup] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [upcomingCount, setUpcomingCount] = useState(0)
@@ -124,13 +124,6 @@ export function MobileBottomNav() {
       const currentScrollY = window.scrollY
       const isScrollingDown = currentScrollY > lastScrollY.current
       const isNearBottom = window.innerHeight + currentScrollY >= document.body.scrollHeight - 100
-      const isAtTop = currentScrollY <= 0
-
-      if (isAtTop) {
-        setIsVisible(false)
-        lastScrollY.current = currentScrollY
-        return
-      }
 
       if (isScrollingDown && currentScrollY > 100) {
         setIsVisible(false)
@@ -149,9 +142,7 @@ export function MobileBottomNav() {
       }
 
       scrollTimeout.current = setTimeout(() => {
-        if (window.scrollY > 0) {
-          setIsVisible(true)
-        }
+        setIsVisible(true)
       }, 300)
     }
 
@@ -162,10 +153,6 @@ export function MobileBottomNav() {
         clearTimeout(scrollTimeout.current)
       }
     }
-  }, [])
-
-  useEffect(() => {
-    setIsVisible(window.scrollY > 0)
   }, [])
 
   // Close dropup on outside click
@@ -369,7 +356,7 @@ export function MobileBottomNav() {
           ref={navRef}
           className={cn(
             'pointer-events-auto relative',
-            'w-full max-w-[380px]',
+            'w-full max-w-[420px]',
             'h-[60px] rounded-2xl',
             'flex items-center',
             'bg-[#0d0f11] backdrop-blur-xl',
