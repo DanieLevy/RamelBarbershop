@@ -456,8 +456,9 @@ export async function getReservationById(reservationId: string) {
 export interface EditReservationData {
   reservationId: string
   barberId: string
-  callerType?: 'barber' | 'customer'
+  callerType?: 'barber' | 'customer' | 'admin'
   customerId?: string
+  adminId?: string
   newTimeTimestamp: number
   newDateTimestamp: number
   newDayName: string
@@ -507,6 +508,7 @@ export async function editReservation(
         barberId: data.barberId,
         callerType: data.callerType || 'barber',
         customerId: data.customerId,
+        adminId: data.adminId,
         newTimeTimestamp: data.newTimeTimestamp,
         newDateTimestamp: data.newDateTimestamp,
         newDayName: data.newDayName,

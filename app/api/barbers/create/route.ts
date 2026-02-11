@@ -10,6 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -164,6 +165,9 @@ export async function POST(request: NextRequest) {
     }
     
     console.log(`[${requestId}] Barber created successfully with all settings`)
+    
+    // Invalidate homepage barbers cache so new barber appears immediately
+    revalidateTag('barbers', 'max')
     
     return NextResponse.json({
       success: true,

@@ -27,6 +27,7 @@ import {
   CalendarOff,
   BarChart3,
   UserX,
+  CalendarRange,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -54,6 +55,7 @@ const navItems: NavItem[] = [
 ]
 
 const adminNavItems: NavItem[] = [
+  { label: 'לוחות ספרים', href: '/barber/dashboard/all-barbers', icon: CalendarRange, adminOnly: true },
   { label: 'הגדרות המספרה', href: '/barber/dashboard/settings', icon: Settings, adminOnly: true },
   { label: 'ניהול ספרים', href: '/barber/dashboard/barbers', icon: Users, adminOnly: true },
   { label: 'ניהול לקוחות', href: '/barber/dashboard/users', icon: User, adminOnly: true },

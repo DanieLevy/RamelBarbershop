@@ -209,6 +209,12 @@ export default function ProfilePage() {
     if (result.success) {
       showToast.success('הפרופיל עודכן בהצלחה!')
       setBarber({ ...barber, fullname, email, phone, img_url: imgUrl, username, name_en: nameEn.trim() || null, instagram_url: cleanedInstagramUrl || null } as typeof barber)
+      // Invalidate homepage barbers cache so profile changes reflect immediately
+      fetch('/api/revalidate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag: 'barbers' }),
+      }).catch((err) => console.error('[Profile] Cache revalidation error:', err))
     } else {
       await report(new Error(result.error || 'Profile update failed'), 'Saving barber profile')
       showToast.error(result.error || 'שגיאה בעדכון')

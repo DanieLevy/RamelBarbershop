@@ -88,9 +88,13 @@ export const getCachedProducts = unstable_cache(
  * 
  * Barber status rarely changes (activating/deactivating a barber is an infrequent admin action).
  * Manual invalidation via revalidateTag('barbers') is triggered by:
- * - app/api/barber/manage/route.ts (create/update/deactivate barber)
+ * - app/api/barber/manage/route.ts (delete/reorder barber)
+ * - app/api/barbers/create/route.ts (new barber created)
+ * - Client-side via /api/revalidate (is_active toggle, profile updates)
  * This ensures the cache is fresh when barber data actually changes.
  * The booking flow fetches fresh data independently.
+ * 
+ * ORDERING: Admin barber(s) appear first, then by display_order ascending.
  */
 export const getCachedBarbers = unstable_cache(
   async (): Promise<BarberWithWorkDays[]> => {
@@ -107,7 +111,17 @@ export const getCachedBarbers = unstable_cache(
       return []
     }
     
-    return (data as BarberWithWorkDays[]) || []
+    const barbers = (data as BarberWithWorkDays[]) || []
+    
+    // Sort admin barber(s) to the front while preserving display_order among non-admins
+    barbers.sort((a, b) => {
+      const aIsAdmin = a.role === 'admin' ? 0 : 1
+      const bIsAdmin = b.role === 'admin' ? 0 : 1
+      if (aIsAdmin !== bIsAdmin) return aIsAdmin - bIsAdmin
+      return (a.display_order ?? 999) - (b.display_order ?? 999)
+    })
+    
+    return barbers
   },
   ['active-barbers'], // Cache key
   { 

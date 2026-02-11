@@ -300,6 +300,12 @@ export default function BarbersPage() {
     if (result.success) {
       showToast.success(barber.is_active ? 'הספר הושבת' : 'הספר הופעל')
       fetchBarbers()
+      // Invalidate homepage barbers cache so change reflects immediately
+      fetch('/api/revalidate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag: 'barbers' }),
+      }).catch((err) => console.error('[Barbers] Cache revalidation error:', err))
     } else {
       showToast.error('שגיאה בעדכון')
     }
@@ -318,6 +324,12 @@ export default function BarbersPage() {
       showToast.success(newActiveState ? 'החשבון שלך הופעל מחדש' : 'החשבון שלך הושבת - לקוחות לא יוכלו לקבוע תורים אצלך')
       fetchBarbers()
       setSelfPauseModal({ isOpen: false, action: 'pause' })
+      // Invalidate homepage barbers cache so change reflects immediately
+      fetch('/api/revalidate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag: 'barbers' }),
+      }).catch((err) => console.error('[Barbers] Cache revalidation error:', err))
     } else {
       showToast.error('שגיאה בעדכון')
     }

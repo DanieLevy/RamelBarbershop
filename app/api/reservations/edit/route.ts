@@ -2,9 +2,10 @@
  * API Route: Edit (Reschedule) Reservation
  * 
  * Server-side reservation editing using admin client (bypasses RLS).
- * Supports both barber and customer callers:
+ * Supports barber, customer, and admin callers:
  *  - Barber: can edit any reservation assigned to them
  *  - Customer: can edit their own reservations (same barber enforced, service change allowed)
+ *  - Admin: can edit ANY barber's reservation (verified via DB role check)
  * Updates the SAME reservation record (preserves reservation ID).
  * 
  * VALIDATION LAYERS:
@@ -35,8 +36,9 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 interface EditReservationRequest {
   reservationId: string
   barberId: string
-  callerType: 'barber' | 'customer'
+  callerType: 'barber' | 'customer' | 'admin'
   customerId?: string
+  adminId?: string
   newTimeTimestamp: number
   newDateTimestamp: number
   newDayName: string
@@ -137,6 +139,9 @@ export async function POST(request: NextRequest) {
     if (callerType === 'customer' && (!body.customerId?.trim() || !UUID_REGEX.test(body.customerId))) {
       validationErrors.push('customerId is required for customer edits')
     }
+    if (callerType === 'admin' && (!body.adminId?.trim() || !UUID_REGEX.test(body.adminId))) {
+      validationErrors.push('adminId is required for admin edits')
+    }
     if (!body.newTimeTimestamp || typeof body.newTimeTimestamp !== 'number') {
       validationErrors.push('newTimeTimestamp is required')
     }
@@ -182,7 +187,25 @@ export async function POST(request: NextRequest) {
     }
     
     // 2.1 Authorization based on caller type
-    if (callerType === 'barber') {
+    if (callerType === 'admin') {
+      // Admin: verify the adminId is actually an admin in the database
+      const { data: adminUser, error: adminError } = await supabase
+        .from('users')
+        .select('id, role')
+        .eq('id', body.adminId!)
+        .eq('is_barber', true)
+        .single()
+      
+      if (adminError || !adminUser || adminUser.role !== 'admin') {
+        console.error('[API/Edit] Not authorized - invalid admin:', { adminId: body.adminId, error: adminError })
+        return NextResponse.json(
+          { success: false, error: 'NOT_AUTHORIZED', message: ERROR_MESSAGES.NOT_AUTHORIZED },
+          { status: 403 }
+        )
+      }
+      // Admin can edit any barber's reservation — barberId in the request is the target barber,
+      // not necessarily the admin's own ID. We use reservation.barber_id for all barber-related queries.
+    } else if (callerType === 'barber') {
       // Barber must own the reservation
       if (reservation.barber_id !== body.barberId) {
         console.error('[API/Edit] Not authorized - barber mismatch:', { reservationBarber: reservation.barber_id, requestBarber: body.barberId })
@@ -577,8 +600,8 @@ export async function POST(request: NextRequest) {
         newValues.service_id = effectiveServiceId
       }
       
-      const changedById = callerType === 'barber' ? body.barberId : body.customerId
-      const reason = callerType === 'barber' ? 'שינוי מועד ע"י הספר' : 'שינוי מועד ע"י הלקוח'
+      const changedById = callerType === 'admin' ? body.adminId : callerType === 'barber' ? body.barberId : body.customerId
+      const reason = callerType === 'admin' ? 'שינוי מועד ע"י המנהל' : callerType === 'barber' ? 'שינוי מועד ע"י הספר' : 'שינוי מועד ע"י הלקוח'
       
       await supabase
         .from('reservation_changes')

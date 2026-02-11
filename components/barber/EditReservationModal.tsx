@@ -44,6 +44,8 @@ interface EditReservationModalProps {
   barberId: string
   barberName?: string
   shopSettings: BarbershopSettings | null
+  callerType?: 'barber' | 'admin'
+  adminId?: string
 }
 
 type SlotStatus = 'available' | 'reserved' | 'breakout' | 'past' | 'current'
@@ -67,6 +69,8 @@ export function EditReservationModal({
   barberId,
   barberName,
   shopSettings,
+  callerType = 'barber',
+  adminId,
 }: EditReservationModalProps) {
   // ── State ──
   const [selectedDate, setSelectedDate] = useState<Date>(nowInIsrael())
@@ -298,6 +302,8 @@ export function EditReservationModal({
       const result = await editReservation({
         reservationId: reservation.id,
         barberId,
+        callerType,
+        adminId,
         newTimeTimestamp: selectedTime,
         newDateTimestamp: dateTimestamp,
         newDayName: dayName,
