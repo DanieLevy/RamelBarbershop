@@ -10,7 +10,7 @@ import { GlassCard } from '@/components/ui/GlassCard'
 import { AppointmentDetailModal } from '@/components/barber/AppointmentDetailModal'
 import { showToast } from '@/lib/toast'
 import { cn, formatTime as formatTimeUtil, timestampToIsraelDate, nowInIsrael, isSameDayInIsrael, normalizeTimestampFormat } from '@/lib/utils'
-import { Calendar, Scissors, User, X, History, ChevronRight, LogIn, Info, AlertCircle, Repeat, Clock } from 'lucide-react'
+import { Calendar, Scissors, User, X, History, ChevronRight, LogIn, Info, AlertCircle, Repeat, Clock, Pencil } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { ReservationWithDetails, CustomerRecurringAppointment } from '@/types/database'
 import { LoginModal } from '@/components/LoginModal'
@@ -19,6 +19,7 @@ import { useHaptics } from '@/hooks/useHaptics'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { cancelReservation } from '@/lib/services/booking.service'
 import { CancelBlockedModal } from '@/components/booking/CancelBlockedModal'
+import { CustomerEditReservationModal } from '@/components/booking/CustomerEditReservationModal'
 import { getRecurringByCustomer } from '@/lib/services/recurring.service'
 import { Button } from '@heroui/react'
 
@@ -82,6 +83,15 @@ function MyAppointmentsContent() {
     minCancelHours: number
   }>({ isOpen: false, reservation: null, hoursUntil: 0, minCancelHours: 3 })
   
+  // Edit reservation modal state
+  const [editModal, setEditModal] = useState<{
+    isOpen: boolean
+    reservation: ReservationWithDetails | null
+  }>({ isOpen: false, reservation: null })
+  
+  // One-time tooltip for edit feature
+  const [showEditTooltip, setShowEditTooltip] = useState(false)
+  
   // Cache for barber cancellation settings
   const [barberCancelSettings, setBarberCancelSettings] = useState<Map<string, number>>(new Map())
 
@@ -106,6 +116,30 @@ function MyAppointmentsContent() {
       // The data is non-critical so we silently fail
     }
   }
+
+  // Show one-time tooltip about the edit feature
+  useEffect(() => {
+    if (!isLoggedIn || loading || reservations.length === 0) return
+    const hasUpcoming = reservations.some(r => {
+      const resTime = normalizeTimestampFormat(r.time_timestamp)
+      return resTime > Date.now() && r.status === 'confirmed'
+    })
+    if (!hasUpcoming) return
+    
+    const tooltipKey = 'edit_reservation_tooltip_shown'
+    const alreadyShown = localStorage.getItem(tooltipKey)
+    if (alreadyShown) return
+    
+    // Show tooltip after a short delay so the page renders first
+    const timer = setTimeout(() => {
+      setShowEditTooltip(true)
+      localStorage.setItem(tooltipKey, '1')
+      // Auto-dismiss after 6 seconds
+      setTimeout(() => setShowEditTooltip(false), 6000)
+    }, 1200)
+    
+    return () => clearTimeout(timer)
+  }, [isLoggedIn, loading, reservations])
 
   // Handle URL params from push notification deep links
   // This processes highlight and tab params to show the specific reservation
@@ -580,7 +614,7 @@ function MyAppointmentsContent() {
             ) : (
               <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden">
                 <div className="divide-y divide-white/[0.04]">
-                  {filteredReservations.map((reservation) => {
+                  {filteredReservations.map((reservation, index) => {
                     const smartDate = getSmartDateTime(reservation.time_timestamp)
                     const upcoming = isUpcoming(reservation)
                     const cancelled = isCancelled(reservation)
@@ -658,6 +692,34 @@ function MyAppointmentsContent() {
                             <Info size={16} strokeWidth={1.5} className="text-foreground-muted" />
                           </Button>
                           
+                          {/* Edit - only for upcoming */}
+                          {upcoming && (
+                            <div className="relative" onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant="ghost"
+                                isIconOnly
+                                onPress={() => {
+                                  haptics.light()
+                                  setShowEditTooltip(false)
+                                  setEditModal({ isOpen: true, reservation })
+                                }}
+                                className="min-w-[36px] w-9 h-9 hover:bg-accent-gold/10 text-accent-gold/70"
+                                aria-label="ערוך תור"
+                              >
+                                <Pencil size={14} strokeWidth={1.5} />
+                              </Button>
+                              {/* One-time tooltip */}
+                              {showEditTooltip && index === 0 && (
+                                <div className="absolute -top-11 left-1/2 -translate-x-1/2 z-20 pointer-events-none animate-fade-in">
+                                  <div className="bg-accent-gold text-background-dark text-[11px] font-medium px-3 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
+                                    חדש! אפשר לערוך תור
+                                  </div>
+                                  <div className="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 bg-accent-gold rotate-45 -mt-1" />
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
                           {/* Cancel - only for upcoming */}
                           {upcoming && (
                             <Button
@@ -728,6 +790,15 @@ function MyAppointmentsContent() {
           minCancelHours={cancelBlockedModal.minCancelHours}
         />
       )}
+
+      {/* Edit Reservation Modal */}
+      <CustomerEditReservationModal
+        isOpen={editModal.isOpen}
+        onClose={() => setEditModal({ isOpen: false, reservation: null })}
+        onSuccess={fetchReservations}
+        reservation={editModal.reservation}
+        customerId={customer?.id || ''}
+      />
     </>
   )
 }

@@ -9,7 +9,7 @@
 
 import { cn } from '@/lib/utils'
 import { getExternalLinkProps } from '@/lib/utils/external-link'
-import { Phone, X, MessageCircle } from 'lucide-react'
+import { Phone, X, MessageCircle, Pencil } from 'lucide-react'
 import { Button } from '@heroui/react'
 import type { Reservation, Service } from '@/types/database'
 
@@ -28,6 +28,7 @@ interface ReservationRowProps {
   updatingId: string | null
   onDetail: (reservation: ReservationWithService) => void
   onCancel: (reservation: ReservationWithService) => void
+  onEdit?: (reservation: ReservationWithService) => void
   formatPhoneForWhatsApp: (phone: string) => string
 }
 
@@ -41,6 +42,7 @@ export const ReservationRow = ({
   updatingId,
   onDetail,
   onCancel,
+  onEdit,
   formatPhoneForWhatsApp,
 }: ReservationRowProps) => {
   return (
@@ -150,6 +152,27 @@ export const ReservationRow = ({
         >
           <Phone size={16} strokeWidth={1.5} className="text-accent-gold" />
         </a>
+
+        {/* Edit - Only for upcoming confirmed appointments */}
+        {res.status === 'confirmed' && isUpcoming && onEdit && (
+          <div onClick={(e) => e.stopPropagation()}>
+            <Button
+              onPress={() => onEdit(res)}
+              isDisabled={updatingId === res.id}
+              isIconOnly
+              variant="ghost"
+              className={cn(
+                'icon-btn p-2 rounded-lg transition-colors min-w-[32px] w-8 h-8',
+                updatingId === res.id
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'hover:bg-accent-gold/10 text-accent-gold/70'
+              )}
+              aria-label="ערוך תור"
+            >
+              <Pencil size={14} strokeWidth={1.5} />
+            </Button>
+          </div>
+        )}
 
         {/* Cancel - Only for upcoming appointments */}
         {res.status === 'confirmed' && isUpcoming && (

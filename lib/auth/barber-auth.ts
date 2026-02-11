@@ -3,11 +3,14 @@ import { createClient } from '@/lib/supabase/client'
 import type { User, BarberSession, UserRole } from '@/types/database'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
 import { withSupabaseRetry, isRetryableError } from '@/lib/utils/retry'
+import { saveSessionDual, readSessionDual, clearSessionDual } from '@/lib/utils/session-storage'
 
 const SALT_ROUNDS = 10
 const SESSION_KEY = 'ramel_barber_session'
+const COOKIE_KEY = 'rb_barber_s'
 // Session never expires - only manual logout clears the session
 // This ensures barbers stay logged in permanently for best UX
+// Dual-storage: localStorage + cookie fallback for iOS resilience
 
 /**
  * Hash a password
@@ -202,8 +205,9 @@ export async function loginBarber(
 }
 
 /**
- * Save barber session to localStorage
+ * Save barber session to localStorage + cookie fallback
  * Sessions are permanent - no expiration (only manual logout clears them)
+ * Dual-storage ensures iOS localStorage eviction doesn't cause logouts
  */
 export function saveBarberSession(user: User): void {
   if (typeof window === 'undefined') return
@@ -216,47 +220,40 @@ export function saveBarberSession(user: User): void {
     expiresAt: 0, // 0 = never expires (kept for backward compatibility)
   }
   
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+  saveSessionDual(SESSION_KEY, COOKIE_KEY, session)
 }
 
 /**
- * Get barber session from localStorage
+ * Get barber session from localStorage with cookie fallback
  * Sessions are permanent - only manual logout clears them
+ * If localStorage was evicted (iOS), recovers from cookie automatically
  */
 export function getBarberSession(): BarberSession | null {
   if (typeof window === 'undefined') return null
   
-  const stored = localStorage.getItem(SESSION_KEY)
-  if (!stored) return null
+  const session = readSessionDual<BarberSession>(SESSION_KEY, COOKIE_KEY)
+  if (!session) return null
   
-  try {
-    const session: BarberSession = JSON.parse(stored)
-    
-    // Sessions are now permanent - skip expiration check
-    // expiresAt === 0 means never expires (new behavior)
-    // For backward compatibility, also accept old sessions with future dates
-    // Only reject if expiresAt is set to a past date AND is not 0
-    if (session.expiresAt !== 0 && session.expiresAt > 0 && session.expiresAt < Date.now()) {
-      // Migrate old expired sessions: re-save without expiration
-      // This allows previously logged-in barbers to stay logged in
-      console.log('[BarberAuth] Migrating old session to permanent format')
-      session.expiresAt = 0
-      localStorage.setItem(SESSION_KEY, JSON.stringify(session))
-    }
-    
-    return session
-  } catch {
-    localStorage.removeItem(SESSION_KEY)
-    return null
+  // Sessions are now permanent - skip expiration check
+  // expiresAt === 0 means never expires (new behavior)
+  // For backward compatibility, also accept old sessions with future dates
+  // Only reject if expiresAt is set to a past date AND is not 0
+  if (session.expiresAt !== 0 && session.expiresAt > 0 && session.expiresAt < Date.now()) {
+    // Migrate old expired sessions: re-save without expiration
+    console.log('[BarberAuth] Migrating old session to permanent format')
+    session.expiresAt = 0
+    saveSessionDual(SESSION_KEY, COOKIE_KEY, session)
   }
+  
+  return session
 }
 
 /**
- * Clear barber session
+ * Clear barber session from all storage layers
  */
 export function clearBarberSession(): void {
   if (typeof window === 'undefined') return
-  localStorage.removeItem(SESSION_KEY)
+  clearSessionDual(SESSION_KEY, COOKIE_KEY)
 }
 
 /**

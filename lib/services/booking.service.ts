@@ -449,6 +449,116 @@ export async function getReservationById(reservationId: string) {
   }
 }
 
+// ============================================================
+// Edit (Reschedule) Reservation
+// ============================================================
+
+export interface EditReservationData {
+  reservationId: string
+  barberId: string
+  callerType?: 'barber' | 'customer'
+  customerId?: string
+  newTimeTimestamp: number
+  newDateTimestamp: number
+  newDayName: string
+  newDayNum: string
+  newServiceId?: string
+  expectedVersion?: number
+}
+
+export interface EditReservationResult {
+  success: boolean
+  reservationId?: string
+  newVersion?: number
+  error?: string
+  message?: string
+  concurrencyConflict?: boolean
+}
+
+/**
+ * Edit (reschedule) an existing reservation.
+ * Supports both barber and customer callers.
+ * Preserves the same reservation ID - date/time/service can change.
+ * Barber cannot be changed (enforced server-side).
+ */
+export async function editReservation(
+  data: EditReservationData
+): Promise<EditReservationResult> {
+  // Validate required fields
+  if (!data.reservationId?.trim() || !isValidUUID(data.reservationId)) {
+    return { success: false, error: 'VALIDATION_ERROR', message: 'מזהה תור לא תקין' }
+  }
+  if (!data.barberId?.trim() || !isValidUUID(data.barberId)) {
+    return { success: false, error: 'VALIDATION_ERROR', message: 'מזהה ספר לא תקין' }
+  }
+  if (!data.newTimeTimestamp || typeof data.newTimeTimestamp !== 'number') {
+    return { success: false, error: 'VALIDATION_ERROR', message: 'נא לבחור שעה חדשה' }
+  }
+  if (!data.newDateTimestamp || typeof data.newDateTimestamp !== 'number') {
+    return { success: false, error: 'VALIDATION_ERROR', message: 'נא לבחור תאריך חדש' }
+  }
+  
+  try {
+    const response = await fetch('/api/reservations/edit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reservationId: data.reservationId,
+        barberId: data.barberId,
+        callerType: data.callerType || 'barber',
+        customerId: data.customerId,
+        newTimeTimestamp: data.newTimeTimestamp,
+        newDateTimestamp: data.newDateTimestamp,
+        newDayName: data.newDayName,
+        newDayNum: data.newDayNum,
+        newServiceId: data.newServiceId,
+        expectedVersion: data.expectedVersion,
+      }),
+    })
+    
+    const result = await response.json()
+    
+    if (!response.ok || !result.success) {
+      console.error('[BookingService] Edit error:', result)
+      
+      if (response.status === 409 || result.concurrencyConflict) {
+        return {
+          success: false,
+          error: result.error || 'CONCURRENCY_CONFLICT',
+          message: result.message || 'התור עודכן על ידי אחר. אנא רענן ונסה שוב.',
+          concurrencyConflict: true,
+        }
+      }
+      
+      return {
+        success: false,
+        error: result.error || 'DATABASE_ERROR',
+        message: result.message || 'שגיאה בעדכון התור',
+      }
+    }
+    
+    console.log('[BookingService] Reservation edited successfully:', result.reservationId, 'v' + result.newVersion)
+    
+    return {
+      success: true,
+      reservationId: result.reservationId as string,
+      newVersion: result.newVersion as number,
+    }
+  } catch (err) {
+    console.error('[BookingService] Edit exception:', err)
+    await reportSupabaseError(
+      { message: err instanceof Error ? err.message : String(err), code: 'EDIT_EXCEPTION' },
+      'Editing reservation - unexpected error',
+      { table: 'reservations', operation: 'update' }
+    )
+    return {
+      success: false,
+      error: 'UNKNOWN_ERROR',
+      message: 'שגיאה בלתי צפויה בעריכת התור',
+    }
+  }
+}
+
 // Note: parseBookingError was moved to app/api/reservations/create/route.ts
 // createReservationLegacy was removed as it used direct database inserts
 // which don't work with strict RLS policies. Use createReservation() instead.

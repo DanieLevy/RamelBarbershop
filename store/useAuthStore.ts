@@ -7,10 +7,13 @@ import {
   getCustomerById 
 } from '@/lib/services/customer.service'
 import { signOutSupabase } from '@/lib/auth/email-auth'
+import { saveSessionDual, readSessionDual, clearSessionDual } from '@/lib/utils/session-storage'
 
 const SESSION_KEY = 'ramel_auth_session'
+const COOKIE_KEY = 'rb_customer_s'
 // Session never expires - only manual logout clears the session
 // This ensures users stay logged in permanently for best UX
+// Dual-storage: localStorage + cookie fallback for iOS resilience
 
 // Auth method type
 export type SessionAuthMethod = 'phone' | 'email'
@@ -45,8 +48,9 @@ interface ExtendedSession extends StoredSession {
 }
 
 /**
- * Save session to localStorage
+ * Save session to localStorage + cookie fallback
  * Sessions are permanent - no expiration (only manual logout clears them)
+ * Dual-storage ensures iOS localStorage eviction doesn't cause logouts
  */
 function saveSession(customer: Customer, authMethod: SessionAuthMethod = 'phone'): void {
   if (typeof window === 'undefined') return
@@ -60,47 +64,40 @@ function saveSession(customer: Customer, authMethod: SessionAuthMethod = 'phone'
     email: customer.email || undefined,
   }
   
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+  saveSessionDual(SESSION_KEY, COOKIE_KEY, session)
 }
 
 /**
- * Get session from localStorage
+ * Get session from localStorage with cookie fallback
  * Sessions are permanent - only manual logout clears them
+ * If localStorage was evicted (iOS), recovers from cookie automatically
  */
 function getStoredSession(): ExtendedSession | null {
   if (typeof window === 'undefined') return null
   
-  const stored = localStorage.getItem(SESSION_KEY)
-  if (!stored) return null
+  const session = readSessionDual<ExtendedSession>(SESSION_KEY, COOKIE_KEY)
+  if (!session) return null
   
-  try {
-    const session: ExtendedSession = JSON.parse(stored)
-    
-    // Sessions are now permanent - skip expiration check
-    // expiresAt === 0 means never expires (new behavior)
-    // For backward compatibility, also accept old sessions with future dates
-    // Only reject if expiresAt is set to a past date AND is not 0
-    if (session.expiresAt !== 0 && session.expiresAt > 0 && session.expiresAt < Date.now()) {
-      // Migrate old expired sessions: re-save without expiration
-      // This allows previously logged-in users to stay logged in
-      console.log('[Auth] Migrating old session to permanent format')
-      session.expiresAt = 0
-      localStorage.setItem(SESSION_KEY, JSON.stringify(session))
-    }
-    
-    return session
-  } catch {
-    localStorage.removeItem(SESSION_KEY)
-    return null
+  // Sessions are now permanent - skip expiration check
+  // expiresAt === 0 means never expires (new behavior)
+  // For backward compatibility, also accept old sessions with future dates
+  // Only reject if expiresAt is set to a past date AND is not 0
+  if (session.expiresAt !== 0 && session.expiresAt > 0 && session.expiresAt < Date.now()) {
+    // Migrate old expired sessions: re-save without expiration
+    console.log('[Auth] Migrating old session to permanent format')
+    session.expiresAt = 0
+    saveSessionDual(SESSION_KEY, COOKIE_KEY, session)
   }
+  
+  return session
 }
 
 /**
- * Clear session from localStorage
+ * Clear session from all storage layers
  */
 function clearSession(): void {
   if (typeof window === 'undefined') return
-  localStorage.removeItem(SESSION_KEY)
+  clearSessionDual(SESSION_KEY, COOKIE_KEY)
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({

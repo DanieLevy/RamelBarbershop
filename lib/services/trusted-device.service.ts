@@ -47,30 +47,85 @@ function getExpirationDate(): string {
   return date.toISOString()
 }
 
+// Cookie key for device token fallback (iOS localStorage resilience)
+const DEVICE_COOKIE_KEY = 'rb_device_t'
+
 /**
- * Get device token from localStorage
+ * Get cookie value by name
+ */
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null
+  const cookies = document.cookie.split(';')
+  for (const cookie of cookies) {
+    const [key, ...valueParts] = cookie.trim().split('=')
+    if (key === name) {
+      try { return decodeURIComponent(valueParts.join('=')) } catch { return null }
+    }
+  }
+  return null
+}
+
+/**
+ * Set a long-lived cookie (30 days to match device expiration)
+ */
+function setCookie(name: string, value: string): void {
+  if (typeof document === 'undefined') return
+  const maxAge = DEVICE_EXPIRATION_DAYS * 24 * 60 * 60
+  const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:'
+  document.cookie = `${name}=${encodeURIComponent(value)}; Max-Age=${maxAge}; Path=/; SameSite=Lax${isSecure ? '; Secure' : ''}`
+}
+
+/**
+ * Delete a cookie
+ */
+function deleteCookie(name: string): void {
+  if (typeof document === 'undefined') return
+  document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`
+}
+
+/**
+ * Get device token from localStorage with cookie fallback
+ * Recovers from iOS localStorage eviction automatically
  */
 export function getStoredDeviceToken(): string | null {
   if (typeof window === 'undefined') return null
-  return localStorage.getItem(DEVICE_TOKEN_KEY)
+  
+  // Try localStorage first
+  const stored = localStorage.getItem(DEVICE_TOKEN_KEY)
+  if (stored) {
+    // Keep cookie in sync
+    setCookie(DEVICE_COOKIE_KEY, stored)
+    return stored
+  }
+  
+  // Fallback: recover from cookie
+  const cookieValue = getCookie(DEVICE_COOKIE_KEY)
+  if (cookieValue) {
+    console.log('[TrustedDevice] Recovered device token from cookie fallback')
+    try { localStorage.setItem(DEVICE_TOKEN_KEY, cookieValue) } catch { /* ignore */ }
+    return cookieValue
+  }
+  
+  return null
 }
 
 /**
- * Save device token to localStorage
+ * Save device token to localStorage + cookie fallback
  */
 export function saveDeviceToken(token: string): void {
   if (typeof window === 'undefined') return
-  localStorage.setItem(DEVICE_TOKEN_KEY, token)
+  try { localStorage.setItem(DEVICE_TOKEN_KEY, token) } catch { /* ignore */ }
+  setCookie(DEVICE_COOKIE_KEY, token)
 }
 
 /**
- * Remove device token from localStorage
+ * Remove device token from all storage layers
  * Note: This does NOT deactivate the device in the database
- * The user can still use the token from another browser/device if they have it
  */
 export function removeDeviceToken(): void {
   if (typeof window === 'undefined') return
-  localStorage.removeItem(DEVICE_TOKEN_KEY)
+  try { localStorage.removeItem(DEVICE_TOKEN_KEY) } catch { /* ignore */ }
+  deleteCookie(DEVICE_COOKIE_KEY)
 }
 
 /**

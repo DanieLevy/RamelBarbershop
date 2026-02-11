@@ -18,6 +18,7 @@ import { CancelReservationModal } from '@/components/barber/CancelReservationMod
 import { BulkCancelModal } from '@/components/barber/BulkCancelModal'
 import { AppointmentDetailModal } from '@/components/barber/AppointmentDetailModal'
 import { ManualBookingModal } from '@/components/barber/ManualBookingModal'
+import { EditReservationModal } from '@/components/barber/EditReservationModal'
 import { cancelReservation } from '@/lib/services/booking.service'
 import { Button, Switch } from '@heroui/react'
 import { useReservationsRealtime } from '@/hooks/useReservationsRealtime'
@@ -120,6 +121,12 @@ function ReservationsContent() {
     preselectedDate?: Date | null
     preselectedTime?: number | null
   }>({ isOpen: false, preselectedDate: null, preselectedTime: null })
+
+  // Edit reservation modal state
+  const [editModal, setEditModal] = useState<{
+    isOpen: boolean
+    reservation: ReservationWithService | null
+  }>({ isOpen: false, reservation: null })
 
   // ============================================================
   // Data fetching
@@ -841,6 +848,7 @@ function ReservationsContent() {
                   updatingId={updatingId}
                   onDetail={(r) => setDetailModal({ isOpen: true, reservation: r })}
                   onCancel={(r) => setCancelModal({ isOpen: true, reservation: r })}
+                  onEdit={(r) => setEditModal({ isOpen: true, reservation: r })}
                   formatPhoneForWhatsApp={formatPhoneForWhatsApp}
                 />
               )
@@ -887,6 +895,16 @@ function ReservationsContent() {
         shopSettings={shopSettings}
         preselectedDate={manualBookingModal.preselectedDate}
         preselectedTime={manualBookingModal.preselectedTime}
+      />
+
+      <EditReservationModal
+        isOpen={editModal.isOpen}
+        onClose={() => setEditModal({ isOpen: false, reservation: null })}
+        onSuccess={fetchReservations}
+        reservation={editModal.reservation}
+        barberId={barber?.id || ''}
+        barberName={barber?.fullname || ''}
+        shopSettings={shopSettings}
       />
 
     </div>

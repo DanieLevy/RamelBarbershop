@@ -817,6 +817,56 @@ export type Database = {
           },
         ]
       }
+      reservation_changes: {
+        Row: {
+          change_type: string
+          changed_by_id: string | null
+          changed_by_type: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          new_values: Json | null
+          old_values: Json | null
+          reason: string | null
+          reservation_id: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          change_type: string
+          changed_by_id?: string | null
+          changed_by_type: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          reason?: string | null
+          reservation_id?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          change_type?: string
+          changed_by_id?: string | null
+          changed_by_type?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          reason?: string | null
+          reservation_id?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reservation_changes_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reservations: {
         Row: {
           barber_id: string
