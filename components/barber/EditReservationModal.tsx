@@ -16,7 +16,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { X, Loader2, Calendar, Clock, AlertTriangle, Pencil, ArrowLeftRight } from 'lucide-react'
+import { X, Loader2, Calendar, Clock, AlertTriangle, Pencil, ArrowLeftRight, ChevronDown } from 'lucide-react'
 import { cn, generateTimeSlots, parseTimeString, nowInIsrael, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael, getSlotKey, getIsraelDateString, formatTime, formatDateHebrew } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { editReservation } from '@/lib/services/booking.service'
@@ -78,6 +78,7 @@ export function EditReservationModal({
   const [reservedSlots, setReservedSlots] = useState<number[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [showUnavailable, setShowUnavailable] = useState(false)
 
   const israelNow = nowInIsrael()
 
@@ -92,6 +93,7 @@ export function EditReservationModal({
       const resDate = new Date(reservation.date_timestamp)
       setSelectedDate(resDate)
       setSelectedTime(null)
+      setShowUnavailable(false)
       fetchBarberWorkDays()
       fetchClosures()
     }
@@ -490,101 +492,125 @@ export function EditReservationModal({
                   <div className="text-center py-4">
                     <p className="text-foreground-muted text-sm">אין משבצות ביום זה</p>
                   </div>
+                ) : availableSlots.length === 0 ? (
+                  <div className="text-center py-4">
+                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20">
+                      <p className="text-red-400 text-sm">אין משבצות פנויות ביום זה</p>
+                    </div>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     {/* Available count info */}
                     <p className="text-foreground-muted text-xs">
-                      {availableSlots.length} פנויות מתוך {allSlotsWithStatus.length} משבצות
+                      {availableSlots.length} משבצות פנויות
                       {currentDayWorkHours.start && currentDayWorkHours.end && (
                         <span className="text-foreground-muted/50"> · {currentDayWorkHours.start} - {currentDayWorkHours.end}</span>
                       )}
                     </p>
 
+                    {/* Current reservation slot (if on same date) */}
+                    {allSlotsWithStatus.some(s => s.status === 'current') && (
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-foreground-muted text-xs">התור הנוכחי:</span>
+                        {allSlotsWithStatus.filter(s => s.status === 'current').map(slot => (
+                          <span key={slot.timestamp} className="px-3 py-1.5 rounded-lg text-sm font-medium tabular-nums bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                            {slot.time}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Available slots */}
                     <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto pb-2">
-                      {allSlotsWithStatus.map(slot => {
-                        const isUnavailable = slot.status !== 'available' && slot.status !== 'current'
-                        const isCurrent = slot.status === 'current'
-                        const isSelected = selectedTime === slot.timestamp && !isUnavailable && !isCurrent
+                      {availableSlots.map(slot => {
+                        const isSelected = selectedTime === slot.timestamp
 
                         return (
                           <button
                             key={slot.timestamp}
-                            onClick={() => {
-                              if (!isUnavailable && !isCurrent) setSelectedTime(slot.timestamp)
-                            }}
-                            disabled={isUnavailable || isCurrent}
-                            title={
-                              isCurrent
-                                ? `${slot.time} - התור הנוכחי`
-                                : isUnavailable
-                                  ? `${slot.time} - ${slot.reason}`
-                                  : slot.time
-                            }
+                            onClick={() => setSelectedTime(slot.timestamp)}
+                            title={slot.time}
                             className={cn(
-                              'px-3 py-1.5 rounded-lg text-sm font-medium transition-all tabular-nums relative',
+                              'px-3 py-1.5 rounded-lg text-sm font-medium transition-all tabular-nums',
                               isSelected
                                 ? 'bg-accent-gold text-background-dark ring-2 ring-accent-gold/50'
-                                : isCurrent
-                                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30 cursor-not-allowed'
-                                  : isUnavailable
-                                    ? 'bg-white/[0.02] text-foreground-muted/30 border border-white/[0.04] cursor-not-allowed line-through'
-                                    : 'bg-white/[0.05] text-foreground-muted hover:bg-white/[0.1] border border-white/[0.08]'
+                                : 'bg-white/[0.05] text-foreground-muted hover:bg-white/[0.1] border border-white/[0.08]'
                             )}
-                            aria-label={
-                              isCurrent
-                                ? `${slot.time} - התור הנוכחי`
-                                : isUnavailable
-                                  ? `${slot.time} - ${slot.reason}`
-                                  : `בחר שעה ${slot.time}`
-                            }
-                            tabIndex={isUnavailable || isCurrent ? -1 : 0}
+                            aria-label={`בחר שעה ${slot.time}`}
+                            tabIndex={0}
                           >
                             {slot.time}
-                            {isCurrent && (
-                              <span className="absolute -top-1 -left-1 w-3 h-3 rounded-full bg-blue-500/80 flex items-center justify-center">
-                                <Clock size={7} className="text-white" />
-                              </span>
-                            )}
-                            {isUnavailable && slot.status === 'breakout' && (
-                              <span className="absolute -top-1 -left-1 w-3 h-3 rounded-full bg-orange-500/60 flex items-center justify-center">
-                                <AlertTriangle size={7} className="text-white" />
-                              </span>
-                            )}
-                            {isUnavailable && slot.status === 'reserved' && (
-                              <span className="absolute -top-1 -left-1 w-3 h-3 rounded-full bg-red-500/60 flex items-center justify-center">
-                                <X size={7} className="text-white" />
-                              </span>
-                            )}
                           </button>
                         )
                       })}
                     </div>
 
-                    {/* Legend */}
-                    <div className="flex flex-wrap gap-3 pt-1">
-                      <div className="flex items-center gap-1.5 text-[10px] text-foreground-muted/60">
-                        <span className="w-2 h-2 rounded-full bg-blue-500/80" />
-                        נוכחי
-                      </div>
-                      {allSlotsWithStatus.some(s => s.status === 'reserved') && (
-                        <div className="flex items-center gap-1.5 text-[10px] text-foreground-muted/60">
-                          <span className="w-2 h-2 rounded-full bg-red-500/60" />
-                          תפוס
+                    {/* Collapsible unavailable slots */}
+                    {(() => {
+                      const unavailableSlots = allSlotsWithStatus.filter(s => s.status !== 'available' && s.status !== 'current')
+                      if (unavailableSlots.length === 0) return null
+
+                      return (
+                        <div className="pt-1">
+                          <button
+                            onClick={() => setShowUnavailable(prev => !prev)}
+                            className="flex items-center gap-1.5 text-foreground-muted/60 text-xs hover:text-foreground-muted transition-colors"
+                            aria-expanded={showUnavailable}
+                            aria-label={showUnavailable ? 'הסתר שעות תפוסות' : 'הצג שעות תפוסות'}
+                            tabIndex={0}
+                          >
+                            <ChevronDown size={12} className={cn('transition-transform', showUnavailable && 'rotate-180')} />
+                            {unavailableSlots.length} שעות לא זמינות
+                          </button>
+
+                          {showUnavailable && (
+                            <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-white/[0.04]">
+                              {unavailableSlots.map(slot => (
+                                <span
+                                  key={slot.timestamp}
+                                  title={`${slot.time} - ${slot.reason}`}
+                                  className="px-3 py-1.5 rounded-lg text-sm font-medium tabular-nums bg-white/[0.02] text-foreground-muted/30 border border-white/[0.04] line-through relative"
+                                >
+                                  {slot.time}
+                                  {slot.status === 'breakout' && (
+                                    <span className="absolute -top-1 -left-1 w-3 h-3 rounded-full bg-orange-500/60 flex items-center justify-center">
+                                      <AlertTriangle size={7} className="text-white" />
+                                    </span>
+                                  )}
+                                  {slot.status === 'reserved' && (
+                                    <span className="absolute -top-1 -left-1 w-3 h-3 rounded-full bg-red-500/60 flex items-center justify-center">
+                                      <X size={7} className="text-white" />
+                                    </span>
+                                  )}
+                                </span>
+                              ))}
+
+                              {/* Legend for unavailable */}
+                              <div className="w-full flex flex-wrap gap-3 pt-1">
+                                {unavailableSlots.some(s => s.status === 'reserved') && (
+                                  <div className="flex items-center gap-1.5 text-[10px] text-foreground-muted/60">
+                                    <span className="w-2 h-2 rounded-full bg-red-500/60" />
+                                    תפוס
+                                  </div>
+                                )}
+                                {unavailableSlots.some(s => s.status === 'breakout') && (
+                                  <div className="flex items-center gap-1.5 text-[10px] text-foreground-muted/60">
+                                    <span className="w-2 h-2 rounded-full bg-orange-500/60" />
+                                    הפסקה
+                                  </div>
+                                )}
+                                {unavailableSlots.some(s => s.status === 'past') && (
+                                  <div className="flex items-center gap-1.5 text-[10px] text-foreground-muted/60">
+                                    <span className="w-2 h-2 rounded-full bg-zinc-500/60" />
+                                    עבר
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {allSlotsWithStatus.some(s => s.status === 'breakout') && (
-                        <div className="flex items-center gap-1.5 text-[10px] text-foreground-muted/60">
-                          <span className="w-2 h-2 rounded-full bg-orange-500/60" />
-                          הפסקה
-                        </div>
-                      )}
-                      {allSlotsWithStatus.some(s => s.status === 'past') && (
-                        <div className="flex items-center gap-1.5 text-[10px] text-foreground-muted/60">
-                          <span className="w-2 h-2 rounded-full bg-zinc-500/60" />
-                          עבר
-                        </div>
-                      )}
-                    </div>
+                      )
+                    })()}
                   </div>
                 )}
               </div>

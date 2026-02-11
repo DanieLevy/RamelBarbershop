@@ -202,7 +202,6 @@ export function UnifiedProfilePage({
   }
 
   const appointmentsPath = isBarber ? '/barber/dashboard/reservations' : '/my-appointments'
-  const appointmentsLabel = isBarber ? 'תורים פעילים' : 'תורים'
 
   // ── Loading state ──
 
@@ -359,7 +358,7 @@ export function UnifiedProfilePage({
               >
                 <div className="flex items-center gap-1 text-foreground-muted text-[11px] mb-1">
                   <History size={12} strokeWidth={1.5} />
-                  <span>סה"כ תורים</span>
+                  <span>סה&quot;כ תורים</span>
                 </div>
                 <div className="text-foreground-light font-semibold text-base leading-5">
                   {loadingStats ? (

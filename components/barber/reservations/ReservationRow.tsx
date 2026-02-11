@@ -134,11 +134,11 @@ export const ReservationRow = ({
               )
               if (linkProps.onClick) linkProps.onClick(e)
             }}
-            className="icon-btn p-2 rounded-lg hover:bg-green-500/10 transition-colors"
+            className="icon-btn p-1.5 rounded-lg hover:bg-green-500/10 transition-colors"
             aria-label="שלח הודעה בוואטסאפ"
             title="וואטסאפ"
           >
-            <MessageCircle size={16} strokeWidth={1.5} className="text-green-500" />
+            <MessageCircle size={15} strokeWidth={1.5} className="text-green-500" />
           </a>
         )}
 
@@ -146,11 +146,11 @@ export const ReservationRow = ({
         <a
           href={`tel:${res.customer_phone}`}
           onClick={(e) => e.stopPropagation()}
-          className="icon-btn p-2 rounded-lg hover:bg-accent-gold/10 transition-colors"
+          className="icon-btn p-1.5 rounded-lg hover:bg-accent-gold/10 transition-colors"
           aria-label="התקשר"
           title="התקשר"
         >
-          <Phone size={16} strokeWidth={1.5} className="text-accent-gold" />
+          <Phone size={15} strokeWidth={1.5} className="text-accent-gold" />
         </a>
 
         {/* Edit - Only for upcoming confirmed appointments */}
@@ -162,14 +162,14 @@ export const ReservationRow = ({
               isIconOnly
               variant="ghost"
               className={cn(
-                'icon-btn p-2 rounded-lg transition-colors min-w-[32px] w-8 h-8',
+                'icon-btn p-1 rounded-lg transition-colors min-w-[28px] w-7 h-7',
                 updatingId === res.id
                   ? 'opacity-50 cursor-not-allowed'
                   : 'hover:bg-accent-gold/10 text-accent-gold/70'
               )}
               aria-label="ערוך תור"
             >
-              <Pencil size={14} strokeWidth={1.5} />
+              <Pencil size={13} strokeWidth={1.5} />
             </Button>
           </div>
         )}
@@ -183,14 +183,14 @@ export const ReservationRow = ({
               isIconOnly
               variant="ghost"
               className={cn(
-                'icon-btn p-2 rounded-lg transition-colors min-w-[32px] w-8 h-8',
+                'icon-btn p-1 rounded-lg transition-colors min-w-[28px] w-7 h-7',
                 updatingId === res.id
                   ? 'opacity-50 cursor-not-allowed'
                   : 'hover:bg-red-500/10 text-red-400'
               )}
               aria-label="בטל"
             >
-              <X size={16} strokeWidth={1.5} />
+              <X size={14} strokeWidth={1.5} />
             </Button>
           </div>
         )}

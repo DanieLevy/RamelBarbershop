@@ -8,7 +8,6 @@ import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { LoginModal } from './LoginModal'
 import { User, Calendar, LogOut, Menu, X, Home, Phone, MapPin, Scissors, ChevronDown, LayoutDashboard, Settings } from 'lucide-react'
 import { Button } from '@heroui/react'
-import { motion } from 'framer-motion'
 
 
 interface AppHeaderProps {

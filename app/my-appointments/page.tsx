@@ -686,10 +686,10 @@ function MyAppointmentsContent() {
                             variant="ghost"
                             isIconOnly
                             onPress={() => setDetailModal({ isOpen: true, reservation })}
-                            className="min-w-[40px] w-10 h-10"
+                            className="min-w-[32px] w-8 h-8"
                             aria-label="פרטים"
                           >
-                            <Info size={16} strokeWidth={1.5} className="text-foreground-muted" />
+                            <Info size={14} strokeWidth={1.5} className="text-foreground-muted" />
                           </Button>
                           
                           {/* Edit - only for upcoming */}
@@ -703,10 +703,10 @@ function MyAppointmentsContent() {
                                   setShowEditTooltip(false)
                                   setEditModal({ isOpen: true, reservation })
                                 }}
-                                className="min-w-[36px] w-9 h-9 hover:bg-accent-gold/10 text-accent-gold/70"
+                                className="min-w-[32px] w-8 h-8 hover:bg-accent-gold/10 text-accent-gold/70"
                                 aria-label="ערוך תור"
                               >
-                                <Pencil size={14} strokeWidth={1.5} />
+                                <Pencil size={13} strokeWidth={1.5} />
                               </Button>
                               {/* One-time tooltip */}
                               {showEditTooltip && index === 0 && (
@@ -728,12 +728,12 @@ function MyAppointmentsContent() {
                               onPress={() => handleCancelReservation(reservation.id)}
                               isDisabled={cancellingId === reservation.id}
                               className={cn(
-                                'min-w-[40px] w-10 h-10',
+                                'min-w-[32px] w-8 h-8',
                                 cancellingId !== reservation.id && 'hover:bg-red-500/10 text-red-400'
                               )}
                               aria-label="בטל"
                             >
-                              <X size={16} strokeWidth={1.5} />
+                              <X size={14} strokeWidth={1.5} />
                             </Button>
                           )}
                           
