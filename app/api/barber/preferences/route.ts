@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     // Fetch notification settings
     let { data: notifSettings, error: notifError } = await supabase // eslint-disable-line prefer-const
       .from('barber_notification_settings')
-      .select('*')
+      .select('id, barber_id, reminder_hours_before, notify_on_customer_cancel, notify_on_new_booking, broadcast_enabled')
       .eq('barber_id', barberId)
       .maybeSingle()
 
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     // Fetch booking settings
     let { data: bookingSettings, error: bookingError } = await supabase // eslint-disable-line prefer-const
       .from('barber_booking_settings')
-      .select('*')
+      .select('id, barber_id, max_booking_days_ahead, min_hours_before_booking, min_cancel_hours')
       .eq('barber_id', barberId)
       .maybeSingle()
 

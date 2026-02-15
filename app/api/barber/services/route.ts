@@ -13,6 +13,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { reportApiError } from '@/lib/bug-reporter/helpers'
 import { verifyBarber, verifyOwnership } from '@/lib/auth/barber-api-auth'
 import { z } from 'zod'
@@ -76,6 +77,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    revalidateTag('services', 'max')
     return NextResponse.json({ success: true, data })
   } catch (err) {
     console.error('[API/barber/services] POST exception:', err)
@@ -148,6 +150,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    revalidateTag('services', 'max')
     return NextResponse.json({ success: true, data })
   } catch (err) {
     console.error('[API/barber/services] PUT exception:', err)
@@ -205,6 +208,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    revalidateTag('services', 'max')
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('[API/barber/services] DELETE exception:', err)

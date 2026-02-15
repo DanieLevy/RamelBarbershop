@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     // Build query
     let query = supabase
       .from('notification_logs')
-      .select('*', { count: 'exact' })
+      .select('id, notification_type, recipient_type, recipient_id, title, body, status, is_read, created_at, sent_at, devices_targeted, devices_succeeded, devices_failed', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 

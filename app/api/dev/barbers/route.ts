@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     // Get all barbers
     const { data: barbers, error } = await supabase
       .from('users')
-      .select('*')
+      .select('id, username, fullname, name_en, img_url, phone, email, is_barber, is_active, role, display_order')
       .eq('is_barber', true)
       .order('display_order', { ascending: true })
 

@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
     // Build query
     let query = supabase
       .from('notification_logs')
-      .select('*', { count: 'exact' })
+      .select('id, notification_type, recipient_type, recipient_id, reservation_id, sender_id, title, body, payload, status, is_read, created_at, sent_at', { count: 'exact' })
       .eq('recipient_type', recipientType)
       .eq('recipient_id', recipientId)
       .in('status', ['sent', 'partial']) // Only show successfully sent notifications
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
     // Get total unread count (for badge display)
     const { count: unreadCount, error: unreadError } = await supabase
       .from('notification_logs')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('recipient_type', recipientType)
       .eq('recipient_id', recipientId)
       .eq('is_read', false)

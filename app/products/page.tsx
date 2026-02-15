@@ -17,7 +17,7 @@ export default async function ProductsPage() {
   // Fetch all active products
   const { data: products } = await supabase
     .from('products')
-    .select('*')
+    .select('id, name, name_he, description, price, image_url, is_active, display_order')
     .eq('is_active', true)
     .order('display_order', { ascending: true }) as { data: Product[] | null }
 

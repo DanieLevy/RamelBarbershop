@@ -360,7 +360,7 @@ export async function checkCustomerEligibility(
     // Count future bookings
     const { count: futureBookingsCount, error: countError } = await supabase
       .from('reservations')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('customer_id', customerId)
       .eq('status', 'confirmed')
       .gt('time_timestamp', now)

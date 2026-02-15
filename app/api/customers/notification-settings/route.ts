@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     
     const { data: settings, error } = await supabase
       .from('customer_notification_settings')
-      .select('*')
+      .select('id, customer_id, pwa_installed, notifications_enabled, reminder_enabled, cancellation_alerts_enabled, sms_reminder_enabled, push_reminder_enabled, reminder_method')
       .eq('customer_id', customerId)
       .maybeSingle()
     

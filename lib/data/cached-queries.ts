@@ -2,12 +2,14 @@
  * Cached Data Queries
  * 
  * Uses Next.js unstable_cache for selective caching of data that doesn't change frequently.
+ * All queries use explicit field selection to minimize egress (never select('*')).
  * 
  * CACHING STRATEGY:
- * - Barbers (with work_days): 30 seconds - tolerable for homepage display,
- *   barber status changes are infrequent (activating/deactivating a barber)
- * - Shop settings: 10 minutes - rarely change
- * - Products: 10 minutes - rarely change
+ * - Shop settings: 30 minutes - rarely change
+ * - Products: 30 minutes - rarely change
+ * - Barbers (with work_days): 1 day - tag-invalidated on changes
+ * - Services: 30 minutes - tag-invalidated on changes
+ * - Shop closures: 30 minutes - tag-invalidated on changes
  * 
  * NEVER cache:
  * - Reservation data (must be real-time for booking flow)
@@ -21,21 +23,93 @@
 
 import { unstable_cache } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
-import type { BarbershopSettings, Product, BarberWithWorkDays } from '@/types/database'
+import type { BarbershopSettings, Product, BarberWithWorkDays, Service, BarbershopClosure } from '@/types/database'
+
+// ============================================================
+// FIELD SELECTIONS - Centralized to avoid over-fetching
+// ============================================================
+
+/** Fields needed for shop settings display (excludes rarely-used fields) */
+const SHOP_SETTINGS_FIELDS = `
+  id,
+  name,
+  phone,
+  address,
+  address_text,
+  address_lat,
+  address_lng,
+  description,
+  work_hours_start,
+  work_hours_end,
+  open_days,
+  hero_title,
+  hero_subtitle,
+  hero_description,
+  waze_link,
+  google_maps_link,
+  contact_phone,
+  contact_email,
+  contact_whatsapp,
+  social_instagram,
+  social_facebook,
+  social_tiktok,
+  show_phone,
+  show_email,
+  show_whatsapp,
+  show_instagram,
+  show_facebook,
+  show_tiktok,
+  max_booking_days_ahead,
+  default_reminder_hours
+` as const
+
+/** Fields needed for product display */
+const PRODUCT_FIELDS = 'id, name, name_he, description, price, image_url, is_active, display_order' as const
+
+/** Fields needed for barber display (excludes password_hash, email, etc.) */
+const BARBER_FIELDS = `
+  id,
+  username,
+  fullname,
+  name_en,
+  img_url,
+  img_position_x,
+  img_position_y,
+  phone,
+  is_barber,
+  is_active,
+  role,
+  display_order,
+  instagram_url,
+  blocked_customers
+` as const
+
+/** Fields needed for work days */
+const WORK_DAYS_FIELDS = 'id, user_id, day_of_week, is_working, start_time, end_time' as const
+
+/** Fields needed for services display */
+const SERVICE_FIELDS = 'id, name, name_he, description, duration, price, is_active, barber_id' as const
+
+/** Fields needed for closures */
+const CLOSURE_FIELDS = 'id, start_date, end_date, reason, created_at' as const
+
+/** Fields needed for barber closures */
+const BARBER_CLOSURE_FIELDS = 'id, barber_id, start_date, end_date, reason, created_at' as const
+
+// ============================================================
+// CACHED QUERIES
+// ============================================================
 
 /**
  * Get cached barbershop settings
- * Cached for 10 minutes (600 seconds)
- * 
- * This is safe to cache because shop settings rarely change,
- * and a 10-minute delay is acceptable for display purposes.
+ * Cached for 30 minutes (1800 seconds)
  */
 export const getCachedShopSettings = unstable_cache(
   async (): Promise<BarbershopSettings | null> => {
     const supabase = createAdminClient()
     const { data, error } = await supabase
       .from('barbershop_settings')
-      .select('*')
+      .select(SHOP_SETTINGS_FIELDS)
       .single()
     
     if (error) {
@@ -45,26 +119,23 @@ export const getCachedShopSettings = unstable_cache(
     
     return data as BarbershopSettings
   },
-  ['barbershop-settings'], // Cache key
+  ['barbershop-settings'],
   { 
-    revalidate: 600, // 10 minutes
+    revalidate: 1800, // 30 minutes
     tags: ['shop-settings'] 
   }
 )
 
 /**
  * Get cached products list
- * Cached for 10 minutes (600 seconds)
- * 
- * Products are displayed on the home page and rarely change.
- * A 10-minute cache is acceptable for this static-ish content.
+ * Cached for 30 minutes (1800 seconds)
  */
 export const getCachedProducts = unstable_cache(
   async (): Promise<Product[]> => {
     const supabase = createAdminClient()
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select(PRODUCT_FIELDS)
       .eq('is_active', true)
       .order('display_order', { ascending: true })
     
@@ -75,33 +146,23 @@ export const getCachedProducts = unstable_cache(
     
     return (data as Product[]) || []
   },
-  ['active-products'], // Cache key
+  ['active-products'],
   { 
-    revalidate: 600, // 10 minutes
+    revalidate: 1800, // 30 minutes
     tags: ['products'] 
   }
 )
 
 /**
  * Get cached active barbers with work days
- * Cached for 1 day (86400 seconds)
- * 
- * Barber status rarely changes (activating/deactivating a barber is an infrequent admin action).
- * Manual invalidation via revalidateTag('barbers') is triggered by:
- * - app/api/barber/manage/route.ts (delete/reorder barber)
- * - app/api/barbers/create/route.ts (new barber created)
- * - Client-side via /api/revalidate (is_active toggle, profile updates)
- * This ensures the cache is fresh when barber data actually changes.
- * The booking flow fetches fresh data independently.
- * 
- * ORDERING: Admin barber(s) appear first, then by display_order ascending.
+ * Cached for 1 day (86400 seconds) - tag-invalidated on barber changes
  */
 export const getCachedBarbers = unstable_cache(
   async (): Promise<BarberWithWorkDays[]> => {
     const supabase = createAdminClient()
     const { data, error } = await supabase
       .from('users')
-      .select('*, work_days(*)')
+      .select(`${BARBER_FIELDS}, work_days(${WORK_DAYS_FIELDS})`)
       .eq('is_barber', true)
       .eq('is_active', true)
       .order('display_order', { ascending: true })
@@ -123,12 +184,81 @@ export const getCachedBarbers = unstable_cache(
     
     return barbers
   },
-  ['active-barbers'], // Cache key
+  ['active-barbers'],
   { 
     revalidate: 86400, // 1 day - tag-invalidated on barber changes
     tags: ['barbers'] 
   }
 )
+
+/**
+ * Get cached active services for a barber
+ * Cached for 30 minutes - tag-invalidated on service changes
+ */
+export const getCachedBarberServices = unstable_cache(
+  async (barberId: string): Promise<Service[]> => {
+    const supabase = createAdminClient()
+    const { data, error } = await supabase
+      .from('services')
+      .select(SERVICE_FIELDS)
+      .eq('barber_id', barberId)
+      .eq('is_active', true)
+      .order('name_he', { ascending: true })
+    
+    if (error) {
+      console.error('[CachedQueries] Failed to fetch barber services:', error)
+      return []
+    }
+    
+    return (data as Service[]) || []
+  },
+  ['barber-services'],
+  {
+    revalidate: 1800, // 30 minutes
+    tags: ['services']
+  }
+)
+
+/**
+ * Get cached barbershop closures (upcoming only)
+ * Cached for 30 minutes - tag-invalidated on changes
+ */
+export const getCachedShopClosures = unstable_cache(
+  async (): Promise<BarbershopClosure[]> => {
+    const supabase = createAdminClient()
+    const today = new Date().toISOString().split('T')[0]
+    const { data, error } = await supabase
+      .from('barbershop_closures')
+      .select(CLOSURE_FIELDS)
+      .gte('end_date', today)
+    
+    if (error) {
+      console.error('[CachedQueries] Failed to fetch shop closures:', error)
+      return []
+    }
+    
+    return (data as BarbershopClosure[]) || []
+  },
+  ['shop-closures'],
+  {
+    revalidate: 1800, // 30 minutes
+    tags: ['shop-closures']
+  }
+)
+
+// ============================================================
+// EXPORTED FIELD CONSTANTS - For use in other files
+// ============================================================
+
+export {
+  SHOP_SETTINGS_FIELDS,
+  PRODUCT_FIELDS,
+  BARBER_FIELDS,
+  WORK_DAYS_FIELDS,
+  SERVICE_FIELDS,
+  CLOSURE_FIELDS,
+  BARBER_CLOSURE_FIELDS,
+}
 
 /**
  * Revalidation Notes:
@@ -138,7 +268,9 @@ export const getCachedBarbers = unstable_cache(
  * import { revalidateTag } from 'next/cache'
  * 
  * // In API route or server action:
- * revalidateTag('shop-settings', 'max')
- * revalidateTag('products', 'max')
- * revalidateTag('barbers', 'max')
+ * revalidateTag('shop-settings')
+ * revalidateTag('products')
+ * revalidateTag('barbers')
+ * revalidateTag('services')
+ * revalidateTag('shop-closures')
  */

@@ -32,7 +32,7 @@ export default function AbsenceDaysPage() {
     
     const { data, error } = await supabase
       .from('barber_closures')
-      .select('*')
+      .select('id, barber_id, start_date, end_date, reason, created_at')
       .eq('barber_id', barber.id)
       .order('start_date', { ascending: true })
     

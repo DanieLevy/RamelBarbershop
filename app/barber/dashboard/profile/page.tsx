@@ -74,7 +74,7 @@ export default function ProfilePage() {
     
     const { data, error } = await supabase
       .from('barber_messages')
-      .select('*')
+      .select('id, barber_id, message, is_active, created_at, updated_at')
       .eq('barber_id', barber.id)
       .order('created_at', { ascending: false })
     

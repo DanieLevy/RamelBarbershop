@@ -74,7 +74,7 @@ export default function DashboardPage() {
       // Fetch reservations for stats
       const { data: reservations } = await supabase
         .from('reservations')
-        .select('*, services(*)')
+        .select('id, barber_id, service_id, customer_id, customer_name, customer_phone, date_timestamp, time_timestamp, day_name, day_num, status, created_at, cancelled_by, cancellation_reason, barber_notes, version, sms_reminder_sent_at, services(id, name, name_he, duration, price)')
         .eq('barber_id', barber.id)
         .gte('time_timestamp', monthStartMs)
         .order('time_timestamp', { ascending: true })

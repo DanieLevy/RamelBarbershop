@@ -229,7 +229,7 @@ export async function GET(request: NextRequest) {
     // Fetch all active breakouts for the barber
     const { data, error } = await supabase
       .from('barber_breakouts')
-      .select('*')
+      .select('id, barber_id, breakout_type, start_time, end_time, start_date, end_date, day_of_week, reason, is_active, created_at, deactivated_at')
       .eq('barber_id', barberId)
       .eq('is_active', true)
       .order('created_at', { ascending: false })

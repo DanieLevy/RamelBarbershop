@@ -256,7 +256,7 @@ export default function DebugPage() {
     
     const { data, error } = await supabase
       .from('push_subscriptions')
-      .select('*')
+      .select('id, customer_id, barber_id, endpoint, p256dh, auth, device_type, device_name, user_agent, is_active, consecutive_failures, last_delivery_status, last_used, created_at')
       .eq('is_active', true)
       .order('created_at', { ascending: false })
     

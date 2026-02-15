@@ -11,6 +11,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { reportApiError } from '@/lib/bug-reporter/helpers'
 import { verifyBarber } from '@/lib/auth/barber-api-auth'
 import { z } from 'zod'
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    revalidateTag('shop-closures', 'max')
     return NextResponse.json({ success: true, data })
   } catch (err) {
     console.error('[API/barber/shop-closures] POST exception:', err)
@@ -107,6 +109,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    revalidateTag('shop-closures', 'max')
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('[API/barber/shop-closures] DELETE exception:', err)

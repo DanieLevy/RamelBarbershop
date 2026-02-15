@@ -27,7 +27,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   // Fetch the product
   const { data: product, error } = await supabase
     .from('products')
-    .select('*')
+    .select('id, name, name_he, description, price, image_url, is_active, display_order, created_at')
     .eq('id', productId)
     .eq('is_active', true)
     .single() as { data: Product | null; error: unknown }

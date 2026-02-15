@@ -173,7 +173,7 @@ function ReservationsContent() {
     const supabase = createClient()
     const { data } = await supabase
       .from('barbershop_settings')
-      .select('*')
+      .select('id, name, phone, address, address_text, address_lat, address_lng, description, work_hours_start, work_hours_end, open_days, hero_title, hero_subtitle, hero_description, waze_link, google_maps_link, contact_phone, contact_email, contact_whatsapp, social_instagram, social_facebook, social_tiktok, show_phone, show_email, show_whatsapp, show_instagram, show_facebook, show_tiktok, max_booking_days_ahead, default_reminder_hours')
       .single()
     
     if (data) {
@@ -186,7 +186,7 @@ function ReservationsContent() {
     const supabase = createClient()
     const { data } = await supabase
       .from('work_days')
-      .select('*')
+      .select('id, user_id, day_of_week, is_working, start_time, end_time')
       .eq('user_id', barber.id)
     
     if (data) {

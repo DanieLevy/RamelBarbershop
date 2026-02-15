@@ -88,16 +88,37 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
   const requiresPWA = isIOS // iOS requires PWA for push
 
   /**
+   * Safely check if the Notification API is available.
+   * On some iOS Safari versions, 'Notification' in window may be true
+   * but accessing Notification itself throws a ReferenceError.
+   */
+  const getNotificationPermission = useCallback((): NotificationPermission | 'unavailable' => {
+    try {
+      if (typeof window !== 'undefined' && 'Notification' in window && typeof Notification !== 'undefined') {
+        return Notification.permission
+      }
+    } catch {
+      // iOS Safari can throw ReferenceError: Can't find variable: Notification
+    }
+    return 'unavailable'
+  }, [])
+
+  /**
    * Check if push notifications are supported
    */
   const checkSupport = useCallback((): boolean => {
     if (typeof window === 'undefined') return false
     
-    return (
-      'serviceWorker' in navigator &&
-      'PushManager' in window &&
-      'Notification' in window
-    )
+    try {
+      return (
+        'serviceWorker' in navigator &&
+        'PushManager' in window &&
+        typeof Notification !== 'undefined'
+      )
+    } catch {
+      // iOS Safari can throw ReferenceError when accessing Notification
+      return false
+    }
   }, [])
 
   /**
@@ -185,8 +206,17 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
         return
       }
 
-      // Check permission (synchronous)
-      const permission = Notification.permission
+      // Check permission (synchronous, with iOS safety guard)
+      const permission = getNotificationPermission()
+      if (permission === 'unavailable') {
+        setState(prev => ({
+          ...prev,
+          isSupported: false,
+          permission: 'unavailable',
+          isLoading: false
+        }))
+        return
+      }
 
       // Check if already subscribed in browser (async)
       const subscription = await getCurrentSubscription()
@@ -290,6 +320,7 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
     }
 
     try {
+      if (typeof Notification === 'undefined') return 'denied'
       const permission = await Notification.requestPermission()
       setState(prev => ({ ...prev, permission }))
       return permission
@@ -520,10 +551,11 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
     
     // Re-check local subscription
     const subscription = await getCurrentSubscription()
+    const currentPermission = getNotificationPermission()
     setState(prev => ({
       ...prev,
       isSubscribed: Boolean(subscription),
-      permission: Notification.permission
+      permission: currentPermission
     }))
 
     // Reset cooldown and fetch from server (explicit refresh should always work)
@@ -531,7 +563,7 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
     await fetchServerStatus()
     
     setState(prev => ({ ...prev, isLoading: false }))
-  }, [getCurrentSubscription, fetchServerStatus])
+  }, [getCurrentSubscription, fetchServerStatus, getNotificationPermission])
 
   return {
     ...state,

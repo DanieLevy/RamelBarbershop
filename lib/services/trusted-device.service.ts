@@ -191,7 +191,7 @@ export async function validateTrustedDevice(
   // Find the device by token
   const { data: device, error: deviceError } = await supabase
     .from('trusted_devices')
-    .select('*')
+    .select('id, customer_id, phone, device_token, device_fingerprint, user_agent, created_at, expires_at, last_used_at, is_active')
     .eq('device_token', token)
     .eq('phone', normalizedPhone)
     .eq('is_active', true)
@@ -221,7 +221,7 @@ export async function validateTrustedDevice(
   // Get the customer
   const { data: customer, error: customerError } = await supabase
     .from('customers')
-    .select('*')
+    .select('id, phone, fullname, email, is_blocked, blocked_at, blocked_reason, created_at, updated_at, auth_method, provider_uid, supabase_uid, firebase_uid, last_login_at')
     .eq('id', device.customer_id)
     .maybeSingle()
   
@@ -320,7 +320,7 @@ export async function getActiveDeviceCount(customerId: string): Promise<number> 
   
   const { count, error } = await supabase
     .from('trusted_devices')
-    .select('*', { count: 'exact', head: true })
+    .select('id', { count: 'exact', head: true })
     .eq('customer_id', customerId)
     .eq('is_active', true)
     .gt('expires_at', new Date().toISOString())

@@ -501,7 +501,7 @@ export async function getBarberById(barberId: string): Promise<User | null> {
   
   const { data, error } = await supabase
     .from('users')
-    .select('*')
+    .select('id, username, fullname, name_en, img_url, img_position_x, img_position_y, phone, email, is_barber, is_active, role, display_order, instagram_url, blocked_customers')
     .eq('id', barberId)
     .eq('is_barber', true)
     .single()

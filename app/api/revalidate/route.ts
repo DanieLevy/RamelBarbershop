@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
 
 // Only allow revalidation of known, safe cache tags
-const ALLOWED_TAGS = new Set(['barbers', 'shop-settings', 'products'])
+const ALLOWED_TAGS = new Set(['barbers', 'shop-settings', 'products', 'services', 'shop-closures'])
 
 export async function POST(request: NextRequest) {
   try {

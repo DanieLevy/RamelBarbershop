@@ -1,0 +1,2997 @@
+================================================================
+RAMEL BARBERSHOP — REACT NATIVE MIGRATION PRD
+Product Requirements Document v1.0
+Date: February 12, 2026
+================================================================================
+
+TABLE OF CONTENTS
+=================
+1.  Executive Summary
+2.  Current System Overview
+3.  Environment & Connection Details
+4.  Database Schema (Complete)
+5.  API Reference (All 47 Endpoints)
+6.  Business Logic & Algorithms
+7.  Auth Flows (All Methods)
+8.  Push Notification System
+9.  SMS System (019 Provider)
+10. Zustand Stores (State Management)
+11. What Will Be Reused
+12. What Will NOT Be Migrated
+13. React Native Architecture
+14. Screen-by-Screen Specifications
+15. Navigation Structure
+16. UX/UI Adaptation
+17. Native-Specific Features
+18. Infrastructure Changes
+19. App Store & Play Store Requirements
+20. Implementation Plan (Phased)
+21. Validation Schemas
+22. Utility Functions (Critical)
+23. TypeScript Types (Full Database)
+24. Risk Assessment
+25. Success Metrics
+
+
+
+================================================================================
+1. EXECUTIVE SUMMARY
+================================================================================
+
+PRODUCT: Ramel Barbershop ("רם אל ברברשופ")
+TYPE: Hebrew RTL barbershop booking and management platform
+LANGUAGE: Hebrew (he), RTL layout
+USERS: ~265 customers, 8 barbers
+CURRENT: Next.js 16 PWA deployed on Netlify
+TARGET: React Native (Expo) app for iOS App Store & Google Play Store
+
+WHY MIGRATE:
+- Web push is unreliable on iOS (requires PWA install first)
+- No App Store/Play Store presence (zero discoverability)
+- PWA install friction (manual "Add to Home Screen")
+- No biometric auth (Face ID / Touch ID)
+- Limited offline capabilities
+- Limited native gestures and haptics
+- No background processing
+
+GOALS:
+1. Native push notifications via FCM + APNs (reliable delivery)
+2. App Store / Play Store presence (discoverability + trust)
+3. Native UX (gestures, haptics, navigation, bottom sheets, biometrics)
+4. Offline resilience (queued bookings, cached data)
+5. Improved retention (native reminders, app badges, background refresh)
+6. Better engagement (deep links, share sheets)
+7. Performance (native rendering, no browser overhead)
+
+CRITICAL CONSTRAINT:
+The mobile app is a NEW CLIENT connecting to the EXISTING backend.
+The backend (API routes, database, cron jobs) stays 100% intact.
+The web PWA continues to run alongside the mobile app.
+
+
+
+================================================================================
+2. CURRENT SYSTEM OVERVIEW
+================================================================================
+
+2.1 TECHNOLOGY STACK
+--------------------
+Layer               | Technology
+--------------------|--------------------------------------------------
+Framework           | Next.js 16, React 19, TypeScript
+UI Library          | HeroUI v3 (beta), Tailwind CSS v4
+Database            | Supabase (PostgreSQL)
+Auth                | Custom: SMS OTP (019), Email OTP (Supabase Auth),
+                    |   barber email/password (bcrypt)
+State Management    | Zustand 5 (5 stores), TanStack React Query 5
+Real-time           | Supabase Realtime (reservations channel)
+Push Notifications  | Web Push (VAPID/web-push library)
+SMS Provider        | 019 SMS API (Israeli provider)
+Email               | Resend (bug reports only)
+Hosting             | Netlify (primary), Vercel (cron), Firebase (backup)
+Cron                | Netlify scheduled function (every 30min)
+                    |   + Vercel cron (7:00, 19:00 daily)
+Rate Limiting       | proxy.ts (Next.js 16 convention)
+
+
+2.2 CORE FEATURES
+-----------------
+
+CUSTOMER-FACING:
+1.  Home page — hero section, team cards, products carousel, location, contact
+2.  Barber profiles — gallery slideshow, services list, booking link
+3.  Booking wizard — 6-step (guest) / 4-step (logged-in):
+      service → date → time → details → OTP → confirmation
+4.  My appointments — upcoming/past/cancelled tabs, edit, cancel, recurring
+5.  Profile — name edit, notification settings, push management, logout
+6.  Login — SMS OTP (019), email OTP (Supabase), trusted device auto-login
+7.  Push notifications — confirmations, reminders, cancellations, broadcasts
+8.  SMS reminders — appointment reminders via 019 SMS
+9.  Products catalog — product cards with detail pages
+10. FAQ, Terms, Privacy Policy, Accessibility pages
+
+BARBER DASHBOARD:
+1.  Reservations — daily/weekly view, status management, barber notes
+2.  Schedule — per-barber work days with start/end times
+3.  Services — CRUD per barber (name_he, duration, price)
+4.  Closures — barber-specific and shop-wide date ranges
+5.  Breakouts — lunch breaks, early departures (single/range/recurring types)
+6.  Recurring appointments — create, conflict detection, cancel conflicts
+7.  Customers — list, block/unblock, view history
+8.  Notifications — settings, broadcast to customers
+9.  Gallery — image upload with focal point positioning
+10. Products — CRUD, display order management
+11. Profile — name, image, password change
+12. Settings — booking rules (max_booking_days_ahead, min_hours_before, min_cancel_hours)
+13. All barbers management (admin role only)
+
+
+2.3 THIRD-PARTY SERVICES
+-------------------------
+Service         | Purpose                        | Reuse in Mobile?
+----------------|--------------------------------|------------------
+Supabase        | DB, Auth, Realtime, Storage    | YES (core backend)
+019 SMS API     | OTP verification, SMS reminders| YES (same API)
+Resend          | Bug report emails              | YES (server-side)
+VAPID/web-push  | Web push notifications         | NO (replace with FCM)
+Netlify         | Hosting, scheduled functions   | PARTIAL (keep cron)
+Vercel          | Cron jobs                      | PARTIAL (keep cron)
+
+
+2.4 DEPLOYMENT TOPOLOGY
+------------------------
+- Web app: ramel-barbershop.netlify.app
+- API routes: ramel-barbershop.netlify.app/api/*
+- Cron (Netlify): every 30 min → /api/cron/process-reminders
+- Cron (Vercel): 07:00, 19:00 → /api/cron/send-reminders
+- Supabase: zdisrkjxsvpqrrryfbdo.supabase.co
+- Firebase: configured but secondary
+
+
+
+================================================================================
+3. ENVIRONMENT & CONNECTION DETAILS
+================================================================================
+
+3.1 MOBILE APP ENVIRONMENT VARIABLES (.env)
+--------------------------------------------
+Create this file in the React Native project root:
+
+# =============================================================================
+# Ramel Barbershop React Native - Environment Variables
+# =============================================================================
+
+# App Configuration
+EXPO_PUBLIC_APP_VERSION=1.0.0
+EXPO_PUBLIC_API_BASE_URL=https://ramel-barbershop.netlify.app
+
+# Supabase Configuration (PUBLIC - safe for client)
+EXPO_PUBLIC_SUPABASE_URL=https://zdisrkjxsvpqrrryfbdo.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkaXNya2p4c3ZwcXJycnlmYmRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3Nzc0MDQsImV4cCI6MjA4MjM1MzQwNH0.yGDjxFP7Ab1Q0qMWnZl7Xj85GH5mzqPAzPMJDRSHcd8
+
+# VAPID Key (for web-push compatibility if needed)
+EXPO_PUBLIC_VAPID_PUBLIC_KEY=BARQgt_vYk7LIfx7VAOSBdCTxLSfo0ECD1BtVS6zAiNf4TQEoYcJF4BiaLfIAzNEvjE9i399hZITzwGsdOkg9qw
+
+
+3.2 SERVER-SIDE ENVIRONMENT (Already configured on Netlify - DO NOT CHANGE)
+----------------------------------------------------------------------------
+These remain on Netlify/Vercel. Listed for reference only:
+
+NEXT_PUBLIC_SUPABASE_URL=https://zdisrkjxsvpqrrryfbdo.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<same as above>
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkaXNya2p4c3ZwcXJycnlmYmRvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Njc3NzQwNCwiZXhwIjoyMDgyMzUzNDA0fQ.H0p-c19baTk866XWXeMwj-o4y9QBS8RoVri5WHnZpTQ
+O19_SMS_API_TOKEN=eyJ0eXAiOiJqd3QiLCJhbGciOiJIUzI1NiJ9.eyJmaXJzdF9rZXkiOiI4MzA5OCIsInNlY29uZF9rZXkiOiI0MjE5NDQ0IiwiaXNzdWVkQXQiOiIwMi0wMi0yMDI2IDEzOjMwOjIxIiwidHRsIjo2MzA3MjAwMH0.40AC9Nl3Jf8BSI129wJyZ8-PcWT8cpA3KObsu5ZTolM
+O19_SMS_USERNAME=daniellofficial
+O19_SMS_SOURCE=RamelBarber
+VAPID_EMAIL=mailto:daniellofficial@gmail.com
+VAPID_PRIVATE_KEY=0HXBIgLaHuO7o82X22UVc4DW2kJcX2NslYRMuIGB_0Y
+RESEND_API_KEY=re_QUo2VVEe_9D6532DwQLMESLXaXQfbW6Ex
+BUG_REPORT_TO_EMAIL=daniellofficial@gmail.com
+CRON_SECRET=ramel-cron-secret-2026-secure-token
+INTERNAL_API_SECRET=K_yqh7dOF-kTrMaUkf35rCY0UcLD2UhPrORi7_tz1fDvOcF35ujJV5ezo18d5zBe
+
+
+3.3 SUPABASE CONNECTION
+-----------------------
+URL:      https://zdisrkjxsvpqrrryfbdo.supabase.co
+Anon Key: (see above — safe for client use, protected by RLS)
+Region:   (check Supabase dashboard)
+
+IMPORTANT: The mobile app ONLY uses the anon key.
+All write operations go through API routes that use the service_role key.
+The service_role key NEVER appears in the mobile app.
+
+
+3.4 SUPABASE CLIENT SETUP (React Native)
+-----------------------------------------
+  import { createClient } from '@supabase/supabase-js';
+  import * as SecureStore from 'expo-secure-store';
+
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+  export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      storage: {
+        getItem: (key) => SecureStore.getItemAsync(key),
+        setItem: (key, value) => SecureStore.setItemAsync(key, value),
+        removeItem: (key) => SecureStore.deleteItemAsync(key),
+      },
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false, // No URL-based auth in mobile
+    },
+  });
+
+
+3.5 API CLIENT SETUP
+---------------------
+All API calls target the existing Netlify-hosted Next.js API:
+
+  const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL + '/api';
+
+  // Example:
+  // POST reservation → fetch(API_BASE + '/reservations/create', { method: 'POST', body: ... })
+  // GET push status  → fetch(API_BASE + '/push/status?customerId=...')
+
+IMPORTANT: No CORS issues — native apps don't have CORS restrictions.
+Rate limiting (proxy.ts on server) still applies — respect limits.
+
+
+
+================================================================================
+4. DATABASE SCHEMA (COMPLETE)
+================================================================================
+
+Supabase PostgreSQL — 20 tables, all with RLS enabled.
+All writes go through API routes using service_role key.
+Mobile app reads via Supabase anon key (RLS: public SELECT on most tables).
+
+4.1 TABLE: users (Barbers)
+--------------------------
+Rows: 8
+
+Column              | Type                     | Nullable | Default          | Notes
+--------------------|--------------------------|----------|------------------|------
+id                  | uuid                     | NO       | gen_random_uuid()| PK
+username            | text                     | NO       | —                | UNIQUE, URL slug
+fullname            | text                     | NO       | —                | Hebrew name
+name_en             | varchar                  | YES      | NULL             | English name for slugs
+email               | text                     | YES      | —                | UNIQUE, login
+password_hash       | text                     | YES      | —                | bcrypt hash
+role                | text                     | NO       | 'barber'         | CHECK: admin, barber
+is_barber           | boolean                  | YES      | false            |
+is_active           | boolean                  | NO       | true             |
+display_order       | integer                  | YES      | 0                | Homepage sort order
+img_url             | text                     | YES      | —                | Profile image
+img_position_x      | integer                  | YES      | 50               | Focal point 0-100%
+img_position_y      | integer                  | YES      | 30               | Focal point 0-100%
+instagram_url       | varchar                  | YES      | NULL             |
+phone               | text                     | YES      | —                |
+blocked_customers   | text[]                   | YES      | '{}'             | Array of customer IDs
+created_at          | timestamptz              | YES      | now()            |
+updated_at          | timestamptz              | YES      | now()            |
+
+RLS: Public can SELECT where is_barber=true. Public can INSERT/UPDATE/DELETE where is_barber=true.
+     service_role has full access.
+
+Referenced by: services, work_days, barber_closures, barber_breakouts, barber_messages,
+              barber_gallery, barber_booking_settings, barber_notification_settings,
+              push_subscriptions, recurring_appointments, reservations
+
+
+4.2 TABLE: customers
+--------------------
+Rows: 265
+
+Column              | Type                     | Nullable | Default          | Notes
+--------------------|--------------------------|----------|------------------|------
+id                  | uuid                     | NO       | gen_random_uuid()| PK
+phone               | text                     | NO       | —                | UNIQUE
+fullname            | text                     | NO       | —                |
+email               | text                     | YES      | —                | UNIQUE
+auth_method         | text                     | YES      | 'phone'          | CHECK: phone, email, both
+firebase_uid        | text                     | YES      | —                | Legacy (unused)
+provider_uid        | text                     | YES      | —                | SMS provider UID
+supabase_uid        | text                     | YES      | —                | Supabase Auth user ID
+is_blocked          | boolean                  | YES      | false            |
+blocked_at          | timestamptz              | YES      | —                |
+blocked_reason      | text                     | YES      | —                |
+last_login_at       | timestamptz              | YES      | now()            |
+created_at          | timestamptz              | YES      | now()            |
+updated_at          | timestamptz              | YES      | now()            |
+
+RLS: Public can SELECT (read any customer). service_role can manage all.
+
+Referenced by: reservations, push_subscriptions, trusted_devices,
+              customer_notification_settings, recurring_appointments
+
+
+4.3 TABLE: reservations
+-----------------------
+Rows: 343
+
+Column              | Type                     | Nullable | Default          | Notes
+--------------------|--------------------------|----------|------------------|------
+id                  | uuid                     | NO       | gen_random_uuid()| PK
+barber_id           | uuid                     | NO       | —                | FK → users.id
+service_id          | uuid                     | NO       | —                | FK → services.id
+customer_id         | uuid                     | NO       | —                | FK → customers.id
+customer_name       | text                     | NO       | —                | Denormalized
+customer_phone      | text                     | NO       | —                | Denormalized
+date_timestamp      | bigint                   | NO       | —                | Day start in ms (Israel TZ)
+time_timestamp      | bigint                   | NO       | —                | Slot time in ms (Israel TZ)
+day_name            | text                     | NO       | —                | Hebrew day name
+day_num             | text                     | NO       | —                | Day number string
+status              | text                     | YES      | 'confirmed'      | CHECK: confirmed, cancelled, completed
+cancelled_by        | text                     | YES      | —                | CHECK: customer, barber, system
+cancellation_reason | text                     | YES      | —                |
+barber_notes        | text                     | YES      | —                | Notes by barber
+version             | integer                  | NO       | 1                | Optimistic locking
+sms_reminder_sent_at| timestamptz              | YES      | —                |
+created_at          | timestamptz              | YES      | now()            |
+
+RLS: Public can SELECT. service_role can manage all.
+
+TRIGGERS:
+- increment_reservation_version: Auto-increments version on UPDATE
+- log_reservation_change: Creates audit trail in reservation_changes
+- validate_reservation_insert: Validates data on INSERT
+- validate_reservation_update: Validates data on UPDATE
+
+IMPORTANT: All timestamps are Unix milliseconds in Israel timezone.
+           30-minute slot intervals. See Section 6 for slot logic.
+
+
+4.4 TABLE: services
+-------------------
+Rows: 36
+
+Column    | Type      | Nullable | Default          | Notes
+----------|-----------|----------|------------------|------
+id        | uuid      | NO       | gen_random_uuid()| PK
+barber_id | uuid      | YES      | —                | FK → users.id (per-barber services)
+name      | text      | NO       | —                | English name
+name_he   | text      | NO       | —                | Hebrew name (DISPLAY THIS)
+description| text     | YES      | —                |
+duration  | integer   | NO       | —                | Minutes (e.g., 30, 45, 60)
+price     | numeric   | NO       | —                | ILS (e.g., 80, 120)
+is_active | boolean   | YES      | true             |
+created_at| timestamptz| YES     | now()            |
+
+
+4.5 TABLE: products
+-------------------
+Rows: 7
+
+Column       | Type      | Nullable | Default          | Notes
+-------------|-----------|----------|------------------|------
+id           | uuid      | NO       | gen_random_uuid()| PK
+name         | text      | NO       | —                | English name
+name_he      | text      | NO       | —                | Hebrew name
+description  | text      | YES      | —                |
+price        | numeric   | NO       | —                | ILS
+image_url    | text      | YES      | —                |
+is_active    | boolean   | YES      | true             |
+display_order| integer   | YES      | 0                |
+created_at   | timestamptz| YES     | now()            |
+updated_at   | timestamptz| YES     | now()            |
+
+
+4.6 TABLE: work_days
+--------------------
+Rows: 56 (7 days x 8 barbers)
+
+Column      | Type   | Nullable | Default          | Notes
+------------|--------|----------|------------------|------
+id          | uuid   | NO       | gen_random_uuid()| PK
+user_id     | uuid   | YES      | —                | FK → users.id
+day_of_week | text   | NO       | —                | CHECK: sunday..saturday
+is_working  | boolean| YES      | false            |
+start_time  | time   | YES      | —                | NULL if not working (HH:MM:SS)
+end_time    | time   | YES      | —                | NULL if not working (HH:MM:SS)
+
+
+4.7 TABLE: barber_closures
+--------------------------
+Rows: 3
+
+Column     | Type      | Nullable | Default          | Notes
+-----------|-----------|----------|------------------|------
+id         | uuid      | NO       | gen_random_uuid()| PK
+barber_id  | uuid      | NO       | —                | FK → users.id
+start_date | date      | NO       | —                | YYYY-MM-DD
+end_date   | date      | NO       | —                | YYYY-MM-DD
+reason     | text      | YES      | —                |
+created_at | timestamptz| YES     | now()            |
+
+
+4.8 TABLE: barbershop_closures
+------------------------------
+Rows: 0
+
+Column     | Type      | Nullable | Default          | Notes
+-----------|-----------|----------|------------------|------
+id         | uuid      | NO       | gen_random_uuid()| PK
+start_date | date      | NO       | —                |
+end_date   | date      | NO       | —                |
+reason     | text      | YES      | —                |
+created_at | timestamptz| YES     | now()            |
+
+
+4.9 TABLE: barber_breakouts
+---------------------------
+Rows: 10
+
+Column       | Type   | Nullable | Default          | Notes
+-------------|--------|----------|------------------|------
+id           | uuid   | NO       | gen_random_uuid()| PK
+barber_id    | uuid   | NO       | —                | FK → users.id
+breakout_type| text   | NO       | —                | CHECK: single, date_range, recurring
+start_time   | time   | NO       | —                | HH:MM:SS
+end_time     | time   | YES      | —                | NULL = rest of day
+start_date   | date   | YES      | —                | Required for single/date_range
+end_date     | date   | YES      | —                | Required for date_range
+day_of_week  | text   | YES      | —                | Required for recurring (sunday..saturday)
+reason       | text   | YES      | —                |
+is_active    | boolean| YES      | true             |
+created_at   | timestamptz| YES  | now()            |
+deactivated_at| timestamptz| YES | —                |
+
+
+4.10 TABLE: barber_booking_settings
+-----------------------------------
+Rows: 8
+
+Column                  | Type    | Nullable | Default | Notes
+------------------------|---------|----------|---------|------
+id                      | uuid    | NO       | gen_random_uuid()| PK
+barber_id               | uuid    | NO       | —       | FK → users.id, UNIQUE
+max_booking_days_ahead  | integer | YES      | 15      | How far ahead customers can book
+min_hours_before_booking| integer | YES      | 1       | Min hours before slot to allow booking
+min_cancel_hours        | integer | YES      | 2       | Min hours before to allow cancel
+created_at              | timestamptz| YES   | now()   |
+updated_at              | timestamptz| YES   | now()   |
+
+
+4.11 TABLE: barber_notification_settings
+----------------------------------------
+Rows: 8
+
+Column                    | Type    | Nullable | Default | Notes
+--------------------------|---------|----------|---------|------
+id                        | uuid    | NO       | gen_random_uuid()| PK
+barber_id                 | uuid    | NO       | —       | FK → users.id, UNIQUE
+reminder_hours_before     | integer | NO       | 3       | CHECK: 1-24
+notify_on_customer_cancel | boolean | NO       | true    |
+notify_on_new_booking     | boolean | NO       | true    |
+broadcast_enabled         | boolean | NO       | true    |
+created_at                | timestamptz| YES   | now()   |
+updated_at                | timestamptz| YES   | now()   |
+
+
+4.12 TABLE: barber_messages
+---------------------------
+Rows: 1
+
+Column     | Type      | Nullable | Default | Notes
+-----------|-----------|----------|---------|------
+id         | uuid      | NO       | gen_random_uuid()| PK
+barber_id  | uuid      | NO       | —       | FK → users.id
+message    | text      | NO       | —       | Hebrew message shown in booking
+is_active  | boolean   | NO       | true    |
+created_at | timestamptz| YES     | now()   |
+updated_at | timestamptz| YES     | now()   |
+
+
+4.13 TABLE: barber_gallery
+--------------------------
+Rows: 2
+
+Column       | Type    | Nullable | Default | Notes
+-------------|---------|----------|---------|------
+id           | uuid    | NO       | gen_random_uuid()| PK
+barber_id    | uuid    | NO       | —       | FK → users.id
+image_url    | text    | NO       | —       | Full URL to Supabase Storage
+display_order| integer | YES      | 0       |
+position_x   | integer | YES      | 50      | Focal point 0-100%
+position_y   | integer | YES      | 50      | Focal point 0-100%
+caption      | text    | YES      | —       |
+created_at   | timestamptz| YES   | now()   |
+
+
+4.14 TABLE: barbershop_settings (SINGLETON)
+-------------------------------------------
+Rows: 1
+
+Column               | Type    | Nullable | Default                    | Notes
+---------------------|---------|----------|----------------------------|------
+id                   | uuid    | NO       | gen_random_uuid()          | PK
+name                 | text    | NO       | 'Ramel Barbershop'         |
+phone                | text    | YES      | —                          |
+address              | text    | YES      | —                          |
+address_text         | text    | YES      | 'רחוב הנביאים 15, ירושלים' |
+address_lat          | numeric | YES      | 31.7857                    |
+address_lng          | numeric | YES      | 35.2271                    |
+waze_link            | text    | YES      | https://waze.com/ul?...    |
+google_maps_link     | text    | YES      | https://google.com/maps/...| 
+description          | text    | YES      | (Hebrew description)       |
+hero_title           | text    | YES      | 'רמאל ברברשופ'             |
+hero_subtitle        | text    | YES      | 'חווית טיפוח ייחודית...'   |
+hero_description     | text    | YES      | (long Hebrew text)         |
+work_hours_start     | time    | NO       | '09:00:00'                 |
+work_hours_end       | time    | NO       | '19:00:00'                 |
+open_days            | text[]  | NO       | {sunday..friday}           | Saturday excluded
+max_booking_days_ahead| integer| NO       | 21                         |
+default_reminder_hours| integer| YES      | 3                          |
+contact_phone        | text    | YES      | '052-1234567'              |
+contact_email        | text    | YES      | 'info@ramel-barbershop...' |
+contact_whatsapp     | text    | YES      | '972521234567'             |
+social_instagram     | text    | YES      | URL                        |
+social_facebook      | text    | YES      | URL                        |
+social_tiktok        | text    | YES      | ''                         |
+show_phone           | boolean | YES      | true                       |
+show_email           | boolean | YES      | true                       |
+show_whatsapp        | boolean | YES      | true                       |
+show_instagram       | boolean | YES      | true                       |
+show_facebook        | boolean | YES      | true                       |
+show_tiktok          | boolean | YES      | false                      |
+created_at           | timestamptz| YES   | now()                      |
+updated_at           | timestamptz| YES   | now()                      |
+
+
+4.15 TABLE: customer_notification_settings
+------------------------------------------
+Rows: 19
+
+Column                      | Type    | Nullable | Default | Notes
+----------------------------|---------|----------|---------|------
+id                          | uuid    | NO       | gen_random_uuid()| PK
+customer_id                 | uuid    | NO       | —       | FK → customers.id, UNIQUE
+pwa_installed               | boolean | YES      | false   |
+notifications_enabled       | boolean | YES      | false   |
+reminder_enabled            | boolean | YES      | true    |
+cancellation_alerts_enabled | boolean | YES      | true    |
+sms_reminder_enabled        | boolean | YES      | true    |
+push_reminder_enabled       | boolean | YES      | true    |
+reminder_method             | text    | YES      | 'both'  | CHECK: sms, push, both, none
+created_at                  | timestamptz| YES   | now()   |
+updated_at                  | timestamptz| YES   | now()   |
+
+
+4.16 TABLE: push_subscriptions
+------------------------------
+Rows: 51
+
+Column               | Type    | Nullable | Default   | Notes
+---------------------|---------|----------|-----------|------
+id                   | uuid    | NO       | gen_random_uuid()| PK
+customer_id          | uuid    | YES      | —         | FK → customers.id
+barber_id            | uuid    | YES      | —         | FK → users.id
+endpoint             | text    | NO       | —         | UNIQUE, web-push endpoint
+p256dh               | text    | NO       | —         | Web-push key
+auth                 | text    | NO       | —         | Web-push auth
+device_type          | text    | NO       | 'desktop' | CHECK: ios, android, desktop
+device_name          | text    | YES      | —         |
+user_agent           | text    | YES      | —         |
+is_active            | boolean | YES      | true      |
+consecutive_failures | integer | YES      | 0         | Deactivate after 5
+last_delivery_status | text    | YES      | —         | CHECK: success, failed, pending, user_deleted
+last_used            | timestamptz| YES   | now()     |
+created_at           | timestamptz| YES   | now()     |
+
+MIGRATION NEEDED FOR MOBILE:
+  - Add column: token_type TEXT DEFAULT 'web_push' CHECK (token_type IN ('web_push', 'fcm'))
+  - Add column: fcm_token TEXT
+  - For mobile: endpoint can be empty, fcm_token stores the FCM device token
+  - Server push-service.ts branches on token_type when sending
+
+
+4.17 TABLE: notification_logs
+-----------------------------
+Rows: 416
+
+Column            | Type    | Nullable | Default   | Notes
+------------------|---------|----------|-----------|------
+id                | uuid    | NO       | gen_random_uuid()| PK
+notification_type | text    | NO       | —         | CHECK: reminder, cancellation, booking_confirmed, chat_message, barber_broadcast, admin_broadcast
+recipient_type    | text    | NO       | —         | CHECK: customer, barber
+recipient_id      | uuid    | NO       | —         |
+reservation_id    | uuid    | YES      | —         | FK → reservations.id
+sender_id         | uuid    | YES      | —         |
+title             | text    | NO       | —         |
+body              | text    | NO       | —         |
+payload           | jsonb   | YES      | —         |
+devices_targeted  | integer | NO       | 0         |
+devices_succeeded | integer | NO       | 0         |
+devices_failed    | integer | NO       | 0         |
+status            | text    | NO       | 'pending' | CHECK: pending, sent, partial, failed
+error_message     | text    | YES      | —         |
+is_read           | boolean | YES      | false     | For badge count tracking
+created_at        | timestamptz| YES   | now()     |
+sent_at           | timestamptz| YES   | —         |
+
+
+4.18 TABLE: trusted_devices
+---------------------------
+Rows: 203
+
+Column            | Type      | Nullable | Default   | Notes
+------------------|-----------|----------|-----------|------
+id                | uuid      | NO       | gen_random_uuid()| PK
+customer_id       | uuid      | NO       | —         | FK → customers.id
+phone             | text      | NO       | —         |
+device_token      | text      | NO       | —         | UNIQUE, format: td_{timestamp}_{random}
+device_fingerprint| text      | YES      | —         |
+user_agent        | text      | YES      | —         |
+created_at        | timestamptz| YES     | now()     |
+expires_at        | timestamptz| NO      | —         | 30 days from creation
+last_used_at      | timestamptz| YES     | now()     |
+is_active         | boolean   | YES      | true      |
+
+
+4.19 TABLE: recurring_appointments
+----------------------------------
+Rows: 2
+
+Column            | Type   | Nullable | Default   | Notes
+------------------|--------|----------|-----------|------
+id                | uuid   | NO       | gen_random_uuid()| PK
+barber_id         | uuid   | NO       | —         | FK → users.id
+customer_id       | uuid   | NO       | —         | FK → customers.id
+service_id        | uuid   | NO       | —         | FK → services.id
+created_by        | uuid   | YES      | —         | FK → users.id
+day_of_week       | text   | NO       | —         | CHECK: sunday..saturday
+time_slot         | time   | NO       | —         | HH:MM:SS
+notes             | text   | YES      | —         |
+is_active         | boolean| YES      | true      |
+created_at        | timestamptz| YES  | now()     |
+deactivated_at    | timestamptz| YES  | —         |
+last_reminder_date| date   | YES      | —         |
+
+
+4.20 TABLE: reservation_changes (Audit)
+----------------------------------------
+Rows: 708
+
+Column          | Type   | Nullable | Default | Notes
+----------------|--------|----------|---------|------
+id              | uuid   | NO       | gen_random_uuid()| PK
+reservation_id  | uuid   | YES      | —       | FK → reservations.id
+changed_by_type | text   | NO       | —       | CHECK: customer, barber, system
+changed_by_id   | uuid   | YES      | —       |
+change_type     | text   | NO       | —       | CHECK: created, updated, cancelled, completed
+old_values      | jsonb  | YES      | —       |
+new_values      | jsonb  | YES      | —       |
+reason          | text   | YES      | —       |
+ip_address      | text   | YES      | —       |
+user_agent      | text   | YES      | —       |
+created_at      | timestamptz| NO   | now()   |
+
+
+4.21 TABLE: reminder_batch_logs
+-------------------------------
+Rows: 491
+
+Column             | Type    | Nullable | Default   | Notes
+-------------------|---------|----------|-----------|------
+id                 | uuid    | NO       | gen_random_uuid()| PK
+executed_at        | timestamptz| YES   | now()     |
+duration_ms        | integer | YES      | —         |
+total_reservations | integer | YES      | —         |
+sms_sent           | integer | YES      | 0         |
+sms_failed         | integer | YES      | 0         |
+push_sent          | integer | YES      | 0         |
+push_failed        | integer | YES      | 0         |
+skipped_already_sent| integer| YES      | 0         |
+skipped_disabled   | integer | YES      | 0         |
+skipped_no_phone   | integer | YES      | 0         |
+details            | jsonb   | YES      | —         |
+trigger_source     | text    | YES      | 'netlify' |
+
+
+4.22 DATABASE RPC FUNCTIONS
+---------------------------
+
+FUNCTION: create_reservation_atomic
+  Args: p_barber_id (uuid), p_service_id (uuid), p_customer_id (uuid),
+        p_customer_name (text), p_customer_phone (text),
+        p_date_timestamp (bigint), p_time_timestamp (bigint),
+        p_day_name (text), p_day_num (text),
+        p_barber_notes (text, optional), p_max_days_ahead (int, optional)
+  Returns: uuid (new reservation ID)
+  Purpose: Atomic reservation creation with slot collision check
+
+FUNCTION: get_available_time_slots (overload 1)
+  Args: p_barber_id (uuid), p_date (text), p_service_duration (int)
+  Returns: { slot_time: time }[]
+
+FUNCTION: get_available_time_slots (overload 2)
+  Args: p_barber_id (uuid), p_date_timestamp (bigint)
+  Returns: { is_available: boolean, time_timestamp: bigint }[]
+
+TRIGGERS (auto-fire, no manual calling needed):
+  - increment_reservation_version → on reservations UPDATE
+  - log_reservation_change → on reservations INSERT/UPDATE
+  - validate_reservation_insert → on reservations INSERT
+  - validate_reservation_update → on reservations UPDATE
+  - prevent_barber_deletion → on users DELETE
+  - prevent_customer_deletion → on customers DELETE
+  - prevent_service_deletion → on services DELETE
+
+
+4.23 RLS POLICY PATTERN
+------------------------
+All tables follow this pattern:
+  - Public can SELECT (read) most tables
+  - service_role can manage (INSERT/UPDATE/DELETE) all tables
+  - Exception: users table allows public INSERT/UPDATE/DELETE where is_barber=true
+  - Exception: reminder_batch_logs requires 'authenticated' role for SELECT
+
+IMPLICATION FOR MOBILE:
+  The anon key gives read access to most data.
+  All writes must go through API routes (which use service_role internally).
+
+
+
+================================================================================
+5. API REFERENCE (ALL 47 ENDPOINTS)
+================================================================================
+
+Base URL: https://ramel-barbershop.netlify.app/api
+
+5.1 AUTHENTICATION
+------------------
+
+POST /api/sms/send-otp
+  Body: { phone: string }
+  Returns: { success: true, sessionId: string } | { error: string }
+  Purpose: Send SMS OTP via 019 provider
+  Rate limit: 20/min
+
+POST /api/sms/verify-otp
+  Body: { sessionId: string, code: string }
+  Returns: { success: true, verified: true } | { error: string }
+  Purpose: Verify SMS OTP code
+
+GET /api/sms/balance
+  Returns: { balance: number, currency: string }
+  Purpose: Check SMS credit balance (admin use)
+
+POST /api/auth/trust-device
+  Body: { customerId: string, phone: string }
+  Returns: { success: true, token: string } | { error: string }
+  Purpose: Save device as trusted (30-day token)
+
+POST /api/auth/validate-device
+  Body: { phone: string, token: string }
+  Returns: { success: true, customer: Customer } | { valid: false }
+  Purpose: Validate trusted device token → skip OTP
+
+
+5.2 CUSTOMERS
+-------------
+
+POST /api/customers/get-or-create
+  Body: { phone: string, fullname: string, smsProviderUid?: string,
+          email?: string, supabaseUid?: string }
+  Returns: { customer: Customer, isNew: boolean }
+  Purpose: Find existing customer by phone or create new one
+
+PATCH /api/customers/update
+  Body: { customerId: string, fullname?: string, email?: string }
+  Returns: { customer: Customer }
+  Purpose: Update customer profile
+
+GET /api/customers/notification-settings?customerId={uuid}
+  Returns: { settings: CustomerNotificationSettings }
+
+POST /api/customers/notification-settings
+  Body: { customerId: string, ...settings }
+  Returns: { settings: CustomerNotificationSettings }
+
+
+5.3 RESERVATIONS
+----------------
+
+POST /api/reservations/create
+  Body: {
+    barberId: string (uuid),
+    serviceId: string (uuid),
+    customerId: string (uuid),
+    customerName: string,
+    customerPhone: string,
+    dateTimestamp: number (ms, Israel TZ day start),
+    timeTimestamp: number (ms, Israel TZ slot time),
+    dayName: string (Hebrew),
+    dayNum: string
+  }
+  Returns: { success: true, reservationId: string } | { error: string, code: string }
+  Purpose: Create reservation (calls create_reservation_atomic RPC)
+  Error codes: SLOT_TAKEN, CUSTOMER_BLOCKED, MAX_BOOKINGS_REACHED, INVALID_DATE, etc.
+
+POST /api/reservations/cancel
+  Body: {
+    reservationId: string (uuid),
+    cancelledBy: 'customer' | 'barber',
+    reason?: string,
+    version?: number (optimistic locking)
+  }
+  Returns: { success: true } | { error: string, code: string }
+  Error codes: NOT_FOUND, ALREADY_CANCELLED, VERSION_CONFLICT
+
+PATCH /api/reservations/edit
+  Body: {
+    reservationId: string (uuid),
+    barberId: string (uuid),
+    serviceId?: string (uuid),
+    dateTimestamp?: number,
+    timeTimestamp?: number,
+    dayName?: string,
+    dayNum?: string,
+    version: number
+  }
+  Returns: { success: true, reservation: Reservation } | { error: string }
+  409 on version conflict
+
+
+5.4 PUSH NOTIFICATIONS
+----------------------
+
+GET /api/push/vapid-key
+  Returns: { publicKey: string }
+  Purpose: Get VAPID public key (web-push only, not needed for FCM)
+
+POST /api/push/subscribe
+  Body: {
+    subscription: { endpoint, keys: { p256dh, auth } },
+    userType: 'customer' | 'barber',
+    userId: string (uuid)
+  }
+  Returns: { success: true }
+  Purpose: Register push subscription
+  NOTE FOR MOBILE: Extend to accept { fcmToken, userType, userId, tokenType: 'fcm' }
+
+DELETE /api/push/subscribe (or POST with action: 'unsubscribe')
+  Body: { endpoint: string }
+  Purpose: Deactivate push subscription
+
+GET /api/push/status?customerId={uuid}  OR  ?barberId={uuid}
+  Returns: { subscriptions: PushSubscription[], deviceCount: number }
+
+GET /api/push/notifications?recipientType={type}&recipientId={uuid}&limit={n}
+  Returns: { notifications: NotificationLog[] }
+
+POST /api/push/mark-read
+  Body: { recipientType: 'customer'|'barber', recipientId: string }
+  Returns: { success: true, count: number }
+
+POST /api/push/notify-booking
+  Body: {
+    reservationId: string, barberId: string, customerId?: string,
+    customerName: string, barberName?: string,
+    serviceName: string, appointmentTime: number
+  }
+  Purpose: Send new booking notification to barber
+
+POST /api/push/notify-cancellation
+  Body: {
+    reservationId: string, barberId: string, customerId?: string,
+    cancelledBy: 'customer'|'barber', customerName: string,
+    barberName?: string, serviceName: string,
+    appointmentTime: number, reason?: string
+  }
+  Purpose: Send cancellation alert
+
+POST /api/push/notify-blocked-attempt
+  Body: { barberId: string, customerName: string, customerPhone: string }
+  Purpose: Alert barber of blocked customer attempt
+
+POST /api/push/request-cancel
+  Body: { reservationId: string, barberId: string, customerId: string,
+          customerName: string, serviceName: string, appointmentTime: number }
+  Purpose: Customer requests cancellation from barber (when inside min_cancel_hours)
+
+POST /api/push/send
+  Body: { recipientType, recipientId, title, body, url?, data? }
+  Purpose: Send custom notification
+
+
+5.5 BARBER MANAGEMENT
+---------------------
+
+All barber endpoints require barberId in body or query for authorization.
+Server validates barber exists in users table with is_barber=true.
+
+GET  /api/barber/services?barberId={uuid}
+POST /api/barber/services
+  Body: { barberId, action: 'create'|'update'|'delete', ...serviceData }
+
+GET  /api/barber/work-days?barberId={uuid}
+POST /api/barber/work-days
+  Body: { barberId, workDays: WorkDay[] }
+
+GET  /api/barber/closures?barberId={uuid}
+POST /api/barber/closures
+  Body: { barberId, action: 'create'|'delete', ...closureData }
+
+GET  /api/barber/shop-closures
+POST /api/barber/shop-closures
+  Body: { barberId, action: 'create'|'delete', ...closureData }
+
+GET  /api/barber/gallery?barberId={uuid}
+POST /api/barber/gallery
+  Body: { barberId, action: 'add'|'update'|'delete', ...imageData }
+
+GET  /api/barber/messages?barberId={uuid}
+POST /api/barber/messages
+  Body: { barberId, action: 'create'|'update'|'delete', ...messageData }
+
+GET  /api/barber/preferences?barberId={uuid}
+POST /api/barber/preferences
+  Body: { barberId, ...notificationSettings }
+
+GET  /api/barber/products
+POST /api/barber/products
+  Body: { barberId, action: 'create'|'update'|'delete', ...productData }
+
+GET  /api/barber/settings?barberId={uuid}
+POST /api/barber/settings
+  Body: { barberId, ...bookingSettings }
+
+GET  /api/barber/manage?barberId={uuid}
+  Returns: Full barber data for management
+
+POST /api/barbers/create
+  Body: { fullname, username, email, password, role?, ... }
+  Returns: { barber: User }
+
+GET/POST /api/breakouts
+  GET:  ?barberId={uuid}
+  POST: { barberId, action: 'create'|'deactivate', ...breakoutData }
+
+GET/POST /api/recurring
+  GET:  ?barberId={uuid}
+  POST: { barberId, action: 'create'|'delete'|'cancel_conflicts', ...data }
+
+
+5.6 OTHER
+---------
+
+GET /api/health
+  Returns: { status: 'ok', timestamp: string }
+
+POST /api/bug-report
+  Body: { error, context?, component?, userAgent?, url?, customerId?, ... }
+
+POST /api/revalidate
+  Body: { path: string, secret: string }
+  Purpose: ISR cache revalidation (web only)
+
+POST /api/cron/process-reminders
+  Headers: { Authorization: 'Bearer {CRON_SECRET}' }
+  Purpose: Process and send push reminders for today's appointments
+
+POST /api/cron/send-reminders
+  Headers: { Authorization: 'Bearer {CRON_SECRET}' }
+  Purpose: Alias for process-reminders
+
+POST /api/cron/cleanup-push
+  Headers: { Authorization: 'Bearer {CRON_SECRET}' }
+  Purpose: Clean up stale push subscriptions
+
+
+
+================================================================================
+6. BUSINESS LOGIC & ALGORITHMS
+================================================================================
+
+6.1 TIME SLOT SYSTEM
+--------------------
+- All slots are 30-minute intervals
+- SLOT_INTERVAL_MINUTES = 30
+- Timestamps are Unix milliseconds in Israel timezone (Asia/Jerusalem)
+- date_timestamp = start of day (00:00:00) in Israel TZ
+- time_timestamp = exact slot start (e.g., 10:30:00) in Israel TZ
+
+SLOT NORMALIZATION:
+  Input:  1770219042952 (17:30:42.952)
+  Output: 1770219000000 (17:30:00.000)
+  Logic: Round minute down to nearest 30 (0 or 30), zero out seconds+ms
+
+SLOT KEY FORMAT: "YYYY-MM-DD-HH-MM" (e.g., "2026-02-15-17-30")
+  Used for exact slot comparison (avoids floating-point issues)
+
+
+6.2 AVAILABILITY CHECK ORDER
+-----------------------------
+For each date, check in order:
+1. Is date in the past? → unavailable
+2. Is date beyond max_booking_days_ahead? → unavailable
+3. Is shop closed on this day? (open_days array) → unavailable
+4. Is there a barbershop_closures covering this date? → unavailable
+5. Is there a barber_closures covering this date? → unavailable
+6. Does barber work on this day? (work_days.is_working) → unavailable
+
+For each time slot on an available date:
+1. Is slot in the past (now + min_hours_before_booking)? → too soon
+2. Is there a confirmed reservation at this slot? → taken
+3. Is there a recurring appointment at this slot? → recurring (blocked)
+4. Is this slot inside a barber breakout? → breakout (blocked)
+5. Is slot within work hours? (start_time ≤ slot < end_time) → available
+
+
+6.3 BREAKOUT BLOCKING LOGIC
+----------------------------
+Three types of breakouts:
+  - single: Specific date (start_date) + time range
+  - date_range: Date range (start_date to end_date) + time range
+  - recurring: Day of week (day_of_week) + time range (no date boundaries)
+
+A slot is blocked if:
+  slot_time >= breakout.start_time AND
+  (breakout.end_time IS NULL OR slot_time < breakout.end_time)
+  AND breakout applies to the date (type-specific check)
+
+
+6.4 BOOKING FLOW (GUEST - 6 STEPS)
+------------------------------------
+1. SERVICE: Customer selects service → sets service in store
+2. DATE: Customer picks date → validates availability → sets date
+3. TIME: Customer picks slot → real-time conflict check → sets time
+4. DETAILS: Customer enters phone → findCustomerByPhone()
+   - Existing customer: welcome, auto-fill name
+   - New customer: enter name + accept privacy terms
+5. OTP: 
+   a. Check trusted device → POST /api/auth/validate-device
+   b. If valid → skip to step 6
+   c. If not → send OTP (SMS or email) → verify → create/find customer
+   d. Offer "trust this device" checkbox → POST /api/auth/trust-device
+6. CONFIRMATION: 
+   → POST /api/reservations/create
+   → POST /api/push/notify-booking (fire-and-forget)
+   → Show success animation + WhatsApp share
+
+BOOKING FLOW (LOGGED-IN - 4 STEPS)
+1. SERVICE → 2. DATE → 3. TIME → 4. CONFIRMATION (auto-creates reservation)
+
+
+6.5 ISRAEL TIMEZONE HANDLING
+-----------------------------
+CRITICAL: All date/time operations MUST use Israel timezone (Asia/Jerusalem).
+Libraries: date-fns + date-fns-tz
+
+Key functions to port:
+  - nowInIsrael() → current time in Israel
+  - timestampToIsraelDate(ms) → Israel Date from timestamp
+  - israelDateToTimestamp(y,m,d,h,min) → UTC ms from Israel local
+  - getDayKeyInIsrael(ms) → 'sunday'...'saturday'
+  - getIsraelDateString(ms) → 'YYYY-MM-DD'
+  - normalizeToSlotBoundary(ms) → normalized 30-min slot timestamp
+  - getSlotKey(ms) → 'YYYY-MM-DD-HH-MM'
+
+IMPORTANT: These functions work identically in React Native.
+           date-fns and date-fns-tz are pure JS — no native dependencies.
+
+
+
+================================================================================
+7. AUTH FLOWS (ALL METHODS)
+================================================================================
+
+7.1 CUSTOMER SMS LOGIN
+-----------------------
+Flow:
+1. User enters Israeli phone (05XXXXXXXX format)
+2. App calls POST /api/sms/send-otp { phone }
+3. Server sends OTP via 019 SMS API
+4. User enters 6-digit code
+5. App calls POST /api/sms/verify-otp { sessionId, code }
+6. On success: POST /api/customers/get-or-create { phone, fullname }
+7. Store customer session in SecureStore
+
+TEST USER (development only):
+  Phone: 0502879998 or +972502879998
+  OTP code: 123456
+
+Phone format normalization:
+  +972501234567 → 0501234567
+  972501234567 → 0501234567
+  0501234567 → 0501234567
+
+For React Native OTP auto-fill:
+  iOS: textContentType="oneTimeCode" on TextInput
+  Android: Use react-native-otp-verify or SMS Retriever API
+
+
+7.2 CUSTOMER EMAIL LOGIN (FALLBACK)
+------------------------------------
+Flow:
+1. User enters email
+2. App calls Supabase Auth: supabase.auth.signInWithOtp({ email })
+3. User enters 6-digit code from email
+4. App calls: supabase.auth.verifyOtp({ email, token, type: 'email' })
+5. On success: POST /api/customers/get-or-create { phone, fullname, email, supabaseUid }
+
+
+7.3 TRUSTED DEVICE AUTO-LOGIN
+------------------------------
+Flow:
+1. On app launch, check SecureStore for device token
+2. If token exists: POST /api/auth/validate-device { phone, token }
+3. If valid → auto-login, skip OTP entirely
+4. If invalid → clear token, show login screen
+5. After successful OTP, offer "Trust this device" toggle
+6. If trusted: POST /api/auth/trust-device { customerId, phone }
+7. Store returned token in SecureStore
+
+Token format: td_{timestamp}_{random}
+Token expiry: 30 days
+Max devices per customer: unlimited (cleanup runs via cron)
+
+
+7.4 BARBER LOGIN
+----------------
+Flow:
+1. Barber enters email + password
+2. App sends to booking service or direct check
+3. Server: find user by email → bcrypt.compare(password, hash)
+4. On success: return user object
+5. Store barber session in SecureStore
+6. Session contains: barberId, email, fullname, role (admin/barber)
+
+
+7.5 BIOMETRIC LOGIN (NEW FOR MOBILE)
+-------------------------------------
+Not in current web app. New feature for mobile.
+Flow:
+1. After first successful login, prompt: "Enable Face ID / Touch ID?"
+2. If accepted: store credentials in Keychain via expo-local-authentication
+3. On subsequent launches: check biometric → auto-login
+4. Library: expo-local-authentication
+
+Implementation:
+  - expo-local-authentication for biometric check
+  - expo-secure-store with requireAuthentication option for storing credentials
+
+
+7.6 SESSION STORAGE (Mobile Adaptation)
+----------------------------------------
+Web uses: localStorage + cookie (dual storage for resilience)
+Mobile uses: expo-secure-store (Keychain on iOS, Keystore on Android)
+
+Session keys to migrate:
+  - 'ramel_auth_session' → customer session { customerId, phone, fullname }
+  - 'ramel_barber_session' → barber session { barberId, email, fullname, role }
+  - 'rb_device_t' → trusted device token
+  - 'ramel_dev_session' → dev session (dev builds only)
+
+
+
+================================================================================
+8. PUSH NOTIFICATION SYSTEM
+================================================================================
+
+8.1 CURRENT (WEB PUSH)
+-----------------------
+Client → ServiceWorker → VAPID subscription → endpoint stored in DB
+Server → web-push library → VAPID → Browser push service → SW → notification
+
+8.2 NEW (NATIVE PUSH)
+----------------------
+Client → expo-notifications → FCM registration → FCM token stored in DB
+Server → Firebase Admin SDK → FCM → APNs (iOS) / FCM (Android) → notification
+
+8.3 DATABASE MIGRATION NEEDED
+------------------------------
+  ALTER TABLE push_subscriptions ADD COLUMN token_type TEXT DEFAULT 'web_push'
+    CHECK (token_type IN ('web_push', 'fcm'));
+  ALTER TABLE push_subscriptions ADD COLUMN fcm_token TEXT;
+
+For web subscriptions: endpoint + p256dh + auth (existing)
+For mobile subscriptions: fcm_token + token_type='fcm'
+Both can coexist — same customer on web + mobile gets both.
+
+
+8.4 SERVER-SIDE CHANGES
+------------------------
+In push-service.ts, the sendToSubscriptions() method branches:
+  - token_type = 'web_push' → use existing web-push library
+  - token_type = 'fcm' → use firebase-admin messaging.send()
+
+Everything else stays: templates, logging, badge counting, notification_logs.
+
+
+8.5 NOTIFICATION TYPES
+-----------------------
+Type                | Trigger                      | Recipient
+--------------------|------------------------------|----------
+reminder            | Cron (processReminders)      | Customer
+cancellation        | Cancel reservation           | Customer or Barber
+booking_confirmed   | New reservation              | Barber
+chat_message        | (placeholder)                | Either
+barber_broadcast    | Barber sends broadcast       | Customers
+admin_broadcast     | Admin sends broadcast        | All
+
+All templates are in Hebrew with Israel timezone formatting.
+
+
+8.6 MOBILE PUSH REGISTRATION FLOW
+----------------------------------
+1. App launch → check permission status
+2. If permission not asked:
+   - Show explainer screen first ("הפעל התראות כדי לקבל תזכורות")
+   - Then call expo-notifications requestPermissionsAsync()
+3. If granted:
+   - Get FCM token: await Notifications.getExpoPushTokenAsync() or getDevicePushTokenAsync()
+   - POST /api/push/subscribe { fcmToken, tokenType: 'fcm', userType, userId }
+4. Token refresh: listen to token change events, update server
+
+
+8.7 DEEP LINKING FROM NOTIFICATIONS
+------------------------------------
+Notification payload includes data.url field:
+  - Reminder: /my-appointments?highlight={id}
+  - Cancellation (customer): /my-appointments?highlight={id}&tab=cancelled
+  - Cancellation (barber): /barber/dashboard/reservations?highlight={id}&tab=cancelled
+  - Booking confirmed: /barber/dashboard/reservations?highlight={id}
+
+Mobile: Convert URL paths to React Navigation deep link routes.
+
+
+
+================================================================================
+9. SMS SYSTEM (019 PROVIDER)
+================================================================================
+
+Provider: 019 SMS (Israeli telecom)
+Docs: https://docs.019sms.co.il
+Auth: JWT token-based
+
+9.1 OTP FLOW
+-------------
+Send: POST https://019sms.co.il/api (with auth headers)
+  Phone format for 019: 05XXXXXXXX (no country code)
+  Source/sender name: "RamelBarber" (approved by 019)
+
+Verify: Server-side comparison of submitted code vs stored session
+
+9.2 SMS REMINDERS
+-----------------
+Template: "היי {firstName}, תזכורת לתור שלך היום בשעה: {time}. מספרת רם אל"
+Max chars: 70 (Hebrew SMS limit)
+Triggered by: cron job (processReminders)
+Currently: Only push reminders are active in cron; SMS is implemented but not wired.
+
+9.3 PHONE VALIDATION
+---------------------
+Israeli mobile regex: /^(\+972|972|0)?[0-9]{9,10}$/
+Normalization: strip non-digits, ensure starts with 05
+
+
+
+================================================================================
+10. ZUSTAND STORES (STATE MANAGEMENT)
+================================================================================
+
+All 5 stores port directly to React Native.
+Only change: replace localStorage/cookie storage with SecureStore/MMKV.
+
+10.1 useAuthStore (Customer Auth)
+---------------------------------
+State:
+  customer: Customer | null
+  isLoggedIn: boolean
+  isLoading: boolean
+  isInitialized: boolean
+  authMethod: 'phone' | 'email' | null
+
+Actions:
+  login(phone, fullname, providerUid?) → Promise<Customer | null>
+  loginWithEmail(phone, fullname, email, supabaseUid?) → Promise<Customer | null>
+  logout() → void
+  checkSession() → Promise<void>
+  refreshCustomer() → Promise<void>
+
+Mobile changes:
+  - Replace saveSessionDual/readSessionDual/clearSessionDual with SecureStore
+  - Replace cookie storage with SecureStore
+
+
+10.2 useBarberAuthStore (Barber Auth)
+-------------------------------------
+State:
+  barber: User | null
+  isLoggedIn: boolean
+  isLoading: boolean
+  isInitialized: boolean
+  isAdmin: boolean
+
+Actions:
+  login(email, password) → Promise<{ success, error? }>
+  logout() → Promise<void>
+  checkSession() → Promise<void>
+
+Mobile changes: Same as above — SecureStore instead of localStorage/cookie
+
+
+10.3 useBookingStore (Booking Wizard)
+-------------------------------------
+State:
+  step: number
+  totalSteps: number (6 guest, 4 logged-in)
+  isUserLoggedIn: boolean
+  loggedInCustomer: Customer | null
+  isFlowLocked: boolean
+  barberId: string | null
+  service: Service | null
+  date: DateSelection | null
+  timeTimestamp: number | null
+  customer: { fullname: string, phone: string }
+  otpConfirmation: OtpSession | null
+
+Actions:
+  setStep, nextStep, prevStep
+  setBarberId, setService, setDate, setTime
+  setCustomer, setOtpConfirmation
+  setLoggedInUser(customer, force?)
+  lockFlow, unlockFlow, reset
+
+Computed:
+  isStepComplete(step) → boolean
+  getActualStep() → service | date | time | details | otp | confirmation
+
+Mobile changes: None — pure state, no browser APIs.
+
+
+10.4 useDevAuthStore (Dev Only)
+-------------------------------
+Dev credentials: daniellofficial@gmail.com / daniel123
+Session key: ramel_dev_session (24h expiry)
+Include only in dev/debug builds.
+
+
+10.5 usePushStore (Push Status)
+-------------------------------
+State:
+  isSubscribed: boolean
+  permission: NotificationPermission | 'unavailable'
+  isSupported: boolean
+  deviceCount: number
+
+Mobile changes: Replace web NotificationPermission with expo-notifications permission values.
+
+
+10.6 NEW STORE: useAppStore
+----------------------------
+New for mobile:
+State:
+  isOnline: boolean
+  appState: 'active' | 'background' | 'inactive'
+  deepLinkUrl: string | null
+  hasCheckedUpdate: boolean
+
+
+
+================================================================================
+11. WHAT WILL BE REUSED
+================================================================================
+
+Asset                              | Reuse Strategy
+-----------------------------------|------------------------------------------
+Supabase database (20 tables)      | 100% — no schema changes except push_subscriptions
+Database RPC functions & triggers   | 100% — untouched
+RLS policies                        | 100% — untouched
+All API routes (47 endpoints)       | 100% — mobile calls same HTTP endpoints
+Zustand stores (5)                  | 95% — replace storage adapters
+React Query patterns                | 100% — same library, same patterns
+Zod validation schemas              | 100% — pure TypeScript
+TypeScript types (database.ts)      | 100% — copy to mobile project
+Business logic (date, slot, tz)     | 100% — pure JS functions
+Barber slug utilities               | 100% — pure JS
+SMS OTP flow                        | 100% — same API
+Email OTP flow                      | 100% — same Supabase Auth
+Supabase Realtime subscriptions     | 100% — @supabase/supabase-js works in RN
+Hebrew translations / templates     | 100% — strings are in code
+
+
+
+================================================================================
+12. WHAT WILL NOT BE MIGRATED
+================================================================================
+
+Web Asset                    | Reason
+-----------------------------|--------------------------------------------
+Next.js App Router           | Replace with Expo Router / React Navigation
+SSR / ISR / revalidate       | No server rendering; use React Query caching
+proxy.ts (rate limiter)      | Server-side only, stays on Netlify
+Service Worker (sw.js)        | No SWs in native; use native background fetch
+PWA manifest (manifest.json)  | Not applicable to native
+PWA components               | Replace with native equivalents
+  - InstallBanner            | Not needed (app is installed from store)
+  - UpdateModal              | Replace with expo-updates or CodePush
+  - PushDeniedBanner         | Redesign for native permission flow
+Web Push (VAPID client)      | Replace with FCM/APNs via expo-notifications
+Netlify build config         | Not applicable
+next.config.ts               | Not applicable
+Tailwind CSS / HeroUI        | Replace with NativeWind or StyleSheet
+Cookie-based session storage | Replace with SecureStore
+ChunkErrorBoundary           | Not applicable (no code splitting same way)
+Browser APIs (badge, share)  | Replace with native equivalents
+
+
+
+================================================================================
+13. REACT NATIVE ARCHITECTURE
+================================================================================
+
+13.1 FRAMEWORK
+--------------
+Expo SDK 52+ (managed workflow)
+  - expo-router v4 (file-based routing)
+  - EAS Build (CI/CD)
+  - EAS Submit (store submission)
+  - expo-updates (OTA updates — critical for hotfixes)
+
+13.2 PROJECT STRUCTURE
+----------------------
+ramel-barbershop-mobile/
+  app/                          # Expo Router (file-based)
+    (tabs)/                     # Bottom tab navigator
+      index.tsx                 # Home
+      appointments.tsx          # My Appointments
+      dashboard.tsx             # Barber Dashboard (conditional)
+      profile.tsx               # Profile
+    barber/
+      [slug].tsx                # Barber Profile
+      [slug]/book.tsx           # Booking Wizard
+      login.tsx                 # Barber Login
+      dashboard/                # Dashboard sub-screens
+        index.tsx               # Today's schedule
+        reservations.tsx        # All reservations
+        customers.tsx           # Customer management
+        settings.tsx            # Booking settings
+    auth/
+      login.tsx                 # Customer Login
+      otp.tsx                   # OTP Verification
+    appointment/
+      [id].tsx                  # Appointment Detail
+    products/
+      index.tsx                 # Product List
+      [id].tsx                  # Product Detail
+    legal/
+      privacy.tsx               # Privacy Policy
+      terms.tsx                 # Terms of Service
+      faq.tsx                   # FAQ
+    _layout.tsx                 # Root layout (RTL, fonts, providers)
+    +not-found.tsx              # 404 screen
+  components/                    # Shared components
+    booking/                     # Booking wizard steps
+      ServiceSelection.tsx
+      DateSelection.tsx
+      TimeSelection.tsx
+      CustomerDetails.tsx
+      OTPVerification.tsx
+      Confirmation.tsx
+      LoggedInConfirmation.tsx
+      StepIndicator.tsx
+      BlockedUserModal.tsx
+    barber/                      # Barber dashboard components
+      DashboardSidebar.tsx
+      ReservationCard.tsx
+      ScheduleTimeline.tsx
+      CustomerCard.tsx
+    profile/                     # Profile components
+      UnifiedProfilePage.tsx
+      NotificationSettings.tsx
+      BarberNotificationSettings.tsx
+      LogoutModal.tsx
+    ui/                          # Reusable UI primitives
+      BottomSheet.tsx
+      GlassCard.tsx
+      ScissorsLoader.tsx
+      ConfettiAnimation.tsx
+      SectionTitle.tsx
+      Badge.tsx
+      EmptyState.tsx
+    home/                        # Home screen sections
+      WelcomeSection.tsx
+      TeamSection.tsx
+      BarberCard.tsx
+      ProductsCarousel.tsx
+      LocationSection.tsx
+      ContactSection.tsx
+    navigation/                  # Nav helpers
+      BottomTabBar.tsx
+      HeaderBar.tsx
+  hooks/                         # Custom hooks
+    useCurrentUser.ts            # Unified auth view
+    usePushNotifications.ts      # Native push registration
+    useReservationsRealtime.ts   # Supabase realtime
+    useTimelineItems.ts          # Schedule timeline data
+    useHaptics.ts                # Native haptic feedback
+    useAppState.ts               # App lifecycle (NEW)
+    useNetworkStatus.ts          # Connectivity (NEW)
+    useBiometrics.ts             # Face ID / Touch ID (NEW)
+  lib/                           # Business logic
+    api/                         # API client
+      client.ts                  # Fetch wrapper to Netlify API
+      endpoints.ts               # Endpoint constants
+    auth/                        # Auth logic
+      barber-auth.ts             # Barber email/password
+      customer-auth.ts           # SMS/email OTP
+      biometric-auth.ts          # Biometric enrollment (NEW)
+    services/                    # Business services (adapted from web)
+      availability.service.ts
+      booking.service.ts
+      breakout.service.ts
+      customer.service.ts
+      recurring.service.ts
+      trusted-device.service.ts
+    push/                        # Native push
+      registration.ts            # FCM token registration
+      handlers.ts                # Notification tap handlers
+      permissions.ts             # Permission flow
+    sms/                         # SMS OTP
+      sms-service.ts             # OTP send/verify via API
+    storage/                     # Secure storage
+      secure-store.ts            # expo-secure-store wrapper
+      mmkv.ts                    # MMKV for non-sensitive cache
+      session.ts                 # Session management
+    supabase/                    # Supabase clients
+      client.ts                  # RN client with SecureStore adapter
+    utils/                       # Shared utilities (copied from web)
+      timezone.ts                # Israel timezone functions
+      slots.ts                   # Slot normalization
+      barber-slugs.ts            # Slug generation
+      formatting.ts              # Date/number formatting
+      hebrew.ts                  # Hebrew day names, text
+      cn.ts                      # Class name helper (for NativeWind)
+    validation/                  # Zod schemas (copied from web)
+      api-schemas.ts
+      reservation.ts
+  store/                         # Zustand stores (migrated from web)
+    useAuthStore.ts
+    useBarberAuthStore.ts
+    useBookingStore.ts
+    useDevAuthStore.ts           # Dev builds only
+    usePushStore.ts
+    useAppStore.ts               # NEW — app lifecycle state
+  types/                         # TypeScript types
+    database.ts                  # Full Supabase types (copied from web)
+    navigation.ts                # React Navigation types (NEW)
+  constants/                     # App constants
+    colors.ts                    # Theme colors from Tailwind config
+    layout.ts                    # Spacing, sizing
+    config.ts                    # App config (API base URL, etc.)
+  assets/                        # Static assets
+    fonts/                       # Rubik + Ploni
+    images/                      # Logo, branding
+    animations/                  # Lottie files (scissors loader)
+  app.json                       # Expo config
+  eas.json                       # EAS Build config
+  package.json
+  tsconfig.json
+
+
+13.3 TECH STACK
+---------------
+Concern              | Library                          | Reason
+---------------------|----------------------------------|----------------------------------
+Framework            | Expo SDK 52+                     | Managed workflow, OTA, EAS
+Routing              | Expo Router v4                   | File-based (familiar from Next.js)
+Navigation           | React Navigation 7               | Native stack, bottom tabs, modals
+State (client)       | Zustand 5                        | Same as web — direct migration
+State (server)       | TanStack React Query 5           | Same as web — direct migration
+Database client      | @supabase/supabase-js            | Same client, SecureStore adapter
+Styling              | NativeWind v4                    | Closest to current Tailwind workflow
+Animations           | react-native-reanimated 3        | 60fps native driver
+Gestures             | react-native-gesture-handler     | Swipe, pan, pinch
+Bottom sheets        | @gorhom/bottom-sheet             | Native modals replacement
+Forms                | React Hook Form + Zod            | Same validation as web
+Images               | expo-image                       | Fast, cached, placeholder
+Icons                | lucide-react-native              | Same icon set as web
+Push                 | expo-notifications + FCM         | Native push
+Secure storage       | expo-secure-store                | Token/credential storage
+Local storage        | react-native-mmkv               | High-perf key-value (replaces localStorage)
+Haptics              | expo-haptics                     | Native haptic feedback
+Calendar             | expo-calendar                    | Add-to-calendar feature
+Linking              | expo-linking                     | Deep links
+OTA updates          | expo-updates                     | Critical: no store review for hotfixes
+Splash               | expo-splash-screen               | Branded launch screen
+Font loading         | expo-font                        | Rubik + Ploni fonts
+Biometrics           | expo-local-authentication        | Face ID / Touch ID
+Maps                 | react-native-maps                | Location section
+Date formatting      | date-fns + date-fns-tz           | Same as web — Israel timezone
+Validation           | zod                              | Same as web
+Crash reporting      | @sentry/react-native             | Production monitoring
+Toast                | react-native-toast-message       | Replaces react-hot-toast
+
+
+13.4 API LAYER
+--------------
+Strategy: ALL API calls go through the same Next.js API routes hosted on Netlify.
+The mobile app is a pure client — it never runs server code.
+
+  // lib/api/client.ts
+  const API_BASE_URL = 'https://ramel-barbershop.netlify.app/api';
+
+  type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+
+  interface ApiResponse<T> {
+    data?: T;
+    error?: string;
+    status: number;
+  }
+
+  async function apiRequest<T>(
+    method: HttpMethod,
+    path: string,
+    body?: unknown,
+    params?: Record<string, string>
+  ): Promise<ApiResponse<T>> {
+    const url = new URL(`${API_BASE_URL}${path}`);
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+    }
+
+    const response = await fetch(url.toString(), {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    const data = await response.json().catch(() => null);
+    return { data, status: response.status, error: data?.error };
+  }
+
+  export const api = {
+    get: <T>(path: string, params?: Record<string, string>) =>
+      apiRequest<T>('GET', path, undefined, params),
+    post: <T>(path: string, body: unknown) =>
+      apiRequest<T>('POST', path, body),
+    patch: <T>(path: string, body: unknown) =>
+      apiRequest<T>('PATCH', path, body),
+    delete: <T>(path: string, body?: unknown) =>
+      apiRequest<T>('DELETE', path, body),
+  };
+
+Direct Supabase access for READ queries:
+  - Barbers list (users where is_barber = true)
+  - Services (by barber)
+  - Reservations (by customer or barber)
+  - Shop settings, closures, work_days
+  - Notification logs (for in-app notification list)
+  - Realtime subscriptions (reservations channel)
+
+API routes for ALL WRITE operations:
+  - POST /api/reservations/create
+  - POST /api/reservations/cancel
+  - PATCH /api/reservations/edit
+  - POST /api/sms/send-otp, /api/sms/verify-otp
+  - POST /api/auth/validate-device, /api/auth/trust-device
+  - POST /api/customers/get-or-create
+  - PATCH /api/customers/update
+  - POST /api/push/subscribe, /api/push/send, etc.
+  - All /api/barber/* management endpoints
+
+
+13.5 SUPABASE CLIENT FOR REACT NATIVE
+--------------------------------------
+  // lib/supabase/client.ts
+  import { createClient } from '@supabase/supabase-js';
+  import * as SecureStore from 'expo-secure-store';
+  import { Database } from '@/types/database';
+
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+  const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+
+  const SecureStoreAdapter = {
+    getItem: (key: string) => SecureStore.getItemAsync(key),
+    setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
+    removeItem: (key: string) => SecureStore.deleteItemAsync(key),
+  };
+
+  export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      storage: SecureStoreAdapter,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,  // No URL in mobile
+    },
+  });
+
+NOTE: The Database type is the EXACT same types/database.ts from the web project.
+Copy it directly — no changes needed.
+
+
+13.6 SESSION STORAGE MIGRATION
+------------------------------
+Web (current):
+  - localStorage + cookie dual storage
+  - Keys: ramel_auth_session (customer), ramel_barber_session (barber)
+  - rb_customer_s (cookie), rb_device_t (trusted device cookie)
+
+Mobile (new):
+  - expo-secure-store for sensitive data (sessions, tokens)
+  - react-native-mmkv for non-sensitive cache (preferences, last viewed)
+
+  Storage key mapping:
+  Web Key                 | Mobile Storage      | Mobile Key
+  ------------------------|--------------------|--------------------------
+  ramel_auth_session      | SecureStore        | ramel_auth_session
+  ramel_barber_session    | SecureStore        | ramel_barber_session
+  rb_device_t (cookie)    | SecureStore        | ramel_device_token
+  rb_customer_s (cookie)  | SecureStore        | ramel_customer_backup
+  ramel_dev_session       | MMKV               | ramel_dev_session
+
+  // lib/storage/secure-store.ts
+  import * as SecureStore from 'expo-secure-store';
+
+  export const secureStorage = {
+    get: async (key: string): Promise<string | null> => {
+      try { return await SecureStore.getItemAsync(key); }
+      catch { return null; }
+    },
+    set: async (key: string, value: string): Promise<void> => {
+      await SecureStore.setItemAsync(key, value);
+    },
+    remove: async (key: string): Promise<void> => {
+      await SecureStore.deleteItemAsync(key);
+    },
+  };
+
+  // lib/storage/mmkv.ts
+  import { MMKV } from 'react-native-mmkv';
+
+  export const mmkvStorage = new MMKV({ id: 'ramel-barbershop' });
+
+  export const cache = {
+    get: (key: string): string | undefined => mmkvStorage.getString(key),
+    set: (key: string, value: string): void => mmkvStorage.set(key, value),
+    remove: (key: string): void => mmkvStorage.delete(key),
+    getObject: <T>(key: string): T | null => {
+      const str = mmkvStorage.getString(key);
+      return str ? JSON.parse(str) : null;
+    },
+    setObject: (key: string, value: unknown): void => {
+      mmkvStorage.set(key, JSON.stringify(value));
+    },
+  };
+
+
+
+================================================================================
+14. SCREEN-BY-SCREEN SPECIFICATIONS
+================================================================================
+
+14.1 HOME SCREEN
+----------------
+Layout: Full-screen ScrollView with RefreshControl
+
+Sections (top to bottom):
+  1. Header: Shop logo + name (sticky, translucent background on scroll)
+  2. Hero: Background image with gradient overlay
+     - Hebrew tagline from barbershop_settings.hero_title
+     - Subtitle from barbershop_settings.hero_subtitle
+     - CTA button: "קבע תור" (Book Appointment)
+  3. Team Section: Horizontal FlatList of barber cards
+     - Avatar (expo-image, focal point from img_position_x/y)
+     - Name (Hebrew fullname)
+     - "קבע תור" button → navigate to barber profile
+  4. Products: Horizontal FlatList (if products exist)
+     - Product card: image, name_he, price
+     - Tap → product detail screen
+  5. Location: Map card (react-native-maps)
+     - Address from barbershop_settings.address_text
+     - Lat/lng from barbershop_settings.address_lat/lng
+     - "Navigate with Waze" button → Linking.openURL(waze_link)
+     - "Navigate with Google Maps" → Linking.openURL(google_maps_link)
+  6. Contact: Buttons for phone, WhatsApp, Instagram, Facebook
+     - Show/hide controlled by barbershop_settings.show_* flags
+     - Phone → Linking.openURL('tel:...')
+     - WhatsApp → Linking.openURL('https://wa.me/...')
+  7. Footer: Terms, Privacy, FAQ links
+
+Data fetching:
+  - React Query: barbers, shopSettings, products (staleTime: 5min)
+  - Direct Supabase queries (anon key)
+
+Pull-to-refresh: Invalidate all three queries
+
+
+14.2 BARBER PROFILE SCREEN
+---------------------------
+Layout: Stack screen with translucent header
+
+Sections:
+  1. Gallery: Full-width Animated.FlatList horizontal pager
+     - Pinch-to-zoom via react-native-gesture-handler
+     - Pagination dots
+     - Data from barber_gallery (sorted by display_order)
+     - Focal point: position_x, position_y for image positioning
+  2. Barber Info Card:
+     - Name (fullname), Instagram link
+     - Active status badge
+  3. Messages Banner (if barber_messages.is_active):
+     - Yellow alert card with message text
+  4. Services List: FlatList
+     - Cards: name_he, duration badge, price (₪)
+     - Tap → start booking with this service pre-selected
+  5. Sticky CTA: "קבע תור עכשיו" (Book Now) floating button
+
+Navigation:
+  - Back → Home tab
+  - Book → booking wizard with barberId and optional serviceId
+
+Data: React Query — barber details + services + gallery + messages
+
+
+14.3 BOOKING WIZARD
+-------------------
+Layout: Full-screen modal stack with custom step indicator
+
+Step Indicator: Horizontal bar at top showing current step (1-6 or 1-4)
+
+Step 1 — SERVICE SELECTION:
+  - FlatList of service cards
+  - Each card: name_he, duration ("30 דקות"), price ("₪50")
+  - Tap → setService + nextStep
+  - Pre-selected service: auto-advance if came from profile
+
+Step 2 — DATE SELECTION:
+  - Custom calendar component (horizontal week strips)
+  - Month/year header with prev/next arrows
+  - Day cells color-coded:
+    - Available (gold outline): bookable
+    - Today (gold ring): current day
+    - Shop closed (red X): barbershop_closures
+    - Barber closed (orange X): barber_closures
+    - Past (grey): can't book
+    - Beyond max (grey): exceeds max_booking_days_ahead
+  - Legend at bottom explaining colors
+  - Tap available day → setDate + nextStep
+  - Back button → return to barber profile (not previous step)
+
+Step 3 — TIME SELECTION:
+  - Grid layout (3 columns)
+  - Data: combine reservations + recurring + breakouts for the day
+  - Slot states:
+    - Available (gold outline + haptic on tap)
+    - Taken (grey, disabled): existing reservation
+    - Recurring (blue stripe): recurring appointment blocks slot
+    - Breakout (orange stripe): barber break
+    - Too-soon (dimmed): within min_hours_before_booking
+  - Real-time: Supabase realtime subscription for new bookings
+  - Tap available slot → setTime + nextStep + haptic feedback
+
+Step 4 — CUSTOMER DETAILS (guest only):
+  - Phone input with IL flag prefix (+972)
+  - keyboardType="phone-pad"
+  - Format mask: 05X-XXX-XXXX
+  - On submit: findCustomerByPhone
+    - Exists: "ברוך הבא חזרה, {name}" + auto-fill + next
+    - New: show name field + privacy consent checkbox → next
+
+Step 5 — OTP VERIFICATION (guest only):
+  - 6-digit code input with auto-advance between cells
+  - SMS auto-read:
+    - iOS: textContentType="oneTimeCode" (AutoFill from Messages)
+    - Android: expo-sms-retriever or manual
+  - Timer: 60s countdown before "שלח שוב" (Resend) enabled
+  - Fallback: "אמת עם אימייל" (Verify with email) button
+  - Trust device toggle: "זכור את המכשיר הזה"
+  - On verify success:
+    - getOrCreateCustomer → createReservation → POST /api/push/notify-booking
+    - Navigate to confirmation
+
+Step 6 — CONFIRMATION:
+  - Confetti animation (react-native-confetti-cannon)
+  - Booking summary card:
+    - Barber name, service, date, time
+    - Duration, price
+  - Actions:
+    - "הוסף ליומן" (Add to Calendar) → expo-calendar
+    - "שתף בוואטסאפ" (Share on WhatsApp) → Share.share()
+    - "חזור לדף הבית" (Back to Home) → navigate home
+
+LOGGED-IN CONFIRMATION (step 4 for logged-in users):
+  - Auto-triggers on mount:
+    - checkCustomerEligibility (blocked? max bookings?)
+    - If eligible: createReservation → confetti
+    - If blocked: BlockedUserModal
+  - Same confirmation UI as step 6 above
+
+
+14.4 MY APPOINTMENTS SCREEN
+----------------------------
+Layout: Screen with top tab bar (Upcoming / Past / Cancelled)
+
+Tabs implemented with @react-navigation/material-top-tabs or custom SegmentedControl
+
+Each tab: FlatList of appointment cards
+
+Appointment Card:
+  - Left: Barber avatar (small)
+  - Center: Service name, date (Hebrew), time
+  - Right: Status badge (confirmed/cancelled/completed)
+  - Swipe left actions (upcoming only):
+    - Edit (blue) → navigate to edit screen
+    - Cancel (red) → confirm bottom sheet
+
+Empty State: Illustrated empty state + "קבע תור חדש" CTA
+
+Recurring Section (above tabs if customer has recurring):
+  - Card per recurring: day_of_week_hebrew, time_slot, barber, service
+
+Deep Link Support:
+  - From push notification: ?highlight={id}&tab={tab}
+  - On mount: check route params, scroll to highlighted card, pulse animation
+
+Cancel Flow:
+  - Tap cancel or swipe → bottom sheet confirmation
+  - Check min_cancel_hours from barber_booking_settings
+  - If within window: show CancelBlockedModal (request cancel from barber)
+  - If allowed: call cancelReservation → POST /api/push/notify-cancellation
+
+Edit Flow:
+  - Navigate to edit screen with reservation data
+  - Pick new date + time (same calendar/time UI as booking)
+  - Call editReservation → handle 409 conflicts
+
+
+14.5 PROFILE SCREEN
+--------------------
+Layout: ScrollView
+
+Sections:
+  1. Avatar Area: Generated initials circle (first letter of name)
+  2. Info Card:
+     - Name (tap to edit → inline TextInput)
+     - Phone (read-only)
+     - Email (if exists, read-only)
+     - Role badge: "לקוח" or "ספר"
+  3. Stats: Join date, total appointments count
+  4. Notification Settings:
+     - Push notifications toggle
+     - Reminder toggle
+     - Reminder method: SMS / Push / Both / None (bottom sheet picker)
+     - Cancellation alerts toggle
+  5. Actions:
+     - "התורים שלי" (My Appointments) → navigate
+     - "התנתק" (Logout) → LogoutModal
+
+Barber Variant (when useBarberAuthStore.isLoggedIn):
+  - Additional "לוח בקרה" (Dashboard) link
+  - Barber notification settings (notify_on_new_booking, etc.)
+  - Password change option
+
+
+14.6 BARBER DASHBOARD (Mobile — Simplified)
+--------------------------------------------
+Layout: Stack navigator from dashboard tab
+
+TODAY VIEW (main screen):
+  - Header: "לוח בקרה — {barber name}" + date
+  - Stats row: Total today, completed, remaining, next appointment
+  - Timeline: Vertical FlatList of today's appointments
+    - Time column (left)
+    - Appointment card (right): customer name, service, phone
+    - Breakout slots shown as break indicators
+    - Empty slots shown as available
+  - FAB (Floating Action Button): Quick actions bottom sheet
+
+QUICK ACTIONS (bottom sheet):
+  - "הוסף הפסקה" (Add Breakout)
+  - "הוסף סגירה" (Add Closure)
+  - "שלח הודעה ללקוחות" (Broadcast)
+  - "צפה בכל התורים" (View All Reservations)
+
+RESERVATIONS LIST:
+  - Date picker at top (horizontal date scroll)
+  - FlatList of reservation cards for selected date
+  - Search by customer name/phone
+  - Status filter (confirmed/cancelled/all)
+
+CUSTOMER MANAGEMENT:
+  - Search bar
+  - FlatList: name, phone, total bookings, last visit
+  - Tap → customer detail (booking history)
+  - Long press → block/unblock bottom sheet
+
+SETTINGS:
+  - Booking rules: max_booking_days_ahead, min_hours_before_booking, min_cancel_hours
+  - Notification preferences
+  - Profile (name, image, password)
+
+
+14.7 LOGIN SCREEN
+-----------------
+Layout: Full screen with gradient background
+
+Flow:
+  1. Phone input with Israeli format mask
+  2. "המשך" (Continue) button
+  3. Check for trusted device → if valid, auto-login
+  4. Otherwise → navigate to OTP screen
+  5. Toggle: "אמת עם אימייל" (Verify with email) alternative
+
+Barber Login (separate screen):
+  - Email + password fields
+  - "התחבר" (Login) button
+  - Error messages in Hebrew
+
+
+
+================================================================================
+15. NAVIGATION STRUCTURE
+================================================================================
+
+15.1 ROOT NAVIGATOR
+--------------------
+Stack.Navigator (native stack)
+  ├── (tabs)              # Bottom tab navigator (main app)
+  ├── barber/[slug]       # Barber profile (modal presentation)
+  ├── barber/[slug]/book  # Booking wizard (full screen modal)
+  ├── auth/login          # Customer login
+  ├── auth/otp            # OTP verification
+  ├── barber/login        # Barber login
+  ├── appointment/[id]    # Appointment detail (modal)
+  ├── products/[id]       # Product detail (modal)
+  └── legal/*             # Legal screens
+
+
+15.2 BOTTOM TABS
+-----------------
+Customer tabs:
+  Tab 1: Home        → HomeScreen         (icon: Home)
+  Tab 2: Search      → BarberListScreen   (icon: Search)
+  Tab 3: Appointments→ MyAppointmentsScreen (icon: Calendar, badge: upcoming count)
+  Tab 4: Profile     → ProfileScreen      (icon: User, badge: notification dot)
+
+Barber tabs:
+  Tab 1: Home        → HomeScreen         (icon: Home)
+  Tab 2: Dashboard   → DashboardScreen    (icon: LayoutDashboard)
+  Tab 3: Reservations→ ReservationsScreen (icon: Calendar, badge: today count)
+  Tab 4: Profile     → BarberProfileScreen (icon: User)
+
+Guest tabs (not logged in):
+  Tab 1: Home        → HomeScreen         (icon: Home)
+  Tab 2: Search      → BarberListScreen   (icon: Search)
+  Tab 3: Appointments→ MyAppointmentsScreen (icon: Calendar) → shows login prompt
+  Tab 4: Login       → LoginScreen        (icon: LogIn)
+
+
+15.3 DEEP LINK ROUTES
+----------------------
+Scheme: ramelbarbershop://
+
+Route                                  | Screen
+---------------------------------------|----------------------------
+ramelbarbershop://home                 | Home tab
+ramelbarbershop://barber/{slug}        | Barber Profile
+ramelbarbershop://barber/{slug}/book   | Booking Wizard
+ramelbarbershop://appointments         | My Appointments
+ramelbarbershop://appointments?id={id} | Appointment highlight
+ramelbarbershop://profile              | Profile
+ramelbarbershop://dashboard            | Barber Dashboard
+
+Universal links (web → app):
+  https://ramel-barbershop.netlify.app/barber/{slug} → barber profile
+  https://ramel-barbershop.netlify.app/my-appointments → appointments
+
+
+
+================================================================================
+16. UX/UI ADAPTATION
+================================================================================
+
+16.1 RTL SETUP
+--------------
+  // In app/_layout.tsx (root layout, runs once)
+  import { I18nManager } from 'react-native';
+
+  if (!I18nManager.isRTL) {
+    I18nManager.allowRTL(true);
+    I18nManager.forceRTL(true);
+    // App will restart to apply RTL
+  }
+
+All navigation animations are RTL-aware when forceRTL is set.
+React Navigation handles back gesture direction automatically.
+
+
+16.2 THEME COLORS
+-----------------
+From current Tailwind config → React Native constants:
+
+  // constants/colors.ts
+  export const Colors = {
+    // Base
+    background: '#080b0d',
+    foreground: '#e8e4dc',
+    card: '#0f1318',
+    cardBorder: 'rgba(201, 169, 110, 0.15)',
+
+    // Accent
+    gold: '#c9a96e',
+    goldDim: 'rgba(201, 169, 110, 0.6)',
+    goldSubtle: 'rgba(201, 169, 110, 0.15)',
+
+    // Status
+    success: '#22c55e',
+    error: '#ef4444',
+    warning: '#f59e0b',
+    info: '#3b82f6',
+
+    // Text
+    textPrimary: '#e8e4dc',
+    textSecondary: 'rgba(232, 228, 220, 0.7)',
+    textMuted: 'rgba(232, 228, 220, 0.4)',
+
+    // Surface
+    surface: 'rgba(255, 255, 255, 0.03)',
+    surfaceHover: 'rgba(255, 255, 255, 0.06)',
+    overlay: 'rgba(0, 0, 0, 0.6)',
+  } as const;
+
+
+16.3 FONTS
+----------
+  // Load in app/_layout.tsx
+  import { useFonts } from 'expo-font';
+
+  const [fontsLoaded] = useFonts({
+    'Rubik-Regular': require('@/assets/fonts/Rubik-Regular.ttf'),
+    'Rubik-Medium': require('@/assets/fonts/Rubik-Medium.ttf'),
+    'Rubik-Bold': require('@/assets/fonts/Rubik-Bold.ttf'),
+    'Rubik-SemiBold': require('@/assets/fonts/Rubik-SemiBold.ttf'),
+    'Ploni-Regular': require('@/assets/fonts/ploni-regular.otf'),
+    'Ploni-Light': require('@/assets/fonts/ploni-light.otf'),
+    'Ploni-UltraLight': require('@/assets/fonts/ploni-ultralight.otf'),
+  });
+
+  // Keep splash screen visible until fonts loaded
+  if (!fontsLoaded) return null; // or <SplashScreen />
+
+
+16.4 GESTURE SUPPORT
+--------------------
+Gesture                    | Action
+---------------------------|-------------------------------
+Swipe back (RTL-adjusted)  | Go back in stack navigator
+Swipe on appointment card  | Reveal cancel/edit actions
+Long press on time slot    | Show slot details
+Pull down                  | Refresh data (RefreshControl)
+Swipe on gallery           | Native horizontal pager
+Pinch on gallery image     | Zoom (react-native-gesture-handler)
+Pan on calendar            | Scroll months
+
+
+16.5 NATIVE COMPONENT MAPPING
+------------------------------
+Web (HeroUI / HTML)          | Native Replacement
+-----------------------------|-------------------------------------
+HeroUI Modal                 | @gorhom/bottom-sheet
+HeroUI Input                 | React Native TextInput + custom styling
+HeroUI Button                | Pressable + Animated + haptic
+HeroUI Tabs                  | Material Top Tabs or SegmentedControl
+HeroUI Select                | Bottom sheet picker
+react-hot-toast              | react-native-toast-message
+HTML <img>                   | expo-image (cached, placeholder)
+CSS animations               | react-native-reanimated
+CSS transitions              | LayoutAnimation or Reanimated
+Service Worker badge         | expo-notifications badge count
+navigator.share()            | Share.share() (React Native)
+navigator.vibrate()          | expo-haptics
+window.open()                | Linking.openURL()
+window.scrollTo()            | ScrollView.scrollTo() or FlatList
+
+
+16.6 SAFE AREA
+--------------
+  import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+
+  // Wrap entire app in SafeAreaProvider (in _layout.tsx)
+  // Use SafeAreaView or useSafeAreaInsets() in screens
+
+  Supported devices:
+  - iPhone SE (375pt) → iPhone 16 Pro Max (430pt)
+  - Android phones: various densities (hdpi → xxxhdpi)
+  - No tablet optimization in MVP
+
+
+16.7 KEYBOARD HANDLING
+----------------------
+  - KeyboardAvoidingView wrapping all form screens
+  - behavior="padding" on iOS, behavior="height" on Android
+  - Phone input: keyboardType="phone-pad"
+  - OTP input: keyboardType="number-pad"
+  - Text inputs: keyboardType="default"
+  - Dismiss keyboard on tap outside: TouchableWithoutFeedback + Keyboard.dismiss()
+
+
+
+================================================================================
+17. NATIVE-SPECIFIC FEATURES (New)
+================================================================================
+
+17.1 NATIVE PUSH NOTIFICATIONS
+-------------------------------
+Replace web push entirely.
+
+Flow:
+  1. App start → check permission status
+  2. If 'undetermined': request on first login or booking completion
+  3. Get Expo push token or FCM token
+  4. POST /api/push/subscribe with:
+     {
+       subscription: {
+         endpoint: 'expo://{token}' or 'fcm://{token}',
+         keys: { p256dh: 'native', auth: 'native' }
+       },
+       userType: 'customer' | 'barber',
+       userId: string,
+       // NEW fields for mobile:
+       tokenType: 'fcm',       // or 'expo'
+       fcmToken: string,
+       platform: 'ios' | 'android'
+     }
+
+Database migration needed:
+  ALTER TABLE push_subscriptions ADD COLUMN token_type TEXT DEFAULT 'web_push'
+    CHECK (token_type IN ('web_push', 'fcm', 'expo'));
+  ALTER TABLE push_subscriptions ADD COLUMN fcm_token TEXT;
+  ALTER TABLE push_subscriptions ADD COLUMN platform TEXT
+    CHECK (platform IN ('web', 'ios', 'android'));
+
+Server changes needed (on Netlify API):
+  - lib/push/push-service.ts: Add FCM sender
+  - sendToSubscriptions(): branch on token_type
+    - 'web_push' → existing web-push library
+    - 'fcm' → firebase-admin messaging.send()
+  - Install firebase-admin on Netlify
+
+Notification handlers (client):
+  // lib/push/handlers.ts
+  import * as Notifications from 'expo-notifications';
+
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+
+  // Handle tap on notification
+  const subscription = Notifications.addNotificationResponseReceivedListener(
+    (response) => {
+      const data = response.notification.request.content.data;
+      const url = data?.url as string;
+      if (url) {
+        // Navigate using expo-router
+        router.push(url);
+      }
+    }
+  );
+
+
+17.2 BIOMETRIC AUTH
+-------------------
+  import * as LocalAuthentication from 'expo-local-authentication';
+
+  Flow:
+  1. After first successful login → prompt "הפעל כניסה ביומטרית?"
+  2. If accepted → store session in SecureStore with biometric protection
+  3. On next app open → check biometric → auto-login
+
+  Implementation:
+  const handleBiometricEnroll = async () => {
+    const hasHardware = await LocalAuthentication.hasHardwareAsync();
+    const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+    if (!hasHardware || !isEnrolled) return false;
+
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: 'אמת את הזהות שלך',
+      fallbackLabel: 'השתמש בקוד',
+      disableDeviceFallback: false,
+    });
+
+    if (result.success) {
+      // Store session flag for biometric login
+      await secureStorage.set('ramel_biometric_enabled', 'true');
+      return true;
+    }
+    return false;
+  };
+
+
+17.3 OFFLINE MODE
+-----------------
+Strategy: React Query persistence + MMKV
+
+  // In app/_layout.tsx
+  import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
+  import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+  import { mmkvStorage } from '@/lib/storage/mmkv';
+
+  const persister = createAsyncStoragePersister({
+    storage: {
+      getItem: (key) => mmkvStorage.getString(key) ?? null,
+      setItem: (key, value) => mmkvStorage.set(key, value),
+      removeItem: (key) => mmkvStorage.delete(key),
+    },
+  });
+
+  // Wrap app:
+  <PersistQueryClientProvider
+    client={queryClient}
+    persistOptions={{ persister, maxAge: 1000 * 60 * 60 * 24 }} // 24h
+  >
+
+What works offline:
+  - Browse barbers (cached)
+  - Browse services (cached)
+  - View upcoming appointments (cached)
+  - View profile (cached)
+
+What requires online:
+  - Create/cancel/edit bookings (show "no connection" message)
+  - OTP verification
+  - Push subscription management
+
+Network detection:
+  // hooks/useNetworkStatus.ts
+  import NetInfo from '@react-native-community/netinfo';
+
+  export const useNetworkStatus = () => {
+    const [isOnline, setIsOnline] = useState(true);
+    useEffect(() => {
+      const unsub = NetInfo.addEventListener(state => {
+        setIsOnline(state.isConnected ?? true);
+      });
+      return unsub;
+    }, []);
+    return isOnline;
+  };
+
+
+17.4 APP STATE HANDLING
+-----------------------
+  import { AppState } from 'react-native';
+
+  // In AuthProvider or root layout:
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        // App came to foreground
+        // Re-check auth session validity
+        // Refresh push subscription status
+        // Sync data
+      }
+    });
+    return () => subscription.remove();
+  }, []);
+
+
+17.5 OTA UPDATES
+----------------
+  import * as Updates from 'expo-updates';
+
+  // Check on app launch:
+  const checkForUpdate = async () => {
+    if (__DEV__) return;
+    try {
+      const update = await Updates.checkForUpdateAsync();
+      if (update.isAvailable) {
+        await Updates.fetchUpdateAsync();
+        // Show modal: "עדכון חדש זמין. להפעיל מחדש?"
+        // On confirm:
+        await Updates.reloadAsync();
+      }
+    } catch (e) {
+      console.error('Update check failed:', e);
+    }
+  };
+
+CRITICAL: OTA allows hotfixes without waiting for store review (3-7 days).
+Use for: bug fixes, text changes, layout fixes.
+NOT for: native module changes, new permissions.
+
+
+17.6 CALENDAR INTEGRATION
+--------------------------
+  import * as Calendar from 'expo-calendar';
+
+  const addToCalendar = async (reservation: ReservationWithDetails) => {
+    const { status } = await Calendar.requestCalendarPermissionsAsync();
+    if (status !== 'granted') return;
+
+    const calendars = await Calendar.getCalendarsAsync();
+    const defaultCalendar = calendars.find(c => c.isPrimary) || calendars[0];
+
+    const israelDate = timestampToIsraelDate(reservation.time_timestamp);
+    const endDate = new Date(israelDate.getTime() + (service.duration * 60 * 1000));
+
+    await Calendar.createEventAsync(defaultCalendar.id, {
+      title: `תור ב${shopName} - ${service.name_he}`,
+      startDate: israelDate,
+      endDate,
+      location: shopAddress,
+      notes: `ספר: ${barberName}\nשירות: ${service.name_he}\nמחיר: ₪${service.price}`,
+      alarms: [{ relativeOffset: -60 }], // Remind 1 hour before
+    });
+  };
+
+
+
+================================================================================
+18. INFRASTRUCTURE CHANGES
+================================================================================
+
+18.1 WHAT STAYS
+---------------
+Infrastructure              | Status
+----------------------------|--------
+Supabase project            | KEEP — same database, same project
+Netlify hosting             | KEEP — serves API routes (web version optional)
+Netlify scheduled functions | KEEP — reminder cron unchanged
+Vercel cron                 | KEEP — backup cron unchanged
+019 SMS API                 | KEEP — same OTP + reminders
+Resend email                | KEEP — bug reports
+
+18.2 WHAT IS NEW
+-----------------
+Infrastructure              | Purpose
+----------------------------|-------------------------------------------
+Firebase project (new)      | FCM for native push notifications
+EAS Build                   | CI/CD for iOS/Android builds
+EAS Submit                  | App Store / Play Store submission
+Apple Developer Account     | $99/year — iOS distribution
+Google Play Console         | $25 one-time — Android distribution
+TestFlight                  | iOS beta testing
+Sentry                      | Crash reporting + performance monitoring
+
+18.3 FIREBASE SETUP (for FCM only)
+-----------------------------------
+  1. Create Firebase project: "ramel-barbershop-mobile"
+  2. Add iOS app: bundle ID "com.ramelbarbershop.app"
+  3. Add Android app: package "com.ramelbarbershop.app"
+  4. Download GoogleService-Info.plist (iOS) and google-services.json (Android)
+  5. Place in project root (Expo handles them via app.json)
+  6. Server-side: install firebase-admin on Netlify, add service account key to env
+
+  Server env additions (Netlify):
+    FIREBASE_SERVICE_ACCOUNT_JSON=<base64 encoded service account>
+
+  // On server (lib/push/fcm-sender.ts):
+  import * as admin from 'firebase-admin';
+
+  if (!admin.apps.length) {
+    const serviceAccount = JSON.parse(
+      Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_JSON!, 'base64').toString()
+    );
+    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+  }
+
+  export async function sendFcmNotification(
+    token: string,
+    payload: NotificationPayload
+  ): Promise<boolean> {
+    try {
+      await admin.messaging().send({
+        token,
+        notification: { title: payload.title, body: payload.body },
+        data: {
+          url: payload.url || '',
+          type: payload.data?.type as string || '',
+          reservationId: payload.data?.reservationId as string || '',
+        },
+        android: {
+          priority: 'high',
+          notification: {
+            channelId: 'appointments',
+            sound: 'default',
+          },
+        },
+        apns: {
+          payload: {
+            aps: {
+              badge: payload.badgeCount || 0,
+              sound: 'default',
+              'mutable-content': 1,
+            },
+          },
+        },
+      });
+      return true;
+    } catch (error) {
+      console.error('[FCM] Send failed:', error);
+      return false;
+    }
+  }
+
+
+18.4 EXPO CONFIGURATION
+------------------------
+  // app.json
+  {
+    "expo": {
+      "name": "רם אל ברברשופ",
+      "slug": "ramel-barbershop",
+      "version": "1.0.0",
+      "orientation": "portrait",
+      "icon": "./assets/images/icon.png",
+      "scheme": "ramelbarbershop",
+      "userInterfaceStyle": "dark",
+      "splash": {
+        "image": "./assets/images/splash.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#080b0d"
+      },
+      "ios": {
+        "supportsTablet": false,
+        "bundleIdentifier": "com.ramelbarbershop.app",
+        "infoPlist": {
+          "NSCalendarsUsageDescription": "כדי להוסיף תורים ליומן שלך",
+          "NSFaceIDUsageDescription": "כדי להתחבר בקלות עם Face ID",
+          "CFBundleLocalizations": ["he"],
+          "CFBundleDevelopmentRegion": "he"
+        },
+        "googleServicesFile": "./GoogleService-Info.plist"
+      },
+      "android": {
+        "adaptiveIcon": {
+          "foregroundImage": "./assets/images/adaptive-icon.png",
+          "backgroundColor": "#080b0d"
+        },
+        "package": "com.ramelbarbershop.app",
+        "googleServicesFile": "./google-services.json",
+        "permissions": [
+          "NOTIFICATIONS",
+          "VIBRATE",
+          "READ_CALENDAR",
+          "WRITE_CALENDAR"
+        ]
+      },
+      "plugins": [
+        "expo-router",
+        "expo-secure-store",
+        "expo-notifications",
+        "expo-local-authentication",
+        "expo-calendar",
+        [
+          "expo-updates",
+          { "username": "ramelbarbershop" }
+        ]
+      ],
+      "extra": {
+        "eas": { "projectId": "<eas-project-id>" }
+      },
+      "updates": {
+        "url": "https://u.expo.dev/<eas-project-id>"
+      },
+      "runtimeVersion": { "policy": "appVersion" }
+    }
+  }
+
+  // eas.json
+  {
+    "cli": { "version": ">= 12.0.0" },
+    "build": {
+      "development": {
+        "developmentClient": true,
+        "distribution": "internal"
+      },
+      "preview": {
+        "distribution": "internal"
+      },
+      "production": {
+        "autoIncrement": true
+      }
+    },
+    "submit": {
+      "production": {
+        "ios": {
+          "appleId": "<apple-id>",
+          "ascAppId": "<app-store-connect-app-id>",
+          "appleTeamId": "<team-id>"
+        },
+        "android": {
+          "serviceAccountKeyPath": "./play-store-key.json"
+        }
+      }
+    }
+  }
+
+
+
+================================================================================
+19. APP STORE & PLAY STORE REQUIREMENTS
+================================================================================
+
+19.1 APPLE APP STORE
+--------------------
+Requirement                    | Status
+-------------------------------|--------
+Apple Developer Account        | NEEDED — $99/year
+App name: "רם אל ברברשופ"     | Hebrew allowed
+Subtitle: "Ramel Barbershop"   | English subtitle for searchability
+Privacy policy URL             | EXISTS: https://ramel-barbershop.netlify.app/privacy-policy
+App icons (1024x1024)          | EXISTS: public/assets/branding/logo-1024.png
+Screenshots (6.7", 6.5")      | NEEDED — design before submission
+App description (HE + EN)     | NEEDED
+Age rating                     | 4+ (no objectionable content)
+App Tracking Transparency      | NOT NEEDED — no tracking/ads
+In-app purchases               | NONE
+Data collection disclosure     | Phone number, name, email (optional)
+
+19.2 GOOGLE PLAY STORE
+-----------------------
+Requirement                    | Status
+-------------------------------|--------
+Google Play Console            | NEEDED — $25 one-time
+App name: "רם אל ברברשופ"     | Hebrew allowed
+Privacy policy URL             | EXISTS
+Feature graphic (1024x500)     | NEEDED
+Screenshots                    | NEEDED
+Content rating (IARC)          | Everyone
+Data safety form               | Phone number, name, email (optional)
+Target API level               | API 34+ (Android 14)
+
+19.3 COMPLIANCE CHECKLIST
+--------------------------
+[x] Privacy policy exists
+[x] Terms of service exists
+[ ] Data deletion mechanism (add in-app "Delete my account" option)
+[x] No payment processing (no IAP)
+[ ] Accessibility statement for mobile
+[ ] App Store screenshots (HE)
+[ ] Play Store feature graphic
+
+
+
+================================================================================
+20. IMPLEMENTATION PLAN (PHASED)
+================================================================================
+
+PHASE 1 — FOUNDATION (Week 1-2)
+---------------------------------
+Tasks:
+  [ ] Create Expo project: npx create-expo-app ramel-barbershop-mobile -t tabs
+  [ ] Install all dependencies (see tech stack section 13.3)
+  [ ] Set up NativeWind v4 with color constants
+  [ ] Configure RTL (I18nManager.forceRTL)
+  [ ] Load fonts (Rubik + Ploni)
+  [ ] Set up Supabase client with SecureStore adapter
+  [ ] Create API client (lib/api/client.ts)
+  [ ] Copy types/database.ts from web project
+  [ ] Copy utility functions (timezone.ts, slots.ts, barber-slugs.ts, formatting.ts)
+  [ ] Copy Zod validation schemas
+  [ ] Set up Zustand stores (migrate 5 stores + add useAppStore)
+  [ ] Configure React Query with MMKV persistence
+  [ ] Set up navigation skeleton (bottom tabs + stacks)
+  [ ] Configure Sentry for crash reporting
+  [ ] Create .env with EXPO_PUBLIC_* variables
+
+Deliverable: App opens, shows bottom tabs, connects to Supabase
+
+PHASE 2 — CORE CUSTOMER SCREENS (Week 3-4)
+---------------------------------------------
+Tasks:
+  [ ] Home screen (hero, barbers, products, location, contact)
+  [ ] Barber profile screen (gallery, services, messages)
+  [ ] Login screen (phone input, format mask)
+  [ ] OTP verification screen (6-digit input, SMS auto-read)
+  [ ] Auth flow: SMS OTP via 019 (same API)
+  [ ] Auth flow: Email OTP via Supabase Auth
+  [ ] Trusted device validation on login
+  [ ] Profile screen (view, edit name, stats)
+  [ ] My appointments screen (tabs, list, detail)
+  [ ] Product screens (list, detail)
+  [ ] Legal screens (privacy, terms, FAQ)
+
+Deliverable: Full customer journey works end-to-end (browse → login → view profile)
+
+PHASE 3 — BOOKING + PUSH (Week 5-6)
+--------------------------------------
+Tasks:
+  [ ] Booking wizard: service selection
+  [ ] Booking wizard: date selection (calendar component)
+  [ ] Booking wizard: time selection (grid, real-time)
+  [ ] Booking wizard: customer details (guest)
+  [ ] Booking wizard: OTP verification (guest)
+  [ ] Booking wizard: confirmation (logged-in + guest)
+  [ ] Confetti animation on booking success
+  [ ] Cancel reservation flow (with min_cancel_hours check)
+  [ ] Edit reservation flow (reschedule)
+  [ ] Set up Firebase project for FCM
+  [ ] Implement expo-notifications registration
+  [ ] POST push tokens to /api/push/subscribe (new token_type)
+  [ ] Server: Add FCM sender to push-service.ts (Netlify)
+  [ ] DB migration: Add token_type, fcm_token, platform to push_subscriptions
+  [ ] Deep linking from notifications → correct screen
+  [ ] Supabase realtime for booking conflicts
+
+Deliverable: Complete booking flow + native push notifications working
+
+PHASE 4 — BARBER DASHBOARD (Week 7-8)
+---------------------------------------
+Tasks:
+  [ ] Barber login screen (email/password)
+  [ ] Dashboard today view (timeline)
+  [ ] Reservations list (date picker, search, filter)
+  [ ] Customer management (search, block/unblock)
+  [ ] Quick actions (breakout, closure, broadcast)
+  [ ] Booking settings management
+  [ ] Barber notification settings
+
+Deliverable: Barbers can manage their day from the phone
+
+PHASE 5 — POLISH (Week 9-10)
+------------------------------
+Tasks:
+  [ ] Biometric auth enrollment (Face ID / Touch ID)
+  [ ] Calendar integration (add-to-calendar)
+  [ ] Offline mode (React Query persistence)
+  [ ] OTA updates setup (expo-updates)
+  [ ] Animations (screen transitions, list animations)
+  [ ] Loading states (skeleton placeholders)
+  [ ] Error boundaries (ErrorBoundary component)
+  [ ] Haptic feedback on interactions
+  [ ] Dark mode refinement
+  [ ] Accessibility audit (screen reader, dynamic type)
+  [ ] Performance profiling (hermes, list optimization)
+  [ ] Network status handling (online/offline banner)
+
+Deliverable: Polished, production-quality app
+
+PHASE 6 — BETA TESTING (Week 11-12)
+-------------------------------------
+Tasks:
+  [ ] Build via EAS: eas build --platform all --profile preview
+  [ ] iOS: TestFlight distribution to barber team
+  [ ] Android: Google Play Internal Testing track
+  [ ] Bug fixing based on tester feedback
+  [ ] Performance testing on low-end devices
+  [ ] RTL layout verification on multiple devices
+  [ ] Push notification delivery testing (iOS + Android)
+  [ ] Edge case testing (offline, background, multi-device)
+
+Deliverable: Stable beta with real-user feedback
+
+PHASE 7 — STORE SUBMISSION (Week 13-14)
+-----------------------------------------
+Tasks:
+  [ ] Create App Store screenshots (HE, multiple device sizes)
+  [ ] Create Play Store feature graphic + screenshots
+  [ ] Write app descriptions (Hebrew + English)
+  [ ] Complete Apple data collection disclosure
+  [ ] Complete Google Play data safety form
+  [ ] Add "Delete my account" feature (store requirement)
+  [ ] Final build: eas build --platform all --profile production
+  [ ] Submit iOS: eas submit --platform ios
+  [ ] Submit Android: eas submit --platform android
+  [ ] Monitor review process
+  [ ] Address any rejections
+
+Deliverable: App live on App Store + Play Store
+
+
+
+================================================================================
+21. VALIDATION SCHEMAS (Zod — Copy from Web)
+================================================================================
+
+These schemas are PURE TypeScript and work identically in React Native.
+Copy lib/validation/api-schemas.ts directly into the mobile project.
+
+Key schemas:
+
+  UUIDSchema = z.string().uuid()
+  PhoneSchema = z.string().regex(/^(\+972|972|0)?[0-9]{9,10}$/)
+  TimestampSchema = z.number().int().positive()
+
+  CreateReservationSchema = z.object({
+    barberId: UUIDSchema,
+    serviceId: UUIDSchema,
+    customerId: UUIDSchema,
+    customerName: z.string().min(2).max(100),
+    customerPhone: PhoneSchema,
+    dateTimestamp: TimestampSchema,
+    timeTimestamp: TimestampSchema,
+    dayName: z.string().min(1),
+    dayNum: z.string().min(1),
+  })
+
+  CancelReservationSchema = z.object({
+    reservationId: UUIDSchema,
+    cancelledBy: z.enum(['customer', 'barber']),
+    reason: z.string().max(500).optional(),
+    version: z.number().int().positive().optional(),
+  })
+
+  PushSubscriptionSchema = z.object({
+    subscription: z.object({
+      endpoint: z.string().url(),
+      keys: z.object({ p256dh: z.string(), auth: z.string() }),
+    }),
+    userType: z.enum(['customer', 'barber']),
+    userId: UUIDSchema,
+  })
+
+  CustomerAuthSchema = z.object({
+    phone: PhoneSchema,
+    fullname: z.string().min(2).max(100),
+    smsProviderUid: z.string().optional(),
+  })
+
+Full file: see web project lib/validation/api-schemas.ts (copy as-is)
+
+
+
+================================================================================
+22. UTILITY FUNCTIONS (Critical — Copy from Web)
+================================================================================
+
+22.1 TIMEZONE UTILITIES (lib/utils/timezone.ts)
+-------------------------------------------------
+These are PURE JS functions. Copy exactly from web project.
+
+  ISRAEL_TIMEZONE = 'Asia/Jerusalem'
+
+  Key functions:
+  - nowInIsrael() → Date in Israel timezone
+  - timestampToIsraelDate(ts) → Date from timestamp in Israel TZ
+  - israelDateToTimestamp(y, m, d, h?, min?) → UTC ms from Israel local
+  - getIsraelDayStart(date) → start of day timestamp
+  - getIsraelDayEnd(date) → end of day timestamp
+  - getDayKeyInIsrael(ts) → 'sunday' | 'monday' | ...
+  - isTodayInIsrael(ts) → boolean
+  - getIsraelDateString(ts) → 'YYYY-MM-DD'
+  - isSameDayInIsrael(ts1, ts2) → boolean
+
+  Dependencies: date-fns, date-fns-tz (install in mobile project)
+
+
+22.2 SLOT UTILITIES (lib/utils/slots.ts)
+------------------------------------------
+  SLOT_INTERVAL_MINUTES = 30
+  SLOT_INTERVAL_MS = 30 * 60 * 1000
+
+  Key functions:
+  - normalizeToSlotBoundary(ts) → normalized timestamp at slot start
+  - getSlotKey(ts) → 'YYYY-MM-DD-HH-MM' string for comparison
+  - isSameSlot(ts1, ts2) → boolean
+  - normalizeTimestampFormat(ts) → ensure milliseconds
+
+  Dependencies: timezone.ts (above)
+
+
+22.3 BARBER SLUG UTILITIES (lib/utils/barber-slugs.ts)
+-------------------------------------------------------
+  Key functions:
+  - generateSlugFromName(name) → URL-safe slug (Hebrew transliteration)
+  - generateSlugFromEnglishName(nameEn) → 'firstname.lastname'
+  - isValidUUID(str) → boolean
+  - isValidSlug(str) → boolean
+  - getPreferredBarberSlug(nameEn, username) → preferred slug
+  - buildBarberProfileUrl(slug) → '/barber/{slug}'
+  - buildBarberBookingUrl(slug, serviceId?) → '/barber/{slug}/book'
+
+  Dependencies: none (pure string operations)
+
+
+
+================================================================================
+23. TYPESCRIPT TYPES (Full Database — Copy from Web)
+================================================================================
+
+Copy types/database.ts EXACTLY from the web project.
+This file is 1573 lines and contains:
+
+  - Full Supabase Database type with all 20 tables
+  - Row, Insert, Update types for every table
+  - Relationship definitions
+  - RPC function signatures (create_reservation_atomic, get_available_time_slots)
+  - Helper types: Tables<T>, TablesInsert<T>, TablesUpdate<T>
+  - Convenience aliases: User, Customer, Reservation, Service, Product, etc.
+  - Extended types: ReservationWithDetails, BarberWithWorkDays, etc.
+  - Push notification types: NotificationPayload, PushDeviceInfo, etc.
+  - Booking settings: BarberBookingSettings
+  - Recurring: RecurringAppointment, DayOfWeek, DAY_OF_WEEK_HEBREW
+  - Session types: StoredSession, BarberSession
+
+The file is self-contained and has no imports.
+Copy it directly — zero modifications needed.
+
+Location in web project:
+  /types/database.ts
+
+Location in mobile project:
+  /types/database.ts
+
+
+
+================================================================================
+24. RISK ASSESSMENT
+================================================================================
+
+24.1 HIGH RISK
+--------------
+Risk                          | Impact      | Mitigation
+------------------------------|-------------|------------------------------------------
+App Store rejection           | Delayed     | Conservative notification defaults, opt-in
+FCM token unreliability (iOS) | Missed push | Token refresh on every app launch
+OTP auto-read failure         | User friction| Always show manual input + email fallback
+RTL layout bugs               | Broken UX   | Test on physical devices from Phase 1
+
+24.2 MEDIUM RISK
+-----------------
+Risk                          | Impact      | Mitigation
+------------------------------|-------------|------------------------------------------
+Expo SDK breaking changes     | Build fail  | Pin SDK version, update cautiously
+NativeWind compatibility      | Style bugs  | Fallback to StyleSheet for complex cases
+Hebrew font rendering diffs   | Visual      | Test on multiple devices, fallback fonts
+Offline sync conflicts        | Data loss   | Server-side version checking (exists)
+
+24.3 LOW RISK
+--------------
+Risk                          | Impact      | Mitigation
+------------------------------|-------------|------------------------------------------
+Supabase API changes          | Breaking    | Pin @supabase/supabase-js version
+019 SMS API downtime          | OTP fails   | Email OTP fallback exists
+Device storage limits         | Data loss   | Minimal caching, SecureStore for critical
+
+
+
+================================================================================
+25. SUCCESS METRICS
+================================================================================
+
+25.1 LAUNCH METRICS (First 30 Days)
+-------------------------------------
+Metric                        | Target
+------------------------------|--------
+App installs                  | 50+ (from ~265 existing customers)
+Push notification opt-in rate | >70% (vs ~20% on PWA)
+Booking completion rate       | >80%
+Crash-free rate               | >99%
+App Store rating              | 4.5+
+
+25.2 ONGOING METRICS
+---------------------
+Metric                        | Target
+------------------------------|--------
+DAU/MAU ratio                 | >30%
+Push delivery rate            | >95%
+Booking-via-mobile share      | >60% within 3 months
+Customer retention (7-day)    | >50%
+Average session duration      | >2 minutes
+
+
+
+================================================================================
+END OF PRD
+================================================================================
+
+This document contains everything needed to build the React Native app:
+  - Full environment variables and connection details (Section 3)
+  - Complete database schema with all 20 tables (Section 4)
+  - All 47 API endpoints with request/response formats (Section 5)
+  - Business logic algorithms (Section 6)
+  - Auth flows for all methods (Section 7)
+  - Push notification architecture (Section 8)
+  - SMS OTP integration (Section 9)
+  - State management stores (Section 10)
+  - Screen-by-screen specifications (Section 14)
+  - Navigation structure with deep links (Section 15)
+  - TypeScript types to copy directly (Section 23)
+  - Utility functions to copy directly (Section 22)
+  - Validation schemas to copy directly (Section 21)
+  - Phased implementation plan (Section 20)
+
+All code examples are ready to use. All env vars are included.
+A developer can build the complete app using only this file.

@@ -92,7 +92,7 @@ export async function getBarberBreakouts(barberId: string): Promise<BarberBreako
   
   const { data, error } = await supabase
     .from('barber_breakouts')
-    .select('*')
+    .select('id, barber_id, breakout_type, start_time, end_time, start_date, end_date, day_of_week, reason, is_active, created_at, deactivated_at')
     .eq('barber_id', barberId)
     .eq('is_active', true)
     .order('created_at', { ascending: false })
@@ -124,7 +124,7 @@ export async function getBreakoutsForDate(
   // Fetch all active breakouts for this barber
   const { data, error } = await supabase
     .from('barber_breakouts')
-    .select('*')
+    .select('id, barber_id, breakout_type, start_time, end_time, start_date, end_date, day_of_week, reason, is_active, created_at, deactivated_at')
     .eq('barber_id', barberId)
     .eq('is_active', true)
   

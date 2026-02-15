@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     // Get all subscriptions
     const { data: subscriptions, error } = await supabase
       .from('push_subscriptions')
-      .select('*')
+      .select('id, customer_id, barber_id, endpoint, device_type, device_name, is_active, consecutive_failures, last_delivery_status, last_used, created_at')
       .order('created_at', { ascending: false })
 
     if (error) {

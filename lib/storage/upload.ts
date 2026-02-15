@@ -46,10 +46,11 @@ export async function uploadAvatar(file: File, barberId: string): Promise<Upload
     const fileName = `${barberId}/${timestamp}.${ext}`
     
     // Upload to Supabase Storage
+    // Cache for 1 year - URLs include timestamps so new uploads always produce new URLs
     const { data, error } = await supabase.storage
       .from(AVATARS_BUCKET)
       .upload(fileName, file, {
-        cacheControl: '3600',
+        cacheControl: '31536000',
         upsert: true, // Overwrite if exists
       })
     
@@ -184,10 +185,11 @@ export async function uploadProductImage(file: File, productId: string): Promise
     const fileName = `${productId}/${timestamp}.${ext}`
     
     // Upload to Supabase Storage
+    // Cache for 1 year - URLs include timestamps so new uploads always produce new URLs
     const { data, error } = await supabase.storage
       .from(PRODUCTS_BUCKET)
       .upload(fileName, file, {
-        cacheControl: '3600',
+        cacheControl: '31536000',
         upsert: true,
       })
     

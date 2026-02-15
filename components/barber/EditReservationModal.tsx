@@ -119,7 +119,7 @@ export function EditReservationModal({
     const supabase = createClient()
     const { data } = await supabase
       .from('work_days')
-      .select('*')
+      .select('id, user_id, day_of_week, is_working, start_time, end_time')
       .eq('user_id', barberId)
 
     if (data) {
@@ -139,12 +139,12 @@ export function EditReservationModal({
     const [barberRes, shopRes] = await Promise.all([
       supabase
         .from('barber_closures')
-        .select('*')
+        .select('id, barber_id, start_date, end_date, reason, created_at')
         .eq('barber_id', barberId)
         .gte('end_date', todayStr),
       supabase
         .from('barbershop_closures')
-        .select('*')
+        .select('id, start_date, end_date, reason, created_at')
         .gte('end_date', todayStr),
     ])
 

@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     // Build query
     let query = supabase
       .from('customers')
-      .select('*', { count: 'exact' })
+      .select('id, phone, fullname, email, is_blocked, blocked_at, blocked_reason, created_at, updated_at, auth_method', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 

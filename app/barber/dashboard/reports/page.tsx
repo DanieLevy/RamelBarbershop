@@ -66,7 +66,7 @@ export default function ReportsPage() {
     
     const { data, error } = await supabase
       .from('reservations')
-      .select('*, services(*)')
+      .select('id, barber_id, service_id, customer_name, customer_phone, date_timestamp, time_timestamp, day_name, status, created_at, barber_notes, services(id, name, name_he, duration, price)')
       .eq('barber_id', barber.id)
       .gte('time_timestamp', startMs)
       .lte('time_timestamp', endMs)

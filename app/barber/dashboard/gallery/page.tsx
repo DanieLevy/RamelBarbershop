@@ -47,7 +47,7 @@ export default function GalleryPage() {
     const supabase = createClient()
     const { data, error } = await supabase
       .from('barber_gallery')
-      .select('*')
+      .select('id, barber_id, image_url, display_order, position_x, position_y, caption, created_at')
       .eq('barber_id', barber.id)
       .order('display_order', { ascending: true })
     

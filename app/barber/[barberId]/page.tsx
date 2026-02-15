@@ -49,11 +49,11 @@ const getBarberWithAllData = cache(async (slug: string): Promise<{
   // Single consolidated query with nested selects
   // Fetches: barber + work_days + services + messages + gallery in ONE request
   const selectQuery = `
-    *,
-    work_days(*),
-    services(*),
-    barber_messages(*),
-    barber_gallery(*)
+    id, username, fullname, name_en, img_url, img_position_x, img_position_y, phone, email, is_barber, is_active, role, display_order, instagram_url, blocked_customers,
+    work_days(id, user_id, day_of_week, is_working, start_time, end_time),
+    services(id, name, name_he, description, duration, price, is_active, barber_id),
+    barber_messages(id, barber_id, message, is_active, created_at, updated_at),
+    barber_gallery(id, barber_id, image_url, display_order, position_x, position_y, caption, created_at)
   `
   
   if (isUuidLookup) {

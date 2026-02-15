@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     // First check if customer exists by phone
     const { data: existing, error: findError } = await supabase
       .from('customers')
-      .select('*')
+      .select('id, phone, fullname, email, is_blocked, blocked_at, blocked_reason, created_at, updated_at, auth_method, provider_uid, supabase_uid, firebase_uid')
       .eq('phone', normalizedPhone)
       .maybeSingle()
     

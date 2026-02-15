@@ -42,7 +42,7 @@ export default function ServicesPage() {
     
     const { data, error } = await supabase
       .from('services')
-      .select('*')
+      .select('id, name, name_he, description, duration, price, is_active, barber_id')
       .eq('barber_id', barber.id)
       .order('created_at', { ascending: true })
     

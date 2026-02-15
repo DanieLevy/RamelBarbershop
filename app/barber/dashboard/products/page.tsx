@@ -54,7 +54,7 @@ export default function ProductsPage() {
       const supabase = createClient()
       const { data, error } = await supabase
         .from('products')
-        .select('*')
+        .select('id, name, name_he, description, price, image_url, is_active, display_order')
         .order('display_order', { ascending: true })
       
       if (error) throw error

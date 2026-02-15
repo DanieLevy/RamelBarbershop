@@ -35,11 +35,11 @@ const getBarberWithBookingData = cache(async (slug: string): Promise<BarberWithB
   
   // Combined query with nested selects for booking-related data
   const selectQuery = `
-    *,
-    work_days(*),
-    services(*),
-    barber_messages(*),
-    barber_booking_settings(*)
+    id, username, fullname, name_en, img_url, img_position_x, img_position_y, phone, email, is_barber, is_active, role, display_order, instagram_url, blocked_customers,
+    work_days(id, user_id, day_of_week, is_working, start_time, end_time),
+    services(id, name, name_he, description, duration, price, is_active, barber_id),
+    barber_messages(id, barber_id, message, is_active, created_at, updated_at),
+    barber_booking_settings(id, barber_id, max_booking_days_ahead, min_hours_before_booking, min_cancel_hours)
   `
   
   if (isUuidLookup) {
@@ -136,12 +136,12 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
     // Barbershop closures - must be fresh (date-filtered)
     supabase
       .from('barbershop_closures')
-      .select('*')
+      .select('id, start_date, end_date, reason, created_at')
       .gte('end_date', todayStr),
     // Barber closures - must be fresh (date-filtered)
     supabase
       .from('barber_closures')
-      .select('*')
+      .select('id, barber_id, start_date, end_date, reason, created_at')
       .eq('barber_id', barberWithData.id)
       .gte('end_date', todayStr)
   ])

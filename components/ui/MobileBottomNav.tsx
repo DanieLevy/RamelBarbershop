@@ -90,7 +90,7 @@ export function MobileBottomNav() {
 
       const { count, error } = await supabase
         .from('reservations')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('customer_id', customer.id)
         .eq('status', 'confirmed')
         .gt('time_timestamp', now)

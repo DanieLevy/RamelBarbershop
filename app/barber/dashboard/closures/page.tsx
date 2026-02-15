@@ -29,7 +29,7 @@ export default function ClosuresPage() {
     
     const { data, error } = await supabase
       .from('barbershop_closures')
-      .select('*')
+      .select('id, start_date, end_date, reason, created_at')
       .order('start_date', { ascending: true })
     
     if (error) {

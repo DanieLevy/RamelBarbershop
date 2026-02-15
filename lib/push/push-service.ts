@@ -551,7 +551,7 @@ class PushNotificationService {
   async getUnreadCount(recipientType: RecipientType, recipientId: string): Promise<number> {
     const { count, error } = await supabase
       .from('notification_logs')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('recipient_type', recipientType)
       .eq('recipient_id', recipientId)
       .eq('is_read', false)
@@ -683,7 +683,7 @@ class PushNotificationService {
     const { data, error } = await supabase
       .from('barber_notification_settings')
       .insert({ barber_id: barberId })
-      .select('*')
+      .select('id, barber_id, reminder_hours_before, notify_on_customer_cancel, notify_on_new_booking, broadcast_enabled')
       .single()
 
     if (error) {
@@ -939,7 +939,7 @@ class PushNotificationService {
     // Get subscriptions linked to customer_id
     const { data: customerSubs } = await supabase
       .from('push_subscriptions')
-      .select('*')
+      .select('id, customer_id, barber_id, endpoint, p256dh, auth, device_type, device_name, is_active, consecutive_failures, last_delivery_status, last_used, created_at')
       .eq('customer_id', customerId)
       .eq('is_active', true)
       .order('last_used', { ascending: false })
@@ -958,7 +958,7 @@ class PushNotificationService {
     if (barberCheck) {
       const { data: barberSubs } = await supabase
         .from('push_subscriptions')
-        .select('*')
+        .select('id, customer_id, barber_id, endpoint, p256dh, auth, device_type, device_name, is_active, consecutive_failures, last_delivery_status, last_used, created_at')
         .eq('barber_id', customerId)
         .eq('is_active', true)
 
@@ -985,7 +985,7 @@ class PushNotificationService {
     // Get subscriptions linked to barber_id
     const { data: barberSubs } = await supabase
       .from('push_subscriptions')
-      .select('*')
+      .select('id, customer_id, barber_id, endpoint, p256dh, auth, device_type, device_name, is_active, consecutive_failures, last_delivery_status, last_used, created_at')
       .eq('barber_id', barberId)
       .eq('is_active', true)
       .order('last_used', { ascending: false })
@@ -1003,7 +1003,7 @@ class PushNotificationService {
     if (customerCheck) {
       const { data: customerSubs } = await supabase
         .from('push_subscriptions')
-        .select('*')
+        .select('id, customer_id, barber_id, endpoint, p256dh, auth, device_type, device_name, is_active, consecutive_failures, last_delivery_status, last_used, created_at')
         .eq('customer_id', barberId)
         .eq('is_active', true)
 
@@ -1081,7 +1081,7 @@ class PushNotificationService {
   async getActiveSubscriptionCount(): Promise<number> {
     const { count } = await supabase
       .from('push_subscriptions')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('is_active', true)
 
     return count || 0

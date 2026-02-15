@@ -120,7 +120,7 @@ export function CustomerEditReservationModal({
     const supabase = createClient()
     const { data } = await supabase
       .from('barbershop_settings')
-      .select('*')
+      .select('id, name, phone, address, address_text, address_lat, address_lng, description, work_hours_start, work_hours_end, open_days, hero_title, hero_subtitle, hero_description, waze_link, google_maps_link, contact_phone, contact_email, contact_whatsapp, social_instagram, social_facebook, social_tiktok, show_phone, show_email, show_whatsapp, show_instagram, show_facebook, show_tiktok, max_booking_days_ahead, default_reminder_hours')
       .single()
     if (data) setShopSettings(data as BarbershopSettings)
   }
@@ -142,7 +142,7 @@ export function CustomerEditReservationModal({
     const supabase = createClient()
     const { data } = await supabase
       .from('services')
-      .select('*')
+      .select('id, name, name_he, description, duration, price, is_active, barber_id')
       .eq('barber_id', barberId)
       .eq('is_active', true)
       .order('price', { ascending: true })
@@ -154,7 +154,7 @@ export function CustomerEditReservationModal({
     const supabase = createClient()
     const { data } = await supabase
       .from('work_days')
-      .select('*')
+      .select('id, user_id, day_of_week, is_working, start_time, end_time')
       .eq('user_id', barberId)
     if (data) setBarberWorkDays(data as WorkDay[])
   }
@@ -168,8 +168,8 @@ export function CustomerEditReservationModal({
     const supabase = createClient()
     const todayStr = getIsraelDateString(Date.now())
     const [barberRes, shopRes] = await Promise.all([
-      supabase.from('barber_closures').select('*').eq('barber_id', barberId).gte('end_date', todayStr),
-      supabase.from('barbershop_closures').select('*').gte('end_date', todayStr),
+      supabase.from('barber_closures').select('id, barber_id, start_date, end_date, reason, created_at').eq('barber_id', barberId).gte('end_date', todayStr),
+      supabase.from('barbershop_closures').select('id, start_date, end_date, reason, created_at').gte('end_date', todayStr),
     ])
     if (barberRes.data) setBarberClosures(barberRes.data as BarberClosure[])
     if (shopRes.data) setShopClosures(shopRes.data as BarbershopClosure[])

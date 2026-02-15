@@ -174,7 +174,7 @@ function AdminAllBarbersContent() {
       const supabase = createClient()
       const { data, error } = await supabase
         .from('users')
-        .select('*')
+        .select('id, username, fullname, name_en, img_url, img_position_x, img_position_y, phone, is_barber, is_active, role, display_order, instagram_url, blocked_customers, email')
         .eq('is_barber', true)
         .eq('is_active', true)
         .order('display_order', { ascending: true })
@@ -242,7 +242,7 @@ function AdminAllBarbersContent() {
 
   const fetchShopSettings = async () => {
     const supabase = createClient()
-    const { data } = await supabase.from('barbershop_settings').select('*').single()
+    const { data } = await supabase.from('barbershop_settings').select('id, name, phone, address, address_text, address_lat, address_lng, description, work_hours_start, work_hours_end, open_days, hero_title, hero_subtitle, hero_description, waze_link, google_maps_link, contact_phone, contact_email, contact_whatsapp, social_instagram, social_facebook, social_tiktok, show_phone, show_email, show_whatsapp, show_instagram, show_facebook, show_tiktok, max_booking_days_ahead, default_reminder_hours').single()
     if (data) setShopSettings(data as BarbershopSettings)
   }
 
@@ -251,7 +251,7 @@ function AdminAllBarbersContent() {
     const supabase = createClient()
     const { data } = await supabase
       .from('work_days')
-      .select('*')
+      .select('id, user_id, day_of_week, is_working, start_time, end_time')
       .eq('user_id', selectedBarberId)
     if (data) setBarberWorkDays(data as WorkDay[])
   }, [selectedBarberId])

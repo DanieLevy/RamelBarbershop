@@ -23,7 +23,7 @@ export async function getBarbershopSettings(): Promise<BarbershopSettings | null
   
   const { data, error } = await supabase
     .from('barbershop_settings')
-    .select('*')
+    .select('id, name, phone, address, address_text, address_lat, address_lng, description, work_hours_start, work_hours_end, open_days, hero_title, hero_subtitle, hero_description, waze_link, google_maps_link, contact_phone, contact_email, contact_whatsapp, social_instagram, social_facebook, social_tiktok, show_phone, show_email, show_whatsapp, show_instagram, show_facebook, show_tiktok, max_booking_days_ahead, default_reminder_hours')
     .single()
   
   if (error) {
@@ -43,7 +43,7 @@ export async function getBarbershopClosures(): Promise<BarbershopClosure[]> {
   
   const { data, error } = await supabase
     .from('barbershop_closures')
-    .select('*')
+    .select('id, start_date, end_date, reason, created_at')
     .gte('end_date', getTodayDateString())
   
   if (error) {
@@ -64,7 +64,7 @@ export async function getBarberWorkDays(barberId: string): Promise<WorkDay[]> {
   
   const { data, error } = await supabase
     .from('work_days')
-    .select('*')
+    .select('id, user_id, day_of_week, is_working, start_time, end_time')
     .eq('user_id', barberId)
   
   if (error) {
@@ -118,7 +118,7 @@ export async function getBarberClosures(barberId: string): Promise<BarberClosure
   
   const { data, error } = await supabase
     .from('barber_closures')
-    .select('*')
+    .select('id, barber_id, start_date, end_date, reason, created_at')
     .eq('barber_id', barberId)
     .gte('end_date', getTodayDateString())
   
@@ -139,7 +139,7 @@ export async function getBarberMessages(barberId: string): Promise<BarberMessage
   
   const { data, error } = await supabase
     .from('barber_messages')
-    .select('*')
+    .select('id, barber_id, message, is_active, created_at, updated_at')
     .eq('barber_id', barberId)
     .eq('is_active', true)
   
@@ -294,7 +294,7 @@ export async function getBarberBookingSettings(barberId: string): Promise<Barber
   
   const { data, error } = await supabase
     .from('barber_booking_settings')
-    .select('*')
+    .select('id, barber_id, max_booking_days_ahead, min_hours_before_booking, min_cancel_hours')
     .eq('barber_id', barberId)
     .single()
   

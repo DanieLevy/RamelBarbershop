@@ -70,7 +70,7 @@ export default function UsersManagementPage() {
       // Fetch all customers
       const { data: customersData, error } = await supabase
         .from('customers')
-        .select('*')
+        .select('id, phone, fullname, email, auth_method, is_blocked, blocked_at, blocked_reason, created_at, updated_at')
         .order('created_at', { ascending: false })
       
       if (error) {
@@ -85,7 +85,7 @@ export default function UsersManagementPage() {
         (customersData || []).map(async (customer: Customer) => {
           const { count } = await supabase
             .from('reservations')
-            .select('*', { count: 'exact', head: true })
+            .select('id', { count: 'exact', head: true })
             .eq('customer_id', customer.id)
           
           return {
