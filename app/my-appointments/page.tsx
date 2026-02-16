@@ -10,7 +10,7 @@ import { GlassCard } from '@/components/ui/GlassCard'
 import { AppointmentDetailModal } from '@/components/barber/AppointmentDetailModal'
 import { showToast } from '@/lib/toast'
 import { cn, formatTime as formatTimeUtil, timestampToIsraelDate, nowInIsrael, isSameDayInIsrael, normalizeTimestampFormat } from '@/lib/utils'
-import { Calendar, Scissors, User, X, History, ChevronRight, LogIn, Info, AlertCircle, Repeat, Clock, Pencil } from 'lucide-react'
+import { Calendar, Scissors, User, X, History, ChevronRight, LogIn, Info, AlertCircle, Repeat, Clock, Pencil, RefreshCw, WifiOff } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { ReservationWithDetails, CustomerRecurringAppointment } from '@/types/database'
 import { LoginModal } from '@/components/LoginModal'
@@ -21,6 +21,7 @@ import { cancelReservation } from '@/lib/services/booking.service'
 import { CancelBlockedModal } from '@/components/booking/CancelBlockedModal'
 import { CustomerEditReservationModal } from '@/components/booking/CustomerEditReservationModal'
 import { getRecurringByCustomer } from '@/lib/services/recurring.service'
+import { withSupabaseRetry, isTransientNetworkError } from '@/lib/utils/retry'
 import { Button } from '@heroui/react'
 
 type TabType = 'upcoming' | 'past' | 'cancelled'
@@ -66,6 +67,7 @@ function MyAppointmentsContent() {
   const [reservations, setReservations] = useState<ReservationWithDetails[]>([])
   const [recurringAppointments, setRecurringAppointments] = useState<CustomerRecurringAppointment[]>([])
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(false)
   const [activeTab, setActiveTab] = useState<TabType>('upcoming')
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [showLoginModal, setShowLoginModal] = useState(false)
@@ -189,56 +191,60 @@ function MyAppointmentsContent() {
 
   const fetchReservations = async () => {
     if (!customer) return
-    
+
     setLoading(true)
-    
+    setFetchError(false)
+
     try {
-      const supabase = createClient()
-      
-      // Only select necessary fields for performance
-      // Include version for optimistic locking
-      // IMPORTANT: date_timestamp is required for AppointmentDetailModal
-      let query = supabase
-        .from('reservations')
-        .select(`
-          id, 
-          date_timestamp,
-          time_timestamp, 
-          status, 
-          customer_name,
-          customer_phone,
-          barber_notes,
-          cancelled_by, 
-          cancellation_reason,
-          barber_id, 
-          service_id,
-          version,
-          created_at,
-          services (id, name_he, price), 
-          users (id, fullname)
-        `)
-        .order('time_timestamp', { ascending: false })
-      
-      if (customer.id) {
-        query = query.or(`customer_id.eq.${customer.id},customer_phone.eq.${customer.phone}`)
-      } else if (customer.phone) {
-        query = query.eq('customer_phone', customer.phone)
-      }
-      
-      const { data, error } = await query
-      
-      if (error) {
-        console.error('Error fetching reservations:', error)
-        await report(new Error(error.message), 'Fetching customer reservations')
-        showToast.error('שגיאה בטעינת התורים')
-        return
-      }
-      
-      setReservations((data as ReservationWithDetails[]) || [])
+      const data = await withSupabaseRetry(async () => {
+        const supabase = createClient()
+
+        // Only select necessary fields for performance
+        // Include version for optimistic locking
+        // IMPORTANT: date_timestamp is required for AppointmentDetailModal
+        let query = supabase
+          .from('reservations')
+          .select(`
+            id,
+            date_timestamp,
+            time_timestamp,
+            status,
+            customer_name,
+            customer_phone,
+            barber_notes,
+            cancelled_by,
+            cancellation_reason,
+            barber_id,
+            service_id,
+            version,
+            created_at,
+            services (id, name_he, price),
+            users (id, fullname)
+          `)
+          .order('time_timestamp', { ascending: false })
+
+        if (customer.id) {
+          query = query.or(`customer_id.eq.${customer.id},customer_phone.eq.${customer.phone}`)
+        } else if (customer.phone) {
+          query = query.eq('customer_phone', customer.phone)
+        }
+
+        const { data, error } = await query
+
+        if (error) {
+          throw error
+        }
+
+        return (data as ReservationWithDetails[]) || []
+      }, { maxRetries: 2, initialDelayMs: 500 })
+
+      setReservations(data)
     } catch (err) {
       console.error('Error fetching reservations:', err)
-      await report(err, 'Fetching customer reservations (exception)')
-      showToast.error('שגיאה בטעינת התורים')
+      setFetchError(true)
+      if (!isTransientNetworkError(err)) {
+        await report(err, 'Fetching customer reservations (after retries)')
+      }
     } finally {
       setLoading(false)
     }
@@ -592,6 +598,25 @@ function MyAppointmentsContent() {
               <div className="flex flex-col items-center py-16">
                 <ScissorsLoader size="md" text="טוען תורים..." />
               </div>
+            ) : fetchError ? (
+              <GlassCard className="flex flex-col items-center text-center py-12">
+                <div className="w-16 h-16 mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+                  <WifiOff size={32} strokeWidth={1} className="text-red-400" />
+                </div>
+                <p className="text-foreground-light font-medium mb-2">
+                  שגיאה בטעינת התורים
+                </p>
+                <p className="text-foreground-muted text-sm mb-6">
+                  בדוק את החיבור לאינטרנט ונסה שוב
+                </p>
+                <Button
+                  variant="primary"
+                  onPress={() => { fetchReservations(); fetchRecurringAppointments() }}
+                >
+                  <RefreshCw size={16} strokeWidth={2} />
+                  <span>נסה שוב</span>
+                </Button>
+              </GlassCard>
             ) : filteredReservations.length === 0 ? (
               <GlassCard className="flex flex-col items-center text-center py-12">
                 <div className="w-16 h-16 mb-4 rounded-full bg-white/5 flex items-center justify-center">

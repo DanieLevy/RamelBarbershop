@@ -9,7 +9,7 @@
 import { createClient } from '@/lib/supabase/client'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
 import { getSlotKey, timestampToIsraelDate, israelDateToTimestamp, getIsraelDayStart, getDayKeyInIsrael } from '@/lib/utils'
-import { withSupabaseRetry } from '@/lib/utils/retry'
+import { withSupabaseRetry, isTransientNetworkError } from '@/lib/utils/retry'
 import type {
   RecurringAppointment,
   RecurringAppointmentWithDetails,
@@ -160,7 +160,7 @@ export const getRecurringByCustomer = async (
     // (especially Safari "Load failed" on iOS PWA wake-up)
     return await withSupabaseRetry(async () => {
       const supabase = createClient()
-      
+
       const { data, error } = await supabase
         .from('recurring_appointments')
         .select(`
@@ -174,16 +174,12 @@ export const getRecurringByCustomer = async (
         .eq('is_active', true)
         .order('day_of_week')
         .order('time_slot')
-      
+
       if (error) {
-        console.error('[RecurringService] Error fetching customer recurring:', error)
-        await reportSupabaseError(error, 'Fetching customer recurring appointments', {
-          table: 'recurring_appointments',
-          operation: 'select',
-        })
-        return []
+        // Throw so withSupabaseRetry can actually retry
+        throw error
       }
-      
+
       // Transform to customer-friendly format
       return (data || []).map((rec) => ({
         id: rec.id,
@@ -195,7 +191,17 @@ export const getRecurringByCustomer = async (
       }))
     }, { maxRetries: 2, initialDelayMs: 500 })
   } catch (err) {
-    console.error('[RecurringService] Exception fetching customer recurring:', err)
+    // Only report after all retries exhausted, and skip transient network errors
+    if (isTransientNetworkError(err)) {
+      console.warn('[RecurringService] Network error fetching customer recurring (transient):', err instanceof Error ? err.message : err)
+    } else {
+      console.error('[RecurringService] Error fetching customer recurring:', err)
+      await reportSupabaseError(
+        err instanceof Error ? err : { message: String(err), code: 'RECURRING_FETCH_ERROR' },
+        'Fetching customer recurring appointments',
+        { table: 'recurring_appointments', operation: 'select' }
+      )
+    }
     return []
   }
 }

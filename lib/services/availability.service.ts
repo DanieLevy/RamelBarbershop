@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { BarbershopSettings, BarbershopClosure, BarberClosure, BarberMessage, WorkDay, BarberBookingSettings } from '@/types/database'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
 import { getTodayDateString, getIsraelDateString, getDayKeyInIsrael } from '@/lib/utils'
+import { withSupabaseRetry, isTransientNetworkError } from '@/lib/utils/retry'
 
 /**
  * Day-specific work hours for a barber
@@ -112,33 +113,38 @@ export function workDaysToMap(workDays: WorkDay[]): DayWorkHours {
 
 /**
  * Get barber closures (upcoming)
+ * Uses retry logic for resilience against transient network errors (Safari "Load failed")
  */
 export async function getBarberClosures(barberId: string): Promise<BarberClosure[]> {
-  const supabase = createClient()
-  
-  const { data, error } = await supabase
-    .from('barber_closures')
-    .select('id, barber_id, start_date, end_date, reason, created_at')
-    .eq('barber_id', barberId)
-    .gte('end_date', getTodayDateString())
-  
-  if (error) {
-    // Detect transient network errors (Safari "Load failed", Firefox network error)
-    const isNetworkError = error.message?.includes('Load failed') || 
-      error.message?.includes('Failed to fetch') || 
-      error.message?.includes('NetworkError')
-    
-    if (isNetworkError) {
-      // Don't report transient network errors to bug reporter - they're expected on mobile
-      console.warn('Network error fetching barber closures (transient):', error.message)
+  try {
+    return await withSupabaseRetry(async () => {
+      const supabase = createClient()
+
+      const { data, error } = await supabase
+        .from('barber_closures')
+        .select('id, barber_id, start_date, end_date, reason, created_at')
+        .eq('barber_id', barberId)
+        .gte('end_date', getTodayDateString())
+
+      if (error) {
+        throw error
+      }
+
+      return (data as BarberClosure[]) || []
+    }, { maxRetries: 2, initialDelayMs: 500 })
+  } catch (err) {
+    if (isTransientNetworkError(err)) {
+      console.warn('[AvailabilityService] Network error fetching barber closures (transient):', err instanceof Error ? err.message : err)
     } else {
-      console.error('Error fetching barber closures:', error)
-      await reportSupabaseError(error, 'Fetching barber closures', { table: 'barber_closures', operation: 'select' })
+      console.error('[AvailabilityService] Error fetching barber closures:', err)
+      await reportSupabaseError(
+        err instanceof Error ? err : { message: String(err), code: 'CLOSURES_FETCH_ERROR' },
+        'Fetching barber closures',
+        { table: 'barber_closures', operation: 'select' }
+      )
     }
     return []
   }
-  
-  return (data as BarberClosure[]) || []
 }
 
 /**

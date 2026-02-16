@@ -20,6 +20,7 @@ import { getBreakoutsForDate, isSlotInBreakout } from '@/lib/services/breakout.s
 import { format, addDays, isSameDay } from 'date-fns'
 import { he } from 'date-fns/locale'
 import { showToast } from '@/lib/toast'
+import { withSupabaseRetry } from '@/lib/utils/retry'
 import type { BarbershopSettings, Service, WorkDay, BarberBreakout, BarbershopClosure, BarberClosure, ReservationWithDetails } from '@/types/database'
 import { Portal } from '@/components/ui/Portal'
 import { Button } from '@heroui/react'
@@ -165,14 +166,27 @@ export function CustomerEditReservationModal({
   }
 
   const fetchClosures = async () => {
-    const supabase = createClient()
-    const todayStr = getIsraelDateString(Date.now())
-    const [barberRes, shopRes] = await Promise.all([
-      supabase.from('barber_closures').select('id, barber_id, start_date, end_date, reason, created_at').eq('barber_id', barberId).gte('end_date', todayStr),
-      supabase.from('barbershop_closures').select('id, start_date, end_date, reason, created_at').gte('end_date', todayStr),
-    ])
-    if (barberRes.data) setBarberClosures(barberRes.data as BarberClosure[])
-    if (shopRes.data) setShopClosures(shopRes.data as BarbershopClosure[])
+    try {
+      const [barberData, shopData] = await withSupabaseRetry(async () => {
+        const supabase = createClient()
+        const todayStr = getIsraelDateString(Date.now())
+        const [barberRes, shopRes] = await Promise.all([
+          supabase.from('barber_closures').select('id, barber_id, start_date, end_date, reason, created_at').eq('barber_id', barberId).gte('end_date', todayStr),
+          supabase.from('barbershop_closures').select('id, start_date, end_date, reason, created_at').gte('end_date', todayStr),
+        ])
+        if (barberRes.error) throw barberRes.error
+        if (shopRes.error) throw shopRes.error
+        return [barberRes.data as BarberClosure[], shopRes.data as BarbershopClosure[]]
+      }, { maxRetries: 2, initialDelayMs: 500 })
+
+      setBarberClosures(barberData || [])
+      setShopClosures(shopData || [])
+    } catch (err) {
+      console.warn('[CustomerEditModal] Failed to load closures:', err instanceof Error ? err.message : err)
+      showToast.warning('לא הצלחנו לטעון את ימי החופש. ייתכן שחלק מהתאריכים לא יוצגו כתפוסים')
+      setBarberClosures([])
+      setShopClosures([])
+    }
   }
 
   const fetchReservedSlots = async () => {

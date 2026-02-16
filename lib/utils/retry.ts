@@ -30,6 +30,28 @@ const DEFAULT_OPTIONS: Required<RetryOptions> = {
 }
 
 /**
+ * Check if an error is a transient network error (Safari "Load failed", etc.)
+ * Use this to decide whether to suppress bug reports for expected mobile failures.
+ * Unlike isRetryableError(), this does NOT include DB errors or rate limits.
+ */
+export function isTransientNetworkError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase()
+  const errorName = error instanceof Error ? (error.name?.toLowerCase() || '') : ''
+
+  return (
+    message.includes('load failed') ||
+    message.includes('failed to fetch') ||
+    message.includes('fetch failed') ||
+    message.includes('network request failed') ||
+    message.includes('networkerror') ||
+    message.includes('the internet connection appears to be offline') ||
+    message.includes('cancelled') ||
+    message.includes('aborted') ||
+    (errorName === 'typeerror' && (message.includes('load') || message.includes('fetch')))
+  )
+}
+
+/**
  * Default retryable error checker
  * Returns true for network errors and transient database errors
  */
