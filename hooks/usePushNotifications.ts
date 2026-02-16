@@ -89,13 +89,17 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
 
   /**
    * Safely check if the Notification API is available.
-   * On some iOS Safari versions, 'Notification' in window may be true
-   * but accessing Notification itself throws a ReferenceError.
+   * On iOS Safari (especially non-PWA mode), accessing Notification can throw
+   * ReferenceError even when typeof/in checks pass. We use multiple layers of
+   * protection: typeof guard + try-catch + window property access.
    */
   const getNotificationPermission = useCallback((): NotificationPermission | 'unavailable' => {
     try {
-      if (typeof window !== 'undefined' && 'Notification' in window && typeof Notification !== 'undefined') {
-        return Notification.permission
+      if (typeof window === 'undefined') return 'unavailable'
+      // Access via window property to avoid bare Notification reference that can throw on iOS Safari
+      const NotificationAPI = window.Notification
+      if (NotificationAPI && typeof NotificationAPI.permission === 'string') {
+        return NotificationAPI.permission
       }
     } catch {
       // iOS Safari can throw ReferenceError: Can't find variable: Notification
@@ -104,7 +108,9 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
   }, [])
 
   /**
-   * Check if push notifications are supported
+   * Check if push notifications are supported.
+   * Uses window.Notification property access instead of bare Notification reference
+   * to prevent ReferenceError on iOS Safari where the global may not exist.
    */
   const checkSupport = useCallback((): boolean => {
     if (typeof window === 'undefined') return false
@@ -113,7 +119,7 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
       return (
         'serviceWorker' in navigator &&
         'PushManager' in window &&
-        typeof Notification !== 'undefined'
+        window.Notification != null
       )
     } catch {
       // iOS Safari can throw ReferenceError when accessing Notification
@@ -297,7 +303,17 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
       }
     }
 
-    initialize()
+    initialize().catch((err) => {
+      // Catch any unhandled errors from the async initialization to prevent
+      // unhandled promise rejections that crash React's ErrorBoundary on iOS Safari
+      console.error('[Push] Initialization failed:', err)
+      setState(prev => ({
+        ...prev,
+        isSupported: false,
+        permission: 'unavailable',
+        isLoading: false
+      }))
+    })
     // NOTE: fetchServerStatus is intentionally NOT in dependencies - it uses store.getState()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkSupport, getCurrentSubscription, isStandalone, isCustomerLoggedIn, isBarberLoggedIn, setStoreSupported, setStorePermission, setStoreSubscribed])
@@ -320,8 +336,10 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
     }
 
     try {
-      if (typeof Notification === 'undefined') return 'denied'
-      const permission = await Notification.requestPermission()
+      // Use window.Notification to avoid bare reference that can throw on iOS Safari
+      const NotificationAPI = window.Notification
+      if (!NotificationAPI || typeof NotificationAPI.requestPermission !== 'function') return 'denied'
+      const permission = await NotificationAPI.requestPermission()
       setState(prev => ({ ...prev, permission }))
       return permission
     } catch (err) {

@@ -47,13 +47,26 @@ export function BookingWizardClient({
   // Dynamic closures state - initialized with server-side data, updated via real-time subscription
   const [dynamicBarberClosures, setDynamicBarberClosures] = useState<BarberClosure[]>(barberClosures)
   
-  // Refresh closures from server
-  const refreshClosures = useCallback(async () => {
+  // Refresh closures from server with retry for transient network errors (Safari "Load failed")
+  const refreshClosures = useCallback(async (retryCount = 0) => {
+    const MAX_RETRIES = 2
     try {
       const freshClosures = await getBarberClosures(barberId)
       setDynamicBarberClosures(freshClosures)
-      console.log('[BookingWizard] Closures refreshed:', freshClosures.length)
     } catch (err) {
+      const isNetworkError = err instanceof TypeError && 
+        (err.message === 'Load failed' || err.message === 'Failed to fetch' || err.message === 'NetworkError when attempting to fetch resource.')
+      
+      if (isNetworkError && retryCount < MAX_RETRIES) {
+        // Exponential backoff retry for transient network errors (common on mobile Safari)
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 4000)
+        console.warn(`[BookingWizard] Network error fetching closures, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+        return refreshClosures(retryCount + 1)
+      }
+      
+      // After retries exhausted or non-network error, log but keep existing data
+      // Server-side closures passed as props serve as reliable fallback
       console.error('[BookingWizard] Error refreshing closures:', err)
     }
   }, [barberId])

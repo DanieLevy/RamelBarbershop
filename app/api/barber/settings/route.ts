@@ -52,8 +52,8 @@ const UpdateSettingsSchema = z.object({
   show_tiktok: z.boolean().optional(),
   // Booking config
   max_booking_days_ahead: z.number().int().min(1).max(365).optional(),
-  // Schedule (from schedule/page.tsx)
-  open_days: z.record(z.string(), z.boolean()).optional(),
+  // Schedule (from schedule/page.tsx) - open_days is text[] in the DB
+  open_days: z.array(z.string()).optional(),
   work_hours_start: z.string().regex(TIME_REGEX).optional(),
   work_hours_end: z.string().regex(TIME_REGEX).optional(),
 })

@@ -123,8 +123,18 @@ export async function getBarberClosures(barberId: string): Promise<BarberClosure
     .gte('end_date', getTodayDateString())
   
   if (error) {
-    console.error('Error fetching barber closures:', error)
-    await reportSupabaseError(error, 'Fetching barber closures', { table: 'barber_closures', operation: 'select' })
+    // Detect transient network errors (Safari "Load failed", Firefox network error)
+    const isNetworkError = error.message?.includes('Load failed') || 
+      error.message?.includes('Failed to fetch') || 
+      error.message?.includes('NetworkError')
+    
+    if (isNetworkError) {
+      // Don't report transient network errors to bug reporter - they're expected on mobile
+      console.warn('Network error fetching barber closures (transient):', error.message)
+    } else {
+      console.error('Error fetching barber closures:', error)
+      await reportSupabaseError(error, 'Fetching barber closures', { table: 'barber_closures', operation: 'select' })
+    }
     return []
   }
   

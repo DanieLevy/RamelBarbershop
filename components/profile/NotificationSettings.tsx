@@ -148,8 +148,16 @@ export function NotificationSettings({ className }: NotificationSettingsProps) {
     // Refresh status to get current permission from browser
     await push.refreshStatus()
     
-    // Check if permission is now available
-    const currentPermission = typeof Notification !== 'undefined' ? Notification.permission : 'denied'
+    // Check if permission is now available (use window.Notification to avoid iOS Safari ReferenceError)
+    let currentPermission: NotificationPermission | 'denied' = 'denied'
+    try {
+      const NotificationAPI = typeof window !== 'undefined' ? window.Notification : null
+      if (NotificationAPI && typeof NotificationAPI.permission === 'string') {
+        currentPermission = NotificationAPI.permission
+      }
+    } catch {
+      // iOS Safari can throw ReferenceError
+    }
     
     if (currentPermission === 'granted') {
       // Permission granted in settings! Auto-subscribe
