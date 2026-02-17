@@ -54,6 +54,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
           {/* Back Link */}
           <Link
             href="/products"
+            prefetch={false}
             className="inline-flex items-center gap-2 text-foreground-muted hover:text-accent-gold transition-colors mb-8"
           >
             <ChevronRight size={16} strokeWidth={2} />
@@ -132,6 +133,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
               {/* View All Products Link */}
               <Link
                 href="/products"
+                prefetch={false}
                 className="mt-6 flex items-center justify-center gap-2 py-3 px-6 rounded-xl border border-white/10 text-foreground-light hover:border-accent-gold/30 hover:text-accent-gold transition-all"
               >
                 צפייה בכל המוצרים

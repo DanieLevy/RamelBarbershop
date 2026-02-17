@@ -8,7 +8,7 @@ import type { TimeSlot, BarbershopSettings, WorkDay, BarberBookingSettings, DayO
 import { ChevronRight, ChevronDown, ChevronUp, Clock, Repeat, Coffee } from 'lucide-react'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { useBugReporter } from '@/hooks/useBugReporter'
-import { getWorkHours as getWorkHoursFromService, workDaysToMap } from '@/lib/services/availability.service'
+import { workDaysToMap } from '@/lib/services/availability.service'
 import { withSupabaseRetry } from '@/lib/utils/retry'
 import { getRecurringForDay } from '@/lib/services/recurring.service'
 import { getBreakoutsForDate, isSlotInBreakout } from '@/lib/services/breakout.service'
@@ -28,22 +28,39 @@ interface EnrichedTimeSlot extends TimeSlot {
   breakoutReason?: string // Optional reason for breakout (e.g., "צהריים")
 }
 
-export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], barberBookingSettings }: TimeSelectionProps) {
+export function TimeSelection({ barberId, barberWorkDays = [], barberBookingSettings }: TimeSelectionProps) {
   const { date, timeTimestamp, setTime, nextStep, prevStep } = useBookingStore()
   const [availableSlots, setAvailableSlots] = useState<EnrichedTimeSlot[]>([])
   const [reservedSlots, setReservedSlots] = useState<EnrichedTimeSlot[]>([])
   const [tooSoonSlots, setTooSoonSlots] = useState<EnrichedTimeSlot[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [retryTrigger, setRetryTrigger] = useState(0)
   const [showReserved, setShowReserved] = useState(false)
   const [showTooSoon, setShowTooSoon] = useState(false)
   const { report } = useBugReporter('TimeSelection')
 
-  // Get work hours for a specific day - uses day-specific hours from work_days
-  const getWorkHoursForDay = (dateTimestamp: number): { start: string; end: string } => {
+  // Get work hours for a specific day - uses ONLY barber-specific work_days
+  // Returns null if barber work hours are unavailable (never falls back to shop settings
+  // which has work_hours_end: '00:00:00' causing slots until 23:30)
+  const getWorkHoursForDay = (dateTimestamp: number): { start: string; end: string } | null => {
     const dayName = getDayKeyInIsrael(dateTimestamp)
     const workDaysMap = workDaysToMap(barberWorkDays)
-    return getWorkHoursFromService(shopSettings || null, dayName, workDaysMap)
+    
+    // Only use barber-specific hours - never fall back to shop settings for time slots
+    const dayHours = workDaysMap[dayName]
+    if (dayHours && dayHours.isWorking && dayHours.startTime && dayHours.endTime) {
+      const normalizeTime = (time: string): string => {
+        const parts = time.split(':')
+        return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`
+      }
+      return {
+        start: normalizeTime(dayHours.startTime),
+        end: normalizeTime(dayHours.endTime),
+      }
+    }
+    
+    return null
   }
 
   useEffect(() => {
@@ -56,7 +73,15 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
       try {
         const supabase = createClient()
         // Get day-specific work hours for the selected date
+        // Returns null if barber work hours are unavailable - show retry instead of wrong slots
         const workHours = getWorkHoursForDay(date.dateTimestamp)
+        
+        if (!workHours) {
+          setError('לא ניתן לטעון את שעות העבודה. נסה שוב.')
+          setLoading(false)
+          return
+        }
+        
         const { hour: startHour, minute: startMinute } = parseTimeString(workHours.start)
         const { hour: endHour, minute: endMinute } = parseTimeString(workHours.end)
         
@@ -263,7 +288,11 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
 
     fetchTimeSlots()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [barberId, date, barberWorkDays, barberBookingSettings])
+  }, [barberId, date, barberWorkDays, barberBookingSettings, retryTrigger])
+
+  const handleRetry = () => {
+    setRetryTrigger(prev => prev + 1)
+  }
 
   const handleSelect = (timestamp: number) => {
     setTime(timestamp)
@@ -287,12 +316,15 @@ export function TimeSelection({ barberId, shopSettings, barberWorkDays = [], bar
         </div>
       ) : error ? (
         <div className="text-center py-8">
-          <p className="text-red-400 mb-4">{error}</p>
+          <p className="text-red-400 mb-3">{error}</p>
           <button
             type="button"
-            onClick={() => window.location.reload()}
-            className="text-accent-gold hover:underline text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-gold rounded"
+            onClick={handleRetry}
+            aria-label="נסה לטעון שוב את שעות העבודה"
+            tabIndex={0}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-accent-gold/10 text-accent-gold border border-accent-gold/30 rounded-lg hover:bg-accent-gold/20 transition-colors text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-gold"
           >
+            <Clock className="w-4 h-4" />
             נסה שוב
           </button>
         </div>

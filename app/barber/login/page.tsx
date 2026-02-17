@@ -172,6 +172,7 @@ export default function BarberLoginPage() {
               
               <Link
                 href="/"
+                prefetch={false}
                 className="w-full py-3.5 rounded-xl font-medium transition-all flex items-center justify-center border border-white/20 text-foreground-light hover:bg-white/5"
               >
                 חזרה לאתר
@@ -363,6 +364,7 @@ export default function BarberLoginPage() {
         <div className="mt-6 text-center">
           <Link
             href="/"
+            prefetch={false}
             className="inline-flex items-center gap-2 text-foreground-muted hover:text-foreground-light text-sm transition-colors py-2"
           >
             <ChevronRight size={12} strokeWidth={1.5} />

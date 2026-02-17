@@ -67,6 +67,7 @@ export function ProductsCarousel({ products }: ProductsCarouselProps) {
       <SectionContent className="mt-6 text-center">
         <Link
           href="/products"
+          prefetch={false}
           className="inline-flex items-center gap-3 px-6 py-3 rounded-xl border border-accent-gold/30 text-accent-gold hover:bg-accent-gold/10 hover:border-accent-gold/50 transition-all group"
         >
           <ShoppingBag size={18} strokeWidth={1.5} />

@@ -255,6 +255,7 @@ export default function DashboardPage() {
           <h2 className="font-medium text-foreground-light">התורים הקרובים</h2>
           <Link
             href="/barber/dashboard/reservations"
+            prefetch={false}
             className="flex items-center gap-1 text-accent-gold text-sm hover:underline"
           >
             הצג הכל
@@ -355,6 +356,7 @@ export default function DashboardPage() {
               <Link
                 key={action.href}
                 href={action.href}
+                prefetch={false}
                 className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-background-dark/50 hover:bg-background-dark transition-colors group"
               >
                 <action.icon 

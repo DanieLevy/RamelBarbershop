@@ -31,7 +31,7 @@ export function DashboardMobileHeader({ onMenuToggle }: DashboardMobileHeaderPro
         </Button>
         
         {/* Logo and title */}
-        <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+        <Link href="/" prefetch={false} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <div className="w-8 h-8 rounded-full overflow-hidden border border-accent-gold/30">
             <Image
               src="/icon.png"
@@ -47,6 +47,7 @@ export function DashboardMobileHeader({ onMenuToggle }: DashboardMobileHeaderPro
         {/* Home button */}
         <Link
           href="/"
+          prefetch={false}
           className="p-2 text-foreground-muted hover:text-accent-gold transition-colors flex items-center justify-center"
           aria-label="חזרה לדף הבית"
         >

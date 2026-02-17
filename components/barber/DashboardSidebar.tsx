@@ -293,6 +293,7 @@ function SidebarContent({
         
         <Link
           href="/"
+          prefetch={false}
           className="block mt-2 text-center text-xs text-foreground-muted hover:text-foreground-light transition-colors"
         >
           ← חזרה לאתר

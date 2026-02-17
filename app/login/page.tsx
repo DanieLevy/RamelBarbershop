@@ -133,6 +133,7 @@ export default function LoginPage() {
                   אני מסכים/ה ל
                   <Link 
                     href="/terms" 
+                    prefetch={false}
                     target="_blank"
                     className="text-accent-gold hover:underline mx-1"
                     onClick={(e) => e.stopPropagation()}
@@ -142,6 +143,7 @@ export default function LoginPage() {
                   ול
                   <Link 
                     href="/privacy-policy" 
+                    prefetch={false}
                     target="_blank"
                     className="text-accent-gold hover:underline mx-1"
                     onClick={(e) => e.stopPropagation()}

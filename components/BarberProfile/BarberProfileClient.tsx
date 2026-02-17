@@ -40,16 +40,6 @@ export function BarberProfileClient({
   // Use username (slug) for nicer URLs, fallback to UUID
   const barberSlug = barber.username || barber.id
 
-  // Prefetch the booking page on mount for instant navigation
-  useEffect(() => {
-    // Prefetch the booking page with each service option
-    services.forEach(service => {
-      router.prefetch(buildBarberBookingUrl(barberSlug, service.id))
-    })
-    // Also prefetch without a service (fallback)
-    router.prefetch(buildBarberBookingUrl(barberSlug))
-  }, [barberSlug, services, router])
-
   // Edge-to-edge hero mode - add fallback class for browsers without :has() support
   useEffect(() => {
     // Add class to body for CSS fallback (browsers without :has() selector)

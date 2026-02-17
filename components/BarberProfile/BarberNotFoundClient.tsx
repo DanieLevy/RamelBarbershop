@@ -81,6 +81,7 @@ export function BarberNotFoundClient({
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
             href="/#team"
+            prefetch={false}
             className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-accent-gold text-background-dark font-medium hover:bg-accent-gold/90 active:scale-[0.98] transition-all"
             aria-label="בחר ספר אחר"
           >
@@ -90,6 +91,7 @@ export function BarberNotFoundClient({
           
           <Link
             href="/"
+            prefetch={false}
             className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl border border-white/10 text-foreground-light hover:bg-white/5 active:scale-[0.98] transition-all"
             aria-label="חזור לדף הבית"
           >

@@ -373,6 +373,7 @@ export default function FAQPage() {
         {/* Back Button */}
         <Link
           href="/"
+          prefetch={false}
           className="inline-flex items-center gap-2 text-foreground-muted hover:text-accent-gold transition-colors mb-6"
         >
           <ArrowRight size={16} />
@@ -429,6 +430,7 @@ export default function FAQPage() {
         <div className="mt-8 text-center">
           <Link
             href="/"
+            prefetch={false}
             className="inline-flex items-center gap-2 text-accent-gold hover:text-accent-gold/80 transition-colors"
           >
             <ArrowRight size={16} />

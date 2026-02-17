@@ -14,6 +14,7 @@ export default function TermsPage() {
         {/* Back Button */}
         <Link
           href="/"
+          prefetch={false}
           className="inline-flex items-center gap-2 text-foreground-muted hover:text-accent-gold transition-colors mb-6"
         >
           <ArrowRight size={16} />
@@ -74,7 +75,7 @@ export default function TermsPage() {
             <h2 className="text-lg font-medium text-accent-gold mb-3">4. קבלת התנאים</h2>
             <p className="text-foreground-muted">
               הגלישה באתר ו/או השימוש בשירותיו מהווים הסכמה מלאה ובלתי מותנית לתנאי תקנון זה
-              ול<Link href="/privacy-policy" className="text-accent-gold hover:underline">מדיניות הפרטיות</Link> שלנו. 
+              ול<Link href="/privacy-policy" prefetch={false} className="text-accent-gold hover:underline">מדיניות הפרטיות</Link> שלנו. 
               אם אינך מסכים לתנאים אלה, עליך להימנע משימוש באתר.
             </p>
           </section>
@@ -203,7 +204,7 @@ export default function TermsPage() {
             <h2 className="text-lg font-medium text-accent-gold mb-3">12. פרטיות ואבטחת מידע</h2>
             <p className="text-foreground-muted">
               איסוף ועיבוד מידע אישי באתר כפוף ל
-              <Link href="/privacy-policy" className="text-accent-gold hover:underline mx-1">
+              <Link href="/privacy-policy" prefetch={false} className="text-accent-gold hover:underline mx-1">
                 מדיניות הפרטיות
               </Link>
               שלנו, המהווה חלק בלתי נפרד מתקנון זה. אנו פועלים בהתאם לחוק הגנת הפרטיות, התשמ&quot;א-1981 
@@ -217,7 +218,7 @@ export default function TermsPage() {
             <p className="text-foreground-muted">
               אנו מחויבים להנגשת האתר לאנשים עם מוגבלויות בהתאם לחוק שוויון זכויות לאנשים עם מוגבלות. 
               לפרטים נוספים, ראו את{' '}
-              <Link href="/accessibility" className="text-accent-gold hover:underline">
+              <Link href="/accessibility" prefetch={false} className="text-accent-gold hover:underline">
                 הצהרת הנגישות
               </Link>
               {' '}שלנו.
@@ -262,6 +263,7 @@ export default function TermsPage() {
         <div className="mt-8 text-center">
           <Link
             href="/"
+            prefetch={false}
             className="inline-flex items-center gap-2 text-accent-gold hover:text-accent-gold/80 transition-colors"
           >
             <ArrowRight size={16} />

@@ -46,6 +46,7 @@ export function ProductCard({ product, size = 'md', className }: ProductCardProp
   return (
     <Link
       href={`/products/${product.id}`}
+      prefetch={false}
       className={cn(
         'group block rounded-2xl overflow-hidden bg-white/[0.03] border border-white/10',
         'hover:border-accent-gold/30 hover:bg-white/[0.05] transition-all duration-300',

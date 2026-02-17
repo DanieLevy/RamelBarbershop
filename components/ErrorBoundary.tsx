@@ -115,6 +115,7 @@ class ErrorBoundary extends Component<Props, State> {
             <div className="flex justify-center">
               <Link
                 href="/"
+                prefetch={false}
                 className="flex items-center gap-2 px-6 py-3 bg-accent-gold text-background-dark rounded-lg font-medium text-sm hover:bg-accent-gold/90 transition-colors"
               >
                 <Home className="w-4 h-4" />

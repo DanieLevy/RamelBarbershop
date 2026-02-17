@@ -141,7 +141,7 @@ export const BarberCard = ({ barber, index = 0 }: BarberCardProps) => {
       {/* ── Image Section (4:3 aspect ratio) ── */}
       <Link
         href={barberUrl}
-        prefetch={true}
+        prefetch={false}
         onClick={handleNavigation}
         className="block relative aspect-[4/3] overflow-hidden mb-0"
         aria-label={`הזמן תור אצל ${barber.fullname}`}
@@ -236,7 +236,7 @@ export const BarberCard = ({ barber, index = 0 }: BarberCardProps) => {
       {/* Add scissors icon to the left of the text with nice moving animation */}
       <Link
         href={barberUrl}
-        prefetch={true}
+        prefetch={false}
         onClick={handleNavigation}
         className={cn(
           'block py-2.5 mx-3 mb-3 rounded-xl',

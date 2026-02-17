@@ -112,6 +112,7 @@ export function UpcomingAppointmentBanner() {
   return (
     <Link
       href="/my-appointments"
+      prefetch={false}
       className={cn(
         'block w-full py-2 px-4 transition-all duration-300',
         'bg-accent-gold/10 hover:bg-accent-gold/15 border-b border-accent-gold/20'

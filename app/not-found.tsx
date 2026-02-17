@@ -57,6 +57,7 @@ export default function NotFound() {
         {/* CTA Button */}
         <Link
           href="/"
+          prefetch={false}
           className="inline-flex items-center gap-2 px-8 py-4 bg-accent-gold text-background-dark font-medium rounded-xl hover:bg-accent-gold/90 transition-all hover:scale-105 shadow-gold"
         >
           <svg

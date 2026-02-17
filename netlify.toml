@@ -94,3 +94,62 @@
   for = "/api/dev/*"
   [headers.values]
     Cache-Control = "no-store, no-cache, must-revalidate, private"
+
+# ──────────────────────────────────────────────────────
+# CDN-ONLY caching - reduces Netlify function invocations
+# Netlify-CDN-Cache-Control only affects CDN, NOT the browser.
+# Browser still follows Cache-Control set by Next.js.
+# This means repeat visits within the cache window are served
+# from CDN (no function invocation) while the browser still
+# gets fresh content on each visit.
+# ──────────────────────────────────────────────────────
+
+# Homepage - brief CDN cache (content is mostly static barber cards)
+[[headers]]
+  for = "/"
+  [headers.values]
+    Netlify-CDN-Cache-Control = "public, max-age=60, stale-while-revalidate=300, durable"
+
+# Legal/static pages - longer CDN cache (rarely updated)
+[[headers]]
+  for = "/faq"
+  [headers.values]
+    Netlify-CDN-Cache-Control = "public, max-age=3600, stale-while-revalidate=86400, durable"
+
+[[headers]]
+  for = "/terms"
+  [headers.values]
+    Netlify-CDN-Cache-Control = "public, max-age=3600, stale-while-revalidate=86400, durable"
+
+[[headers]]
+  for = "/privacy-policy"
+  [headers.values]
+    Netlify-CDN-Cache-Control = "public, max-age=3600, stale-while-revalidate=86400, durable"
+
+[[headers]]
+  for = "/accessibility"
+  [headers.values]
+    Netlify-CDN-Cache-Control = "public, max-age=3600, stale-while-revalidate=86400, durable"
+
+# Products catalog - moderate CDN cache
+[[headers]]
+  for = "/products"
+  [headers.values]
+    Netlify-CDN-Cache-Control = "public, max-age=300, stale-while-revalidate=600, durable"
+
+[[headers]]
+  for = "/products/*"
+  [headers.values]
+    Netlify-CDN-Cache-Control = "public, max-age=300, stale-while-revalidate=600, durable"
+
+# Login page - brief CDN cache (static page, no dynamic data)
+[[headers]]
+  for = "/login"
+  [headers.values]
+    Netlify-CDN-Cache-Control = "public, max-age=300, stale-while-revalidate=600, durable"
+
+# Notifications page (customer) - no CDN cache (real-time data)
+[[headers]]
+  for = "/notifications"
+  [headers.values]
+    Netlify-CDN-Cache-Control = "public, max-age=0, must-revalidate"

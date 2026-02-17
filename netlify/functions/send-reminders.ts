@@ -5,14 +5,21 @@
  * to process and send reminders. All heavy processing happens
  * in the main application to avoid Netlify function limitations.
  * 
- * Schedule: Runs every 30 minutes (at :00 and :30)
+ * Schedule: Runs every 30 minutes during business-relevant hours only (5:00-20:00 UTC)
+ * Israel timezone is UTC+2 (winter) / UTC+3 (summer), so:
+ *   5:00 UTC = 07:00-08:00 Israel time (covers early morning reminders)
+ *   20:00 UTC = 22:00-23:00 Israel time (covers late evening reminders)
+ * This reduces from 48 runs/day to 30 runs/day (saving 18 invocations/day).
+ * Combined with Monday/Saturday skip, this significantly reduces function usage.
  */
 
 import type { Config, Context } from '@netlify/functions'
 
-// Schedule configuration - runs every 30 minutes
+// Schedule: every 30 minutes, but only during hours 5-19 UTC (7:00-22:00 Israel)
+// Before: 0,30 * * * * (48 runs/day)
+// After: 0,30 5-19 * * * (30 runs/day) — saves 37.5% of invocations
 export const config: Config = {
-  schedule: '0,30 * * * *'
+  schedule: '0,30 5-19 * * *'
 }
 
 /**
@@ -24,10 +31,41 @@ function getBaseUrl(): string {
 }
 
 /**
+ * Check if today is a closed day (Monday or Saturday) in Israel timezone.
+ * Barbershop is always closed on these days - hardcoded, no DB needed.
+ * Skipping these days saves ~96 function invocations per week (48 per day × 2 days).
+ */
+function isClosedDay(): boolean {
+  // Get current day in Israel timezone (Asia/Jerusalem)
+  const israelDay = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    timeZone: 'Asia/Jerusalem',
+  }).format(new Date())
+
+  // Monday = 1, Saturday = 6 in JS Date — but using string comparison for clarity
+  return israelDay === 'Monday' || israelDay === 'Saturday'
+}
+
+/**
  * Main handler - triggers the process-reminders API
  */
 export default async function handler(_req: Request, _context: Context) {
   const startTime = Date.now()
+
+  // Skip Monday and Saturday — barbershop is always closed on these days (hardcoded)
+  if (isClosedDay()) {
+    console.log('[Netlify Trigger] Skipping — barbershop is closed today (Monday/Saturday)')
+    return new Response(JSON.stringify({
+      success: true,
+      source: 'netlify',
+      skipped: true,
+      reason: 'Barbershop closed (Monday/Saturday)',
+      triggerDuration: Date.now() - startTime,
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
   
   console.log('[Netlify Trigger] Starting reminder job trigger')
 

@@ -79,7 +79,7 @@ export function Footer({ settings }: FooterProps) {
         <div className="flex flex-col items-center text-center sm:flex-row sm:text-right sm:items-start sm:justify-between gap-6">
           {/* Logo + Info */}
           <div className="flex flex-col items-center sm:items-start gap-4">
-            <Link href="/" className="inline-block">
+            <Link href="/" prefetch={false} className="inline-block">
               <div className="w-12 h-12 rounded-full overflow-hidden border border-accent-gold/30 shadow-gold-sm">
                 <Image
                   src="/icon.png"
@@ -119,27 +119,28 @@ export function Footer({ settings }: FooterProps) {
         <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-4 flex flex-col items-center gap-3 text-xs text-foreground-muted">
           {/* Legal + User Links */}
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
-            <Link href="/faq" className="hover:text-accent-gold transition-colors">
+            <Link href="/faq" prefetch={false} className="hover:text-accent-gold transition-colors">
               שאלות נפוצות
             </Link>
-            <Link href="/terms" className="hover:text-accent-gold transition-colors">
+            <Link href="/terms" prefetch={false} className="hover:text-accent-gold transition-colors">
               תקנון
             </Link>
-            <Link href="/privacy-policy" className="hover:text-accent-gold transition-colors">
+            <Link href="/privacy-policy" prefetch={false} className="hover:text-accent-gold transition-colors">
               פרטיות
             </Link>
-            <Link href="/accessibility" className="hover:text-accent-gold transition-colors">
+            <Link href="/accessibility" prefetch={false} className="hover:text-accent-gold transition-colors">
               נגישות
             </Link>
-            <Link href="/my-appointments" className="hover:text-accent-gold transition-colors">
+            <Link href="/my-appointments" prefetch={false} className="hover:text-accent-gold transition-colors">
               התורים שלי
             </Link>
-            <Link href="/profile" className="hover:text-accent-gold transition-colors">
+            <Link href="/profile" prefetch={false} className="hover:text-accent-gold transition-colors">
               הפרופיל שלי
             </Link>
             {showDebugLink && (
               <Link
                 href="/debug"
+                prefetch={false}
                 className="hover:text-accent-gold transition-colors flex items-center gap-1"
                 title="Debug Console"
               >

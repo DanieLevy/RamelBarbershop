@@ -37,6 +37,7 @@ export default async function ProductsPage() {
           {/* Back Link */}
           <Link
             href="/"
+            prefetch={false}
             className="inline-flex items-center gap-2 text-foreground-muted hover:text-accent-gold transition-colors mb-8"
           >
             <ChevronRight size={16} strokeWidth={2} />

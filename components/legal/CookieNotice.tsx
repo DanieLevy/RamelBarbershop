@@ -113,6 +113,7 @@ export function CookieNotice() {
             אנו משתמשים בעוגיות.{' '}
             <Link 
               href="/privacy-policy#cookies" 
+              prefetch={false}
               className="text-accent-gold hover:underline"
             >
               מדיניות פרטיות

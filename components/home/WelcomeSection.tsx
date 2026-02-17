@@ -211,6 +211,7 @@ export const WelcomeSection = ({
           {isInitialized && isCustomer && isLoggedIn && !loading && nextAppointment && (
             <Link
               href="/my-appointments"
+              prefetch={false}
               className={cn(
                 'block rounded-2xl p-4',
                 'bg-[#1a1a1a] border border-white/[0.08]',
@@ -331,6 +332,7 @@ export const WelcomeSection = ({
               <div className="flex items-center gap-2">
                 <Link
                   href="/barber/dashboard/reservations"
+                  prefetch={false}
                   className={cn(
                     'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl',
                     'bg-white/[0.05] border border-white/[0.06]',
@@ -344,6 +346,7 @@ export const WelcomeSection = ({
                 </Link>
                 <Link
                   href="/barber/dashboard"
+                  prefetch={false}
                   className={cn(
                     'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl',
                     'bg-accent-gold/15 border border-accent-gold/20',
@@ -374,6 +377,7 @@ export const WelcomeSection = ({
 
               <Link
                 href="/barber/dashboard"
+                prefetch={false}
                 className={cn(
                   'flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl w-full',
                   'bg-accent-gold/15 border border-accent-gold/20',

@@ -42,6 +42,7 @@ export function DevNavbar() {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={false}
               className={cn(
                 'flex flex-col items-center justify-center min-w-[60px] py-2 px-3 rounded-xl transition-all',
                 active

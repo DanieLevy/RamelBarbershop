@@ -269,6 +269,7 @@ export function CustomerDetails() {
             אני מסכים/ה ל
             <Link 
               href="/privacy-policy" 
+              prefetch={false}
               target="_blank"
               className="text-accent-gold hover:underline mx-1"
               onClick={(e) => e.stopPropagation()}
