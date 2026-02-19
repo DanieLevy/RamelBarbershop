@@ -515,26 +515,42 @@ class PushNotificationService {
           failed++
           const fcmCode = (fcmError as { code?: string })?.code || String(fcmError)
           errors.push(`FCM ${sub.id}: ${fcmCode}`)
-          const FCM_PERMANENT_CODES = [
-            'messaging/registration-token-not-registered',
-            'messaging/invalid-registration-token',
+          // APNs key errors — server-side config issue, NOT a bad token.
+          // Do not deactivate the subscription; alert so the key can be fixed.
+          const FCM_APNS_AUTH_CODES = [
+            'messaging/third-party-auth-error',
+            'messaging/apns-auth-key-expired',
           ]
-          if (FCM_PERMANENT_CODES.includes(fcmCode)) {
+          if (FCM_APNS_AUTH_CODES.includes(fcmCode)) {
+            console.error(`[PushService] 🚨 APNs KEY ERROR — FCM cannot deliver to iOS. Upload a valid APNs auth key at https://console.firebase.google.com/project/ramel-barbershop-9b054/settings/cloudmessaging. Error: ${fcmCode}`)
+            // Don't deactivate — token is valid, only the server key needs fixing
             await supabase
               .from('push_subscriptions')
-              .update({ is_active: false, last_delivery_status: 'failed' })
+              .update({ last_delivery_status: 'failed' })
               .eq('id', sub.id)
-            console.log(`[PushService] Deactivated FCM subscription ${sub.id}: ${fcmCode}`)
           } else {
-            const newFailureCount = (sub.consecutive_failures || 0) + 1
-            await supabase
-              .from('push_subscriptions')
-              .update({
-                consecutive_failures: newFailureCount,
-                last_delivery_status: 'failed',
-                is_active: newFailureCount < MAX_CONSECUTIVE_FAILURES,
-              })
-              .eq('id', sub.id)
+            const FCM_PERMANENT_CODES = [
+              'messaging/registration-token-not-registered',
+              'messaging/invalid-registration-token',
+            ]
+            if (FCM_PERMANENT_CODES.includes(fcmCode)) {
+              await supabase
+                .from('push_subscriptions')
+                .update({ is_active: false, last_delivery_status: 'failed' })
+                .eq('id', sub.id)
+              console.log(`[PushService] Deactivated FCM subscription ${sub.id}: ${fcmCode}`)
+            } else {
+              const newFailureCount = (sub.consecutive_failures || 0) + 1
+              await supabase
+                .from('push_subscriptions')
+                .update({
+                  consecutive_failures: newFailureCount,
+                  last_delivery_status: 'failed',
+                  is_active: newFailureCount < MAX_CONSECUTIVE_FAILURES,
+                })
+                .eq('id', sub.id)
+              console.error(`[PushService] FCM send failed for ${sub.id} (failure #${newFailureCount}): ${fcmCode}`)
+            }
           }
         }
         return

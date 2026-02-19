@@ -401,11 +401,20 @@ async function sendFcmPush(
     return { success: true }
   } catch (err: unknown) {
     const e = err as { code?: string; message?: string }
+    const code = e?.code || ''
     const permanent = [
       'messaging/registration-token-not-registered',
       'messaging/invalid-registration-token',
-    ].includes(e?.code || '')
-    return { success: false, permanent, error: `${e?.code}: ${e?.message}` }
+    ].includes(code)
+    // APNs key errors — server-side config, not a bad token; log prominently
+    if (code === 'messaging/third-party-auth-error' || code === 'messaging/apns-auth-key-expired') {
+      logger.error('[Reminders] 🚨 APNs KEY ERROR — upload a valid APNs auth key in Firebase Console > Cloud Messaging', {
+        code,
+        message: e?.message,
+        url: 'https://console.firebase.google.com/project/ramel-barbershop-9b054/settings/cloudmessaging',
+      })
+    }
+    return { success: false, permanent, error: `${code}: ${e?.message}` }
   }
 }
 
