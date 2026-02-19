@@ -96,6 +96,10 @@ export interface PushSubscriptionRecord {
   last_delivery_status: DeliveryStatus
   last_used: string | null
   created_at: string | null
+  // FCM fields for native iOS/Android
+  token_type?: 'web_push' | 'fcm' | 'expo' | null
+  fcm_token?: string | null
+  platform?: 'web' | 'ios' | 'android' | null
 }
 
 // Customer notification settings record
@@ -161,6 +165,10 @@ export interface SaveSubscriptionData {
   deviceType: DeviceType
   deviceName?: string
   userAgent: string
+  // FCM fields for native iOS/Android
+  tokenType?: 'web_push' | 'fcm' | 'expo'
+  fcmToken?: string
+  platform?: 'web' | 'ios' | 'android'
 }
 
 // Push notification status for a user

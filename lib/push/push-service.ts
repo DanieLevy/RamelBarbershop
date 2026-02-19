@@ -6,6 +6,7 @@
  */
 
 import webpush from 'web-push'
+import { getFCMMessaging, isFCMConfigured } from './firebase-admin'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getNotificationTemplate } from './notification-templates'
 import { timestampToIsraelDate, nowInIsraelMs } from '@/lib/utils'
@@ -340,7 +341,7 @@ class PushNotificationService {
     // Only select columns needed for sending notifications
     const { data: subscriptions } = await supabase
       .from('push_subscriptions')
-      .select('id, endpoint, p256dh, auth, customer_id, barber_id, device_type, is_active, consecutive_failures')
+      .select('id, endpoint, p256dh, auth, customer_id, barber_id, device_type, is_active, consecutive_failures, token_type, fcm_token')
       .in('customer_id', customerIds)
       .eq('is_active', true)
 
@@ -367,7 +368,7 @@ class PushNotificationService {
     // Only select columns needed for sending notifications
     const { data: subscriptions } = await supabase
       .from('push_subscriptions')
-      .select('id, endpoint, p256dh, auth, customer_id, barber_id, device_type, is_active, consecutive_failures')
+      .select('id, endpoint, p256dh, auth, customer_id, barber_id, device_type, is_active, consecutive_failures, token_type, fcm_token')
       .in('barber_id', barberIds)
       .eq('is_active', true)
 
@@ -391,10 +392,54 @@ class PushNotificationService {
     // Only select columns needed for sending notifications
     const { data: subscriptions } = await supabase
       .from('push_subscriptions')
-      .select('id, endpoint, p256dh, auth, customer_id, barber_id, device_type, is_active, consecutive_failures')
+      .select('id, endpoint, p256dh, auth, customer_id, barber_id, device_type, is_active, consecutive_failures, token_type, fcm_token')
       .eq('is_active', true)
 
     return this.sendToSubscriptions(subscriptions as PushSubscriptionRecord[] || [], payload)
+  }
+
+  /**
+   * Send a single notification via Firebase Admin SDK (FCM → APNs/GCM)
+   * Used for native iOS and Android subscriptions.
+   */
+  private async sendFCMNotification(
+    sub: PushSubscriptionRecord,
+    payload: NotificationPayload
+  ): Promise<void> {
+    if (!isFCMConfigured()) {
+      throw new Error('[PushService] Firebase Admin not configured — set FIREBASE_* env vars on Netlify')
+    }
+
+    await getFCMMessaging().send({
+      token: sub.fcm_token!,
+      notification: {
+        title: payload.title,
+        body: payload.body,
+      },
+      apns: {
+        headers: { 'apns-priority': '10' },
+        payload: {
+          aps: {
+            badge: payload.badgeCount ?? 0,
+            sound: 'default',
+          },
+        },
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          sound: 'default',
+          channelId: 'default',
+        },
+      },
+      data: {
+        url: payload.url || '/',
+        type: String(payload.data?.type || ''),
+        reservationId: String(payload.data?.reservationId || ''),
+        timestamp: String(Date.now()),
+        badgeCount: String(payload.badgeCount ?? 0),
+      },
+    })
   }
 
   /**
@@ -457,8 +502,47 @@ class PushNotificationService {
 
     // Send to each subscription with retry logic
     const sendPromises = healthySubscriptions.map(async (sub) => {
+      // FCM path — native iOS/Android via Firebase Admin → APNs/GCM
+      if (sub.token_type === 'fcm' && sub.fcm_token) {
+        try {
+          await this.sendFCMNotification(sub, payload)
+          await supabase
+            .from('push_subscriptions')
+            .update({ consecutive_failures: 0, last_delivery_status: 'success', last_used: new Date().toISOString() })
+            .eq('id', sub.id)
+          sent++
+        } catch (fcmError: unknown) {
+          failed++
+          const fcmCode = (fcmError as { code?: string })?.code || String(fcmError)
+          errors.push(`FCM ${sub.id}: ${fcmCode}`)
+          const FCM_PERMANENT_CODES = [
+            'messaging/registration-token-not-registered',
+            'messaging/invalid-registration-token',
+          ]
+          if (FCM_PERMANENT_CODES.includes(fcmCode)) {
+            await supabase
+              .from('push_subscriptions')
+              .update({ is_active: false, last_delivery_status: 'failed' })
+              .eq('id', sub.id)
+            console.log(`[PushService] Deactivated FCM subscription ${sub.id}: ${fcmCode}`)
+          } else {
+            const newFailureCount = (sub.consecutive_failures || 0) + 1
+            await supabase
+              .from('push_subscriptions')
+              .update({
+                consecutive_failures: newFailureCount,
+                last_delivery_status: 'failed',
+                is_active: newFailureCount < MAX_CONSECUTIVE_FAILURES,
+              })
+              .eq('id', sub.id)
+          }
+        }
+        return
+      }
+
+      // Web-push path — PWA/browser subscriptions (unchanged)
       let lastError: { message?: string; statusCode?: number } | null = null
-      
+
       // Retry loop with exponential backoff
       for (let attempt = 0; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
         try {
@@ -856,7 +940,11 @@ class PushNotificationService {
         is_active: true,
         consecutive_failures: 0,
         last_delivery_status: null,
-        last_used: new Date().toISOString()
+        last_used: new Date().toISOString(),
+        // FCM fields for native iOS/Android
+        token_type: data.tokenType || null,
+        fcm_token: data.fcmToken || null,
+        platform: data.platform || null,
       }
 
       if (existing) {
@@ -939,7 +1027,7 @@ class PushNotificationService {
     // Get subscriptions linked to customer_id
     const { data: customerSubs } = await supabase
       .from('push_subscriptions')
-      .select('id, customer_id, barber_id, endpoint, p256dh, auth, device_type, device_name, is_active, consecutive_failures, last_delivery_status, last_used, created_at')
+      .select('id, customer_id, barber_id, endpoint, p256dh, auth, device_type, device_name, is_active, consecutive_failures, last_delivery_status, last_used, created_at, token_type, fcm_token, platform')
       .eq('customer_id', customerId)
       .eq('is_active', true)
       .order('last_used', { ascending: false })
@@ -958,7 +1046,7 @@ class PushNotificationService {
     if (barberCheck) {
       const { data: barberSubs } = await supabase
         .from('push_subscriptions')
-        .select('id, customer_id, barber_id, endpoint, p256dh, auth, device_type, device_name, is_active, consecutive_failures, last_delivery_status, last_used, created_at')
+        .select('id, customer_id, barber_id, endpoint, p256dh, auth, device_type, device_name, is_active, consecutive_failures, last_delivery_status, last_used, created_at, token_type, fcm_token, platform')
         .eq('barber_id', customerId)
         .eq('is_active', true)
 
@@ -985,7 +1073,7 @@ class PushNotificationService {
     // Get subscriptions linked to barber_id
     const { data: barberSubs } = await supabase
       .from('push_subscriptions')
-      .select('id, customer_id, barber_id, endpoint, p256dh, auth, device_type, device_name, is_active, consecutive_failures, last_delivery_status, last_used, created_at')
+      .select('id, customer_id, barber_id, endpoint, p256dh, auth, device_type, device_name, is_active, consecutive_failures, last_delivery_status, last_used, created_at, token_type, fcm_token, platform')
       .eq('barber_id', barberId)
       .eq('is_active', true)
       .order('last_used', { ascending: false })
@@ -1003,7 +1091,7 @@ class PushNotificationService {
     if (customerCheck) {
       const { data: customerSubs } = await supabase
         .from('push_subscriptions')
-        .select('id, customer_id, barber_id, endpoint, p256dh, auth, device_type, device_name, is_active, consecutive_failures, last_delivery_status, last_used, created_at')
+        .select('id, customer_id, barber_id, endpoint, p256dh, auth, device_type, device_name, is_active, consecutive_failures, last_delivery_status, last_used, created_at, token_type, fcm_token, platform')
         .eq('customer_id', barberId)
         .eq('is_active', true)
 

@@ -25,7 +25,7 @@ function detectDeviceType(userAgent: string): DeviceType {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { subscription, customerId, barberId, deviceName } = body
+    const { subscription, customerId, barberId, deviceName, tokenType, fcmToken, platform } = body
 
     // Validate subscription object
     if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
@@ -58,7 +58,10 @@ export async function POST(request: NextRequest) {
       subscription,
       deviceType,
       deviceName,
-      userAgent
+      userAgent,
+      tokenType,
+      fcmToken,
+      platform,
     })
 
     if (result.error) {
