@@ -17,30 +17,6 @@
   node_bundler = "esbuild"
   external_node_modules = ["@supabase/supabase-js", "web-push"]
   included_files = ["netlify/functions/**"]
-  # Restrict runtime env vars to stay under AWS Lambda's 4KB limit.
-  # NEXT_PUBLIC_FIREBASE_* vars are baked into the client bundle at build time
-  # and are NOT needed by server-side Lambda functions at runtime.
-  included_env_vars = [
-    "NEXT_PUBLIC_SUPABASE_URL",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-    "NEXT_PUBLIC_APP_URL",
-    "NEXT_PUBLIC_APP_VERSION",
-    "NEXT_PUBLIC_VAPID_PUBLIC_KEY",
-    "SUPABASE_SERVICE_ROLE_KEY",
-    "FIREBASE_PROJECT_ID",
-    "FIREBASE_CLIENT_EMAIL",
-    "FIREBASE_PRIVATE_KEY",
-    "VAPID_PUBLIC_KEY",
-    "VAPID_PRIVATE_KEY",
-    "VAPID_EMAIL",
-    "INTERNAL_API_SECRET",
-    "CRON_SECRET",
-    "O19_SMS_API_TOKEN",
-    "O19_SMS_SOURCE",
-    "O19_SMS_USERNAME",
-    "RESEND_API_KEY",
-    "BUG_REPORT_TO_EMAIL"
-  ]
 
 # Scheduled function for reminders (runs every 30 minutes)
 # Schedule is defined in the function itself using @netlify/functions schedule()
