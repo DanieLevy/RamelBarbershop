@@ -774,11 +774,24 @@ export async function processReminders(): Promise<BatchResults> {
       if (sendPush) {
         const pushResults = await Promise.allSettled(subs.map(async sub => {
           let result: { success: boolean; permanent?: boolean; error?: string }
+          const subType = sub.token_type === 'fcm' ? 'FCM' : 'web_push'
 
           if (sub.token_type === 'fcm' && sub.fcm_token) {
             result = await sendFcmPush(sub.fcm_token, payload)
           } else {
             result = await sendWebPush(sub, payload)
+          }
+
+          if (result.success) {
+            logger.info('[Reminders] ✅ Push delivered', { subId: sub.id, type: subType, resId: res.id })
+          } else {
+            logger.warn('[Reminders] ❌ Push failed', {
+              subId: sub.id,
+              type: subType,
+              resId: res.id,
+              error: result.error,
+              permanent: result.permanent ?? false,
+            })
           }
 
           if (!result.success && result.permanent) {
@@ -792,11 +805,11 @@ export async function processReminders(): Promise<BatchResults> {
 
         if (succeeded > 0) {
           pushSent = true
-          logger.info('[Reminders] ✅ Push sent', { id: res.id, sent: succeeded })
+          logger.info('[Reminders] ✅ Push batch done', { id: res.id, sent: succeeded, failed })
         }
         if (failed > 0) {
           pushFailed = true
-          logger.warn('[Reminders] ⚠️ Some push failed', { id: res.id, failed })
+          logger.warn('[Reminders] ⚠️ Push batch had failures', { id: res.id, sent: succeeded, failed })
         }
       }
 
