@@ -39,7 +39,7 @@
     "O19_SMS_SOURCE",
     "O19_SMS_USERNAME",
     "RESEND_API_KEY",
-    "BUG_REPORT_TO_EMAIL",
+    "BUG_REPORT_TO_EMAIL"
   ]
 
 # Scheduled function for reminders (runs every 30 minutes)
