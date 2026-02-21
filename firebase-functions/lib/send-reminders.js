@@ -582,6 +582,28 @@ function getNotificationMethods(settings, hasPhone, hasPushSub) {
     }
 }
 // ============================================================
+// Mark completed reservations
+// ============================================================
+async function markCompletedReservations() {
+    const supabase = getSupabase();
+    const nowMs = Date.now();
+    const { data, error } = await supabase
+        .from('reservations')
+        .update({ status: 'completed' })
+        .eq('status', 'confirmed')
+        .lt('time_timestamp', nowMs)
+        .select('id');
+    if (error) {
+        logger.error('[Completed] Error marking reservations completed', { error });
+        return 0;
+    }
+    const count = data?.length || 0;
+    if (count > 0) {
+        logger.info(`[Completed] Marked ${count} past reservations as completed`);
+    }
+    return count;
+}
+// ============================================================
 // Main export
 // ============================================================
 async function processReminders() {
@@ -592,6 +614,8 @@ async function processReminders() {
         dryRun,
         time: new Date().toISOString(),
     });
+    // Mark past confirmed reservations as completed before processing reminders
+    await markCompletedReservations();
     const results = {
         total_reservations: 0,
         sms_sent: 0,
@@ -644,6 +668,10 @@ async function processReminders() {
             if (dryRun && !isWhitelisted(res.customer_id, res.barber_id)) {
                 return { type: 'dry_run_skipped' };
             }
+            // In DRY_RUN mode, whitelisted users get real notifications but dedup columns
+            // are intentionally NOT marked, so Netlify also delivers to them for parallel
+            // verification. Double delivery is expected and desired for test users.
+            const skipDedup = dryRun && isWhitelisted(res.customer_id, res.barber_id);
             const payload = buildReminderPayload(res);
             let smsSent = false, smsFailed = false, pushSent = false, pushFailed = false;
             // SMS
@@ -652,13 +680,15 @@ async function processReminders() {
                 const smsResult = await sendSmsReminder(res.customer_phone, firstName, res.time_timestamp);
                 if (smsResult.success) {
                     smsSent = true;
-                    if (res.isRecurring && res.recurringId) {
-                        await markRecurringReminderSent(res.recurringId);
+                    if (!skipDedup) {
+                        if (res.isRecurring && res.recurringId) {
+                            await markRecurringReminderSent(res.recurringId);
+                        }
+                        else {
+                            await markSmsReminderSent(res.id);
+                        }
                     }
-                    else {
-                        await markSmsReminderSent(res.id);
-                    }
-                    logger.info('[Reminders] ✅ SMS sent', { id: res.id, recurring: res.isRecurring });
+                    logger.info('[Reminders] ✅ SMS sent', { id: res.id, recurring: res.isRecurring, skipDedup });
                 }
                 else {
                     smsFailed = true;

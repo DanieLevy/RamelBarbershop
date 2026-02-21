@@ -354,30 +354,29 @@ export async function validateBarberSession(): Promise<User | null> {
 }
 
 /**
- * Create or update barber password
+ * Create or update barber password via API (service_role — RLS-safe)
  */
 export async function setBarberPassword(
   barberId: string,
-  newPassword: string
+  newPassword: string,
+  oldPassword?: string
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = createClient()
-  
-  const passwordHash = await hashPassword(newPassword)
-  
-  const { error } = await supabase.from('users')
-    .update({ password_hash: passwordHash, updated_at: new Date().toISOString() })
-    .eq('id', barberId)
-  
-  if (error) {
-    console.error('Error setting password:', error)
-    await reportSupabaseError(error, 'Setting Barber Password', {
-      table: 'users',
-      operation: 'update',
+  try {
+    const response = await fetch('/api/barber/set-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ barberId, targetBarberId: barberId, newPassword, oldPassword }),
     })
-    return { success: false, error: 'שגיאה בעדכון הסיסמה' }
+    const result = await response.json()
+    if (!response.ok || !result.success) {
+      console.error('Error setting password:', result.error)
+      return { success: false, error: result.message || 'שגיאה בעדכון הסיסמה' }
+    }
+    return { success: true }
+  } catch (error) {
+    console.error('Error in setBarberPassword:', error)
+    return { success: false, error: 'שגיאה בתקשורת עם השרת' }
   }
-  
-  return { success: true }
 }
 
 /**
@@ -426,7 +425,7 @@ export async function createBarber(data: {
 }
 
 /**
- * Update barber details
+ * Update barber details via API (service_role — RLS-safe)
  */
 export async function updateBarber(
   barberId: string,
@@ -443,22 +442,22 @@ export async function updateBarber(
     instagram_url?: string | null
   }
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = createClient()
-  
-  const { error } = await supabase.from('users')
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', barberId)
-  
-  if (error) {
-    console.error('Error updating barber:', error)
-    await reportSupabaseError(error, 'Updating Barber Profile', {
-      table: 'users',
-      operation: 'update',
+  try {
+    const response = await fetch('/api/barber/update-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ barberId, ...updates }),
     })
-    return { success: false, error: 'שגיאה בעדכון המשתמש' }
+    const result = await response.json()
+    if (!response.ok || !result.success) {
+      console.error('Error updating barber:', result.error)
+      return { success: false, error: result.message || 'שגיאה בעדכון המשתמש' }
+    }
+    return { success: true }
+  } catch (error) {
+    console.error('Error in updateBarber:', error)
+    return { success: false, error: 'שגיאה בתקשורת עם השרת' }
   }
-  
-  return { success: true }
 }
 
 /**

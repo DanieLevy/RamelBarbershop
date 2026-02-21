@@ -672,6 +672,33 @@ function getNotificationMethods(
 }
 
 // ============================================================
+// Mark completed reservations
+// ============================================================
+
+async function markCompletedReservations(): Promise<number> {
+  const supabase = getSupabase()
+  const nowMs = Date.now()
+
+  const { data, error } = await supabase
+    .from('reservations')
+    .update({ status: 'completed' })
+    .eq('status', 'confirmed')
+    .lt('time_timestamp', nowMs)
+    .select('id')
+
+  if (error) {
+    logger.error('[Completed] Error marking reservations completed', { error })
+    return 0
+  }
+
+  const count = data?.length || 0
+  if (count > 0) {
+    logger.info(`[Completed] Marked ${count} past reservations as completed`)
+  }
+  return count
+}
+
+// ============================================================
 // Main export
 // ============================================================
 
@@ -684,6 +711,9 @@ export async function processReminders(): Promise<BatchResults> {
     dryRun,
     time: new Date().toISOString(),
   })
+
+  // Mark past confirmed reservations as completed before processing reminders
+  await markCompletedReservations()
 
   const results: BatchResults = {
     total_reservations: 0,
@@ -748,6 +778,11 @@ export async function processReminders(): Promise<BatchResults> {
         return { type: 'dry_run_skipped' as const }
       }
 
+      // In DRY_RUN mode, whitelisted users get real notifications but dedup columns
+      // are intentionally NOT marked, so Netlify also delivers to them for parallel
+      // verification. Double delivery is expected and desired for test users.
+      const skipDedup = dryRun && isWhitelisted(res.customer_id, res.barber_id)
+
       const payload = buildReminderPayload(res)
       let smsSent = false, smsFailed = false, pushSent = false, pushFailed = false
 
@@ -758,12 +793,14 @@ export async function processReminders(): Promise<BatchResults> {
 
         if (smsResult.success) {
           smsSent = true
-          if (res.isRecurring && res.recurringId) {
-            await markRecurringReminderSent(res.recurringId)
-          } else {
-            await markSmsReminderSent(res.id)
+          if (!skipDedup) {
+            if (res.isRecurring && res.recurringId) {
+              await markRecurringReminderSent(res.recurringId)
+            } else {
+              await markSmsReminderSent(res.id)
+            }
           }
-          logger.info('[Reminders] ✅ SMS sent', { id: res.id, recurring: res.isRecurring })
+          logger.info('[Reminders] ✅ SMS sent', { id: res.id, recurring: res.isRecurring, skipDedup })
         } else {
           smsFailed = true
           logger.error('[Reminders] ❌ SMS failed', { id: res.id, error: smsResult.error })

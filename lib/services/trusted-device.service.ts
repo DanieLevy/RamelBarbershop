@@ -10,8 +10,8 @@ function getSupabase() {
   return createAdminClient()
 }
 
-// Device token expiration in days
-const DEVICE_EXPIRATION_DAYS = 30
+// Device token expiration in days — effectively unlimited (100 years)
+const DEVICE_EXPIRATION_DAYS = 36500
 
 // LocalStorage key for device token
 export const DEVICE_TOKEN_KEY = 'ramel_trusted_device_token'

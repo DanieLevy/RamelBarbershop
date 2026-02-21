@@ -1,0 +1,50 @@
+[debug] [2026-02-21T20:19:59.895Z] ----------------------------------------------------------------------
+[debug] [2026-02-21T20:19:59.896Z] Command:       /Users/levid/.nvm/versions/node/v24.12.0/bin/node /Users/levid/.nvm/versions/node/v24.12.0/bin/firebase deploy --only functions
+[debug] [2026-02-21T20:19:59.897Z] CLI Version:   15.6.0
+[debug] [2026-02-21T20:19:59.897Z] Platform:      darwin
+[debug] [2026-02-21T20:19:59.897Z] Node Version:  v24.12.0
+[debug] [2026-02-21T20:19:59.897Z] Time:          Sat Feb 21 2026 22:19:59 GMT+0200 (Eastern European Standard Time)
+[debug] [2026-02-21T20:19:59.897Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-02-21T20:19:59.897Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2026-02-21T20:20:00.527Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-02-21T20:20:00.527Z] > authorizing via signed-in user (danielencore2@gmail.com)
+[debug] [2026-02-21T20:20:00.527Z] [iam] checking project ramel-barbershop-9b054 for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2026-02-21T20:20:00.528Z] Checked if tokens are valid: false, expires at: 1771704015686
+[debug] [2026-02-21T20:20:00.528Z] Checked if tokens are valid: false, expires at: 1771704015686
+[debug] [2026-02-21T20:20:00.528Z] > refreshing access token with scopes: []
+[debug] [2026-02-21T20:20:00.528Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-02-21T20:20:00.528Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-02-21T20:20:00.739Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-02-21T20:20:00.739Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-02-21T20:20:00.751Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/ramel-barbershop-9b054:testIamPermissions [none]
+[debug] [2026-02-21T20:20:00.751Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/ramel-barbershop-9b054:testIamPermissions  x-goog-user-project=ramel-barbershop-9b054
+[debug] [2026-02-21T20:20:00.751Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/ramel-barbershop-9b054:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2026-02-21T20:20:00.880Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2026-02-21T20:20:00.880Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2026-02-21T20:20:01.782Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/ramel-barbershop-9b054:testIamPermissions 200
+[debug] [2026-02-21T20:20:01.782Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/ramel-barbershop-9b054:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2026-02-21T20:20:01.782Z] Checked if tokens are valid: true, expires at: 1771708799739
+[debug] [2026-02-21T20:20:01.782Z] Checked if tokens are valid: true, expires at: 1771708799739
+[debug] [2026-02-21T20:20:01.782Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/ramel-barbershop-9b054/serviceAccounts/ramel-barbershop-9b054@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2026-02-21T20:20:01.782Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/ramel-barbershop-9b054/serviceAccounts/ramel-barbershop-9b054@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2026-02-21T20:20:02.820Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/ramel-barbershop-9b054/serviceAccounts/ramel-barbershop-9b054@appspot.gserviceaccount.com:testIamPermissions 200
+[debug] [2026-02-21T20:20:02.820Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/ramel-barbershop-9b054/serviceAccounts/ramel-barbershop-9b054@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[info] 
+[info] === Deploying to 'ramel-barbershop-9b054'...
+[info] 
+[info] i  deploying functions 
+[info] Running command: npm --prefix firebase-functions run build
+[info] ✔  functions: Finished running predeploy script. 
+[debug] [2026-02-21T20:20:03.781Z] Checked if tokens are valid: true, expires at: 1771708799739
+[debug] [2026-02-21T20:20:03.781Z] Checked if tokens are valid: true, expires at: 1771708799739
+[debug] [2026-02-21T20:20:03.781Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/ramel-barbershop-9b054 [none]
+[debug] [2026-02-21T20:20:04.012Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/ramel-barbershop-9b054 200
+[debug] [2026-02-21T20:20:04.012Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/ramel-barbershop-9b054 {"projectNumber":"876694262570","projectId":"ramel-barbershop-9b054","lifecycleState":"ACTIVE","name":"Ramel-Barbershop","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-12-26T23:56:37.732043Z"}
+[info] i  functions: preparing codebase reminders for deployment 
+[info] i  functions: ensuring required API cloudfunctions.googleapis.com is enabled... 
+[info] i  functions: ensuring required API cloudbuild.googleapis.com is enabled... 
+[info] i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled... 
+[debug] [2026-02-21T20:20:04.013Z] Checked if tokens are valid: true, expires at: 1771708799739
+[debug] [2026-02-21T20:20:04.013Z] Checked if tokens are valid: true, expires at: 1771708799739
+[debug] [2026-02-21T20:20:04.013Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/ramel-barbershop-9b054/adminSdkConfig [none]
