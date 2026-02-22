@@ -53,6 +53,7 @@ export async function DELETE(request: NextRequest) {
         status: 'cancelled',
         cancelled_by: 'barber',
         cancellation_reason: 'הספר הוסר מהמערכת',
+        barber_hidden_at: new Date().toISOString(),
       })
       .eq('barber_id', targetBarberId)
       .eq('status', 'active')

@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { X, Loader2, Search, User, Calendar, Clock, UserPlus, Scissors, AlertTriangle } from 'lucide-react'
+import { X, Loader2, Search, User, Calendar, Clock, UserPlus, Scissors, AlertTriangle, CheckCircle, UserCheck } from 'lucide-react'
 import { cn, generateTimeSlots, parseTimeString, nowInIsrael, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael, getSlotKey, getIsraelDateString } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { createReservation } from '@/lib/services/booking.service'
 import { getOrCreateCustomer } from '@/lib/services/customer.service'
 import { getBreakoutsForDate, isSlotInBreakout } from '@/lib/services/breakout.service'
-import { format, addDays, isSameDay } from 'date-fns'
+import { format, addDays, subDays, isSameDay, isBefore, startOfDay } from 'date-fns'
 import { showToast } from '@/lib/toast'
 import type { Customer, BarbershopSettings, Service, WorkDay, BarberBreakout, BarbershopClosure, BarberClosure } from '@/types/database'
 import { Portal } from '@/components/ui/Portal'
@@ -19,6 +19,7 @@ interface ManualBookingModalProps {
   onSuccess: () => void
   barberId: string
   barberName?: string
+  barberPhone?: string
   shopSettings: BarbershopSettings | null
   preselectedDate?: Date | null
   preselectedTime?: number | null
@@ -32,6 +33,7 @@ export function ManualBookingModal({
   onSuccess,
   barberId,
   barberName,
+  barberPhone,
   shopSettings,
   preselectedDate,
   preselectedTime
@@ -43,6 +45,7 @@ export function ManualBookingModal({
   const [selectedService, setSelectedService] = useState<Service | null>(null)
   const [walkinName, setWalkinName] = useState('')
   const [walkinPhone, setWalkinPhone] = useState('')
+  const [selfAssign, setSelfAssign] = useState(false)
   const [barberNotes, setBarberNotes] = useState('')
   
   // Out-of-hours booking state
@@ -67,6 +70,7 @@ export function ManualBookingModal({
   const [saving, setSaving] = useState(false)
   
   const israelNow = nowInIsrael()
+  const isPastDate = isBefore(startOfDay(selectedDate), startOfDay(israelNow))
 
   // Get the barber's work hours for the currently selected date
   const currentDayWorkHours = useMemo(() => {
@@ -136,6 +140,7 @@ export function ManualBookingModal({
       setSelectedService(null)
       setWalkinName('')
       setWalkinPhone('')
+      setSelfAssign(false)
       setBarberNotes('')
       setSearchQuery('')
       setSearchResults([])
@@ -230,17 +235,24 @@ export function ManualBookingModal({
     setLoadingSlots(true)
     const supabase = createClient()
     
-    // Use Israel timezone for day boundaries
     const dayStartMs = getIsraelDayStart(selectedDate)
     const dayEndMs = getIsraelDayEnd(selectedDate)
     
-    const { data } = await supabase
+    // For past dates, check both confirmed and completed to prevent duplicates
+    let query = supabase
       .from('reservations')
       .select('time_timestamp')
       .eq('barber_id', barberId)
-      .eq('status', 'confirmed')
       .gte('time_timestamp', dayStartMs)
       .lte('time_timestamp', dayEndMs)
+
+    if (isPastDate) {
+      query = query.in('status', ['confirmed', 'completed'])
+    } else {
+      query = query.eq('status', 'confirmed')
+    }
+    
+    const { data } = await query
     
     if (data) {
       setReservedSlots(data.map(r => r.time_timestamp))
@@ -299,20 +311,20 @@ export function ManualBookingModal({
     return reservedSlots.some(reserved => getSlotKey(reserved) === customSlotKey)
   }, [customTimeTimestamp, reservedSlots])
 
-  // Check if the selected date is closed (shop or barber closure)
+  // Check if the selected date is closed (skip for past dates -- irrelevant)
   const dateClosureReason = useMemo(() => {
+    if (isPastDate) return null
+
     const dateStr = getIsraelDateString(selectedDate.getTime())
     
-    // Check shop closures
     const shopClosure = shopClosures.find(c => dateStr >= c.start_date && dateStr <= c.end_date)
     if (shopClosure) return shopClosure.reason || 'המספרה סגורה בתאריך זה'
     
-    // Check barber closures
     const barberClosure = barberClosures.find(c => dateStr >= c.start_date && dateStr <= c.end_date)
     if (barberClosure) return barberClosure.reason || 'הספר לא זמין בתאריך זה'
     
     return null
-  }, [selectedDate, shopClosures, barberClosures])
+  }, [selectedDate, isPastDate, shopClosures, barberClosures])
 
   // Generate ALL time slots with availability status and reason
   type SlotStatus = 'available' | 'reserved' | 'breakout' | 'past'
@@ -337,16 +349,14 @@ export function ManualBookingModal({
     if (barberDaySettings && barberDaySettings.is_working && barberDaySettings.start_time && barberDaySettings.end_time) {
       workStart = barberDaySettings.start_time
       workEnd = barberDaySettings.end_time
-    } else if (barberDaySettings && !barberDaySettings.is_working) {
-      // Barber doesn't work on this day
+    } else if (barberDaySettings && !barberDaySettings.is_working && !isPastDate) {
       return { availableSlots: [], allSlotsWithStatus: [] }
     } else {
       workStart = shopSettings?.work_hours_start || '09:00'
       workEnd = shopSettings?.work_hours_end || '19:00'
     }
     
-    // If date is closed, return empty
-    if (dateClosureReason) {
+    if (dateClosureReason && !isPastDate) {
       return { availableSlots: [], allSlotsWithStatus: [] }
     }
     
@@ -368,6 +378,14 @@ export function ManualBookingModal({
     
     // Classify each slot
     const enhancedSlots: EnhancedSlot[] = allSlots.map(slot => {
+      // For past dates, skip "past" and breakout filtering -- only check reserved
+      if (isPastDate) {
+        if (reservedSlotKeys.has(getSlotKey(slot.timestamp))) {
+          return { ...slot, status: 'reserved' as SlotStatus, reason: 'תפוס' }
+        }
+        return { ...slot, status: 'available' as SlotStatus }
+      }
+
       // Check past slots for today
       if (isSameDay(selectedDate, israelNow) && slot.timestamp < now) {
         return { ...slot, status: 'past' as SlotStatus, reason: 'עבר' }
@@ -390,13 +408,11 @@ export function ManualBookingModal({
     const available = enhancedSlots.filter(s => s.status === 'available')
     
     return { availableSlots: available, allSlotsWithStatus: enhancedSlots }
-  }, [selectedDate, shopSettings, reservedSlots, israelNow, barberWorkDays, breakouts, dateClosureReason])
+  }, [selectedDate, shopSettings, reservedSlots, israelNow, isPastDate, barberWorkDays, breakouts, dateClosureReason])
 
   const handleSubmit = async () => {
-    // Determine the final time to use
     const finalTime = isOutOfHours ? customTimeTimestamp : selectedTime
     
-    // Validation
     if (!finalTime) {
       showToast.error('נא לבחור שעה')
       return
@@ -409,18 +425,17 @@ export function ManualBookingModal({
       showToast.error('נא לבחור לקוח')
       return
     }
-    if (mode === 'walkin' && !walkinName.trim()) {
+    if (mode === 'walkin' && !selfAssign && !walkinName.trim()) {
       showToast.error('נא להזין שם הלקוח')
       return
     }
     
-    // Out-of-hours specific validations
-    if (isOutOfHours) {
+    // Out-of-hours specific validations (only for future dates)
+    if (isOutOfHours && !isPastDate) {
       if (isCustomTimeReserved) {
         showToast.error('השעה כבר תפוסה')
         return
       }
-      // Validate time is not in the past for today
       if (isSameDay(selectedDate, israelNow) && finalTime < Date.now()) {
         showToast.error('לא ניתן לקבוע תור בשעה שעברה')
         return
@@ -430,9 +445,6 @@ export function ManualBookingModal({
     setSaving(true)
     
     try {
-      // Note: Slot availability is verified atomically by the createReservation function
-      // No pre-check needed - the atomic database function handles race conditions
-      
       let customerId: string
       let customerName: string
       let customerPhone: string
@@ -441,9 +453,24 @@ export function ManualBookingModal({
         customerId = selectedCustomer!.id
         customerName = selectedCustomer!.fullname
         customerPhone = selectedCustomer!.phone
+      } else if (selfAssign && barberName && barberPhone) {
+        // Self-assign: use barber's details as customer
+        const newCustomer = await getOrCreateCustomer(
+          barberPhone,
+          barberName
+        )
+        
+        if (!newCustomer) {
+          console.error('Error creating self-assign customer record')
+          showToast.error('שגיאה ביצירת רשומת לקוח')
+          setSaving(false)
+          return
+        }
+        
+        customerId = newCustomer.id
+        customerName = barberName
+        customerPhone = barberPhone
       } else {
-        // Create a walkin customer record via API route (bypasses RLS)
-        // Use provided phone if available, otherwise generate a placeholder
         const phoneToUse = walkinPhone.trim() || 'walkin-' + Date.now()
         
         const newCustomer = await getOrCreateCustomer(
@@ -463,75 +490,109 @@ export function ManualBookingModal({
         customerPhone = walkinPhone.trim()
       }
       
-      // Calculate date-related fields - USING ISRAEL TIMEZONE
       const dayName = getDayKeyInIsrael(finalTime)
       const dateTimestamp = getIsraelDayStart(finalTime)
       
-      // Add note for out-of-hours bookings
       let finalNotes = barberNotes.trim()
       if (isOutOfHours) {
         const oohNote = 'תור מחוץ לשעות העבודה הרגילות'
         finalNotes = finalNotes ? `${oohNote} | ${finalNotes}` : oohNote
       }
+      if (isPastDate) {
+        const pastNote = 'תור ידני - הוזן בדיעבד'
+        finalNotes = finalNotes ? `${pastNote} | ${finalNotes}` : pastNote
+      }
       
-      // Use atomic function for race-condition-safe booking
-      // barber_notes is now included in the atomic operation
-      const result = await createReservation({
-        barberId,
-        serviceId: selectedService.id,
-        customerId,
-        customerName,
-        customerPhone,
-        dateTimestamp,
-        timeTimestamp: finalTime,
-        dayName,
-        dayNum: format(selectedDate, 'dd/MM'),
-        barberNotes: finalNotes || undefined,
-      })
-      
-      if (!result.success) {
-        console.error('Error creating reservation:', result.error)
-        showToast.error(result.message || 'שגיאה ביצירת התור')
+      if (isPastDate) {
+        // Past reservations: direct insert via dedicated endpoint (status='completed')
+        const response = await fetch('/api/barber/reservations/create-past', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            barberId,
+            serviceId: selectedService.id,
+            customerId,
+            customerName,
+            customerPhone,
+            dateTimestamp,
+            timeTimestamp: finalTime,
+            dayName,
+            dayNum: format(selectedDate, 'dd/MM'),
+            barberNotes: finalNotes || null,
+          }),
+        })
         
-        // Refresh available slots if slot was taken
-        if (result.error === 'SLOT_ALREADY_TAKEN' || result.error === 'CUSTOMER_DOUBLE_BOOKING') {
-          await fetchReservedSlots()
-          setSelectedTime(null)
+        const result = await response.json()
+        
+        if (!response.ok || !result.success) {
+          console.error('Error creating past reservation:', result)
+          showToast.error(result.message || 'שגיאה ביצירת התור')
+          
+          if (result.error === 'SLOT_ALREADY_TAKEN') {
+            await fetchReservedSlots()
+            setSelectedTime(null)
+          }
+          return
         }
-        return
-      }
-      
-      // Send push notification to the customer (for existing customers only)
-      if (mode === 'existing' && selectedCustomer?.id) {
-        try {
-          console.log('[ManualBooking] Sending push notification to customer:', customerId)
-          fetch('/api/push/notify-booking', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              reservationId: result.reservationId,
-              customerId: customerId,
-              customerName: customerName,
-              barberId: barberId,
-              barberName: barberName || 'הספר',
-              serviceName: selectedService.name_he,
-              appointmentTime: finalTime,
-              isManualBooking: true,
+        
+        showToast.success('התור נרשם בהצלחה (הסתיים)')
+      } else {
+        // Future reservations: use existing atomic flow
+        const result = await createReservation({
+          barberId,
+          serviceId: selectedService.id,
+          customerId,
+          customerName,
+          customerPhone,
+          dateTimestamp,
+          timeTimestamp: finalTime,
+          dayName,
+          dayNum: format(selectedDate, 'dd/MM'),
+          barberNotes: finalNotes || undefined,
+        })
+        
+        if (!result.success) {
+          console.error('Error creating reservation:', result.error)
+          showToast.error(result.message || 'שגיאה ביצירת התור')
+          
+          if (result.error === 'SLOT_ALREADY_TAKEN' || result.error === 'CUSTOMER_DOUBLE_BOOKING') {
+            await fetchReservedSlots()
+            setSelectedTime(null)
+          }
+          return
+        }
+        
+        // Push notification only for future bookings with existing customers
+        if (mode === 'existing' && selectedCustomer?.id) {
+          try {
+            fetch('/api/push/notify-booking', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                reservationId: result.reservationId,
+                customerId,
+                customerName,
+                barberId,
+                barberName: barberName || 'הספר',
+                serviceName: selectedService.name_he,
+                appointmentTime: finalTime,
+                isManualBooking: true,
+              })
             })
-          })
-            .then(res => res.json())
-            .then(data => console.log('[ManualBooking] Push notification result:', data))
-            .catch(err => console.error('[ManualBooking] Push notification error:', err))
-        } catch (pushErr) {
-          console.error('[ManualBooking] Failed to send push notification:', pushErr)
-          // Don't fail the booking if push fails
+              .then(res => res.json())
+              .then(data => console.log('[ManualBooking] Push notification result:', data))
+              .catch(err => console.error('[ManualBooking] Push notification error:', err))
+          } catch (pushErr) {
+            console.error('[ManualBooking] Failed to send push notification:', pushErr)
+          }
         }
+        
+        showToast.success(isOutOfHours 
+          ? 'התור מחוץ לשעות נוצר בהצלחה!' 
+          : 'התור נוצר בהצלחה'
+        )
       }
       
-      showToast.success(isOutOfHours 
-        ? 'התור מחוץ לשעות נוצר בהצלחה!' 
-        : 'התור נוצר בהצלחה'
-      )
       onSuccess()
       onClose()
     } catch (err) {
@@ -554,6 +615,12 @@ export function ManualBookingModal({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-medium text-foreground-light">הוספת תור ידני</h3>
+                {isPastDate && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-400 text-[10px] font-medium">
+                    <CheckCircle size={10} />
+                    הסתיים
+                  </span>
+                )}
                 {isOutOfHours && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-500/30 text-orange-400 text-[10px] font-medium animate-pulse">
                     <AlertTriangle size={10} />
@@ -562,9 +629,11 @@ export function ManualBookingModal({
                 )}
               </div>
               <p className="text-foreground-muted text-xs mt-0.5">
-                {isOutOfHours 
-                  ? `שעות העבודה: ${currentDayWorkHours.start} - ${currentDayWorkHours.end}` 
-                  : 'רישום תור על-ידי הספר'
+                {isPastDate
+                  ? 'רישום תור שהתקיים בעבר'
+                  : isOutOfHours 
+                    ? `שעות העבודה: ${currentDayWorkHours.start} - ${currentDayWorkHours.end}` 
+                    : 'רישום תור על-ידי הספר'
                 }
               </p>
             </div>
@@ -616,10 +685,14 @@ export function ManualBookingModal({
           'mb-4 p-3 rounded-xl text-xs',
           mode === 'existing' 
             ? 'bg-green-500/10 border border-green-500/20 text-green-400'
-            : 'bg-orange-500/10 border border-orange-500/20 text-orange-400'
+            : selfAssign
+              ? 'bg-accent-gold/10 border border-accent-gold/20 text-accent-gold'
+              : 'bg-orange-500/10 border border-orange-500/20 text-orange-400'
         )}>
           {mode === 'existing' ? (
-            <p>לקוח קיים יקבל התראות ותזכורות לתור.</p>
+            <p>{isPastDate ? 'לקוח קיים - התור יירשם כהסתיים.' : 'לקוח קיים יקבל התראות ותזכורות לתור.'}</p>
+          ) : selfAssign ? (
+            <p>התור יירשם על שמך, כולל השם והטלפון שלך. מתאים ללקוחות ללא פרטים.</p>
           ) : (
             <p>לקוח חדש ללא רישום במערכת - לא יקבל התראות או תזכורות. מתאים ללקוחות שהגיעו ישירות למספרה.</p>
           )}
@@ -693,32 +766,90 @@ export function ManualBookingModal({
             </div>
           ) : (
             <div className="space-y-3">
-              {/* Walk-in Name */}
-              <div className="flex flex-col gap-2">
-                <label htmlFor="walkin-name" className="text-foreground-light text-sm">שם הלקוח *</label>
-                <input
-                  id="walkin-name"
-                  type="text"
-                  value={walkinName}
-                  onChange={(e) => setWalkinName(e.target.value)}
-                  placeholder="הזן שם הלקוח"
-                  className="w-full p-3 rounded-xl bg-background-card border border-white/10 text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold"
-                />
-              </div>
-              
-              {/* Walk-in Phone (optional) */}
-              <div className="flex flex-col gap-2">
-                <label htmlFor="walkin-phone" className="text-foreground-light text-sm">טלפון (אופציונלי)</label>
-                <input
-                  id="walkin-phone"
-                  type="tel"
-                  value={walkinPhone}
-                  onChange={(e) => setWalkinPhone(e.target.value)}
-                  placeholder="לדוגמה: 050-1234567"
-                  dir="ltr"
-                  className="w-full p-3 rounded-xl bg-background-card border border-white/10 text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold"
-                />
-              </div>
+              {/* Self-assign toggle */}
+              {barberPhone && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !selfAssign
+                    setSelfAssign(next)
+                    if (next) {
+                      setWalkinName(barberName || '')
+                      setWalkinPhone(barberPhone || '')
+                    } else {
+                      setWalkinName('')
+                      setWalkinPhone('')
+                    }
+                  }}
+                  className={cn(
+                    'w-full flex items-center gap-3 p-3 rounded-xl text-sm transition-all text-right',
+                    selfAssign
+                      ? 'bg-accent-gold/15 border border-accent-gold/30 text-accent-gold'
+                      : 'bg-white/[0.03] border border-white/10 text-foreground-muted hover:bg-white/[0.06]'
+                  )}
+                  aria-label="הקצאה עצמית - ללא פרטי לקוח"
+                  tabIndex={0}
+                >
+                  <UserCheck size={18} className={selfAssign ? 'text-accent-gold' : 'text-foreground-muted'} />
+                  <div className="flex-1">
+                    <p className="font-medium">הקצאה עצמית</p>
+                    <p className={cn('text-xs mt-0.5', selfAssign ? 'text-accent-gold/70' : 'text-foreground-muted/60')}>
+                      ללא פרטי לקוח - התור יירשם על שמך
+                    </p>
+                  </div>
+                  <div className={cn(
+                    'w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all',
+                    selfAssign
+                      ? 'bg-accent-gold border-accent-gold'
+                      : 'border-white/20'
+                  )}>
+                    {selfAssign && <CheckCircle size={12} className="text-background-dark" />}
+                  </div>
+                </button>
+              )}
+
+              {selfAssign ? (
+                <div className="p-3 rounded-xl bg-accent-gold/10 border border-accent-gold/20">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-accent-gold/20 flex items-center justify-center flex-shrink-0">
+                      <UserCheck size={14} className="text-accent-gold" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-foreground-light text-sm">{barberName}</p>
+                      <p className="text-foreground-muted text-xs" dir="ltr">{barberPhone}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Walk-in Name */}
+                  <div className="flex flex-col gap-2">
+                    <label htmlFor="walkin-name" className="text-foreground-light text-sm">שם הלקוח *</label>
+                    <input
+                      id="walkin-name"
+                      type="text"
+                      value={walkinName}
+                      onChange={(e) => setWalkinName(e.target.value)}
+                      placeholder="הזן שם הלקוח"
+                      className="w-full p-3 rounded-xl bg-background-card border border-white/10 text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold"
+                    />
+                  </div>
+                  
+                  {/* Walk-in Phone (optional) */}
+                  <div className="flex flex-col gap-2">
+                    <label htmlFor="walkin-phone" className="text-foreground-light text-sm">טלפון (אופציונלי)</label>
+                    <input
+                      id="walkin-phone"
+                      type="tel"
+                      value={walkinPhone}
+                      onChange={(e) => setWalkinPhone(e.target.value)}
+                      placeholder="לדוגמה: 050-1234567"
+                      dir="ltr"
+                      className="w-full p-3 rounded-xl bg-background-card border border-white/10 text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold"
+                    />
+                  </div>
+                </>
+              )}
               
               {/* Barber Notes (optional) */}
               <div className="flex flex-col gap-2">
@@ -778,11 +909,22 @@ export function ManualBookingModal({
               <Calendar size={14} className="text-accent-gold" />
               תאריך
             </label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => setSelectedDate(subDays(israelNow, 1))}
+                className={cn(
+                  'px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                  isSameDay(selectedDate, subDays(israelNow, 1))
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-white/[0.05] text-foreground-muted hover:bg-white/[0.1]'
+                )}
+              >
+                אתמול
+              </button>
               <button
                 onClick={() => setSelectedDate(israelNow)}
                 className={cn(
-                  'px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                  'px-3 py-2 rounded-lg text-sm font-medium transition-all',
                   isSameDay(selectedDate, israelNow)
                     ? 'bg-accent-gold text-background-dark'
                     : 'bg-white/[0.05] text-foreground-muted hover:bg-white/[0.1]'
@@ -793,7 +935,7 @@ export function ManualBookingModal({
               <button
                 onClick={() => setSelectedDate(addDays(israelNow, 1))}
                 className={cn(
-                  'px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                  'px-3 py-2 rounded-lg text-sm font-medium transition-all',
                   isSameDay(selectedDate, addDays(israelNow, 1))
                     ? 'bg-accent-gold text-background-dark'
                     : 'bg-white/[0.05] text-foreground-muted hover:bg-white/[0.1]'
@@ -809,10 +951,22 @@ export function ManualBookingModal({
                   const date = e.target.value ? new Date(e.target.value) : israelNow
                   setSelectedDate(date)
                 }}
-                min={format(israelNow, 'yyyy-MM-dd')}
-                className="flex-1 px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.08] text-foreground-light text-sm outline-none focus:ring-2 focus:ring-accent-gold/50"
+                className={cn(
+                  'flex-1 min-w-[140px] px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-accent-gold/50',
+                  isPastDate
+                    ? 'bg-blue-500/10 border-blue-500/20 text-blue-300'
+                    : 'bg-white/[0.05] border-white/[0.08] text-foreground-light'
+                )}
               />
             </div>
+            {isPastDate && (
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                <CheckCircle size={14} className="text-blue-400 shrink-0" />
+                <p className="text-blue-300 text-xs">
+                  תור בתאריך עבר - יירשם כ&quot;הסתיים&quot;
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Time Selection */}
@@ -1050,6 +1204,8 @@ export function ManualBookingModal({
                 <Loader2 size={16} className="animate-spin" />
                 שומר...
               </span>
+            ) : isPastDate ? (
+              'רשום תור (הסתיים)'
             ) : (
               'צור תור'
             )}

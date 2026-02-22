@@ -122,6 +122,40 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Safely convert any thrown value to a proper Error instance.
+ * Handles Supabase PostgrestError objects, plain objects with .message,
+ * and cross-realm objects where `instanceof Error` fails (common on iOS WebKit PWAs).
+ */
+function toError(thrown: unknown): Error {
+  if (thrown instanceof Error) return thrown
+
+  if (thrown && typeof thrown === 'object') {
+    const obj = thrown as Record<string, unknown>
+    const message = typeof obj.message === 'string'
+      ? obj.message
+      : typeof obj.error === 'string'
+        ? obj.error
+        : safeStringify(thrown)
+    const err = new Error(message)
+    if (typeof obj.name === 'string') err.name = obj.name
+    if (typeof obj.stack === 'string') err.stack = obj.stack
+    return err
+  }
+
+  if (typeof thrown === 'string') return new Error(thrown)
+
+  return new Error(String(thrown))
+}
+
+function safeStringify(obj: unknown): string {
+  try {
+    return JSON.stringify(obj)
+  } catch {
+    return 'Unknown error object'
+  }
+}
+
+/**
  * Execute a function with automatic retry on failure
  * 
  * @example
@@ -142,7 +176,7 @@ export async function withRetry<T>(
     try {
       return await fn()
     } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error))
+      lastError = toError(error)
       
       // Check if we've exhausted retries
       if (attempt > opts.maxRetries) {

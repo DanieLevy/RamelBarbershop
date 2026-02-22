@@ -869,6 +869,7 @@ export type Database = {
       }
       reservations: {
         Row: {
+          barber_hidden_at: string | null
           barber_id: string
           barber_notes: string | null
           cancellation_reason: string | null
@@ -888,6 +889,7 @@ export type Database = {
           version: number
         }
         Insert: {
+          barber_hidden_at?: string | null
           barber_id: string
           barber_notes?: string | null
           cancellation_reason?: string | null
@@ -907,6 +909,7 @@ export type Database = {
           time_timestamp: number
         }
         Update: {
+          barber_hidden_at?: string | null
           barber_id?: string
           barber_notes?: string | null
           cancellation_reason?: string | null

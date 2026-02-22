@@ -149,6 +149,7 @@ function ReservationsContent() {
           services (id, name_he, duration, price)
         `)
         .eq('barber_id', barber.id)
+        .is('barber_hidden_at', null)
         .order('time_timestamp', { ascending: true })
       
       if (error) {
@@ -424,6 +425,40 @@ function ReservationsContent() {
       console.error('Error bulk cancelling:', err)
       await report(err, 'Bulk cancelling reservations', 'high')
       showToast.error('שגיאה בביטול התורים')
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  const handleHideReservation = async (reservationId: string) => {
+    if (!barber?.id) return
+
+    const confirmed = window.confirm('הסתר תור זה מההיסטוריה?\nהלקוח ימשיך לראות אותו.')
+    if (!confirmed) return
+
+    setUpdatingId(reservationId)
+
+    try {
+      const response = await fetch('/api/barber/reservations/hide', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reservationId, barberId: barber.id }),
+      })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        showToast.error(result.error || 'שגיאה בהסתרת התור')
+        return
+      }
+
+      showToast.success('התור הוסתר מההיסטוריה')
+      setDetailModal({ isOpen: false, reservation: null })
+      await fetchReservations()
+    } catch (err) {
+      console.error('Error hiding reservation:', err)
+      await report(err, 'Hiding reservation from barber view', 'high')
+      showToast.error('שגיאה בהסתרת התור')
     } finally {
       setUpdatingId(null)
     }
@@ -849,6 +884,7 @@ function ReservationsContent() {
                   onDetail={(r) => setDetailModal({ isOpen: true, reservation: r })}
                   onCancel={(r) => setCancelModal({ isOpen: true, reservation: r })}
                   onEdit={(r) => setEditModal({ isOpen: true, reservation: r })}
+                  onHide={(r) => handleHideReservation(r.id)}
                   formatPhoneForWhatsApp={formatPhoneForWhatsApp}
                 />
               )
@@ -884,6 +920,8 @@ function ReservationsContent() {
         onClose={() => setDetailModal({ isOpen: false, reservation: null })}
         reservation={detailModal.reservation}
         variant="barber"
+        onHide={(r) => handleHideReservation(r.id)}
+        isHiding={updatingId === detailModal.reservation?.id}
       />
 
       <ManualBookingModal
@@ -892,6 +930,7 @@ function ReservationsContent() {
         onSuccess={fetchReservations}
         barberId={barber?.id || ''}
         barberName={barber?.fullname || ''}
+        barberPhone={barber?.phone || ''}
         shopSettings={shopSettings}
         preselectedDate={manualBookingModal.preselectedDate}
         preselectedTime={manualBookingModal.preselectedTime}

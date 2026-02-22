@@ -54,7 +54,9 @@ export function getPageInfo(): { page: string; route: string } {
 }
 
 /**
- * Serialize an error object
+ * Serialize an error object.
+ * Handles Error instances, plain objects with .message (e.g. Supabase PostgrestError
+ * when cross-realm instanceof fails on iOS WebKit), and raw strings.
  */
 export function serializeError(error: unknown): { name: string; message: string; stack?: string } {
   if (error instanceof Error) {
@@ -69,6 +71,20 @@ export function serializeError(error: unknown): { name: string; message: string;
     return {
       name: 'Error',
       message: error,
+    }
+  }
+
+  if (error && typeof error === 'object') {
+    const obj = error as Record<string, unknown>
+    const message = typeof obj.message === 'string'
+      ? obj.message
+      : typeof obj.error === 'string'
+        ? obj.error
+        : (() => { try { return JSON.stringify(error) } catch { return 'Unserializable error object' } })()
+    return {
+      name: typeof obj.name === 'string' ? obj.name : 'UnknownError',
+      message,
+      stack: typeof obj.stack === 'string' ? obj.stack : undefined,
     }
   }
 

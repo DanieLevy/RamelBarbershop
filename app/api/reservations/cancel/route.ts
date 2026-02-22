@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
         status: 'cancelled',
         cancelled_by: body.cancelledBy,
         cancellation_reason: body.reason || null,
+        ...(body.cancelledBy === 'barber' ? { barber_hidden_at: new Date().toISOString() } : {}),
       })
       .eq('id', body.reservationId)
       .eq('status', 'confirmed') // Only cancel if still confirmed

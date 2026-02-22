@@ -445,11 +445,20 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'שגיאה לא ידועה'
       
-      // Report error to bug tracking
-      report(
-        err instanceof Error ? err : new Error(errorMessage),
-        'Subscribing to push notifications'
-      )
+      const expectedMessages = [
+        'לא ניתנה הרשאה להתראות',
+        'התראות אינן נתמכות במכשיר זה',
+        'יש להתקין את האפליקציה כדי לקבל התראות',
+        'יש להתחבר כדי לקבל התראות',
+      ]
+      const isExpectedUserAction = expectedMessages.includes(errorMessage)
+
+      if (!isExpectedUserAction) {
+        report(
+          err instanceof Error ? err : new Error(errorMessage),
+          'Subscribing to push notifications'
+        )
+      }
       
       setState(prev => ({
         ...prev,

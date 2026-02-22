@@ -1,7 +1,7 @@
 'use client'
 
 import { cn, formatDateHebrew, formatTime as formatTimeUtil } from '@/lib/utils'
-import { Calendar, Scissors, User, Phone, AlertCircle, CheckCircle, XCircle, History, StickyNote } from 'lucide-react'
+import { Calendar, Scissors, User, Phone, AlertCircle, CheckCircle, XCircle, History, StickyNote, EyeOff } from 'lucide-react'
 import type { Reservation, Service, User as UserType, Customer } from '@/types/database'
 import { Button, Modal } from '@heroui/react'
 
@@ -16,19 +16,27 @@ interface AppointmentDetailModalProps {
   onClose: () => void
   reservation: ReservationWithDetails | null
   variant?: 'barber' | 'customer'
+  onHide?: (reservation: ReservationWithDetails) => void
+  isHiding?: boolean
 }
 
 export function AppointmentDetailModal({
   isOpen,
   onClose,
   reservation,
-  variant = 'barber'
+  variant = 'barber',
+  onHide,
+  isHiding = false,
 }: AppointmentDetailModalProps) {
   if (!reservation) return null
 
   const isCancelled = reservation.status === 'cancelled'
   const isCompleted = reservation.status === 'completed'
   const isPast = reservation.time_timestamp < Date.now()
+  const canHide = variant === 'barber' && onHide && (
+    isCompleted ||
+    (isCancelled && reservation.cancelled_by === 'barber')
+  )
 
   // Status styling
   const getStatusConfig = () => {
@@ -214,13 +222,26 @@ export function AppointmentDetailModal({
             </Modal.Body>
 
             <Modal.Footer className="border-t border-white/10">
-              <Button
-                variant="secondary"
-                slot="close"
-                className="w-full"
-              >
-                סגור
-              </Button>
+              <div className="flex w-full gap-2">
+                {canHide && (
+                  <Button
+                    variant="ghost"
+                    onPress={() => onHide(reservation)}
+                    isDisabled={isHiding}
+                    className="flex items-center gap-1.5 text-foreground-muted/60 hover:text-foreground-muted hover:bg-white/[0.05]"
+                  >
+                    <EyeOff size={14} />
+                    <span className="text-sm">הסתר</span>
+                  </Button>
+                )}
+                <Button
+                  variant="secondary"
+                  slot="close"
+                  className="flex-1"
+                >
+                  סגור
+                </Button>
+              </div>
             </Modal.Footer>
           </Modal.Dialog>
         </Modal.Container>

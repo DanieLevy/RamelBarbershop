@@ -9,7 +9,7 @@
 
 import { cn } from '@/lib/utils'
 import { getExternalLinkProps } from '@/lib/utils/external-link'
-import { Phone, X, MessageCircle, Pencil } from 'lucide-react'
+import { Phone, X, MessageCircle, Pencil, EyeOff } from 'lucide-react'
 import { Button } from '@heroui/react'
 import type { Reservation, Service } from '@/types/database'
 
@@ -29,6 +29,7 @@ interface ReservationRowProps {
   onDetail: (reservation: ReservationWithService) => void
   onCancel: (reservation: ReservationWithService) => void
   onEdit?: (reservation: ReservationWithService) => void
+  onHide?: (reservation: ReservationWithService) => void
   formatPhoneForWhatsApp: (phone: string) => string
 }
 
@@ -43,8 +44,13 @@ export const ReservationRow = ({
   onDetail,
   onCancel,
   onEdit,
+  onHide,
   formatPhoneForWhatsApp,
 }: ReservationRowProps) => {
+  const canHide = onHide && (
+    (isPast && !isCancelled && res.status === 'completed') ||
+    (isCancelled && res.cancelled_by === 'barber')
+  )
   return (
     <div
       onClick={() => onDetail(res)}
@@ -191,6 +197,28 @@ export const ReservationRow = ({
               aria-label="בטל"
             >
               <X size={14} strokeWidth={1.5} />
+            </Button>
+          </div>
+        )}
+
+        {/* Hide from history */}
+        {canHide && (
+          <div onClick={(e) => e.stopPropagation()}>
+            <Button
+              onPress={() => onHide(res)}
+              isDisabled={updatingId === res.id}
+              isIconOnly
+              variant="ghost"
+              className={cn(
+                'icon-btn p-1 rounded-lg transition-colors min-w-[28px] w-7 h-7',
+                updatingId === res.id
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'hover:bg-foreground-muted/10 text-foreground-muted/50'
+              )}
+              aria-label="הסתר מההיסטוריה"
+              title="הסתר"
+            >
+              <EyeOff size={13} strokeWidth={1.5} />
             </Button>
           </div>
         )}
