@@ -165,19 +165,11 @@ export default function GalleryPage() {
       return
     }
     
-    // Extract storage path from URL and delete from storage
-    // URL format: https://xxx.supabase.co/storage/v1/object/public/gallery/barberId/timestamp-random.ext
-    try {
-      const url = new URL(imageToDelete.image_url)
-      const pathMatch = url.pathname.match(/\/storage\/v1\/object\/public\/gallery\/(.+)/)
-      if (pathMatch && pathMatch[1]) {
-        const storagePath = pathMatch[1]
-        await deleteGalleryImage(storagePath)
-      }
-    } catch (storageError) {
-      // Log but don't fail - DB record is already deleted
-      console.error('Error deleting from storage:', storageError)
-      await report(storageError, 'Deleting gallery image from storage')
+    if (imageToDelete.image_url && barber?.id) {
+      await deleteGalleryImage(imageToDelete.image_url, barber.id).catch((storageError) => {
+        console.error('Error deleting from R2:', storageError)
+        report(storageError, 'Deleting gallery image from R2')
+      })
     }
     
     setImages(images.filter(img => img.id !== imageId))

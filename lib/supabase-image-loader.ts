@@ -1,18 +1,15 @@
 /**
- * Supabase Image Loader for Next.js
- * 
- * Leverages Supabase Image Transformation to serve optimized, resized images.
- * This reduces egress significantly by:
- * 1. Serving images at the exact size needed (not original 5MB uploads)
- * 2. Automatic WebP conversion for supported browsers
- * 3. Quality optimization (default 75%)
- * 
- * Used by next.config.ts as the custom image loader.
- * 
- * @see https://supabase.com/docs/guides/storage/serving/image-transformations
+ * Custom Image Loader for Next.js
+ *
+ * Handles two image sources:
+ * 1. **Cloudflare R2** — Images are pre-optimized on upload, so URLs are
+ *    returned as-is (R2 CDN handles caching with zero egress).
+ * 2. **Supabase Storage** (legacy) — Rewrites to the `/render/image/` endpoint
+ *    for on-the-fly transforms. Kept for backward compatibility during migration.
  */
 
-const PROJECT_ID = 'zdisrkjxsvpqrrryfbdo'
+const SUPABASE_PROJECT_ID = 'zdisrkjxsvpqrrryfbdo'
+const R2_PUBLIC_HOST = 'pub-7e0259bff3af437b82c83f29dd40ad29.r2.dev'
 
 type ImageLoaderParams = {
   src: string
@@ -20,32 +17,29 @@ type ImageLoaderParams = {
   quality?: number
 }
 
-const supabaseImageLoader = ({ src, width, quality }: ImageLoaderParams): string => {
-  // Only transform Supabase Storage URLs
-  if (src.includes(`${PROJECT_ID}.supabase.co/storage`)) {
-    // Convert /object/public/ to /render/image/public/ for transformation
+const imageLoader = ({ src, width, quality }: ImageLoaderParams): string => {
+  // R2 images — already optimized on upload, serve directly from CDN
+  if (src.includes(R2_PUBLIC_HOST)) {
+    return src
+  }
+
+  // Supabase Storage images (legacy) — apply server-side transforms
+  if (src.includes(`${SUPABASE_PROJECT_ID}.supabase.co/storage`)) {
     const transformedSrc = src.replace(
       '/storage/v1/object/public/',
       '/storage/v1/render/image/public/'
     )
 
-    // If URL already has render path, use it
     const baseUrl = transformedSrc.includes('/render/image/')
       ? transformedSrc
       : src.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/')
 
-    // Add transformation params
     const separator = baseUrl.includes('?') ? '&' : '?'
     return `${baseUrl}${separator}width=${width}&quality=${quality || 75}`
   }
 
-  // For non-Supabase images, return as-is with width param if external CDN
-  if (src.startsWith('http')) {
-    return src
-  }
-
-  // For local images, return as-is
+  // External or local images — return as-is
   return src
 }
 
-export default supabaseImageLoader
+export default imageLoader

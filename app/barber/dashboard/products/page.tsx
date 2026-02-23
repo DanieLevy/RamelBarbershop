@@ -147,7 +147,7 @@ export default function ProductsPage() {
       if (selectedFile) {
         setUploading(true)
         const productId = editingProduct?.id || `temp_${Date.now()}`
-        const uploadResult = await uploadProductImage(selectedFile, productId)
+        const uploadResult = await uploadProductImage(selectedFile, productId, barber!.id)
         
         if (!uploadResult.success) {
           showToast.error(uploadResult.error || 'שגיאה בהעלאת התמונה')
@@ -215,12 +215,10 @@ export default function ProductsPage() {
     if (!confirm(`האם למחוק את "${product.name_he}"?`)) return
     
     try {
-      // Delete image from storage if exists
-      if (product.image_url) {
-        const urlParts = product.image_url.split('/products/')
-        if (urlParts[1]) {
-          await deleteProductImage(urlParts[1])
-        }
+      if (product.image_url && barber?.id) {
+        await deleteProductImage(product.image_url, barber.id).catch((err) =>
+          console.error('Error deleting product image from R2:', err)
+        )
       }
       
       const res = await fetch('/api/barber/products', {

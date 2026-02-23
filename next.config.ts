@@ -29,14 +29,14 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    // Custom loader uses Supabase Image Transformation for on-the-fly resizing + WebP
-    // This dramatically reduces egress by serving only the pixels needed
+    // Custom loader handles R2 URLs (pass-through) and legacy Supabase transforms
     loader: 'custom',
     loaderFile: './lib/supabase-image-loader.ts',
     remotePatterns: [
+      { protocol: 'https', hostname: 'pub-7e0259bff3af437b82c83f29dd40ad29.r2.dev' },
+      { protocol: 'https', hostname: 'zdisrkjxsvpqrrryfbdo.supabase.co' },
       { protocol: 'https', hostname: 'iili.io' },
       { protocol: 'https', hostname: 'upcdn.io' },
-      { protocol: 'https', hostname: 'zdisrkjxsvpqrrryfbdo.supabase.co' },
       { protocol: 'https', hostname: 'gcdnb.pbrd.co' },
     ],
     // Long cache for optimized images - URLs include timestamps so updates get new URLs.
