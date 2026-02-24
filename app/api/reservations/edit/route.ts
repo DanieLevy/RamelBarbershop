@@ -534,6 +534,7 @@ export async function POST(request: NextRequest) {
       updatePayload.time_timestamp = normalizedNewTime
       updatePayload.day_name = body.newDayName
       updatePayload.day_num = body.newDayNum
+      updatePayload.sms_reminder_sent_at = null
     }
     
     if (serviceChanged) {
