@@ -159,8 +159,8 @@ export const ReservationRow = ({
           <Phone size={15} strokeWidth={1.5} className="text-accent-gold" />
         </a>
 
-        {/* Edit - Only for upcoming confirmed appointments */}
-        {res.status === 'confirmed' && isUpcoming && onEdit && (
+        {/* TODO: Edit reservation — disabled temporarily, will be re-enabled in a future release */}
+        {/* {res.status === 'confirmed' && isUpcoming && onEdit && (
           <div onClick={(e) => e.stopPropagation()}>
             <Button
               onPress={() => onEdit(res)}
@@ -178,7 +178,7 @@ export const ReservationRow = ({
               <Pencil size={13} strokeWidth={1.5} />
             </Button>
           </div>
-        )}
+        )} */}
 
         {/* Cancel - Only for upcoming appointments */}
         {res.status === 'confirmed' && isUpcoming && (

@@ -717,8 +717,8 @@ function MyAppointmentsContent() {
                             <Info size={14} strokeWidth={1.5} className="text-foreground-muted" />
                           </Button>
                           
-                          {/* Edit - only for upcoming */}
-                          {upcoming && (
+                          {/* TODO: Edit reservation — disabled temporarily, will be re-enabled in a future release */}
+                          {/* {upcoming && (
                             <div className="relative" onClick={(e) => e.stopPropagation()}>
                               <Button
                                 variant="ghost"
@@ -733,7 +733,6 @@ function MyAppointmentsContent() {
                               >
                                 <Pencil size={13} strokeWidth={1.5} />
                               </Button>
-                              {/* One-time tooltip */}
                               {showEditTooltip && index === 0 && (
                                 <div className="absolute -top-11 left-1/2 -translate-x-1/2 z-20 pointer-events-none animate-fade-in">
                                   <div className="bg-accent-gold text-background-dark text-[11px] font-medium px-3 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
@@ -743,7 +742,7 @@ function MyAppointmentsContent() {
                                 </div>
                               )}
                             </div>
-                          )}
+                          )} */}
                           
                           {/* Cancel - only for upcoming */}
                           {upcoming && (
