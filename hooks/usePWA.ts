@@ -76,6 +76,9 @@ const getDismissDuration = (dismissCount: number): number => {
 // BroadcastChannel for cross-tab update coordination
 const UPDATE_CHANNEL_NAME = 'pwa-update-channel'
 
+// Singleton guard — prevent duplicate SW registration across React re-mounts
+let swRegistered = false
+
 export const usePWA = (): UsePWAReturn => {
   const [state, setState] = useState<PWAState>({
     isInstalled: false,
@@ -158,11 +161,13 @@ export const usePWA = (): UsePWAReturn => {
     }
 
     const registerSW = async () => {
+      if (swRegistered) return
+      swRegistered = true
+
       try {
-        // Check for existing registration first
         const existingReg = await navigator.serviceWorker.getRegistration('/')
         if (existingReg?.waiting) {
-          console.log('[PWA] Existing waiting service worker found immediately')
+          console.log('[PWA] Existing waiting service worker found')
           setState((prev) => ({ ...prev, isUpdateAvailable: true, isServiceWorkerReady: true }))
         }
         

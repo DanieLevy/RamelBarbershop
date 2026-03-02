@@ -39,7 +39,6 @@ export function PWAProvider({ children }: PWAProviderProps) {
   const [isInstallDismissed, setIsInstallDismissed] = useState(false)
   const [showUpdateBanner, setShowUpdateBanner] = useState(false)
   const autoUpdateTriggeredRef = useRef(false)
-  const mountTimeRef = useRef(Date.now())
 
   useBadgeManager()
 
@@ -58,15 +57,14 @@ export function PWAProvider({ children }: PWAProviderProps) {
     }
 
     autoUpdateTriggeredRef.current = true
+    sessionStorage.setItem(sessionKey, 'true')
 
-    const timeSinceMount = Date.now() - mountTimeRef.current
-    const delay = Math.max(0, 5000 - timeSinceMount)
-
+    // Apply update immediately — waiting means chunks may already be stale.
+    // The UpdateBanner's "auto" variant shows a brief heads-up before reloading.
     const timer = setTimeout(() => {
-      sessionStorage.setItem(sessionKey, 'true')
-      console.log('[PWA] Showing update banner before auto-update')
+      console.log('[PWA] Applying update immediately (waiting SW detected)')
       setShowUpdateBanner(true)
-    }, delay + 1000)
+    }, 500)
 
     return () => clearTimeout(timer)
   }, [pwa.isUpdateAvailable])
