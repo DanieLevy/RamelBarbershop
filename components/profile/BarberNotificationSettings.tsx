@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { usePushNotifications, getDeviceIcon } from '@/hooks/usePushNotifications'
-import { usePWA } from '@/hooks/usePWA'
+import { usePWAContext } from '@/components/pwa/PWAProvider'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { cn, formatHebrewMinutes, formatHebrewHours, formatHebrewDays } from '@/lib/utils'
 import { showToast } from '@/lib/toast'
@@ -29,7 +29,7 @@ interface BarberNotificationSettingsProps {
 
 export function BarberNotificationSettings({ className }: BarberNotificationSettingsProps) {
   const { barber } = useBarberAuthStore()
-  const pwa = usePWA()
+  const pwa = usePWAContext()
   const push = usePushNotifications()
   const [isEnabling, setIsEnabling] = useState(false)
   const [isRecheckingPermission, setIsRecheckingPermission] = useState(false)

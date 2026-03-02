@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
-import { usePWA } from '@/hooks/usePWA'
+import { usePWAContext } from '@/components/pwa/PWAProvider'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { cn } from '@/lib/utils'
@@ -18,7 +18,7 @@ const BANNER_COOLDOWN_HOURS = 24 // Don't re-show for 24 hours after dismissal
  */
 export function PushDeniedBanner() {
   const push = usePushNotifications()
-  const pwa = usePWA()
+  const pwa = usePWAContext()
   const { isLoggedIn: isCustomerLoggedIn, isInitialized: customerInitialized } = useAuthStore()
   const { isLoggedIn: isBarberLoggedIn, isInitialized: barberInitialized } = useBarberAuthStore()
   

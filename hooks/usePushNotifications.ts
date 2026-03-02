@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 import { usePushStore } from '@/store/usePushStore'
-import { usePWA } from './usePWA'
+import { usePWAContext } from '@/components/pwa/PWAProvider'
 import { useBugReporter } from './useBugReporter'
 import type { DeviceInfo, DeviceType } from '@/lib/push/types'
 
@@ -64,7 +64,7 @@ export const setAppBadge = async (count: number): Promise<boolean> => {
 export const usePushNotifications = (): UsePushNotificationsReturn => {
   const { customer, isLoggedIn: isCustomerLoggedIn } = useAuthStore()
   const { barber, isLoggedIn: isBarberLoggedIn } = useBarberAuthStore()
-  const { isStandalone, deviceOS } = usePWA()
+  const { isStandalone, deviceOS } = usePWAContext()
   const { report } = useBugReporter('PushNotifications')
   
   const setStoreSupported = usePushStore(state => state.setSupported)

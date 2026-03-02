@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
-import { usePWA } from '@/hooks/usePWA'
+import { usePWAContext } from '@/components/pwa/PWAProvider'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useBarberAuthStore } from '@/store/useBarberAuthStore'
 
@@ -22,7 +22,7 @@ const PWA_INSTALLED_KEY = 'pwa_installed_timestamp'
  */
 export function AutoPushSubscriber() {
   const push = usePushNotifications()
-  const pwa = usePWA()
+  const pwa = usePWAContext()
   const { isLoggedIn: isCustomerLoggedIn, isInitialized: customerInitialized } = useAuthStore()
   const { isLoggedIn: isBarberLoggedIn, isInitialized: barberInitialized } = useBarberAuthStore()
   

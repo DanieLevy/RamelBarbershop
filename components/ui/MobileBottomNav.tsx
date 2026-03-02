@@ -8,7 +8,7 @@ import type { LucideIcon } from 'lucide-react'
 import { useCurrentUser, type UserType } from '@/hooks/useCurrentUser'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
 import { usePushStore } from '@/store/usePushStore'
-import { usePWA } from '@/hooks/usePWA'
+import { usePWAContext } from '@/components/pwa/PWAProvider'
 import { LoginModal } from '@/components/LoginModal'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/store/useAuthStore'
@@ -41,7 +41,7 @@ export function MobileBottomNav() {
   // Push notifications state for badge
   const push = usePushNotifications()
   const pushStore = usePushStore()
-  const pwa = usePWA()
+  const pwa = usePWAContext()
 
   const isSubscribedRealtime = pushStore.isSubscribed || push.isSubscribed
   const isSupportedRealtime = pushStore.isSupported || push.isSupported

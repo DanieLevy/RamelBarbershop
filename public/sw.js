@@ -38,8 +38,9 @@ const NEXT_STATIC_PATTERN = /^\/_next\/static\//;
 
 // Development-only patterns that should NEVER be cached
 // These are only present in development mode but we exclude them for safety
+// NOTE: /turbopack/i was removed — Next.js 16 Turbopack builds include a
+// production turbopack-HASH.js runtime chunk that MUST be cached.
 const DEV_PATTERNS = [
-  /turbopack/i,           // Turbopack dev chunks
   /hmr-client/i,          // Hot Module Replacement
   /webpack-hmr/i,         // Webpack HMR
   /_devtools/i,           // Dev tools

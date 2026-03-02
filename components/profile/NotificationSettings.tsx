@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { usePushNotifications, getDeviceIcon } from '@/hooks/usePushNotifications'
-import { usePWA } from '@/hooks/usePWA'
+import { usePWAContext } from '@/components/pwa/PWAProvider'
 import { useAuthStore } from '@/store/useAuthStore'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { cn } from '@/lib/utils'
@@ -37,7 +37,7 @@ interface ReminderSettings {
 }
 
 export function NotificationSettings({ className }: NotificationSettingsProps) {
-  const pwa = usePWA()
+  const pwa = usePWAContext()
   const push = usePushNotifications()
   const { customer } = useAuthStore()
   const [isEnabling, setIsEnabling] = useState(false)
