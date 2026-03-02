@@ -1,70 +1,55 @@
-# Netlify Configuration for Next.js App
-# Full Next.js support (API routes, SSR, ISR, Middleware/Proxy) via @netlify/plugin-nextjs
-# Target: Next.js 16.1.6
+# Netlify Configuration for Next.js App (SSR/ISR + API routes)
+# Next.js 16.x + @netlify/plugin-nextjs
 
 [build]
   command = "npm run build"
-  publish = "public"
+  publish = ".next"
   functions = "netlify/functions"
 
-# Environment-specific build settings
 [build.environment]
   NODE_VERSION = "22"
   NPM_FLAGS = "--legacy-peer-deps"
   NETLIFY_NEXT_SKEW_PROTECTION = "true"
 
-# Functions Configuration
 [functions]
   node_bundler = "esbuild"
   external_node_modules = ["@supabase/supabase-js", "web-push"]
   included_files = ["netlify/functions/**"]
 
-# Use the official Netlify Next.js plugin for full support
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# ──────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
 # Headers
-# NOTE:
-# - We do NOT set Cache-Control / Netlify-CDN-Cache-Control globally here,
-#   to avoid fighting the Next.js runtime/plugin behavior for HTML/SSR/ISR.
-# - We DO set long-cache headers for static assets (/_next/static, icons, fonts, etc.).
-# ──────────────────────────────────────────────────────
+# Goal: prevent stale HTML from being cached at the Netlify edge
+# (stale HTML is what causes old chunk-hash JS/CSS 404 + MIME text/plain).
+# We still cache hashed static assets aggressively.
+# ─────────────────────────────────────────────────────────────
 
-# Security headers (apply to everything)
+# Default: DO NOT cache HTML at Netlify CDN
 [[headers]]
   for = "/*"
   [headers.values]
+    Netlify-CDN-Cache-Control = "no-store"
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-XSS-Protection = "1; mode=block"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
 
-# Cache static assets
-[[headers]]
-  for = "/static/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-
+# Hashed Next static assets: cache forever
 [[headers]]
   for = "/_next/static/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# PWA icons with long cache
+# If you also serve your own static folder
 [[headers]]
-  for = "/icons/*"
+  for = "/static/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# Fonts with long cache
-[[headers]]
-  for = "/fonts/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-
-# Netlify Functions headers
+# Netlify Functions: never cache
 [[headers]]
   for = "/.netlify/functions/*"
   [headers.values]
@@ -73,22 +58,7 @@
     Access-Control-Allow-Methods = "GET, POST, OPTIONS"
     Access-Control-Allow-Headers = "Content-Type, Authorization"
 
-# API routes - no caching, CORS enabled
-[[headers]]
-  for = "/api/*"
-  [headers.values]
-    Cache-Control = "no-store, no-cache, must-revalidate"
-    Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
-    Access-Control-Allow-Headers = "Content-Type, Authorization, X-Dev-Token"
-
-# Developer dashboard API - stricter cache control
-[[headers]]
-  for = "/api/dev/*"
-  [headers.values]
-    Cache-Control = "no-store, no-cache, must-revalidate, private"
-
-# Service Worker headers
+# Service Worker: must revalidate
 [[headers]]
   for = "/sw.js"
   [headers.values]
@@ -102,12 +72,31 @@
     Cache-Control = "public, max-age=0, must-revalidate"
     Content-Type = "application/manifest+json"
 
-# ──────────────────────────────────────────────────────
-# Optional: CDN-only caching for a few mostly-static pages
-# (Netlify-CDN-Cache-Control affects Netlify CDN only; browsers follow Cache-Control.)
-# Keep these small to avoid stale HTML referencing old chunk hashes.
-# ──────────────────────────────────────────────────────
+[[headers]]
+  for = "/icons/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
 
+[[headers]]
+  for = "/fonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# API routes: no cache + CORS
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "no-store, no-cache, must-revalidate"
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization, X-Dev-Token"
+
+[[headers]]
+  for = "/api/dev/*"
+  [headers.values]
+    Cache-Control = "no-store, no-cache, must-revalidate, private"
+
+# Optional: allow small Netlify-CDN caching on a few pages (override default no-store)
 [[headers]]
   for = "/"
   [headers.values]
