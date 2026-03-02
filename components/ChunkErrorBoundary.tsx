@@ -15,7 +15,7 @@ interface State {
 }
 
 const STORAGE_KEY = '__chunk_recovery'
-const MAX_RELOADS_WINDOW_MS = 30_000
+const MAX_RELOADS_WINDOW_MS = 10_000
 
 function isChunkLoadError(error: Error): boolean {
   return (

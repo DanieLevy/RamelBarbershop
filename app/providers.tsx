@@ -5,7 +5,13 @@ import { useState, type ReactNode, useEffect } from 'react'
 import { ChunkErrorBoundary } from '@/components/ChunkErrorBoundary'
 
 const STORAGE_KEY = '__chunk_recovery'
-const MAX_WINDOW_MS = 30_000
+const MAX_WINDOW_MS = 10_000
+
+declare global {
+  interface Window {
+    __APP_BOOTED?: boolean
+  }
+}
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -26,7 +32,8 @@ export function Providers({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    console.log('[Providers:init] Global chunk error listeners registered')
+    window.__APP_BOOTED = true
+    console.log('[Providers:init] React mounted — __APP_BOOTED=true')
 
     const isChunkError = (msg: string) =>
       msg.includes('ChunkLoadError') ||
@@ -70,6 +77,15 @@ export function Providers({ children }: { children: ReactNode }) {
 
     window.addEventListener('error', handleError)
     window.addEventListener('unhandledrejection', handleRejection)
+
+    if (window.location.search.includes('_cb=')) {
+      try {
+        const u = new URL(window.location.href)
+        u.searchParams.delete('_cb')
+        history.replaceState(null, '', u.pathname + (u.search || '') + u.hash)
+      } catch { /* non-critical */ }
+    }
+
     return () => {
       window.removeEventListener('error', handleError)
       window.removeEventListener('unhandledrejection', handleRejection)

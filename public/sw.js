@@ -166,23 +166,14 @@ self.addEventListener('fetch', (event) => {
   if (isDevAsset(url.pathname)) return;
 
   // ========================================
-  // Next.js build assets — network pass-through, never cached by SW.
-  // Browser uses immutable Cache-Control headers from the server.
-  // We only observe: if a chunk 404s, notify clients to reload.
+  // Next.js build assets — full pass-through, SW does NOT intercept.
+  // Browser fetches directly and uses immutable Cache-Control headers.
+  // If a chunk 404s, the browser fires a proper error event that the
+  // inline recovery script (in layout.tsx) catches via capture-phase
+  // listeners. Previously, SW intercepting here caused MIME type
+  // errors (404 response served as script) that recovery couldn't catch.
   // ========================================
   if (url.pathname.startsWith('/_next/')) {
-    event.respondWith(
-      fetch(request).then(function(response) {
-        if (!response.ok && url.pathname.startsWith('/_next/static/chunks/')) {
-          console.warn(`[SW:fetch] Stale chunk ${response.status} url=${url.pathname} type=${request.destination || 'unknown'}`);
-          event.waitUntil(throttledNotifyReload(url.pathname));
-        }
-        return response;
-      }).catch(function(err) {
-        console.error(`[SW:fetch] Network error for _next asset url=${url.pathname} error=${err.message}`);
-        throw err;
-      })
-    );
     return;
   }
 
@@ -315,33 +306,6 @@ function getOfflinePage() {
   </div>
 </body>
 </html>`;
-}
-
-// Chunk 404 recovery — notify clients to reload (one-shot, throttled).
-// SW no longer caches /_next/* so there's nothing to purge;
-// the only recovery action is telling the page to hard-reload.
-let lastNotifyTs = 0;
-const NOTIFY_COOLDOWN_MS = 10000;
-
-async function throttledNotifyReload(chunkUrl) {
-  const now = Date.now();
-  const elapsed = now - lastNotifyTs;
-  if (elapsed < NOTIFY_COOLDOWN_MS) {
-    console.log(`[SW:chunkRecovery] Throttled — ${elapsed}ms since last notify (cooldown=${NOTIFY_COOLDOWN_MS}ms) chunk=${chunkUrl}`);
-    return;
-  }
-  lastNotifyTs = now;
-
-  console.log(`[SW:chunkRecovery] Chunk 404 — notifying clients chunk=${chunkUrl}`);
-  try {
-    const windowClients = await self.clients.matchAll({ type: 'window' });
-    console.log(`[SW:chunkRecovery] Sending CHUNK_STALE to ${windowClients.length} client(s)`);
-    windowClients.forEach(function(client) {
-      client.postMessage({ type: 'CHUNK_STALE', url: chunkUrl });
-    });
-  } catch (err) {
-    console.error(`[SW:chunkRecovery] Failed to notify clients: ${err.message}`);
-  }
 }
 
 // Message handler for skip waiting and cache management

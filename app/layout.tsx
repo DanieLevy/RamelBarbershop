@@ -75,7 +75,7 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){
-var PV=5,pvK='__purge_v';
+var PV=6,pvK='__purge_v';
 console.log('[Audit:boot] url='+location.href+' time='+new Date().toISOString());
 try{
   var hasSW='serviceWorker'in navigator;
@@ -122,8 +122,8 @@ try{
   }
 }catch(e){console.error('[PurgeV] Error:',e)}
 if(location.search.indexOf('_purge=')>=0||location.search.indexOf('_cb=')>=0){try{var pu=new URL(location.href);pu.searchParams.delete('_purge');pu.searchParams.delete('_cb');history.replaceState(null,'',pu.pathname+(pu.search||'')+pu.hash);console.log('[PurgeV] Cleaned _purge/_cb params from URL')}catch(e){}}
-var K='__chunk_recovery',W=30000;
-function chk(m){return m&&(m.indexOf('ChunkLoadError')>=0||m.indexOf('Failed to load chunk')>=0||m.indexOf('Loading chunk')>=0||m.indexOf('dynamically imported module')>=0)}
+var K='__chunk_recovery',W=10000;
+function chk(m){return m&&(m.indexOf('ChunkLoadError')>=0||m.indexOf('Failed to load chunk')>=0||m.indexOf('Loading chunk')>=0||m.indexOf('dynamically imported module')>=0||m.indexOf('MIME type')>=0||m.indexOf('Script load error')>=0||m.indexOf('Boot timeout')>=0)}
 function go(msg){
   var l=0;try{l=+sessionStorage.getItem(K)||0}catch(e){}
   var elapsed=Date.now()-l;
@@ -142,7 +142,21 @@ function go(msg){
 }
 window.addEventListener('error',function(e){if(chk(e.message||'')){console.warn('[ChunkRecovery:inline] window.error: '+e.message+' file='+e.filename+' line='+e.lineno);go(e.message)}});
 window.addEventListener('unhandledrejection',function(e){var r=e.reason;var m=r?(r.message||''+r):'';if(chk(m)){console.warn('[ChunkRecovery:inline] unhandledrejection: '+m);go(m)}});
+window.addEventListener('error',function(e){
+  var t=e.target||e.srcElement;
+  if(t&&t.tagName==='SCRIPT'&&t.src&&t.src.indexOf('/_next/static/chunks/')>=0){
+    console.warn('[ChunkRecovery:inline] Script element load failure src='+t.src);
+    go('Script load error: '+t.src);
+  }
+},true);
 if('serviceWorker'in navigator)navigator.serviceWorker.addEventListener('message',function(e){if(e.data&&e.data.type==='CHUNK_STALE'){console.log('[ChunkRecovery:inline] SW CHUNK_STALE url='+e.data.url);go('SW stale chunk: '+(e.data.url||'unknown'))}});
+window.__APP_BOOTED=false;
+setTimeout(function(){
+  if(!window.__APP_BOOTED){
+    console.warn('[ChunkRecovery:inline] Boot timeout — React did not mount within 12s');
+    go('Boot timeout');
+  }
+},12000);
 console.log('[Audit:boot] Inline script complete — listeners registered');
 })()`,
           }}
