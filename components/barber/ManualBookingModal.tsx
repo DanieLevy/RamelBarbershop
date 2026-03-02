@@ -926,13 +926,13 @@ export function ManualBookingModal({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 justify-center py-2">
+                    <div dir="ltr" className="flex items-center gap-3 justify-center py-2">
                       <div className="flex flex-col items-center gap-1">
                         <span className="text-foreground-muted/50 text-[10px]">שעה</span>
                         <select
                           value={customHour}
                           onChange={(e) => setCustomHour(e.target.value)}
-                          className="w-[72px] py-2.5 rounded-xl bg-background-card border border-orange-500/20 text-foreground-light text-center text-lg font-semibold tabular-nums outline-none focus:ring-2 focus:ring-orange-500/40"
+                          className="w-[72px] py-2.5 rounded-xl bg-background-card border border-orange-500/20 text-foreground-light text-center text-lg font-semibold tabular-nums outline-none focus:ring-2 focus:ring-orange-500/40 appearance-none"
                           aria-label="בחר שעה"
                         >
                           {Array.from({ length: 24 }, (_, i) => (
@@ -946,7 +946,7 @@ export function ManualBookingModal({
                         <select
                           value={customMinute}
                           onChange={(e) => setCustomMinute(e.target.value)}
-                          className="w-[72px] py-2.5 rounded-xl bg-background-card border border-orange-500/20 text-foreground-light text-center text-lg font-semibold tabular-nums outline-none focus:ring-2 focus:ring-orange-500/40"
+                          className="w-[72px] py-2.5 rounded-xl bg-background-card border border-orange-500/20 text-foreground-light text-center text-lg font-semibold tabular-nums outline-none focus:ring-2 focus:ring-orange-500/40 appearance-none"
                           aria-label="בחר דקות"
                         >
                           {['00', '15', '30', '45'].map(min => (

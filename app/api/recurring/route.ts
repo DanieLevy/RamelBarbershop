@@ -327,35 +327,9 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // 5. Verify barber works on this day and time
-    const { data: workDay, error: workDayError } = await supabase
-      .from('work_days')
-      .select('is_working, start_time, end_time')
-      .eq('user_id', createBody.barber_id)
-      .eq('day_of_week', createBody.day_of_week)
-      .maybeSingle()
-    
-    if (workDayError) {
-      console.error('[API/Recurring] Work day check error:', workDayError)
-    }
-    
-    if (!workDay || !workDay.is_working) {
-      return NextResponse.json(
-        { success: false, error: 'BARBER_NOT_WORKING', message: ERROR_MESSAGES.BARBER_NOT_WORKING },
-        { status: 400 }
-      )
-    }
-    
-    // Check if time slot is within work hours
-    if (workDay.start_time && workDay.end_time) {
-      const slotTime = createBody.time_slot
-      if (slotTime < workDay.start_time || slotTime >= workDay.end_time) {
-        return NextResponse.json(
-          { success: false, error: 'BARBER_NOT_WORKING', message: 'השעה מחוץ לשעות העבודה' },
-          { status: 400 }
-        )
-      }
-    }
+    // 5. Barber work-day and time-within-hours are NOT enforced for recurring.
+    // Barbers intentionally schedule recurring slots outside their normal hours
+    // (e.g., 08:30 on a day that officially starts at 09:00).
     
     // 6. Check for existing recurring at same slot (conflict)
     const { data: existingRecurring, error: conflictError } = await supabase

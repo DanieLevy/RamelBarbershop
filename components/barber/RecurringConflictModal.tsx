@@ -10,6 +10,7 @@ interface RecurringConflictModalProps {
   isOpen: boolean
   onClose: () => void
   onConfirm: () => Promise<void>
+  onCreateWithoutCancel: () => Promise<void>
   conflicts: ConflictingReservation[]
   dayLabel: string
   timeSlot: string
@@ -19,11 +20,13 @@ export function RecurringConflictModal({
   isOpen,
   onClose,
   onConfirm,
+  onCreateWithoutCancel,
   conflicts,
   dayLabel,
   timeSlot,
 }: RecurringConflictModalProps) {
   const [loading, setLoading] = useState(false)
+  const [creatingOnly, setCreatingOnly] = useState(false)
 
   if (!isOpen) return null
 
@@ -35,6 +38,17 @@ export function RecurringConflictModal({
       setLoading(false)
     }
   }
+
+  const handleCreateWithoutCancel = async () => {
+    setCreatingOnly(true)
+    try {
+      await onCreateWithoutCancel()
+    } finally {
+      setCreatingOnly(false)
+    }
+  }
+
+  const isBusy = loading || creatingOnly
 
   return (
     <Portal>
@@ -68,7 +82,7 @@ export function RecurringConflictModal({
               variant="ghost"
               isIconOnly
               onPress={onClose}
-              isDisabled={loading}
+              isDisabled={isBusy}
               aria-label="סגור"
             >
               <X size={20} className="text-foreground-muted" />
@@ -78,8 +92,8 @@ export function RecurringConflictModal({
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-5 space-y-4">
             <p className="text-sm text-foreground-muted">
-              קיימים {conflicts.length} תורים רגילים שמתנגשים עם התור הקבוע החדש. 
-              כדי להמשיך, יש לבטל את התורים הבאים:
+              קיימים {conflicts.length} תורים רגילים בשעה זו בשבועות הקרובים.
+              ניתן ליצור את התור הקבוע בלי לבטל אותם, או לבטלם ולהמשיך.
             </p>
 
             {/* Conflicts List */}
@@ -128,33 +142,49 @@ export function RecurringConflictModal({
           </div>
 
           {/* Footer */}
-          <div className="flex gap-3 px-5 py-4 border-t border-white/5 bg-background-dark/30">
+          <div className="flex flex-col gap-2 px-5 py-4 border-t border-white/5 bg-background-dark/30">
             <Button
-              variant="secondary"
-              onPress={onClose}
-              isDisabled={loading}
-              className="flex-1"
+              onPress={handleCreateWithoutCancel}
+              isDisabled={isBusy}
+              className="w-full bg-accent-gold text-background-dark font-medium"
             >
-              ביטול
-            </Button>
-            <Button
-              variant="danger"
-              onPress={handleConfirm}
-              isDisabled={loading}
-              className="flex-1"
-            >
-              {loading ? (
+              {creatingOnly ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
-                  <span>מבטל תורים...</span>
+                  <span>יוצר תור קבוע...</span>
                 </>
               ) : (
-                <>
-                  <Trash2 size={18} />
-                  <span>בטל וצור קבוע</span>
-                </>
+                <span>צור קבוע בלי לבטל תורים</span>
               )}
             </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                onPress={onClose}
+                isDisabled={isBusy}
+                className="flex-1"
+              >
+                ביטול
+              </Button>
+              <Button
+                variant="danger"
+                onPress={handleConfirm}
+                isDisabled={isBusy}
+                className="flex-1"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>מבטל...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={18} />
+                    <span>בטל וצור קבוע</span>
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </div>

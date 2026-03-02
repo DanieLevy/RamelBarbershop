@@ -147,7 +147,7 @@ export function CreateRecurringModal({
       .eq('is_active', true)
     
     if (data) {
-      const slots = new Set(data.map(r => r.time_slot))
+      const slots = new Set(data.map(r => r.time_slot.substring(0, 5)))
       setExistingRecurring(slots)
     } else {
       setExistingRecurring(new Set())
@@ -184,33 +184,40 @@ export function CreateRecurringModal({
     }
   }
 
-  // Get work hours for selected day
-  const selectedDayWorkHours = useMemo(() => {
+  // Get time range for the selected day (extended beyond barber hours)
+  const selectedDayTimeRange = useMemo(() => {
     if (!selectedDay) return null
     
     const daySettings = barberWorkDays.find(wd => wd.day_of_week === selectedDay)
-    
-    if (!daySettings || !daySettings.is_working) {
-      return null
-    }
-    
-    return {
-      start: daySettings.start_time || '09:00',
-      end: daySettings.end_time || '19:00',
-    }
-  }, [selectedDay, barberWorkDays])
+    const isBarberWorkDay = daySettings?.is_working === true
 
-  // Generate available time slots for selected day
-  // IMPORTANT: Uses 30-minute intervals to match the booking system
+    const barberStart = isBarberWorkDay && daySettings?.start_time
+      ? daySettings.start_time.substring(0, 5)
+      : (shopSettings?.work_hours_start?.toString().substring(0, 5) || '09:00')
+    const barberEnd = isBarberWorkDay && daySettings?.end_time
+      ? daySettings.end_time.substring(0, 5)
+      : (shopSettings?.work_hours_end?.toString().substring(0, 5) || '20:00')
+
+    const startHour = Math.max(7, parseInt(barberStart.split(':')[0]) - 1)
+    const endHour = Math.min(22, parseInt(barberEnd.split(':')[0]) + 1)
+
+    return {
+      start: `${startHour.toString().padStart(2, '0')}:00`,
+      end: `${endHour.toString().padStart(2, '0')}:00`,
+      barberStart,
+      barberEnd,
+      isBarberWorkDay,
+    }
+  }, [selectedDay, barberWorkDays, shopSettings])
+
+  // Generate time slots for the extended range
   const availableTimeSlots = useMemo(() => {
-    if (!selectedDayWorkHours) return []
+    if (!selectedDayTimeRange) return []
     
-    const startTime = parseTimeString(selectedDayWorkHours.start)
-    const endTime = parseTimeString(selectedDayWorkHours.end)
+    const startTime = parseTimeString(selectedDayTimeRange.start)
+    const endTime = parseTimeString(selectedDayTimeRange.end)
     
     const slots: string[] = []
-    
-    // Generate slots in 30-minute increments (matching booking system)
     let currentHour = startTime.hour
     let currentMinute = startTime.minute
     
@@ -218,7 +225,7 @@ export function CreateRecurringModal({
       const timeSlot = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`
       slots.push(timeSlot)
       
-      currentMinute += 30 // Fixed 30-minute intervals
+      currentMinute += 30
       if (currentMinute >= 60) {
         currentMinute = 0
         currentHour++
@@ -226,24 +233,23 @@ export function CreateRecurringModal({
     }
     
     return slots
-  }, [selectedDayWorkHours])
+  }, [selectedDayTimeRange])
 
-  // Get available days (days where BOTH barbershop is open AND barber works)
+  const isWithinBarberHours = (slot: string): boolean => {
+    if (!selectedDayTimeRange?.isBarberWorkDay) return false
+    return slot >= selectedDayTimeRange.barberStart && slot < selectedDayTimeRange.barberEnd
+  }
+
+  // Get available days — all days the shop is open, with barber work status
   const availableDays = useMemo(() => {
-    // Get shop open days (defaults to all days if not set)
     const shopOpenDays = shopSettings?.open_days || []
     
-    return DAY_OPTIONS.filter(day => {
-      // Check if barbershop is open on this day
-      const shopIsOpen = shopOpenDays.length === 0 || shopOpenDays.includes(day.value)
-      
-      // Check if barber works on this day
-      const workDay = barberWorkDays.find(wd => wd.day_of_week === day.value)
-      const barberWorks = workDay?.is_working === true
-      
-      // Day is only available if both shop is open AND barber works
-      return shopIsOpen && barberWorks
-    })
+    return DAY_OPTIONS
+      .filter(day => shopOpenDays.length === 0 || shopOpenDays.includes(day.value))
+      .map(day => {
+        const workDay = barberWorkDays.find(wd => wd.day_of_week === day.value)
+        return { ...day, barberWorks: workDay?.is_working === true }
+      })
   }, [barberWorkDays, shopSettings])
 
   // Handle save - checks for conflicts first
@@ -504,7 +510,7 @@ export function CreateRecurringModal({
               {availableDays.length === 0 ? (
                 <div className="flex items-center gap-2 text-sm text-yellow-400 bg-yellow-400/10 rounded-xl p-3">
                   <AlertTriangle size={16} />
-                  <span>לא הוגדרו ימי עבודה</span>
+                  <span>המספרה סגורה בכל הימים</span>
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
@@ -513,16 +519,21 @@ export function CreateRecurringModal({
                       key={day.value}
                       onClick={() => {
                         setSelectedDay(day.value)
-                        setSelectedTimeSlot(null) // Reset time when day changes
+                        setSelectedTimeSlot(null)
                       }}
                       className={cn(
-                        'px-3 py-2 rounded-lg text-sm transition-colors border',
+                        'px-3 py-2 rounded-lg text-sm transition-colors border relative',
                         selectedDay === day.value
                           ? 'bg-accent-gold text-background-dark border-accent-gold'
-                          : 'bg-white/5 text-foreground-light border-white/10 hover:bg-white/10'
+                          : day.barberWorks
+                            ? 'bg-white/5 text-foreground-light border-white/10 hover:bg-white/10'
+                            : 'bg-white/5 text-foreground-muted border-white/5 hover:bg-white/10'
                       )}
                     >
                       {day.label}
+                      {!day.barberWorks && selectedDay !== day.value && (
+                        <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-500" />
+                      )}
                     </button>
                   ))}
                 </div>
@@ -536,33 +547,41 @@ export function CreateRecurringModal({
                   <Clock size={16} className="text-foreground-muted" />
                   שעה
                 </label>
-                
-                {!selectedDayWorkHours ? (
-                  <div className="flex items-center gap-2 text-sm text-yellow-400 bg-yellow-400/10 rounded-xl p-3">
-                    <AlertTriangle size={16} />
-                    <span>אינך עובד ביום זה</span>
+
+                {selectedDayTimeRange && !selectedDayTimeRange.isBarberWorkDay && (
+                  <div className="flex items-center gap-2 text-sm text-amber-400 bg-amber-400/10 rounded-xl p-2.5">
+                    <AlertTriangle size={14} />
+                    <span>יום זה מחוץ ללוח הזמנים הרגיל שלך</span>
                   </div>
-                ) : availableTimeSlots.length === 0 ? (
+                )}
+                
+                {availableTimeSlots.length === 0 ? (
                   <p className="text-sm text-foreground-muted">אין שעות זמינות</p>
                 ) : (
                   <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto">
                     {availableTimeSlots.map(slot => {
                       const isOccupied = existingRecurring.has(slot)
+                      const outOfHours = !isWithinBarberHours(slot)
                       return (
                         <button
                           key={slot}
                           onClick={() => !isOccupied && setSelectedTimeSlot(slot)}
                           disabled={isOccupied}
                           className={cn(
-                            'px-2 py-2 rounded-lg text-sm transition-colors border text-center',
+                            'px-2 py-2 rounded-lg text-sm transition-colors border text-center relative',
                             isOccupied
                               ? 'bg-red-500/10 text-red-400/50 border-red-500/20 cursor-not-allowed line-through'
                               : selectedTimeSlot === slot
                                 ? 'bg-accent-gold text-background-dark border-accent-gold'
-                                : 'bg-white/5 text-foreground-light border-white/10 hover:bg-white/10'
+                                : outOfHours
+                                  ? 'bg-white/3 text-foreground-muted border-white/5 hover:bg-white/10'
+                                  : 'bg-white/5 text-foreground-light border-white/10 hover:bg-white/10'
                           )}
                         >
                           {slot}
+                          {outOfHours && !isOccupied && selectedTimeSlot !== slot && (
+                            <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          )}
                         </button>
                       )
                     })}
@@ -625,6 +644,11 @@ export function CreateRecurringModal({
           setConflictingReservations([])
         }}
         onConfirm={handleConfirmConflicts}
+        onCreateWithoutCancel={async () => {
+          setConflictModalOpen(false)
+          setConflictingReservations([])
+          await createRecurringAppointment()
+        }}
         conflicts={conflictingReservations}
         dayLabel={selectedDay ? DAY_OPTIONS.find(d => d.value === selectedDay)?.label || '' : ''}
         timeSlot={selectedTimeSlot || ''}

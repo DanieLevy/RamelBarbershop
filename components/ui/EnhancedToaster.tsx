@@ -30,6 +30,8 @@ export const EnhancedToaster = () => {
         // Respect iPhone notch / safe area - push toasts below the notch
         top: 'max(env(safe-area-inset-top, 0px), 8px)',
         direction: 'rtl',
+        // Must be above Portal's z-index (9999) so toasts aren't hidden behind modals
+        zIndex: 99999,
       }}
       toastOptions={{
         duration: 4000,
