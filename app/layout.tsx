@@ -75,6 +75,22 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){
+var PV=1,pvK='__purge_v';
+try{
+  var cv=+(localStorage.getItem(pvK)||0);
+  if(cv<PV){
+    localStorage.setItem(pvK,''+PV);
+    var done=[];
+    if('caches'in window)done.push(caches.keys().then(function(n){return Promise.all(n.map(function(c){return caches.delete(c)}))}));
+    if('serviceWorker'in navigator)done.push(navigator.serviceWorker.getRegistrations().then(function(regs){return Promise.all(regs.map(function(r){return r.unregister()}))}));
+    Promise.all(done).catch(function(){}).then(function(){
+      var u=location.pathname+location.search;
+      location.replace(u+(u.indexOf('?')>=0?'&':'?')+'_purge='+PV+'&_cb='+Date.now())
+    });
+    return
+  }
+}catch(e){}
+if(location.search.indexOf('_purge=')>=0){try{var pu=new URL(location.href);pu.searchParams.delete('_purge');pu.searchParams.delete('_cb');history.replaceState(null,'',pu.pathname+(pu.search||'')+pu.hash)}catch(e){}}
 var K='__chunk_recovery',W=30000;
 function diag(msg){
   var d={failedChunkUrl:null,swController:false,swControllerUrl:null,swWaiting:false,isPWA:false,online:navigator.onLine,recoverySource:'inline-script',documentUrl:location.href,previousRecoveryTs:null};

@@ -29,6 +29,10 @@
 [[headers]]
   for = "/*"
   [headers.values]
+    # Default Cache-Control for HTML pages: always revalidate with server.
+    # Static assets (/_next/static/*, /fonts/*, /icons/*) override this below.
+    # This prevents browsers from serving stale HTML that references old chunk hashes.
+    Cache-Control = "public, max-age=0, must-revalidate"
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"

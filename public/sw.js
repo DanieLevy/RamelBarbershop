@@ -181,9 +181,8 @@ self.addEventListener('fetch', (event) => {
   // ========================================
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      fetch(new Request(request, { cache: 'no-store' }))
         .catch(() => {
-          // Return branded offline page
           return new Response(getOfflinePage(), {
             status: 503,
             headers: { 'Content-Type': 'text/html; charset=utf-8' }
