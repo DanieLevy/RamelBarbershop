@@ -240,26 +240,36 @@ export function MobileBottomNav() {
     [navItems, activeItem]
   )
 
+  const isPillVisible = pillStyle !== null && activeIndex >= 0
+
   // ── Measure active item position for pill indicator ──
-  useEffect(() => {
+  const measurePill = useCallback(() => {
     if (activeIndex < 0 || !navRef.current) return
 
-    const measure = () => {
-      const activeBtn = itemRefs.current[activeIndex]
-      const navEl = navRef.current
-      if (!activeBtn || !navEl) return
+    const activeBtn = itemRefs.current[activeIndex]
+    const navEl = navRef.current
+    if (!activeBtn || !navEl) return
 
-      const navRect = navEl.getBoundingClientRect()
-      const btnRect = activeBtn.getBoundingClientRect()
+    const navRect = navEl.getBoundingClientRect()
+    const btnRect = activeBtn.getBoundingClientRect()
 
-      setPillStyle({
-        left: btnRect.left - navRect.left,
-        width: btnRect.width,
-      })
-    }
+    if (btnRect.width === 0) return
 
-    requestAnimationFrame(measure)
-  }, [activeIndex, navItems])
+    setPillStyle({
+      left: btnRect.left - navRect.left,
+      width: btnRect.width,
+    })
+  }, [activeIndex])
+
+  useEffect(() => {
+    requestAnimationFrame(measurePill)
+  }, [measurePill, navItems])
+
+  useEffect(() => {
+    window.addEventListener('resize', measurePill)
+    document.fonts?.ready?.then(measurePill)
+    return () => window.removeEventListener('resize', measurePill)
+  }, [measurePill])
 
   // Determine pill border-radius based on position (edge-matching)
   const pillBorderRadius = useMemo(() => {
@@ -373,7 +383,7 @@ export function MobileBottomNav() {
           aria-label="תפריט ניווט ראשי"
         >
           {/* Animated active pill - solid gold, DOM-measured for RTL */}
-          {pillStyle && activeIndex >= 0 && (
+          {isPillVisible && (
             <div
               className={cn(
                 'absolute h-[calc(100%-12px)] top-[6px]',
@@ -409,9 +419,12 @@ export function MobileBottomNav() {
                     : 'flex-col gap-0.5',
                   'md:max-w-[200px] md:h-full md:flex-col md:gap-0.5',
                   
-                  // Colors: active = dark on gold, inactive = muted
+                  // Colors: active = dark on gold pill, inactive = muted
+                  // Only apply dark text when pill is rendered, else use gold text as fallback
                   isActive
-                    ? 'text-background-dark font-semibold'
+                    ? isPillVisible
+                      ? 'text-background-dark font-semibold'
+                      : 'text-accent-gold font-semibold'
                     : 'text-foreground-muted hover:text-foreground-light',
                     
                   // Touch

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/store/useAuthStore'
 import { createClient } from '@/lib/supabase/client'
@@ -384,14 +384,27 @@ function MyAppointmentsContent() {
     return { date: dateStr, time: formatTimeUtil(normalizedTs), isToday }
   }
 
-  const filteredReservations = reservations.filter(r => {
-    switch (activeTab) {
-      case 'upcoming': return isUpcoming(r)
-      case 'past': return isPast(r)
-      case 'cancelled': return isCancelled(r)
-      default: return true
+  const filteredReservations = useMemo(() => {
+    const now = Date.now()
+
+    const filtered = reservations.filter(r => {
+      const resTime = normalizeTimestampFormat(r.time_timestamp)
+      switch (activeTab) {
+        case 'upcoming': return resTime > now && r.status === 'confirmed'
+        case 'past': return resTime <= now && r.status !== 'cancelled'
+        case 'cancelled': return r.status === 'cancelled'
+        default: return true
+      }
+    })
+
+    if (activeTab === 'upcoming') {
+      filtered.sort((a, b) =>
+        normalizeTimestampFormat(a.time_timestamp) - normalizeTimestampFormat(b.time_timestamp)
+      )
     }
-  })
+
+    return filtered
+  }, [reservations, activeTab])
 
   const tabs: Tab[] = [
     { key: 'upcoming', label: 'קרובים', icon: Calendar, count: reservations.filter(isUpcoming).length },
