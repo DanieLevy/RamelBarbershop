@@ -3,7 +3,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState, type ReactNode, useEffect } from 'react'
 import { ChunkErrorBoundary } from '@/components/ChunkErrorBoundary'
-import { reportBug, getEnvironmentInfo, collectChunkDiagnostics } from '@/lib/bug-reporter'
 
 const STORAGE_KEY = '__chunk_recovery'
 const MAX_WINDOW_MS = 30_000
@@ -33,54 +32,16 @@ export function Providers({ children }: { children: ReactNode }) {
       msg.includes('Loading chunk') ||
       msg.includes('Failed to fetch dynamically imported module')
 
-    const extractChunkUrl = (msg: string) => {
-      const match = msg.match(/\/_next\/static\/chunks\/[^\s"')]+/)
-      return match?.[0]
-    }
-
-    const handleRecovery = async (errorMessage: string) => {
+    const handleRecovery = (errorMessage: string) => {
       const last = Number(sessionStorage.getItem(STORAGE_KEY) || '0')
       if (Date.now() - last < MAX_WINDOW_MS) {
         console.log('[Providers] Chunk recovery within cooldown — skipping')
         return
       }
 
-      console.log('[Providers] Chunk error — starting recovery:', errorMessage)
-      const chunkUrl = extractChunkUrl(errorMessage)
-
-      try {
-        const diag = await collectChunkDiagnostics('global-handler', chunkUrl)
-        await reportBug(
-          new Error(errorMessage),
-          'ChunkLoadError — Global handler recovery (providers.tsx)',
-          {
-            component: 'ProvidersGlobalHandler',
-            environment: getEnvironmentInfo(),
-            severity: 'high',
-            additionalData: { chunkDiagnostics: diag },
-          }
-        )
-      } catch {
-        // Never block recovery if reporting fails
-      }
-
-      console.log('[Providers] Unregistering all SWs + clearing caches')
-      try {
-        if ('serviceWorker' in navigator) {
-          const regs = await navigator.serviceWorker.getRegistrations()
-          await Promise.all(regs.map((r) => r.unregister()))
-        }
-        const names = await caches.keys()
-        await Promise.all(names.map((n) => caches.delete(n)))
-      } catch { /* caches API may be unavailable */ }
-
+      console.log('[Providers] Chunk error — reloading:', errorMessage)
       sessionStorage.setItem(STORAGE_KEY, Date.now().toString())
-
-      const url = window.location.pathname + window.location.search
-      const sep = url.includes('?') ? '&' : '?'
-      const target = url + sep + '_cb=' + Date.now()
-      console.log('[Providers] Cleanup done — navigating to:', target)
-      window.location.replace(target)
+      window.location.reload()
     }
 
     const handleError = (event: ErrorEvent) => {

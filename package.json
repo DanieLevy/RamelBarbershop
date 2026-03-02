@@ -1,6 +1,6 @@
 {
   "name": "ramel-barbershop",
-  "version": "2.0.0",
+  "version": "2.1.2",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",

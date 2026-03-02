@@ -262,19 +262,20 @@ export const usePWA = (): UsePWAReturn => {
     }
     navigator.serviceWorker.addEventListener('message', handleMessage)
 
-    // Handle controller change (new SW took over)
+    // Handle controller change (new SW took over) — reload to get fresh assets.
+    // Guard with sessionStorage to prevent reload loops within the same session.
+    const SW_RELOAD_KEY = '__sw_controller_reloaded'
     const handleControllerChange = () => {
-      // Skip reload if a chunk recovery just happened — the recovery already reloaded
-      const lastRecovery = Number(sessionStorage.getItem('__chunk_recovery') || '0')
-      if (Date.now() - lastRecovery < 10_000) {
-        console.log('[PWA] Controller changed during recovery — skipping reload')
+      if (sessionStorage.getItem(SW_RELOAD_KEY)) {
+        console.log('[PWA] Controller changed but already reloaded this session — skipping')
         return
       }
 
       console.log('[PWA] Controller changed, reloading page...')
+      sessionStorage.setItem(SW_RELOAD_KEY, Date.now().toString())
       setTimeout(() => {
         window.location.reload()
-      }, 100)
+      }, 250)
     }
     navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange)
 

@@ -1,6 +1,6 @@
 // Service Worker for Ramel Barbershop PWA
 // Version is updated automatically during build
-const APP_VERSION = '2.0.0-2026.03.02.1901';
+const APP_VERSION = '2.1.2-2026.03.02.2033';
 const CACHE_NAME = `ramel-pwa-${APP_VERSION}`;
 
 // Icon version - increment when icons change to bust cache
@@ -33,13 +33,8 @@ const STATIC_ASSETS = [
   '/favicon.ico'
 ];
 
-// Next.js static assets pattern - only production chunks should be cached
-const NEXT_STATIC_PATTERN = /^\/_next\/static\//;
-
 // Development-only patterns that should NEVER be cached
 // These are only present in development mode but we exclude them for safety
-// NOTE: /turbopack/i was removed — Next.js 16 Turbopack builds include a
-// production turbopack-HASH.js runtime chunk that MUST be cached.
 const DEV_PATTERNS = [
   /hmr-client/i,          // Hot Module Replacement
   /webpack-hmr/i,         // Webpack HMR
@@ -89,20 +84,20 @@ self.addEventListener('activate', (event) => {
             })
         );
       }),
-      // Clean up dev assets and stale Next.js chunks from current cache
+      // Clean up dev assets from current cache
       caches.open(CACHE_NAME).then(async (cache) => {
         const requests = await cache.keys();
         const deletePromises = [];
         
         for (const request of requests) {
           const url = new URL(request.url);
-          if (isDevAsset(url.pathname) || NEXT_STATIC_PATTERN.test(url.pathname)) {
+          if (isDevAsset(url.pathname)) {
             deletePromises.push(cache.delete(request));
           }
         }
         
         if (deletePromises.length > 0) {
-          console.log(`[SW] Cleaned ${deletePromises.length} stale/dev assets from cache on activate`);
+          console.log(`[SW] Cleaned ${deletePromises.length} dev assets from cache on activate`);
         }
         
         return Promise.all(deletePromises);
@@ -123,23 +118,26 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch event - Network first, cache fallback for static assets only
+// Fetch event - Network pass-through for Next.js assets, cache for static assets only
 // 
-// IMPORTANT: What gets cached vs what stays REAL-TIME:
+// CACHING POLICY:
 // ======================================================
-// ✅ CACHED (truly static, never changes):
-//    - /_next/static/* (JS/CSS with content hashes - immutable)
+// ✅ CACHED by SW (truly static, never changes):
 //    - /fonts/* (static font files)
 //    - /icons/* (static icons)
 //    - /manifest.json, /icon.png, etc.
+//
+// ❌ NOT CACHED by SW (browser/CDN handles via Cache-Control headers):
+//    - /_next/static/* (JS/CSS) — immutable headers let browser cache these;
+//      SW must NOT cache them to avoid version skew after deploys
+//    - /_next/image/* (optimized images)
+//    - /_next/data/* (SSR data)
 //
 // ❌ NEVER CACHED (must be real-time for reservations):
 //    - /api/* (all API endpoints)
 //    - Supabase requests (database queries)
 //    - RSC payloads (?_rsc=* params - dynamic React data)
-//    - /_next/data/* (getServerSideProps data)
 //    - Page navigations (always network-first)
-//    - /_next/image/* (optimized images - short cache via headers)
 //
 self.addEventListener('fetch', (event) => {
   const { request } = event;
@@ -159,20 +157,26 @@ self.addEventListener('fetch', (event) => {
   if (!url.origin.includes(self.location.origin)) return;
 
   // Skip RSC (React Server Components) payloads - these contain dynamic data
-  // RSC payloads have ?_rsc= query parameter and must be fresh for reservations
   if (url.searchParams.has('_rsc')) return;
 
-  // Skip Next.js data routes (getServerSideProps/getStaticProps with revalidation)
-  if (url.pathname.startsWith('/_next/data/')) return;
+  // Skip development-only assets
+  if (isDevAsset(url.pathname)) return;
 
-  // Skip optimized images - let browser cache headers handle these
-  // User-uploaded images (barber photos, products) should be fresh
-  if (url.pathname.startsWith('/_next/image')) return;
-
-  // Skip development-only assets - NEVER cache these
-  // This prevents dev chunks from being cached if SW is used in dev mode
-  if (isDevAsset(url.pathname)) {
-    console.log('[SW] Skipping dev asset:', url.pathname);
+  // ========================================
+  // Next.js build assets — network pass-through, never cached by SW.
+  // Browser uses immutable Cache-Control headers from the server.
+  // We only observe: if a chunk 404s, notify clients to reload.
+  // ========================================
+  if (url.pathname.startsWith('/_next/')) {
+    event.respondWith(
+      fetch(request).then(function(response) {
+        if (!response.ok && url.pathname.startsWith('/_next/static/chunks/')) {
+          console.warn('[SW] Stale chunk (' + response.status + '): ' + url.pathname);
+          event.waitUntil(throttledNotifyReload(url.pathname));
+        }
+        return response;
+      })
+    );
     return;
   }
 
@@ -192,61 +196,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For Next.js static assets - cache-first strategy (no background revalidation)
-  // IMPORTANT: Next.js static chunks have content hashes in filenames, so they're immutable
-  // We don't need stale-while-revalidate because the hash changes when content changes
-  // This prevents duplicate fetches that were doubling our network requests!
-  if (NEXT_STATIC_PATTERN.test(url.pathname)) {
-    event.respondWith(
-      caches.open(CACHE_NAME).then(async (cache) => {
-        const cachedResponse = await cache.match(request);
-        
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-        
-        try {
-          const networkResponse = await fetch(request);
-          if (networkResponse.ok) {
-            cache.put(request, networkResponse.clone());
-            return networkResponse;
-          }
-
-          // Non-200 — might be a CDN propagation delay after deploy.
-          // Retry once after a short delay with cache bypass.
-          if (networkResponse.status === 404) {
-            console.warn('[SW] Chunk 404, retrying in 1.5s: ' + url.pathname);
-            await new Promise(function(r) { setTimeout(r, 1500); });
-
-            try {
-              const retryResponse = await fetch(new Request(request, { cache: 'no-store' }));
-              if (retryResponse.ok) {
-                console.log('[SW] Chunk retry SUCCEEDED: ' + url.pathname);
-                cache.put(request, retryResponse.clone());
-                return retryResponse;
-              }
-              console.error('[SW] Chunk retry FAILED (' + retryResponse.status + '): ' + url.pathname);
-            } catch (retryErr) {
-              console.error('[SW] Chunk retry network error: ' + url.pathname, retryErr);
-            }
-          } else {
-            console.warn('[SW] Chunk non-OK (' + networkResponse.status + '): ' + url.pathname);
-          }
-
-          // Genuinely stale — throttled purge (one purge per cooldown, not per chunk)
-          await throttledPurgeAndNotify(url.pathname);
-          return networkResponse;
-        } catch (fetchError) {
-          // Network error — offline or DNS failure
-          console.error('[SW] Chunk fetch failed (network): ' + url.pathname);
-          await throttledPurgeAndNotify(url.pathname);
-          throw fetchError;
-        }
-      })
-    );
-    return;
-  }
-
   // For static assets (fonts, icons, images) - cache first, network fallback
   const isStaticAsset = 
     url.pathname.startsWith('/fonts/') ||
@@ -262,7 +211,6 @@ self.addEventListener('fetch', (event) => {
           return cachedResponse;
         }
         return fetch(request).then((networkResponse) => {
-          // Cache the new response
           if (networkResponse.ok) {
             const responseClone = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
@@ -277,7 +225,6 @@ self.addEventListener('fetch', (event) => {
   }
 
   // All other requests - network only (real-time data)
-  // Don't cache dynamic content
 });
 
 /**
@@ -364,38 +311,20 @@ function getOfflinePage() {
 </html>`;
 }
 
-// Chunk recovery helpers — purge all caches and notify open windows
-// Throttle purges so rapid-fire 404s don't spam the same work
-let lastPurgeTs = 0;
-const PURGE_COOLDOWN_MS = 10000;
+// Chunk 404 recovery — notify clients to reload (one-shot, throttled).
+// SW no longer caches /_next/* so there's nothing to purge;
+// the only recovery action is telling the page to hard-reload.
+let lastNotifyTs = 0;
+const NOTIFY_COOLDOWN_MS = 10000;
 
-async function purgeAllCachesForRecovery() {
-  try {
-    const names = await caches.keys();
-    await Promise.all(names.map(function(name) { return caches.delete(name); }));
-    console.log('[SW] All caches purged for chunk recovery (' + names.length + ' caches)');
-  } catch (err) {
-    console.error('[SW] Failed to purge caches:', err);
-  }
-}
-
-async function throttledPurgeAndNotify(chunkUrl) {
+async function throttledNotifyReload(chunkUrl) {
   const now = Date.now();
-  if (now - lastPurgeTs < PURGE_COOLDOWN_MS) {
-    console.log('[SW] Purge throttled (cooldown) — chunk:', chunkUrl);
-    return;
-  }
-  lastPurgeTs = now;
-  console.log('[SW] Running throttled purge + notify for:', chunkUrl);
-  await purgeAllCachesForRecovery();
-  await notifyClientsChunkStale(chunkUrl);
-  self.registration.update().catch(function() {});
-}
+  if (now - lastNotifyTs < NOTIFY_COOLDOWN_MS) return;
+  lastNotifyTs = now;
 
-async function notifyClientsChunkStale(chunkUrl) {
+  console.log('[SW] Chunk 404 detected — notifying clients to reload:', chunkUrl);
   try {
     const windowClients = await self.clients.matchAll({ type: 'window' });
-    console.log('[SW] Notifying ' + windowClients.length + ' client(s) about stale chunk:', chunkUrl);
     windowClients.forEach(function(client) {
       client.postMessage({ type: 'CHUNK_STALE', url: chunkUrl });
     });

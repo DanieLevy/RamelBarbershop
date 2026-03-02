@@ -22,6 +22,10 @@ import type { NextConfig } from 'next'
  *    - URLs include timestamps, so updates produce new URLs (safe to cache long)
  */
 const nextConfig: NextConfig = {
+  // Netlify provides COMMIT_REF during builds. Next.js uses this to detect
+  // version skew: assets get ?dpl=<id> and mismatched navigations trigger
+  // a hard reload so clients always get a consistent set of chunks.
+  deploymentId: process.env.COMMIT_REF || undefined,
   // Skip type checking during build - types are validated by ESLint and IDE
   // The .next/types/validator.ts generated file has a known Next.js 16 + TS 5.9 
   // incompatibility with moduleResolution: "bundler" (.js extension imports)
