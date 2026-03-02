@@ -50,7 +50,7 @@ export default function BlockedCustomersPage() {
     // Fetch all customers for search
     const { data: customersData, error: customersError } = await supabase
       .from('customers')
-      .select('id, phone, fullname, email, is_blocked, blocked_at, blocked_reason, created_at, updated_at')
+      .select('*')
       .order('fullname', { ascending: true })
     
     if (customersError) {

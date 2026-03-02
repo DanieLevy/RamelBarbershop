@@ -438,6 +438,11 @@ class PushNotificationService {
         reservationId: String(payload.data?.reservationId || ''),
         timestamp: String(Date.now()),
         badgeCount: String(payload.badgeCount ?? 0),
+        // Extra context for native deep-link routing
+        recipientType: String(payload.data?.recipientType || ''),
+        cancelledBy: String(payload.data?.cancelledBy || ''),
+        appointmentTime: String(payload.data?.appointmentTime || ''),
+        customerName: String((payload.data as Record<string, unknown>)?.customerName || ''),
       },
     })
   }

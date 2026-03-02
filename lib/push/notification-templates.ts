@@ -150,6 +150,7 @@ function getCancellationTemplate(context: CancellationContext): NotificationPayl
       recipientType: 'barber',
       reservationId: context.reservationId,
       cancelledBy: 'customer',
+      customerName: context.customerName,
       reason: context.reason,
       url: barberDeepLinkUrl
     }
@@ -218,6 +219,7 @@ function getBookingConfirmedTemplate(context: ReminderContext): NotificationPayl
     recipientType: 'barber',
     reservationId: context.reservationId,
     appointmentTime: context.appointmentTime,
+    customerName: context.customerName,
     url: barberDeepLinkUrl
   }
   

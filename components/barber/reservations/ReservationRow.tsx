@@ -216,7 +216,6 @@ export const ReservationRow = ({
                   : 'hover:bg-foreground-muted/10 text-foreground-muted/50'
               )}
               aria-label="הסתר מההיסטוריה"
-              title="הסתר"
             >
               <EyeOff size={13} strokeWidth={1.5} />
             </Button>

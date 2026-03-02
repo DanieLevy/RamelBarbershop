@@ -761,11 +761,14 @@ export type Database = {
           device_name: string | null
           device_type: string
           endpoint: string
+          fcm_token: string | null
           id: string
           is_active: boolean | null
           last_delivery_status: string | null
           last_used: string | null
           p256dh: string
+          platform: string | null
+          token_type: string | null
           user_agent: string | null
         }
         Insert: {
@@ -777,11 +780,14 @@ export type Database = {
           device_name?: string | null
           device_type?: string
           endpoint: string
+          fcm_token?: string | null
           id?: string
           is_active?: boolean | null
           last_delivery_status?: string | null
           last_used?: string | null
           p256dh: string
+          platform?: string | null
+          token_type?: string | null
           user_agent?: string | null
         }
         Update: {
@@ -793,11 +799,14 @@ export type Database = {
           device_name?: string | null
           device_type?: string
           endpoint?: string
+          fcm_token?: string | null
           id?: string
           is_active?: boolean | null
           last_delivery_status?: string | null
           last_used?: string | null
           p256dh?: string
+          platform?: string | null
+          token_type?: string | null
           user_agent?: string | null
         }
         Relationships: [

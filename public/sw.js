@@ -88,21 +88,20 @@ self.addEventListener('activate', (event) => {
             })
         );
       }),
-      // Clean up any dev assets from current cache
+      // Clean up dev assets and stale Next.js chunks from current cache
       caches.open(CACHE_NAME).then(async (cache) => {
         const requests = await cache.keys();
         const deletePromises = [];
         
         for (const request of requests) {
           const url = new URL(request.url);
-          if (isDevAsset(url.pathname)) {
-            console.log(`[SW] Removing dev asset from cache: ${url.pathname}`);
+          if (isDevAsset(url.pathname) || NEXT_STATIC_PATTERN.test(url.pathname)) {
             deletePromises.push(cache.delete(request));
           }
         }
         
         if (deletePromises.length > 0) {
-          console.log(`[SW] Cleaned ${deletePromises.length} dev assets from cache`);
+          console.log(`[SW] Cleaned ${deletePromises.length} stale/dev assets from cache on activate`);
         }
         
         return Promise.all(deletePromises);
@@ -203,23 +202,18 @@ self.addEventListener('fetch', (event) => {
         const cachedResponse = await cache.match(request);
         
         if (cachedResponse) {
-          // Cache hit - return immediately, NO background fetch
-          // These files are immutable (content hash in filename)
           return cachedResponse;
         }
         
-        // Cache miss - fetch from network and cache for future
         try {
           const networkResponse = await fetch(request);
           if (networkResponse.ok) {
-            // Clone before caching since response body can only be read once
             cache.put(request, networkResponse.clone());
           }
           return networkResponse;
-        } catch (error) {
-          // Network failed and no cache - return error
-          console.error('[SW] Failed to fetch static asset:', url.pathname);
-          throw error;
+        } catch (fetchError) {
+          console.error('[SW] Failed to fetch chunk:', url.pathname);
+          throw fetchError;
         }
       })
     );
