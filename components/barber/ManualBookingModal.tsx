@@ -165,6 +165,14 @@ export function ManualBookingModal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOutOfHours, selectedDate, barberWorkDays])
 
+  // Reset out-of-hours mode when switching to a past date (past dates bypass hours via dedicated endpoint)
+  useEffect(() => {
+    if (isPastDate && isOutOfHours) {
+      setIsOutOfHours(false)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPastDate])
+
   // Fetch available time slots and breakouts when date changes
   useEffect(() => {
     if (isOpen && selectedDate) {
@@ -289,19 +297,16 @@ export function ManualBookingModal({
   // Compute custom time timestamp for out-of-hours booking
   const customTimeTimestamp = useMemo(() => {
     if (!isOutOfHours) return null
-    
+
     const hour = parseInt(customHour, 10)
     const minute = parseInt(customMinute, 10)
-    
+
     if (isNaN(hour) || isNaN(minute)) return null
-    
-    // Create clean timestamp for the selected date with custom time
-    // Use Israel day start to get a clean base date (00:00:00.000)
+
+    // Use Israel day start (UTC equivalent of midnight Israel time) as the base,
+    // then add hours/minutes as milliseconds - avoids any local timezone offset issues.
     const cleanDayStart = getIsraelDayStart(selectedDate)
-    const date = new Date(cleanDayStart)
-    date.setHours(hour, minute, 0, 0)
-    
-    return date.getTime()
+    return cleanDayStart + hour * 3600000 + minute * 60000
   }, [isOutOfHours, selectedDate, customHour, customMinute])
   
   // Check if custom time slot is already reserved using slot key comparison
@@ -538,38 +543,77 @@ export function ManualBookingModal({
         showToast.success('התור נרשם בהצלחה (הסתיים)')
       } else {
         // Future reservations: use existing atomic flow
-        const result = await createReservation({
-          barberId,
-          serviceId: selectedService.id,
-          customerId,
-          customerName,
-          customerPhone,
-          dateTimestamp,
-          timeTimestamp: finalTime,
-          dayName,
-          dayNum: format(selectedDate, 'dd/MM'),
-          barberNotes: finalNotes || undefined,
-        })
-        
-        if (!result.success) {
-          console.error('Error creating reservation:', result.error)
-          showToast.error(result.message || 'שגיאה ביצירת התור')
-          
-          if (result.error === 'SLOT_ALREADY_TAKEN' || result.error === 'CUSTOMER_DOUBLE_BOOKING') {
-            await fetchReservedSlots()
-            setSelectedTime(null)
+        let reservationId: string | undefined
+
+        if (isOutOfHours) {
+          // Out-of-hours: use barber-specific endpoint that bypasses working-hours checks
+          const response = await fetch('/api/barber/reservations/create-manual', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              barberId,
+              serviceId: selectedService.id,
+              customerId,
+              customerName,
+              customerPhone,
+              dateTimestamp,
+              timeTimestamp: finalTime,
+              dayName,
+              dayNum: format(selectedDate, 'dd/MM'),
+              barberNotes: finalNotes || null,
+            }),
+          })
+
+          const result = await response.json()
+
+          if (!response.ok || !result.success) {
+            console.error('Error creating out-of-hours reservation:', result)
+            showToast.error(result.message || 'שגיאה ביצירת התור')
+
+            if (result.error === 'SLOT_ALREADY_TAKEN' || result.error === 'CUSTOMER_DOUBLE_BOOKING') {
+              await fetchReservedSlots()
+            }
+            return
           }
-          return
+
+          reservationId = result.reservationId
+        } else {
+          // Normal hours: use standard booking flow
+          const result = await createReservation({
+            barberId,
+            serviceId: selectedService.id,
+            customerId,
+            customerName,
+            customerPhone,
+            dateTimestamp,
+            timeTimestamp: finalTime,
+            dayName,
+            dayNum: format(selectedDate, 'dd/MM'),
+            barberNotes: finalNotes || undefined,
+          })
+
+          if (!result.success) {
+            console.error('Error creating reservation:', result.error)
+            showToast.error(result.message || 'שגיאה ביצירת התור')
+
+            if (result.error === 'SLOT_ALREADY_TAKEN' || result.error === 'CUSTOMER_DOUBLE_BOOKING') {
+              await fetchReservedSlots()
+              setSelectedTime(null)
+            }
+            return
+          }
+
+          reservationId = result.reservationId
         }
-        
+
         // Push notification only for future bookings with existing customers
-        if (mode === 'existing' && selectedCustomer?.id) {
+        if (mode === 'existing' && selectedCustomer?.id && reservationId) {
           try {
             fetch('/api/push/notify-booking', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                reservationId: result.reservationId,
+                reservationId,
                 customerId,
                 customerName,
                 barberId,
@@ -586,9 +630,9 @@ export function ManualBookingModal({
             console.error('[ManualBooking] Failed to send push notification:', pushErr)
           }
         }
-        
-        showToast.success(isOutOfHours 
-          ? 'התור מחוץ לשעות נוצר בהצלחה!' 
+
+        showToast.success(isOutOfHours
+          ? 'התור מחוץ לשעות נוצר בהצלחה!'
           : 'התור נוצר בהצלחה'
         )
       }
@@ -851,20 +895,21 @@ export function ManualBookingModal({
                 </>
               )}
               
-              {/* Barber Notes (optional) */}
-              <div className="flex flex-col gap-2">
-                <label htmlFor="barber-notes" className="text-foreground-light text-sm">הערות (אופציונלי)</label>
-                <textarea
-                  id="barber-notes"
-                  value={barberNotes}
-                  onChange={(e) => setBarberNotes(e.target.value)}
-                  placeholder="הערות לתור - נראה רק לספר"
-                  rows={2}
-                  className="w-full p-3 rounded-xl bg-background-card border border-white/10 text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold resize-none"
-                />
-              </div>
             </div>
           )}
+
+          {/* Barber Notes - available in all modes */}
+          <div className="flex flex-col gap-2">
+            <label htmlFor="barber-notes" className="text-foreground-light text-sm">הערות לתור (אופציונלי)</label>
+            <textarea
+              id="barber-notes"
+              value={barberNotes}
+              onChange={(e) => setBarberNotes(e.target.value)}
+              placeholder="הערות לתור - נראה רק לספר"
+              rows={2}
+              className="w-full p-3 rounded-xl bg-background-card border border-white/10 text-foreground-light placeholder:text-foreground-muted/50 outline-none focus:ring-2 focus:ring-accent-gold resize-none"
+            />
+          </div>
 
           {/* Service Selection */}
           <div className="flex flex-col gap-2">
@@ -948,7 +993,8 @@ export function ManualBookingModal({
                 aria-label="בחר תאריך"
                 value={format(selectedDate, 'yyyy-MM-dd')}
                 onChange={(e) => {
-                  const date = e.target.value ? new Date(e.target.value) : israelNow
+                  // Add noon time to avoid UTC-midnight timezone shifting date by one day
+                  const date = e.target.value ? new Date(e.target.value + 'T12:00:00') : israelNow
                   setSelectedDate(date)
                 }}
                 className={cn(
@@ -977,25 +1023,27 @@ export function ManualBookingModal({
                 שעה
               </label>
               
-              {/* Out-of-Hours Toggle */}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsOutOfHours(!isOutOfHours)
-                  if (!isOutOfHours) {
-                    setSelectedTime(null) // Clear regular time when switching to OOH
-                  }
-                }}
-                className={cn(
-                  'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all',
-                  isOutOfHours
-                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                    : 'bg-white/[0.05] text-foreground-muted hover:bg-white/[0.1] border border-white/[0.08]'
-                )}
-              >
-                <AlertTriangle size={12} />
-                מחוץ לשעות
-              </button>
+              {/* Out-of-Hours Toggle - hidden for past dates (create-past bypasses all checks) */}
+              {!isPastDate && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOutOfHours(!isOutOfHours)
+                    if (!isOutOfHours) {
+                      setSelectedTime(null) // Clear regular time when switching to OOH
+                    }
+                  }}
+                  className={cn(
+                    'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all',
+                    isOutOfHours
+                      ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                      : 'bg-white/[0.05] text-foreground-muted hover:bg-white/[0.1] border border-white/[0.08]'
+                  )}
+                >
+                  <AlertTriangle size={12} />
+                  מחוץ לשעות
+                </button>
+              )}
             </div>
             
             {/* Out-of-Hours Custom Time Input */}
