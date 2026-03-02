@@ -26,36 +26,43 @@ export function Providers({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
+    console.log('[Providers:init] Global chunk error listeners registered')
+
     const isChunkError = (msg: string) =>
       msg.includes('ChunkLoadError') ||
       msg.includes('Failed to load chunk') ||
       msg.includes('Loading chunk') ||
       msg.includes('Failed to fetch dynamically imported module')
 
-    const handleRecovery = (errorMessage: string) => {
+    const handleRecovery = (errorMessage: string, source: string) => {
       const last = Number(sessionStorage.getItem(STORAGE_KEY) || '0')
-      if (Date.now() - last < MAX_WINDOW_MS) {
-        console.log('[Providers] Chunk recovery within cooldown — skipping')
+      const elapsed = Date.now() - last
+      console.log(`[Providers:recovery] source=${source} elapsed=${elapsed}ms cooldown=${MAX_WINDOW_MS}ms error="${errorMessage.slice(0, 120)}"`)
+
+      if (elapsed < MAX_WINDOW_MS) {
+        console.log('[Providers:recovery] Within cooldown — skipping reload')
         return
       }
 
-      console.log('[Providers] Chunk error — reloading:', errorMessage)
+      console.log('[Providers:recovery] Reloading page')
       sessionStorage.setItem(STORAGE_KEY, Date.now().toString())
       window.location.reload()
     }
 
     const handleError = (event: ErrorEvent) => {
       if (isChunkError(event.message)) {
+        console.warn(`[Providers:error] Chunk error caught — message="${event.message.slice(0, 120)}" filename=${event.filename || 'unknown'} lineno=${event.lineno}`)
         event.preventDefault()
-        handleRecovery(event.message)
+        handleRecovery(event.message, 'window.error')
       }
     }
 
     const handleRejection = (event: PromiseRejectionEvent) => {
       const msg = event.reason?.message || String(event.reason || '')
       if (isChunkError(msg)) {
+        console.warn(`[Providers:rejection] Chunk rejection caught — message="${msg.slice(0, 120)}"`)
         event.preventDefault()
-        handleRecovery(msg)
+        handleRecovery(msg, 'unhandledrejection')
       }
     }
 

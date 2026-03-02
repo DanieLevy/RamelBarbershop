@@ -52,18 +52,18 @@ async function reportChunkError(error: Error, source: 'error-boundary' | 'manual
 }
 
 async function purgeAndReload(): Promise<void> {
-  console.log('[ChunkEB] purgeAndReload — unregistering SWs + clearing caches')
+  console.log('[ChunkEB:purgeAndReload] Starting — unregistering SWs + clearing caches')
   try {
     if ('serviceWorker' in navigator) {
       const regs = await navigator.serviceWorker.getRegistrations()
-      console.log('[ChunkEB] Unregistering', regs.length, 'SW(s)')
+      console.log(`[ChunkEB:purgeAndReload] Unregistering ${regs.length} SW(s)`)
       await Promise.all(regs.map((r) => r.unregister()))
     }
     const cacheNames = await caches.keys()
-    console.log('[ChunkEB] Clearing', cacheNames.length, 'cache(s)')
+    console.log(`[ChunkEB:purgeAndReload] Clearing ${cacheNames.length} cache(s): [${cacheNames.join(', ')}]`)
     await Promise.all(cacheNames.map((n) => caches.delete(n)))
-  } catch {
-    // caches API may be unavailable
+  } catch (err) {
+    console.warn('[ChunkEB:purgeAndReload] Cleanup error (non-blocking):', err)
   }
 
   sessionStorage.setItem(STORAGE_KEY, Date.now().toString())
@@ -71,28 +71,37 @@ async function purgeAndReload(): Promise<void> {
   const url = window.location.pathname + window.location.search
   const sep = url.includes('?') ? '&' : '?'
   const target = url + sep + '_cb=' + Date.now()
-  console.log('[ChunkEB] Cleanup done — navigating to:', target)
+  console.log(`[ChunkEB:purgeAndReload] Navigating to ${target}`)
   window.location.replace(target)
 }
 
 async function aggressiveRecovery(): Promise<void> {
+  console.log('[ChunkEB:aggressiveRecovery] Starting full cleanup')
   try {
     if ('serviceWorker' in navigator) {
       const regs = await navigator.serviceWorker.getRegistrations()
+      console.log(`[ChunkEB:aggressiveRecovery] Unregistering ${regs.length} SW(s)`)
       await Promise.all(regs.map((r) => r.unregister()))
     }
-  } catch { /* ignore */ }
+  } catch (err) {
+    console.warn('[ChunkEB:aggressiveRecovery] SW cleanup error:', err)
+  }
 
   try {
     const names = await caches.keys()
+    console.log(`[ChunkEB:aggressiveRecovery] Clearing ${names.length} cache(s): [${names.join(', ')}]`)
     await Promise.all(names.map((n) => caches.delete(n)))
-  } catch { /* ignore */ }
+  } catch (err) {
+    console.warn('[ChunkEB:aggressiveRecovery] Cache cleanup error:', err)
+  }
 
   sessionStorage.removeItem(STORAGE_KEY)
 
   const url = window.location.pathname + window.location.search
   const sep = url.includes('?') ? '&' : '?'
-  window.location.replace(url + sep + '_cb=' + Date.now())
+  const target = url + sep + '_cb=' + Date.now()
+  console.log(`[ChunkEB:aggressiveRecovery] Navigating to ${target}`)
+  window.location.replace(target)
 }
 
 export class ChunkErrorBoundary extends Component<Props, State> {
@@ -111,33 +120,40 @@ export class ChunkErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error) {
-    if (!isChunkLoadError(error)) return
+    if (!isChunkLoadError(error)) {
+      console.log(`[ChunkEB:catch] Non-chunk error — name=${error.name} message="${error.message.slice(0, 120)}"`)
+      return
+    }
 
     this.lastError = error
+    const chunkUrl = extractChunkUrl(error) || 'unknown'
 
     const lastReload = Number(sessionStorage.getItem(STORAGE_KEY) || '0')
-    const withinWindow = Date.now() - lastReload < MAX_RELOADS_WINDOW_MS
+    const elapsed = Date.now() - lastReload
+    console.warn(`[ChunkEB:catch] ChunkLoadError — chunk=${chunkUrl} elapsed=${elapsed}ms cooldown=${MAX_RELOADS_WINDOW_MS}ms message="${error.message.slice(0, 120)}"`)
 
-    if (withinWindow) {
-      console.warn('[ChunkErrorBoundary] Reload already attempted recently — showing banner')
+    if (elapsed < MAX_RELOADS_WINDOW_MS) {
+      console.warn('[ChunkEB:catch] Within cooldown — showing fallback banner')
       reportChunkError(error, 'error-boundary')
       this.setState({ retryExhausted: true })
       return
     }
 
-    console.warn('[ChunkErrorBoundary] Stale chunk detected — reporting and recovering')
+    console.warn('[ChunkEB:catch] Cooldown expired — reporting + purgeAndReload')
     reportChunkError(error, 'error-boundary').finally(() => {
       purgeAndReload()
     })
   }
 
   handleBannerReload = () => {
+    console.log('[ChunkEB:bannerReload] User clicked manual reload — starting aggressive recovery')
     this.setState({ isRecovering: true })
 
     const error = this.lastError || new Error('Manual reload after ChunkLoadError recovery exhausted')
     if (!this.lastError) error.name = 'ChunkLoadError'
 
     reportChunkError(error, 'aggressive-recovery').finally(() => {
+      console.log('[ChunkEB:bannerReload] Report sent — running aggressiveRecovery')
       aggressiveRecovery()
     })
   }

@@ -45,29 +45,25 @@ export function PWAProvider({ children }: PWAProviderProps) {
   useEffect(() => {
     setIsMounted(true)
     setIsInstallDismissed(wasInstallDismissed())
+    console.log(`[PWAProvider:mount] Mounted — standalone=${pwa.isStandalone} installed=${pwa.isInstalled} os=${pwa.deviceOS}`)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
+    console.log(`[PWAProvider:updateCheck] isUpdateAvailable=${pwa.isUpdateAvailable} autoTriggered=${autoUpdateTriggeredRef.current} swReady=${pwa.isServiceWorkerReady} currentVer=${pwa.currentVersion} newVer=${pwa.newVersion}`)
+
     if (!pwa.isUpdateAvailable || autoUpdateTriggeredRef.current) return
 
-    const sessionKey = 'pwa_auto_updated_session'
-    if (sessionStorage.getItem(sessionKey)) {
-      console.log('[PWA] Already updated this session, skipping')
-      return
-    }
-
     autoUpdateTriggeredRef.current = true
-    sessionStorage.setItem(sessionKey, 'true')
+    console.log('[PWAProvider:updateCheck] Scheduling update banner in 500ms')
 
-    // Apply update immediately — waiting means chunks may already be stale.
-    // The UpdateBanner's "auto" variant shows a brief heads-up before reloading.
     const timer = setTimeout(() => {
-      console.log('[PWA] Applying update immediately (waiting SW detected)')
+      console.log('[PWAProvider:updateCheck] Showing update banner')
       setShowUpdateBanner(true)
     }, 500)
 
     return () => clearTimeout(timer)
-  }, [pwa.isUpdateAvailable])
+  }, [pwa.isUpdateAvailable, pwa.isServiceWorkerReady, pwa.currentVersion, pwa.newVersion])
 
   const handleInstallDismiss = useCallback(() => {
     pwa.dismissInstallPrompt()

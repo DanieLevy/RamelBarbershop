@@ -1,6 +1,6 @@
 // Service Worker for Ramel Barbershop PWA
 // Version is updated automatically during build
-const APP_VERSION = '2.1.2-2026.03.02.2044';
+const APP_VERSION = '2.1.2-2026.03.02.2056';
 const CACHE_NAME = `ramel-pwa-${APP_VERSION}`;
 
 // Icon version - increment when icons change to bust cache
@@ -47,44 +47,45 @@ function isDevAsset(pathname) {
   return DEV_PATTERNS.some(pattern => pattern.test(pathname));
 }
 
-// Install event - cache static assets
-// IMPORTANT: Do NOT call skipWaiting() here - we want the SW to enter "waiting" state
-// so the user can see the update modal and choose when to update
+// Install event - cache static assets and activate immediately.
+// skipWaiting() ensures the new SW replaces the old one without waiting
+// for all tabs to close. This prevents stale-chunk 404 loops where an
+// old SW keeps intercepting requests with outdated cache-first logic.
 self.addEventListener('install', (event) => {
-  console.log(`[SW] Installing version ${APP_VERSION}`);
+  console.log(`[SW:install] version=${APP_VERSION} cacheName=${CACHE_NAME} staticAssets=${STATIC_ASSETS.length}`);
   
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('[SW] Caching static assets');
+        console.log(`[SW:install] Caching ${STATIC_ASSETS.length} static assets`);
         return cache.addAll(STATIC_ASSETS);
       })
       .then(() => {
-        console.log('[SW] Installation complete - waiting for activation');
-        // Do NOT call skipWaiting() here - let the update modal handle it
-        // The user will trigger skipWaiting via the update modal
+        console.log('[SW:install] Assets cached — calling skipWaiting()');
+        return self.skipWaiting();
+      })
+      .then(() => {
+        console.log('[SW:install] skipWaiting() resolved — will activate next');
       })
   );
 });
 
 // Activate event - clean old caches and notify clients
 self.addEventListener('activate', (event) => {
-  console.log(`[SW] Activating version ${APP_VERSION}`);
+  console.log(`[SW:activate] version=${APP_VERSION} cacheName=${CACHE_NAME}`);
   
   event.waitUntil(
     Promise.all([
-      // Clean up old version caches completely
       caches.keys().then((cacheNames) => {
+        const oldCaches = cacheNames.filter((name) => name.startsWith('ramel-pwa-') && name !== CACHE_NAME);
+        console.log(`[SW:activate] Found ${cacheNames.length} total caches, ${oldCaches.length} old to delete: [${oldCaches.join(', ')}]`);
         return Promise.all(
-          cacheNames
-            .filter((name) => name.startsWith('ramel-pwa-') && name !== CACHE_NAME)
-            .map((name) => {
-              console.log(`[SW] Deleting old cache: ${name}`);
-              return caches.delete(name);
-            })
+          oldCaches.map((name) => {
+            console.log(`[SW:activate] Deleting old cache: ${name}`);
+            return caches.delete(name);
+          })
         );
       }),
-      // Clean up dev assets from current cache
       caches.open(CACHE_NAME).then(async (cache) => {
         const requests = await cache.keys();
         const deletePromises = [];
@@ -97,22 +98,24 @@ self.addEventListener('activate', (event) => {
         }
         
         if (deletePromises.length > 0) {
-          console.log(`[SW] Cleaned ${deletePromises.length} dev assets from cache on activate`);
+          console.log(`[SW:activate] Cleaned ${deletePromises.length} dev assets from cache`);
         }
         
         return Promise.all(deletePromises);
       }),
-      // Take control of all clients immediately
-      self.clients.claim()
+      self.clients.claim().then(() => {
+        console.log('[SW:activate] clients.claim() resolved — controlling all tabs');
+      })
     ]).then(() => {
-      // Notify all clients about the update
       return self.clients.matchAll({ type: 'window' }).then((clients) => {
+        console.log(`[SW:activate] Notifying ${clients.length} client(s) of SW_UPDATED v${APP_VERSION}`);
         clients.forEach((client) => {
           client.postMessage({
             type: 'SW_UPDATED',
             version: APP_VERSION
           });
         });
+        console.log('[SW:activate] Activation complete');
       });
     })
   );
@@ -171,10 +174,13 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request).then(function(response) {
         if (!response.ok && url.pathname.startsWith('/_next/static/chunks/')) {
-          console.warn('[SW] Stale chunk (' + response.status + '): ' + url.pathname);
+          console.warn(`[SW:fetch] Stale chunk ${response.status} url=${url.pathname} type=${request.destination || 'unknown'}`);
           event.waitUntil(throttledNotifyReload(url.pathname));
         }
         return response;
+      }).catch(function(err) {
+        console.error(`[SW:fetch] Network error for _next asset url=${url.pathname} error=${err.message}`);
+        throw err;
       })
     );
     return;
@@ -319,49 +325,53 @@ const NOTIFY_COOLDOWN_MS = 10000;
 
 async function throttledNotifyReload(chunkUrl) {
   const now = Date.now();
-  if (now - lastNotifyTs < NOTIFY_COOLDOWN_MS) return;
+  const elapsed = now - lastNotifyTs;
+  if (elapsed < NOTIFY_COOLDOWN_MS) {
+    console.log(`[SW:chunkRecovery] Throttled — ${elapsed}ms since last notify (cooldown=${NOTIFY_COOLDOWN_MS}ms) chunk=${chunkUrl}`);
+    return;
+  }
   lastNotifyTs = now;
 
-  console.log('[SW] Chunk 404 detected — notifying clients to reload:', chunkUrl);
+  console.log(`[SW:chunkRecovery] Chunk 404 — notifying clients chunk=${chunkUrl}`);
   try {
     const windowClients = await self.clients.matchAll({ type: 'window' });
+    console.log(`[SW:chunkRecovery] Sending CHUNK_STALE to ${windowClients.length} client(s)`);
     windowClients.forEach(function(client) {
       client.postMessage({ type: 'CHUNK_STALE', url: chunkUrl });
     });
   } catch (err) {
-    console.error('[SW] Failed to notify clients:', err);
+    console.error(`[SW:chunkRecovery] Failed to notify clients: ${err.message}`);
   }
 }
 
 // Message handler for skip waiting and cache management
 self.addEventListener('message', (event) => {
+  console.log(`[SW:message] Received type=${event.data?.type || 'unknown'}`);
+
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    console.log('[SW] Skip waiting requested');
+    console.log('[SW:message] SKIP_WAITING — calling skipWaiting()');
     self.skipWaiting();
   }
   
   if (event.data && event.data.type === 'GET_VERSION') {
+    console.log(`[SW:message] GET_VERSION — responding v${APP_VERSION}`);
     event.ports[0].postMessage({ version: APP_VERSION });
   }
   
-  // Handle cache clear request - useful for troubleshooting
   if (event.data && event.data.type === 'CLEAR_CACHE') {
-    console.log('[SW] Clear cache requested');
+    console.log('[SW:message] CLEAR_CACHE — purging all caches');
     caches.keys().then((cacheNames) => {
+      console.log(`[SW:message] Deleting ${cacheNames.length} cache(s): [${cacheNames.join(', ')}]`);
       return Promise.all(
-        cacheNames.map((name) => {
-          console.log(`[SW] Deleting cache: ${name}`);
-          return caches.delete(name);
-        })
+        cacheNames.map((name) => caches.delete(name))
       );
     }).then(() => {
-      console.log('[SW] All caches cleared');
-      // Notify the requesting client
+      console.log('[SW:message] All caches cleared successfully');
       if (event.source) {
         event.source.postMessage({ type: 'CACHE_CLEARED', success: true });
       }
     }).catch((error) => {
-      console.error('[SW] Failed to clear caches:', error);
+      console.error(`[SW:message] Cache clear failed: ${error.message}`);
       if (event.source) {
         event.source.postMessage({ type: 'CACHE_CLEARED', success: false, error: error.message });
       }

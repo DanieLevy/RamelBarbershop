@@ -75,37 +75,59 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){
-var PV=3,pvK='__purge_v';
+var PV=4,pvK='__purge_v';
+console.log('[Audit:boot] url='+location.href+' time='+new Date().toISOString());
+try{
+  var hasSW='serviceWorker'in navigator;
+  var hasCaches='caches'in window;
+  console.log('[Audit:boot] hasSW='+hasSW+' hasCaches='+hasCaches+' online='+navigator.onLine+' standalone='+!!(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches));
+  if(hasSW&&navigator.serviceWorker.controller){
+    var ctrl=navigator.serviceWorker.controller;
+    console.log('[Audit:boot] SW controller active url='+ctrl.scriptURL+' state='+ctrl.state);
+  }else{
+    console.log('[Audit:boot] No SW controller — page not controlled');
+  }
+  if(hasSW){navigator.serviceWorker.getRegistration('/').then(function(r){
+    if(r)console.log('[Audit:boot] SW reg scope='+r.scope+' active='+(r.active?r.active.state:'none')+' waiting='+(r.waiting?r.waiting.state:'none')+' installing='+(r.installing?r.installing.state:'none'));
+    else console.log('[Audit:boot] No SW registration found');
+  }).catch(function(e){console.warn('[Audit:boot] getRegistration error:',e)})}
+  if(hasCaches){caches.keys().then(function(n){console.log('[Audit:boot] Caches('+n.length+'): ['+n.join(', ')+']')}).catch(function(){})}
+}catch(e){console.warn('[Audit:boot] Snapshot error:',e)}
 try{
   var cv=+(localStorage.getItem(pvK)||0);
   console.log('[PurgeV] current='+cv+' required='+PV);
   if(cv<PV){
-    console.log('[PurgeV] Outdated — running forced cleanup');
+    console.log('[PurgeV] Outdated — running forced cleanup ('+cv+' -> '+PV+')');
     localStorage.setItem(pvK,''+PV);
     var done=[];
-    if('caches'in window)done.push(caches.keys().then(function(n){console.log('[PurgeV] Clearing '+n.length+' caches');return Promise.all(n.map(function(c){return caches.delete(c)}))}));
+    if('caches'in window)done.push(caches.keys().then(function(n){console.log('[PurgeV] Clearing '+n.length+' caches: ['+n.join(', ')+']');return Promise.all(n.map(function(c){return caches.delete(c)}))}));
     if('serviceWorker'in navigator)done.push(navigator.serviceWorker.getRegistrations().then(function(regs){console.log('[PurgeV] Unregistering '+regs.length+' SW(s)');return Promise.all(regs.map(function(r){return r.unregister()}))}));
     Promise.all(done).catch(function(){}).then(function(){
-      console.log('[PurgeV] Done — reloading');
+      console.log('[PurgeV] Cleanup done — reloading');
       var u=location.pathname+location.search;
       location.replace(u+(u.indexOf('?')>=0?'&':'?')+'_purge='+PV+'&_cb='+Date.now())
     });
     return
+  }else{
+    console.log('[PurgeV] Up to date — no cleanup needed');
   }
 }catch(e){console.error('[PurgeV] Error:',e)}
-if(location.search.indexOf('_purge=')>=0){try{var pu=new URL(location.href);pu.searchParams.delete('_purge');pu.searchParams.delete('_cb');history.replaceState(null,'',pu.pathname+(pu.search||'')+pu.hash)}catch(e){}}
+if(location.search.indexOf('_purge=')>=0){try{var pu=new URL(location.href);pu.searchParams.delete('_purge');pu.searchParams.delete('_cb');history.replaceState(null,'',pu.pathname+(pu.search||'')+pu.hash);console.log('[PurgeV] Cleaned _purge params from URL')}catch(e){}}
 var K='__chunk_recovery',W=30000;
 function chk(m){return m&&(m.indexOf('ChunkLoadError')>=0||m.indexOf('Failed to load chunk')>=0||m.indexOf('Loading chunk')>=0||m.indexOf('dynamically imported module')>=0)}
 function go(msg){
-  console.log('[ChunkRecovery] Error detected:',msg);
-  try{var l=+sessionStorage.getItem(K)||0;if(Date.now()-l<W){console.log('[ChunkRecovery] Within cooldown — skipping');return}}catch(e){}
+  var l=0;try{l=+sessionStorage.getItem(K)||0}catch(e){}
+  var elapsed=Date.now()-l;
+  console.log('[ChunkRecovery:inline] error="'+String(msg).slice(0,120)+'" elapsed='+elapsed+'ms cooldown='+W+'ms');
+  if(elapsed<W){console.log('[ChunkRecovery:inline] Within cooldown — skipping');return}
   try{sessionStorage.setItem(K,''+Date.now())}catch(e){}
-  console.log('[ChunkRecovery] Reloading to get fresh assets');
+  console.log('[ChunkRecovery:inline] Reloading for fresh assets');
   location.reload();
 }
-window.addEventListener('error',function(e){if(chk(e.message||''))go(e.message)});
-window.addEventListener('unhandledrejection',function(e){var r=e.reason;var m=r?(r.message||''+r):'';if(chk(m))go(m)});
-if('serviceWorker'in navigator)navigator.serviceWorker.addEventListener('message',function(e){if(e.data&&e.data.type==='CHUNK_STALE'){console.log('[ChunkRecovery] SW notified stale chunk:',e.data.url);go('SW stale chunk: '+(e.data.url||'unknown'))}})
+window.addEventListener('error',function(e){if(chk(e.message||'')){console.warn('[ChunkRecovery:inline] window.error: '+e.message+' file='+e.filename+' line='+e.lineno);go(e.message)}});
+window.addEventListener('unhandledrejection',function(e){var r=e.reason;var m=r?(r.message||''+r):'';if(chk(m)){console.warn('[ChunkRecovery:inline] unhandledrejection: '+m);go(m)}});
+if('serviceWorker'in navigator)navigator.serviceWorker.addEventListener('message',function(e){if(e.data&&e.data.type==='CHUNK_STALE'){console.log('[ChunkRecovery:inline] SW CHUNK_STALE url='+e.data.url);go('SW stale chunk: '+(e.data.url||'unknown'))}});
+console.log('[Audit:boot] Inline script complete — listeners registered');
 })()`,
           }}
         />

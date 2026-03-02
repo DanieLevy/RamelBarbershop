@@ -125,13 +125,13 @@ export const usePWA = (): UsePWAReturn => {
     // Initialize BroadcastChannel for cross-tab coordination
     if ('BroadcastChannel' in window) {
       broadcastChannelRef.current = new BroadcastChannel(UPDATE_CHANNEL_NAME)
+      console.log('[usePWA:init] BroadcastChannel created')
       broadcastChannelRef.current.onmessage = (event) => {
+        console.log(`[usePWA:broadcast] Received type=${event.data?.type}`, event.data)
         if (event.data?.type === 'UPDATE_TRIGGERED') {
-          console.log('[PWA] Update triggered from another tab')
           setState((prev) => ({ ...prev, isUpdating: true }))
         }
         if (event.data?.type === 'UPDATE_AVAILABLE') {
-          console.log('[PWA] Update available notification from another tab')
           setState((prev) => ({ 
             ...prev, 
             isUpdateAvailable: true,
@@ -145,29 +145,38 @@ export const usePWA = (): UsePWAReturn => {
     const getCurrentVersion = async () => {
       try {
         const reg = await navigator.serviceWorker.getRegistration('/')
+        console.log(`[usePWA:getVersion] Registration found=${!!reg} active=${reg?.active?.state || 'none'}`)
         if (reg?.active) {
           const messageChannel = new MessageChannel()
           messageChannel.port1.onmessage = (event) => {
             if (event.data?.version) {
-              console.log('[PWA] Current version:', event.data.version)
+              console.log(`[usePWA:getVersion] Active SW version=${event.data.version}`)
               setState((prev) => ({ ...prev, currentVersion: event.data.version }))
             }
           }
           reg.active.postMessage({ type: 'GET_VERSION' }, [messageChannel.port2])
         }
       } catch (error) {
-        console.warn('[PWA] Could not get current version:', error)
+        console.warn('[usePWA:getVersion] Failed:', error)
       }
     }
 
     const registerSW = async () => {
-      if (swRegistered) return
+      if (swRegistered) {
+        console.log('[usePWA:registerSW] Already registered (singleton guard) — skipping')
+        return
+      }
       swRegistered = true
 
       try {
+        const controller = navigator.serviceWorker.controller
+        console.log(`[usePWA:registerSW] Starting — controller=${controller ? 'yes' : 'none'} controllerUrl=${controller?.scriptURL || 'n/a'}`)
+
         const existingReg = await navigator.serviceWorker.getRegistration('/')
+        console.log(`[usePWA:registerSW] Existing registration: active=${existingReg?.active?.state || 'none'} waiting=${existingReg?.waiting?.state || 'none'} installing=${existingReg?.installing?.state || 'none'}`)
+        
         if (existingReg?.waiting) {
-          console.log('[PWA] Existing waiting SW found before registration')
+          console.log('[usePWA:registerSW] Waiting SW found pre-register — setting isUpdateAvailable=true')
           setState((prev) => ({ ...prev, isUpdateAvailable: true, isServiceWorkerReady: true }))
         }
         
@@ -177,64 +186,63 @@ export const usePWA = (): UsePWAReturn => {
         })
 
         swRegistrationRef.current = registration
-        console.log('[PWA] Service Worker registered')
+        console.log(`[usePWA:registerSW] Registered — scope=${registration.scope} active=${registration.active?.state || 'none'} waiting=${registration.waiting?.state || 'none'} installing=${registration.installing?.state || 'none'}`)
 
         setState((prev) => ({ ...prev, isServiceWorkerReady: true }))
         
-        // Get current version after registration
         getCurrentVersion()
 
-        // Check if there's already a waiting worker (user closed app before updating)
         if (registration.waiting) {
-          console.log('[PWA] Found waiting service worker on load')
+          console.log('[usePWA:registerSW] Waiting worker found post-register — setting isUpdateAvailable=true')
           setState((prev) => ({ ...prev, isUpdateAvailable: true }))
         }
 
-        // Delay first update check to prevent reload on fresh page load
-        // This gives the user time to interact with the page first
         setTimeout(() => {
+          console.log('[usePWA:registerSW] Running first update check (10s delay)')
           registration.update()
-        }, 10000) // 10 seconds delay for first check
+        }, 10000)
         
-        // Check for updates every 5 minutes (reduced from 1 minute to be less aggressive)
         updateInterval = setInterval(() => {
+          console.log('[usePWA:registerSW] Periodic update check (5min interval)')
           registration.update()
         }, 5 * 60 * 1000)
 
-        // Listen for new service worker
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing
-          if (!newWorker) return
+          if (!newWorker) {
+            console.log('[usePWA:updatefound] No installing worker — skipping')
+            return
+          }
 
-          console.log('[PWA] New service worker found, tracking state...')
+          console.log(`[usePWA:updatefound] New SW installing — state=${newWorker.state} scriptURL=${newWorker.scriptURL}`)
 
-          // Create handler and track it for cleanup
           const handleStateChange = () => {
-            console.log('[PWA] New worker state:', newWorker.state)
+            console.log(`[usePWA:statechange] New worker state=${newWorker.state} hasController=${!!navigator.serviceWorker.controller}`)
             
             if (newWorker.state === 'installed') {
               if (navigator.serviceWorker.controller) {
-                // New SW installed while old one is still controlling
-                console.log('[PWA] New version installed and waiting!')
+                console.log('[usePWA:statechange] New version installed+waiting — existing controller active')
                 setState((prev) => ({ ...prev, isUpdateAvailable: true }))
                 
-                // Notify other tabs about the update
-                // Note: We don't include the version here since we don't have it yet
-                // Other tabs will detect the update via their own service worker registration
                 if (broadcastChannelRef.current) {
-                  broadcastChannelRef.current.postMessage({ 
-                    type: 'UPDATE_AVAILABLE'
-                  })
+                  broadcastChannelRef.current.postMessage({ type: 'UPDATE_AVAILABLE' })
+                  console.log('[usePWA:statechange] Broadcast UPDATE_AVAILABLE to other tabs')
                 }
               } else {
-                // First install - no update needed, just fresh install
-                console.log('[PWA] First install complete')
+                console.log('[usePWA:statechange] First install complete — no controller existed')
               }
-              // Remove listener once installed state is reached
               newWorker.removeEventListener('statechange', handleStateChange)
               stateChangeCleanupRef.current = stateChangeCleanupRef.current.filter(
                 (item) => item.worker !== newWorker
               )
+            }
+
+            if (newWorker.state === 'activated') {
+              console.log('[usePWA:statechange] New worker ACTIVATED — should be controlling now')
+            }
+
+            if (newWorker.state === 'redundant') {
+              console.warn('[usePWA:statechange] New worker went REDUNDANT — install/activate failed or superseded')
             }
           }
           
@@ -242,19 +250,19 @@ export const usePWA = (): UsePWAReturn => {
           stateChangeCleanupRef.current.push({ worker: newWorker, handler: handleStateChange })
         })
       } catch (error) {
-        console.error('[PWA] Service Worker registration failed:', error)
+        console.error('[usePWA:registerSW] Registration failed:', error)
       }
     }
 
     registerSW()
 
-    // Listen for SW messages
     const handleMessage = (event: MessageEvent) => {
+      console.log(`[usePWA:message] Received type=${event.data?.type || 'unknown'}`, event.data)
       if (event.data?.type === 'SW_UPDATED') {
-        console.log('[PWA] Received update notification, version:', event.data.version)
+        console.log(`[usePWA:message] SW_UPDATED — version=${event.data.version}`)
         setState((prev) => ({
           ...prev,
-          isUpdateAvailable: false, // No longer waiting, it's now active
+          isUpdateAvailable: false,
           isUpdating: false,
           currentVersion: event.data.version,
         }))
@@ -262,16 +270,20 @@ export const usePWA = (): UsePWAReturn => {
     }
     navigator.serviceWorker.addEventListener('message', handleMessage)
 
-    // Handle controller change (new SW took over) — reload to get fresh assets.
-    // Guard with sessionStorage to prevent reload loops within the same session.
-    const SW_RELOAD_KEY = '__sw_controller_reloaded'
+    const SW_RELOAD_KEY = '__sw_controller_reload_ts'
+    const SW_RELOAD_COOLDOWN_MS = 30_000
     const handleControllerChange = () => {
-      if (sessionStorage.getItem(SW_RELOAD_KEY)) {
-        console.log('[PWA] Controller changed but already reloaded this session — skipping')
+      const newController = navigator.serviceWorker.controller
+      const lastReload = Number(sessionStorage.getItem(SW_RELOAD_KEY) || '0')
+      const elapsed = Date.now() - lastReload
+      console.log(`[usePWA:controllerchange] New controller=${newController ? 'yes' : 'none'} url=${newController?.scriptURL || 'n/a'} elapsed=${elapsed}ms cooldown=${SW_RELOAD_COOLDOWN_MS}ms`)
+
+      if (elapsed < SW_RELOAD_COOLDOWN_MS) {
+        console.log('[usePWA:controllerchange] Within cooldown — skipping reload')
         return
       }
 
-      console.log('[PWA] Controller changed, reloading page...')
+      console.log('[usePWA:controllerchange] Reloading page in 250ms')
       sessionStorage.setItem(SW_RELOAD_KEY, Date.now().toString())
       setTimeout(() => {
         window.location.reload()
@@ -352,42 +364,39 @@ export const usePWA = (): UsePWAReturn => {
     }
   }, [])
 
-  // Update the app
   const updateApp = useCallback(() => {
     const registration = swRegistrationRef.current
     
-    // Mark as updating
+    console.log(`[usePWA:updateApp] Called — registration=${!!registration} waiting=${registration?.waiting?.state || 'none'} installing=${registration?.installing?.state || 'none'} active=${registration?.active?.state || 'none'}`)
+    
     setState((prev) => ({ ...prev, isUpdating: true }))
     
-    // Notify other tabs that update is being triggered
     if (broadcastChannelRef.current) {
       broadcastChannelRef.current.postMessage({ type: 'UPDATE_TRIGGERED' })
+      console.log('[usePWA:updateApp] Broadcast UPDATE_TRIGGERED')
     }
     
     if (!registration) {
-      console.log('[PWA] No registration found, reloading...')
+      console.log('[usePWA:updateApp] No registration — falling back to reload')
       window.location.reload()
       return
     }
 
-    // Try waiting worker first
     if (registration.waiting) {
-      console.log('[PWA] Telling waiting worker to skip waiting...')
+      console.log('[usePWA:updateApp] Sending SKIP_WAITING to waiting worker')
       registration.waiting.postMessage({ type: 'SKIP_WAITING' })
       return
     }
 
-    // If no waiting worker, check for installing worker
     if (registration.installing) {
-      console.log('[PWA] Worker still installing, waiting...')
+      console.log('[usePWA:updateApp] Worker still installing — waiting for installed state')
       const worker = registration.installing
       
-      // Create handler that auto-cleans up after firing
       const handleStateChange = () => {
+        console.log(`[usePWA:updateApp:statechange] Installing worker state=${worker.state}`)
         if (worker.state === 'installed') {
-          console.log('[PWA] Worker now installed, skip waiting...')
+          console.log('[usePWA:updateApp:statechange] Now installed — sending SKIP_WAITING')
           worker.postMessage({ type: 'SKIP_WAITING' })
-          // Self-cleanup after handling
           worker.removeEventListener('statechange', handleStateChange)
           stateChangeCleanupRef.current = stateChangeCleanupRef.current.filter(
             (item) => item.worker !== worker
@@ -400,15 +409,14 @@ export const usePWA = (): UsePWAReturn => {
       return
     }
 
-    // Fallback: check for update then reload
-    console.log('[PWA] No worker to update, forcing update check...')
+    console.log('[usePWA:updateApp] No waiting/installing worker — forcing update check')
     registration.update().then(() => {
-      // Give it a moment to find the update
       setTimeout(() => {
         if (registration.waiting) {
+          console.log('[usePWA:updateApp] Post-check: waiting worker found — sending SKIP_WAITING')
           registration.waiting.postMessage({ type: 'SKIP_WAITING' })
         } else {
-          // Last resort: just reload
+          console.log('[usePWA:updateApp] Post-check: no waiting worker — falling back to reload')
           window.location.reload()
         }
       }, 1000)
