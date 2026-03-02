@@ -108,6 +108,15 @@ try{
       location.replace(u+(u.indexOf('?')>=0?'&':'?')+'_purge='+PV+'&_cb='+Date.now())
     });
     return
+  }else if(cv>PV){
+    console.log('[PurgeV] Stale page (cv='+cv+' > PV='+PV+') — CDN serving old HTML, cache-busting');
+    var u2=location.pathname+location.search;
+    if(u2.indexOf('_cb=')<0&&u2.indexOf('_purge=')<0){
+      location.replace(u2+(u2.indexOf('?')>=0?'&':'?')+'_cb='+Date.now());
+    }else{
+      console.log('[PurgeV] Already tried cache-busting — CDN cache stuck, proceeding');
+    }
+    return;
   }else{
     console.log('[PurgeV] Up to date — no cleanup needed');
   }
