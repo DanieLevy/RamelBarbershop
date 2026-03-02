@@ -35,6 +35,7 @@ export default function MySchedulePage() {
   const [workDays, setWorkDays] = useState<DaySchedule[]>([])
   const [shopSettings, setShopSettings] = useState<BarbershopSettings | null>(null)
   const [loading, setLoading] = useState(true)
+  const [fetchFailed, setFetchFailed] = useState(false)
   const [savingSchedule, setSavingSchedule] = useState(false)
   const [expandedDay, setExpandedDay] = useState<string | null>(null)
 
@@ -60,19 +61,24 @@ export default function MySchedulePage() {
   const fetchData = useCallback(async () => {
     if (!barber?.id) return
     
+    setFetchFailed(false)
     const supabase = createClient()
     
-    // Fetch barbershop settings for limits
-    const { data: shopData } = await supabase
+    const { data: shopData, error: shopError } = await supabase
       .from('barbershop_settings')
       .select('id, name, phone, address, address_text, address_lat, address_lng, description, work_hours_start, work_hours_end, open_days, hero_title, hero_subtitle, hero_description, waze_link, google_maps_link, contact_phone, contact_email, contact_whatsapp, social_instagram, social_facebook, social_tiktok, show_phone, show_email, show_whatsapp, show_instagram, show_facebook, show_tiktok, max_booking_days_ahead, default_reminder_hours')
       .single()
     
-    if (shopData) {
-      setShopSettings(shopData as BarbershopSettings)
+    if (shopError || !shopData) {
+      console.error('Error fetching shop settings:', shopError)
+      await report(new Error(shopError?.message || 'Shop settings returned null'), 'Fetching shop settings for schedule')
+      setFetchFailed(true)
+      setLoading(false)
+      return
     }
+
+    setShopSettings(shopData as BarbershopSettings)
     
-    // Fetch barber work days with day-specific hours
     const { data: workDaysData, error: workDaysError } = await supabase
       .from('work_days')
       .select('id, user_id, day_of_week, is_working, start_time, end_time')
@@ -81,30 +87,40 @@ export default function MySchedulePage() {
     if (workDaysError) {
       console.error('Error fetching work days:', workDaysError)
       await report(new Error(workDaysError.message), 'Fetching barber work days')
+      setFetchFailed(true)
+      setLoading(false)
+      return
     }
     
     if (workDaysData && workDaysData.length > 0) {
-      const mapped: DaySchedule[] = (workDaysData as WorkDay[]).map(wd => ({
-        id: wd.id,
-        dayOfWeek: wd.day_of_week,
-        isWorking: wd.is_working || false,
-        startTime: normalizeTime(wd.start_time),
-        endTime: normalizeTime(wd.end_time),
-      }))
-      
-      // Sort by day order
       const dayOrder = DAYS.map(d => d.key)
-      mapped.sort((a, b) => dayOrder.indexOf(a.dayOfWeek) - dayOrder.indexOf(b.dayOfWeek))
+      const seen = new Set<string>()
+      const deduped: DaySchedule[] = []
+
+      const sorted = [...(workDaysData as WorkDay[])].sort(
+        (a, b) => dayOrder.indexOf(a.day_of_week) - dayOrder.indexOf(b.day_of_week)
+      )
+
+      for (const wd of sorted) {
+        if (seen.has(wd.day_of_week)) continue
+        seen.add(wd.day_of_week)
+        deduped.push({
+          id: wd.id,
+          dayOfWeek: wd.day_of_week,
+          isWorking: wd.is_working || false,
+          startTime: normalizeTime(wd.start_time),
+          endTime: normalizeTime(wd.end_time),
+        })
+      }
       
-      setWorkDays(mapped)
+      setWorkDays(deduped)
     } else {
-      // Initialize with defaults if no work_days exist
       const defaults: DaySchedule[] = DAYS.map(day => ({
         id: '',
         dayOfWeek: day.key,
-        isWorking: shopData?.open_days?.includes(day.key) || false,
-        startTime: normalizeTime(shopData?.work_hours_start || '09:00'),
-        endTime: normalizeTime(shopData?.work_hours_end || '19:00'),
+        isWorking: shopData.open_days?.includes(day.key) || false,
+        startTime: normalizeTime(shopData.work_hours_start || '09:00'),
+        endTime: normalizeTime(shopData.work_hours_end || '19:00'),
       }))
       setWorkDays(defaults)
     }
@@ -142,8 +158,17 @@ export default function MySchedulePage() {
 
   const handleSaveSchedule = async () => {
     if (!barber?.id) return
+
+    if (fetchFailed) {
+      showToast.error('לא ניתן לשמור - הנתונים לא נטענו כראוי. נסה לרענן את הדף.')
+      return
+    }
+
+    if (workDays.length !== 7) {
+      showToast.error('שגיאה בנתוני הלוז - רענן את הדף ונסה שוב')
+      return
+    }
     
-    // Validate times are within shop hours
     if (shopSettings) {
       const shopStart = normalizeTime(shopSettings.work_hours_start)
       const shopEnd = normalizeTime(shopSettings.work_hours_end)
@@ -185,7 +210,6 @@ export default function MySchedulePage() {
         body: JSON.stringify({
           barberId: barber.id,
           days: workDays.map(day => ({
-            id: day.id || undefined,
             dayOfWeek: day.dayOfWeek,
             isWorking: day.isWorking,
             startTime: day.isWorking ? day.startTime : null,
@@ -361,12 +385,25 @@ export default function MySchedulePage() {
           })}
         </div>
 
+        {fetchFailed && (
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+            <p className="text-red-400 text-sm">שגיאה בטעינת הנתונים. לא ניתן לשמור שינויים.</p>
+            <button
+              onClick={() => { setLoading(true); fetchData() }}
+              className="text-red-400 underline text-sm mt-1"
+              aria-label="נסה שוב לטעון נתונים"
+            >
+              נסה שוב
+            </button>
+          </div>
+        )}
+
         <button
           onClick={handleSaveSchedule}
-          disabled={savingSchedule}
+          disabled={savingSchedule || fetchFailed}
           className={cn(
             'w-full py-3 rounded-xl font-medium transition-all text-center flex items-center justify-center',
-            savingSchedule
+            (savingSchedule || fetchFailed)
               ? 'bg-foreground-muted/30 text-foreground-muted cursor-not-allowed'
               : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
           )}

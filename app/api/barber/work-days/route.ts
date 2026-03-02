@@ -4,8 +4,8 @@
  * Manages barber work day schedules (per-day working hours).
  * Uses admin client to bypass RLS.
  * 
- * Methods:
- * - PUT: Update existing work day or create if missing
+ * Safety: always upserts on (user_id, day_of_week) so duplicate rows
+ * can never be created, even if the client omits the row id.
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -43,47 +43,24 @@ export async function PUT(request: NextRequest) {
 
     const { barberId, days } = parsed.data
     const supabase = createAdminClient()
-    const errors: string[] = []
 
-    for (const day of days) {
-      if (day.id) {
-        // Update existing
-        const { error } = await supabase
-          .from('work_days')
-          .update({
-            is_working: day.isWorking,
-            start_time: day.isWorking ? day.startTime : null,
-            end_time: day.isWorking ? day.endTime : null,
-          })
-          .eq('id', day.id)
+    const upsertRows = days.map(day => ({
+      user_id: barberId,
+      day_of_week: day.dayOfWeek,
+      is_working: day.isWorking,
+      start_time: day.isWorking ? (day.startTime ?? null) : null,
+      end_time: day.isWorking ? (day.endTime ?? null) : null,
+    }))
 
-        if (error) {
-          console.error(`[API/barber/work-days] Update error for ${day.dayOfWeek}:`, error)
-          errors.push(`${day.dayOfWeek}: ${error.message}`)
-        }
-      } else {
-        // Insert new
-        const { error } = await supabase
-          .from('work_days')
-          .insert({
-            user_id: barberId,
-            day_of_week: day.dayOfWeek,
-            is_working: day.isWorking,
-            start_time: day.isWorking ? day.startTime : null,
-            end_time: day.isWorking ? day.endTime : null,
-          })
+    const { error } = await supabase
+      .from('work_days')
+      .upsert(upsertRows, { onConflict: 'user_id,day_of_week' })
 
-        if (error) {
-          console.error(`[API/barber/work-days] Insert error for ${day.dayOfWeek}:`, error)
-          errors.push(`${day.dayOfWeek}: ${error.message}`)
-        }
-      }
-    }
-
-    if (errors.length > 0) {
-      await reportApiError(new Error(errors.join('; ')), request, 'Update work days partial failure')
+    if (error) {
+      console.error('[API/barber/work-days] Upsert error:', error)
+      await reportApiError(new Error(error.message), request, 'Upsert work days failed')
       return NextResponse.json(
-        { success: false, error: 'DATABASE_ERROR', message: 'שגיאה בעדכון ימי העבודה', details: errors },
+        { success: false, error: 'DATABASE_ERROR', message: 'שגיאה בעדכון ימי העבודה' },
         { status: 500 }
       )
     }
