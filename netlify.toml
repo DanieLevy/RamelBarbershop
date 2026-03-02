@@ -3,8 +3,8 @@
 
 [build]
   command = "npm run build"
-  publish = ".next"
   functions = "netlify/functions"
+  # IMPORTANT: do NOT set publish when using @netlify/plugin-nextjs
 
 [build.environment]
   NODE_VERSION = "22"
@@ -22,8 +22,6 @@
 # ─────────────────────────────────────────────────────────────
 # Headers
 # Goal: prevent stale HTML from being cached at the Netlify edge
-# (stale HTML is what causes old chunk-hash JS/CSS 404 + MIME text/plain).
-# We still cache hashed static assets aggressively.
 # ─────────────────────────────────────────────────────────────
 
 # Default: DO NOT cache HTML at Netlify CDN
@@ -37,13 +35,12 @@
     X-XSS-Protection = "1; mode=block"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
 
-# Hashed Next static assets: cache forever
+# Hashed Next static assets: cache forever (browser cache)
 [[headers]]
   for = "/_next/static/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# If you also serve your own static folder
 [[headers]]
   for = "/static/*"
   [headers.values]
@@ -96,7 +93,8 @@
   [headers.values]
     Cache-Control = "no-store, no-cache, must-revalidate, private"
 
-# Optional: allow small Netlify-CDN caching on a few pages (override default no-store)
+# Optional: allow small Netlify edge caching on a few pages
+# (override the default no-store above)
 [[headers]]
   for = "/"
   [headers.values]
