@@ -75,21 +75,24 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){
-var PV=1,pvK='__purge_v';
+var PV=2,pvK='__purge_v';
 try{
   var cv=+(localStorage.getItem(pvK)||0);
+  console.log('[PurgeV] current='+cv+' required='+PV);
   if(cv<PV){
+    console.log('[PurgeV] Outdated — running forced cleanup');
     localStorage.setItem(pvK,''+PV);
     var done=[];
-    if('caches'in window)done.push(caches.keys().then(function(n){return Promise.all(n.map(function(c){return caches.delete(c)}))}));
-    if('serviceWorker'in navigator)done.push(navigator.serviceWorker.getRegistrations().then(function(regs){return Promise.all(regs.map(function(r){return r.unregister()}))}));
+    if('caches'in window)done.push(caches.keys().then(function(n){console.log('[PurgeV] Clearing '+n.length+' caches');return Promise.all(n.map(function(c){return caches.delete(c)}))}));
+    if('serviceWorker'in navigator)done.push(navigator.serviceWorker.getRegistrations().then(function(regs){console.log('[PurgeV] Unregistering '+regs.length+' SW(s)');return Promise.all(regs.map(function(r){return r.unregister()}))}));
     Promise.all(done).catch(function(){}).then(function(){
+      console.log('[PurgeV] Done — reloading');
       var u=location.pathname+location.search;
       location.replace(u+(u.indexOf('?')>=0?'&':'?')+'_purge='+PV+'&_cb='+Date.now())
     });
     return
   }
-}catch(e){}
+}catch(e){console.error('[PurgeV] Error:',e)}
 if(location.search.indexOf('_purge=')>=0){try{var pu=new URL(location.href);pu.searchParams.delete('_purge');pu.searchParams.delete('_cb');history.replaceState(null,'',pu.pathname+(pu.search||'')+pu.hash)}catch(e){}}
 var K='__chunk_recovery',W=30000;
 function diag(msg){
@@ -116,17 +119,25 @@ function rpt(msg){
   }catch(e){}
 }
 function go(msg){
-  try{var l=+sessionStorage.getItem(K)||0;if(Date.now()-l<W)return}catch(e){}
+  console.log('[ChunkRecovery] Error detected:',msg);
+  try{var l=+sessionStorage.getItem(K)||0;if(Date.now()-l<W){console.log('[ChunkRecovery] Within '+W+'ms cooldown — skipping');return}}catch(e){}
   rpt(msg);
+  console.log('[ChunkRecovery] Starting recovery — unregister SWs + clear caches');
   try{sessionStorage.setItem(K,''+Date.now())}catch(e){}
-  try{if('caches'in window)caches.keys().then(function(n){n.forEach(function(c){caches.delete(c)})}).catch(function(){})}catch(e){}
-  try{if('serviceWorker'in navigator&&navigator.serviceWorker.controller)navigator.serviceWorker.controller.postMessage({type:'CLEAR_CACHE'})}catch(e){}
-  setTimeout(function(){var u=location.pathname+location.search;location.replace(u+(u.indexOf('?')>=0?'&':'?')+'_cb='+Date.now())},600)
+  var tasks=[];
+  try{if('serviceWorker'in navigator)tasks.push(navigator.serviceWorker.getRegistrations().then(function(regs){console.log('[ChunkRecovery] Unregistering '+regs.length+' SW(s)');return Promise.all(regs.map(function(r){return r.unregister()}))}))}catch(e){}
+  try{if('caches'in window)tasks.push(caches.keys().then(function(n){console.log('[ChunkRecovery] Deleting '+n.length+' cache(s)');return Promise.all(n.map(function(c){return caches.delete(c)}))}))}catch(e){}
+  Promise.all(tasks).catch(function(){}).then(function(){
+    var u=location.pathname+location.search;
+    var target=u+(u.indexOf('?')>=0?'&':'?')+'_cb='+Date.now();
+    console.log('[ChunkRecovery] Cleanup done — navigating to:',target);
+    location.replace(target);
+  });
 }
 function chk(m){return m&&(m.indexOf('ChunkLoadError')>=0||m.indexOf('Failed to load chunk')>=0||m.indexOf('Loading chunk')>=0||m.indexOf('dynamically imported module')>=0)}
 window.addEventListener('error',function(e){if(chk(e.message||''))go(e.message)});
 window.addEventListener('unhandledrejection',function(e){var r=e.reason;var m=r?(r.message||''+r):'';if(chk(m))go(m)});
-if('serviceWorker'in navigator)navigator.serviceWorker.addEventListener('message',function(e){if(e.data&&e.data.type==='CHUNK_STALE')go('SW notified stale chunk: '+(e.data.url||'unknown'))});
+if('serviceWorker'in navigator)navigator.serviceWorker.addEventListener('message',function(e){if(e.data&&e.data.type==='CHUNK_STALE'){console.log('[ChunkRecovery] SW notified stale chunk:',e.data.url);go('SW notified stale chunk: '+(e.data.url||'unknown'))}});
 if(location.search.indexOf('_cb=')>=0){try{var u=new URL(location.href);u.searchParams.delete('_cb');history.replaceState(null,'',u.pathname+(u.search||'')+u.hash)}catch(e){}}
 })()`,
           }}

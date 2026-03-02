@@ -52,20 +52,15 @@ async function reportChunkError(error: Error, source: 'error-boundary' | 'manual
 }
 
 async function purgeAndReload(): Promise<void> {
+  console.log('[ChunkEB] purgeAndReload — unregistering SWs + clearing caches')
   try {
     if ('serviceWorker' in navigator) {
-      const reg = await navigator.serviceWorker.getRegistration()
-      if (reg?.waiting) {
-        reg.waiting.postMessage({ type: 'SKIP_WAITING' })
-        await new Promise((r) => setTimeout(r, 500))
-      }
-      if (navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHE' })
-        await new Promise((r) => setTimeout(r, 300))
-      }
+      const regs = await navigator.serviceWorker.getRegistrations()
+      console.log('[ChunkEB] Unregistering', regs.length, 'SW(s)')
+      await Promise.all(regs.map((r) => r.unregister()))
     }
-
     const cacheNames = await caches.keys()
+    console.log('[ChunkEB] Clearing', cacheNames.length, 'cache(s)')
     await Promise.all(cacheNames.map((n) => caches.delete(n)))
   } catch {
     // caches API may be unavailable
@@ -75,7 +70,9 @@ async function purgeAndReload(): Promise<void> {
 
   const url = window.location.pathname + window.location.search
   const sep = url.includes('?') ? '&' : '?'
-  window.location.replace(url + sep + '_cb=' + Date.now())
+  const target = url + sep + '_cb=' + Date.now()
+  console.log('[ChunkEB] Cleanup done — navigating to:', target)
+  window.location.replace(target)
 }
 
 async function aggressiveRecovery(): Promise<void> {

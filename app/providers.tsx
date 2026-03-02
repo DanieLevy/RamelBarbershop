@@ -40,11 +40,14 @@ export function Providers({ children }: { children: ReactNode }) {
 
     const handleRecovery = async (errorMessage: string) => {
       const last = Number(sessionStorage.getItem(STORAGE_KEY) || '0')
-      if (Date.now() - last < MAX_WINDOW_MS) return
+      if (Date.now() - last < MAX_WINDOW_MS) {
+        console.log('[Providers] Chunk recovery within cooldown — skipping')
+        return
+      }
 
+      console.log('[Providers] Chunk error — starting recovery:', errorMessage)
       const chunkUrl = extractChunkUrl(errorMessage)
 
-      // Report with full diagnostics BEFORE recovery
       try {
         const diag = await collectChunkDiagnostics('global-handler', chunkUrl)
         await reportBug(
@@ -61,17 +64,11 @@ export function Providers({ children }: { children: ReactNode }) {
         // Never block recovery if reporting fails
       }
 
+      console.log('[Providers] Unregistering all SWs + clearing caches')
       try {
         if ('serviceWorker' in navigator) {
-          const reg = await navigator.serviceWorker.getRegistration()
-          if (reg?.waiting) {
-            reg.waiting.postMessage({ type: 'SKIP_WAITING' })
-            await new Promise((r) => setTimeout(r, 500))
-          }
-          if (navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHE' })
-            await new Promise((r) => setTimeout(r, 300))
-          }
+          const regs = await navigator.serviceWorker.getRegistrations()
+          await Promise.all(regs.map((r) => r.unregister()))
         }
         const names = await caches.keys()
         await Promise.all(names.map((n) => caches.delete(n)))
@@ -81,7 +78,9 @@ export function Providers({ children }: { children: ReactNode }) {
 
       const url = window.location.pathname + window.location.search
       const sep = url.includes('?') ? '&' : '?'
-      window.location.replace(url + sep + '_cb=' + Date.now())
+      const target = url + sep + '_cb=' + Date.now()
+      console.log('[Providers] Cleanup done — navigating to:', target)
+      window.location.replace(target)
     }
 
     const handleError = (event: ErrorEvent) => {

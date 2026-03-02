@@ -212,19 +212,34 @@ self.addEventListener('fetch', (event) => {
             return networkResponse;
           }
 
-          // Non-200 (likely 404 after new deployment purged old chunks).
-          // Proactively clear all caches and tell clients to force-reload.
-          console.warn('[SW] Stale chunk (' + networkResponse.status + '): ' + url.pathname);
-          await purgeAllCachesForRecovery();
-          await notifyClientsChunkStale(url.pathname);
-          self.registration.update().catch(function() {});
+          // Non-200 — might be a CDN propagation delay after deploy.
+          // Retry once after a short delay with cache bypass.
+          if (networkResponse.status === 404) {
+            console.warn('[SW] Chunk 404, retrying in 1.5s: ' + url.pathname);
+            await new Promise(function(r) { setTimeout(r, 1500); });
 
+            try {
+              const retryResponse = await fetch(new Request(request, { cache: 'no-store' }));
+              if (retryResponse.ok) {
+                console.log('[SW] Chunk retry SUCCEEDED: ' + url.pathname);
+                cache.put(request, retryResponse.clone());
+                return retryResponse;
+              }
+              console.error('[SW] Chunk retry FAILED (' + retryResponse.status + '): ' + url.pathname);
+            } catch (retryErr) {
+              console.error('[SW] Chunk retry network error: ' + url.pathname, retryErr);
+            }
+          } else {
+            console.warn('[SW] Chunk non-OK (' + networkResponse.status + '): ' + url.pathname);
+          }
+
+          // Genuinely stale — throttled purge (one purge per cooldown, not per chunk)
+          await throttledPurgeAndNotify(url.pathname);
           return networkResponse;
         } catch (fetchError) {
           // Network error — offline or DNS failure
-          console.error('[SW] Chunk fetch failed:', url.pathname);
-          await purgeAllCachesForRecovery();
-          await notifyClientsChunkStale(url.pathname);
+          console.error('[SW] Chunk fetch failed (network): ' + url.pathname);
+          await throttledPurgeAndNotify(url.pathname);
           throw fetchError;
         }
       })
@@ -350,19 +365,37 @@ function getOfflinePage() {
 }
 
 // Chunk recovery helpers — purge all caches and notify open windows
+// Throttle purges so rapid-fire 404s don't spam the same work
+let lastPurgeTs = 0;
+const PURGE_COOLDOWN_MS = 10000;
+
 async function purgeAllCachesForRecovery() {
   try {
     const names = await caches.keys();
     await Promise.all(names.map(function(name) { return caches.delete(name); }));
-    console.log('[SW] All caches purged for chunk recovery');
+    console.log('[SW] All caches purged for chunk recovery (' + names.length + ' caches)');
   } catch (err) {
     console.error('[SW] Failed to purge caches:', err);
   }
 }
 
+async function throttledPurgeAndNotify(chunkUrl) {
+  const now = Date.now();
+  if (now - lastPurgeTs < PURGE_COOLDOWN_MS) {
+    console.log('[SW] Purge throttled (cooldown) — chunk:', chunkUrl);
+    return;
+  }
+  lastPurgeTs = now;
+  console.log('[SW] Running throttled purge + notify for:', chunkUrl);
+  await purgeAllCachesForRecovery();
+  await notifyClientsChunkStale(chunkUrl);
+  self.registration.update().catch(function() {});
+}
+
 async function notifyClientsChunkStale(chunkUrl) {
   try {
     const windowClients = await self.clients.matchAll({ type: 'window' });
+    console.log('[SW] Notifying ' + windowClients.length + ' client(s) about stale chunk:', chunkUrl);
     windowClients.forEach(function(client) {
       client.postMessage({ type: 'CHUNK_STALE', url: chunkUrl });
     });

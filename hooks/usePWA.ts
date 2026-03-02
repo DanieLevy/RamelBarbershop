@@ -167,7 +167,7 @@ export const usePWA = (): UsePWAReturn => {
       try {
         const existingReg = await navigator.serviceWorker.getRegistration('/')
         if (existingReg?.waiting) {
-          console.log('[PWA] Existing waiting service worker found')
+          console.log('[PWA] Existing waiting SW found before registration')
           setState((prev) => ({ ...prev, isUpdateAvailable: true, isServiceWorkerReady: true }))
         }
         
@@ -264,9 +264,14 @@ export const usePWA = (): UsePWAReturn => {
 
     // Handle controller change (new SW took over)
     const handleControllerChange = () => {
+      // Skip reload if a chunk recovery just happened — the recovery already reloaded
+      const lastRecovery = Number(sessionStorage.getItem('__chunk_recovery') || '0')
+      if (Date.now() - lastRecovery < 10_000) {
+        console.log('[PWA] Controller changed during recovery — skipping reload')
+        return
+      }
+
       console.log('[PWA] Controller changed, reloading page...')
-      
-      // Small delay to ensure all state is saved
       setTimeout(() => {
         window.location.reload()
       }, 100)
