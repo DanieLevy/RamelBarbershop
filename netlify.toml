@@ -4,7 +4,6 @@
 
 [build]
   command = "npm run build"
-  publish = ".next"
   functions = "netlify/functions"
 
 # Environment-specific build settings
@@ -33,12 +32,11 @@
     # Default Cache-Control for HTML pages: always revalidate with server.
     # Static assets (/_next/static/*, /fonts/*, /icons/*) override this below.
     # This prevents browsers from serving stale HTML that references old chunk hashes.
-    Cache-Control = "public, max-age=0, must-revalidate"
+
     # Explicitly disable Netlify CDN caching for ALL HTML pages by default.
     # Without this, @netlify/plugin-nextjs may apply durable CDN caching to static
     # Next.js pages, causing stale HTML (with old chunk hashes) to be served after deploys.
     # Specific static pages (faq, terms, etc.) override this below with short CDN cache.
-    Netlify-CDN-Cache-Control = "public, max-age=0, must-revalidate"
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
