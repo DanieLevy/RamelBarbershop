@@ -1,7 +1,7 @@
 'use client'
 
 import React, { Component, ErrorInfo, ReactNode } from 'react'
-import { reportBug, getEnvironmentInfo } from '@/lib/bug-reporter'
+import { reportBug, getEnvironmentInfo, collectChunkDiagnostics } from '@/lib/bug-reporter'
 import { AlertTriangle, Home } from 'lucide-react'
 import Link from 'next/link'
 
@@ -19,11 +19,16 @@ interface State {
   isReporting: boolean
 }
 
-/**
- * Error Boundary Component
- * 
- * Catches unhandled React errors and automatically reports them
- */
+function isChunkError(error: Error): boolean {
+  const msg = `${error.name} ${error.message}`
+  return (
+    msg.includes('ChunkLoadError') ||
+    msg.includes('Failed to load chunk') ||
+    msg.includes('Loading chunk') ||
+    msg.includes('Failed to fetch dynamically imported module')
+  )
+}
+
 class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props)
@@ -43,18 +48,27 @@ class ErrorBoundary extends Component<Props, State> {
   async componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     this.setState({ errorInfo, isReporting: true })
 
-    // Report the bug
     try {
+      const additionalData: Record<string, unknown> = {
+        componentStack: errorInfo.componentStack,
+      }
+
+      if (isChunkError(error)) {
+        try {
+          const chunkMatch = error.message.match(/\/_next\/static\/chunks\/[^\s"')]+/)
+          const diag = await collectChunkDiagnostics('error-boundary', chunkMatch?.[0])
+          additionalData.chunkDiagnostics = diag
+        } catch { /* non-blocking */ }
+      }
+
       const reportId = await reportBug(
         error,
         'React Error Boundary Caught Error',
         {
           component: this.props.component || 'Unknown',
           environment: getEnvironmentInfo(),
-          additionalData: {
-            componentStack: errorInfo.componentStack,
-          },
-          severity: 'high',
+          additionalData,
+          severity: isChunkError(error) ? 'high' : 'high',
         }
       )
 
@@ -67,31 +81,25 @@ class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      // Custom fallback if provided
       if (this.props.fallback) {
         return this.props.fallback
       }
 
-      // Default error UI - Hebrew
       return (
         <div className="min-h-[400px] flex items-center justify-center p-4">
           <div className="glass-card p-6 sm:p-8 max-w-md w-full text-center">
-            {/* Error Icon */}
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
               <AlertTriangle className="w-8 h-8 text-red-500" />
             </div>
 
-            {/* Title */}
             <h2 className="text-xl font-bold text-foreground-light mb-2">
               משהו השתבש
             </h2>
 
-            {/* Description */}
             <p className="text-foreground-muted text-sm mb-4">
               אירעה שגיאה בלתי צפויה. הצוות שלנו קיבל התראה אוטומטית.
             </p>
 
-            {/* Error Details (Development only) */}
             {process.env.NODE_ENV === 'development' && this.state.error && (
               <div className="mb-4 p-3 bg-red-500/10 rounded-lg text-left" dir="ltr">
                 <p className="text-xs font-mono text-red-400 break-all">
@@ -100,7 +108,6 @@ class ErrorBoundary extends Component<Props, State> {
               </div>
             )}
 
-            {/* Report Status */}
             {this.state.isReporting ? (
               <p className="text-xs text-foreground-muted mb-4">
                 מדווח על השגיאה...
@@ -111,7 +118,6 @@ class ErrorBoundary extends Component<Props, State> {
               </p>
             ) : null}
 
-            {/* Action Button */}
             <div className="flex justify-center">
               <Link
                 href="/"
@@ -132,4 +138,3 @@ class ErrorBoundary extends Component<Props, State> {
 }
 
 export default ErrorBoundary
-

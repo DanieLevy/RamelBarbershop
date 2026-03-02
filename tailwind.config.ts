@@ -62,6 +62,7 @@ const config: Config = {
         'shimmer': 'shimmer 2s linear infinite',
         'glow-pulse': 'glow-pulse 3s ease-in-out infinite',
         'barber-pole': 'barber-pole 2s linear infinite',
+        'slide-down': 'slide-down 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
       },
       keyframes: {
         'spin-scissors': {
@@ -125,6 +126,10 @@ const config: Config = {
         'barber-pole': {
           '0%': { backgroundPosition: '0 0' },
           '100%': { backgroundPosition: '0 50px' },
+        },
+        'slide-down': {
+          '0%': { opacity: '0', transform: 'translateY(-100%)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
         },
       },
       backdropBlur: {

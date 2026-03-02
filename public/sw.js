@@ -1,6 +1,6 @@
 // Service Worker for Ramel Barbershop PWA
 // Version is updated automatically during build
-const APP_VERSION = '2.0.0-2026.03.02.1837';
+const APP_VERSION = '2.0.0-2026.03.02.1901';
 const CACHE_NAME = `ramel-pwa-${APP_VERSION}`;
 
 // Icon version - increment when icons change to bust cache
@@ -210,10 +210,22 @@ self.addEventListener('fetch', (event) => {
           const networkResponse = await fetch(request);
           if (networkResponse.ok) {
             cache.put(request, networkResponse.clone());
+            return networkResponse;
           }
+
+          // Non-200 (likely 404 after new deployment purged old chunks).
+          // Proactively clear all caches and tell clients to force-reload.
+          console.warn('[SW] Stale chunk (' + networkResponse.status + '): ' + url.pathname);
+          await purgeAllCachesForRecovery();
+          await notifyClientsChunkStale(url.pathname);
+          self.registration.update().catch(function() {});
+
           return networkResponse;
         } catch (fetchError) {
-          console.error('[SW] Failed to fetch chunk:', url.pathname);
+          // Network error — offline or DNS failure
+          console.error('[SW] Chunk fetch failed:', url.pathname);
+          await purgeAllCachesForRecovery();
+          await notifyClientsChunkStale(url.pathname);
           throw fetchError;
         }
       })
@@ -336,6 +348,28 @@ function getOfflinePage() {
   </div>
 </body>
 </html>`;
+}
+
+// Chunk recovery helpers — purge all caches and notify open windows
+async function purgeAllCachesForRecovery() {
+  try {
+    const names = await caches.keys();
+    await Promise.all(names.map(function(name) { return caches.delete(name); }));
+    console.log('[SW] All caches purged for chunk recovery');
+  } catch (err) {
+    console.error('[SW] Failed to purge caches:', err);
+  }
+}
+
+async function notifyClientsChunkStale(chunkUrl) {
+  try {
+    const windowClients = await self.clients.matchAll({ type: 'window' });
+    windowClients.forEach(function(client) {
+      client.postMessage({ type: 'CHUNK_STALE', url: chunkUrl });
+    });
+  } catch (err) {
+    console.error('[SW] Failed to notify clients:', err);
+  }
 }
 
 // Message handler for skip waiting and cache management

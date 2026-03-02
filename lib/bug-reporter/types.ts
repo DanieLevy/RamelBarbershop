@@ -24,32 +24,44 @@ export interface EnvironmentInfo {
   viewportHeight?: number
   timezone?: string
   online?: boolean
+  connectionType?: string
+  connectionEffective?: string
+  isPWA?: boolean
+}
+
+export interface ChunkDiagnostics {
+  failedChunkUrl?: string
+  swInstalled: boolean
+  swController: boolean
+  swControllerUrl?: string
+  swWaiting: boolean
+  swVersion?: string
+  cacheNames: string[]
+  cachedChunkCount: number
+  previousRecoveryTs?: string
+  recoverySource: 'inline-script' | 'error-boundary' | 'global-handler' | 'sw-notification'
+  isPWA: boolean
+  displayMode?: string
+  documentUrl: string
+  referrer?: string
 }
 
 export interface BugReportData {
-  // Error details
   error: {
     name: string
     message: string
     stack?: string
   }
   
-  // Context
   action: string
   page: string
   route?: string
   component?: string
   
-  // User info
   user?: UserContext
-  
-  // Environment
   environment?: EnvironmentInfo
-  
-  // Additional data
   additionalData?: Record<string, unknown>
   
-  // Metadata
   severity?: BugSeverity
   timestamp?: string
   appVersion?: string
@@ -60,4 +72,3 @@ export interface BugReportPayload extends BugReportData {
   appVersion: string
   reportId: string
 }
-

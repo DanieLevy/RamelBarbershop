@@ -3,6 +3,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState, type ReactNode, useEffect } from 'react'
 import { ChunkErrorBoundary } from '@/components/ChunkErrorBoundary'
+import { reportBug, getEnvironmentInfo, collectChunkDiagnostics } from '@/lib/bug-reporter'
+
+const STORAGE_KEY = '__chunk_recovery'
+const MAX_WINDOW_MS = 30_000
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -10,13 +14,10 @@ export function Providers({ children }: { children: ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            // Data is considered fresh for 5 minutes - prevents redundant refetches
-            staleTime: 5 * 60 * 1000, // 5 minutes
-            // Keep unused data in cache for 30 minutes before garbage collection
-            gcTime: 30 * 60 * 1000, // 30 minutes
+            staleTime: 5 * 60 * 1000,
+            gcTime: 30 * 60 * 1000,
             refetchOnWindowFocus: false,
             refetchOnReconnect: false,
-            // Don't retry failed queries aggressively - reduces wasted requests
             retry: 1,
           },
         },
@@ -26,36 +27,67 @@ export function Providers({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const STORAGE_KEY = 'chunk_reload_ts'
-    const MAX_WINDOW_MS = 15_000
-
     const isChunkError = (msg: string) =>
       msg.includes('ChunkLoadError') ||
       msg.includes('Failed to load chunk') ||
       msg.includes('Loading chunk') ||
       msg.includes('Failed to fetch dynamically imported module')
 
-    const handleRecovery = async () => {
+    const extractChunkUrl = (msg: string) => {
+      const match = msg.match(/\/_next\/static\/chunks\/[^\s"')]+/)
+      return match?.[0]
+    }
+
+    const handleRecovery = async (errorMessage: string) => {
       const last = Number(sessionStorage.getItem(STORAGE_KEY) || '0')
       if (Date.now() - last < MAX_WINDOW_MS) return
 
+      const chunkUrl = extractChunkUrl(errorMessage)
+
+      // Report with full diagnostics BEFORE recovery
       try {
-        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHE' })
-          await new Promise((r) => setTimeout(r, 300))
+        const diag = await collectChunkDiagnostics('global-handler', chunkUrl)
+        await reportBug(
+          new Error(errorMessage),
+          'ChunkLoadError — Global handler recovery (providers.tsx)',
+          {
+            component: 'ProvidersGlobalHandler',
+            environment: getEnvironmentInfo(),
+            severity: 'high',
+            additionalData: { chunkDiagnostics: diag },
+          }
+        )
+      } catch {
+        // Never block recovery if reporting fails
+      }
+
+      try {
+        if ('serviceWorker' in navigator) {
+          const reg = await navigator.serviceWorker.getRegistration()
+          if (reg?.waiting) {
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' })
+            await new Promise((r) => setTimeout(r, 500))
+          }
+          if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHE' })
+            await new Promise((r) => setTimeout(r, 300))
+          }
         }
         const names = await caches.keys()
         await Promise.all(names.map((n) => caches.delete(n)))
       } catch { /* caches API may be unavailable */ }
 
       sessionStorage.setItem(STORAGE_KEY, Date.now().toString())
-      window.location.reload()
+
+      const url = window.location.pathname + window.location.search
+      const sep = url.includes('?') ? '&' : '?'
+      window.location.replace(url + sep + '_cb=' + Date.now())
     }
 
     const handleError = (event: ErrorEvent) => {
       if (isChunkError(event.message)) {
         event.preventDefault()
-        handleRecovery()
+        handleRecovery(event.message)
       }
     }
 
@@ -63,7 +95,7 @@ export function Providers({ children }: { children: ReactNode }) {
       const msg = event.reason?.message || String(event.reason || '')
       if (isChunkError(msg)) {
         event.preventDefault()
-        handleRecovery()
+        handleRecovery(msg)
       }
     }
 

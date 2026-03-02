@@ -4,7 +4,7 @@
  * Centralized bug reporting system for automatic error tracking
  */
 
-import type { BugReportData, BugReportPayload, BugSeverity, UserContext, EnvironmentInfo } from './types'
+import type { BugReportData, BugReportPayload, BugSeverity, UserContext, EnvironmentInfo, ChunkDiagnostics } from './types'
 
 // App version - synced from package.json
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '2.0.0'
@@ -26,7 +26,7 @@ export function getEnvironmentInfo(): EnvironmentInfo {
     return {}
   }
 
-  return {
+  const info: EnvironmentInfo = {
     userAgent: navigator.userAgent,
     platform: navigator.platform,
     language: navigator.language,
@@ -36,7 +36,84 @@ export function getEnvironmentInfo(): EnvironmentInfo {
     viewportHeight: window.innerHeight,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     online: navigator.onLine,
+    isPWA: window.matchMedia?.('(display-mode: standalone)')?.matches ?? false,
   }
+
+  const conn = (navigator as Navigator & { connection?: { type?: string; effectiveType?: string } }).connection
+  if (conn) {
+    info.connectionType = conn.type
+    info.connectionEffective = conn.effectiveType
+  }
+
+  return info
+}
+
+/**
+ * Collect detailed diagnostics about Service Worker, caches, and PWA state.
+ * Used exclusively for chunk/cache error reports to give a full debugging picture.
+ */
+export async function collectChunkDiagnostics(
+  source: ChunkDiagnostics['recoverySource'],
+  failedUrl?: string
+): Promise<ChunkDiagnostics> {
+  const diag: ChunkDiagnostics = {
+    failedChunkUrl: failedUrl,
+    swInstalled: false,
+    swController: false,
+    swWaiting: false,
+    cacheNames: [],
+    cachedChunkCount: 0,
+    recoverySource: source,
+    isPWA: window.matchMedia?.('(display-mode: standalone)')?.matches ?? false,
+    displayMode: ['standalone', 'minimal-ui', 'fullscreen', 'browser']
+      .find(m => window.matchMedia?.(`(display-mode: ${m})`)?.matches) || 'unknown',
+    documentUrl: window.location.href,
+    referrer: document.referrer || undefined,
+  }
+
+  try {
+    diag.previousRecoveryTs = sessionStorage.getItem('__chunk_recovery') || undefined
+  } catch { /* sessionStorage unavailable */ }
+
+  if ('serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration()
+      diag.swInstalled = !!reg
+      diag.swController = !!navigator.serviceWorker.controller
+      diag.swControllerUrl = navigator.serviceWorker.controller?.scriptURL
+      diag.swWaiting = !!reg?.waiting
+
+      if (reg?.active && reg.active.state !== 'redundant') {
+        const channel = new MessageChannel()
+        const versionPromise = new Promise<string | undefined>((resolve) => {
+          const timer = setTimeout(() => resolve(undefined), 1500)
+          channel.port1.onmessage = (e) => {
+            clearTimeout(timer)
+            resolve(e.data?.version)
+          }
+        })
+        reg.active.postMessage({ type: 'GET_VERSION' }, [channel.port2])
+        diag.swVersion = await versionPromise
+      }
+    } catch { /* SW API unavailable */ }
+  }
+
+  if ('caches' in window) {
+    try {
+      const names = await caches.keys()
+      diag.cacheNames = names
+
+      let chunkCount = 0
+      for (const name of names) {
+        const cache = await caches.open(name)
+        const keys = await cache.keys()
+        chunkCount += keys.filter(r => new URL(r.url).pathname.startsWith('/_next/static/')).length
+      }
+      diag.cachedChunkCount = chunkCount
+    } catch { /* caches API unavailable */ }
+  }
+
+  return diag
 }
 
 /**
@@ -113,6 +190,8 @@ export function determineSeverity(error: { name: string; message: string }): Bug
     /supabase/i,
     /sms/i,
     /otp/i,
+    /chunk/i,
+    /dynamically imported module/i,
   ]
 
   const lowPatterns = [
@@ -233,5 +312,5 @@ export function createBugReporter(context: {
 }
 
 // Re-export types
-export type { BugReportData, BugReportPayload, BugSeverity, UserContext, EnvironmentInfo }
+export type { BugReportData, BugReportPayload, BugSeverity, UserContext, EnvironmentInfo, ChunkDiagnostics }
 

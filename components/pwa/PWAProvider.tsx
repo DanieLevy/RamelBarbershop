@@ -6,8 +6,8 @@ import { useBadgeManager } from '@/hooks/useBadgeManager'
 import { InstallBanner } from './InstallBanner'
 import { AutoPushSubscriber } from './AutoPushSubscriber'
 import { PushDeniedBanner } from './PushDeniedBanner'
+import { UpdateBanner } from './UpdateBanner'
 
-// PWA Context
 interface PWAContextType {
   isInstalled: boolean
   isStandalone: boolean
@@ -36,76 +36,53 @@ interface PWAProviderProps {
 export function PWAProvider({ children }: PWAProviderProps) {
   const pwa = usePWA()
   const [isMounted, setIsMounted] = useState(false)
-  
-  // Track if install banner is dismissed - this state triggers re-render to unmount the modal
   const [isInstallDismissed, setIsInstallDismissed] = useState(false)
-  
-  // Track if auto-update was already triggered to prevent multiple calls
+  const [showUpdateBanner, setShowUpdateBanner] = useState(false)
   const autoUpdateTriggeredRef = useRef(false)
-  // Track mount time to delay updates on fresh page loads
   const mountTimeRef = useRef(Date.now())
-  
-  // Badge manager handles clearing badges when app is opened
+
   useBadgeManager()
-  
-  // Ensure PWA components only render on client after mount
-  // This prevents hydration issues and SSR errors
+
   useEffect(() => {
     setIsMounted(true)
-    // Check localStorage on mount
     setIsInstallDismissed(wasInstallDismissed())
   }, [])
-  
-  // Auto-update silently when new version is available
-  // Delayed to prevent annoying reload on fresh page load
-  // Only auto-update if user has been on the page for at least 5 seconds
+
   useEffect(() => {
-    if (pwa.isUpdateAvailable && !autoUpdateTriggeredRef.current) {
-      const timeSinceMount = Date.now() - mountTimeRef.current
-      const MIN_DELAY_BEFORE_UPDATE = 5000 // 5 seconds minimum
-      
-      // Check if we already updated in this session to prevent loops
-      const sessionKey = 'pwa_auto_updated_session'
-      const alreadyUpdatedThisSession = sessionStorage.getItem(sessionKey)
-      
-      if (alreadyUpdatedThisSession) {
-        console.log('[PWA] Already updated this session, skipping auto-update')
-        return
-      }
-      
-      autoUpdateTriggeredRef.current = true
-      
-      // Calculate remaining delay (ensure at least 5 seconds since page load)
-      const remainingDelay = Math.max(0, MIN_DELAY_BEFORE_UPDATE - timeSinceMount)
-      
-      console.log(`[PWA] Update available, will apply in ${remainingDelay}ms...`)
-      
-      const timer = setTimeout(() => {
-        // Mark that we're updating in this session
-        sessionStorage.setItem(sessionKey, 'true')
-        console.log('[PWA] Auto-updating to new version silently...')
-        pwa.updateApp()
-      }, remainingDelay + 1000) // Add 1 second buffer
-      
-      return () => clearTimeout(timer)
+    if (!pwa.isUpdateAvailable || autoUpdateTriggeredRef.current) return
+
+    const sessionKey = 'pwa_auto_updated_session'
+    if (sessionStorage.getItem(sessionKey)) {
+      console.log('[PWA] Already updated this session, skipping')
+      return
     }
-  }, [pwa])
-  
-  // Handle install banner dismiss - updates state to trigger re-render
+
+    autoUpdateTriggeredRef.current = true
+
+    const timeSinceMount = Date.now() - mountTimeRef.current
+    const delay = Math.max(0, 5000 - timeSinceMount)
+
+    const timer = setTimeout(() => {
+      sessionStorage.setItem(sessionKey, 'true')
+      console.log('[PWA] Showing update banner before auto-update')
+      setShowUpdateBanner(true)
+    }, delay + 1000)
+
+    return () => clearTimeout(timer)
+  }, [pwa.isUpdateAvailable])
+
   const handleInstallDismiss = useCallback(() => {
     pwa.dismissInstallPrompt()
-    setIsInstallDismissed(true) // This triggers re-render to unmount the modal
+    setIsInstallDismissed(true)
   }, [pwa])
-  
-  // Determine if we should show install banner
-  const shouldShowInstallBanner = 
-    !pwa.isInstalled && 
-    !pwa.isStandalone && 
+
+  const shouldShowInstallBanner =
+    !pwa.isInstalled &&
+    !pwa.isStandalone &&
     !isInstallDismissed
-  
-  // Get visit count for smart banner behavior
+
   const visitCount = getVisitCount()
-  const showAsModal = visitCount > 1 // Show modal on 2nd+ visit
+  const showAsModal = visitCount > 1
 
   const contextValue: PWAContextType = {
     isInstalled: pwa.isInstalled,
@@ -121,11 +98,9 @@ export function PWAProvider({ children }: PWAProviderProps) {
   return (
     <PWAContext.Provider value={contextValue}>
       {children}
-      
-      {/* Only render PWA-related components after client mount to prevent SSR issues */}
+
       {isMounted && (
         <>
-          {/* Install Banner - Smart behavior based on visit count */}
           {shouldShowInstallBanner && (
             <InstallBanner
               isModal={showAsModal}
@@ -136,15 +111,19 @@ export function PWAProvider({ children }: PWAProviderProps) {
               instructions={pwa.getInstallInstructions()}
             />
           )}
-          
-          {/* Auto Push Subscriber - Silently triggers native OS permission after PWA install */}
+
+          {showUpdateBanner && (
+            <UpdateBanner
+              onUpdate={pwa.updateApp}
+              version={pwa.newVersion}
+              variant="auto"
+            />
+          )}
+
           <AutoPushSubscriber />
-          
-          {/* Push Denied Banner - Shows only when user declined, with recovery instructions */}
           <PushDeniedBanner />
         </>
       )}
     </PWAContext.Provider>
   )
 }
-

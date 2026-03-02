@@ -219,6 +219,41 @@ export function generateBugReportEmail(report: BugReportPayload): string {
           </tr>
           ` : ''}
 
+          <!-- Chunk / Cache Diagnostics (only for chunk errors) -->
+          ${report.additionalData?.chunkDiagnostics ? (() => {
+            const cd = report.additionalData.chunkDiagnostics as Record<string, unknown>
+            return `
+          <tr>
+            <td style="padding: 24px 30px; border-bottom: 1px solid #2a2a2a;">
+              <h2 style="margin: 0 0 16px; color: #f59e0b; font-size: 16px; font-weight: 600;">
+                ⚙️ Chunk &amp; Cache Diagnostics
+              </h2>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1a1a1a; border-radius: 8px; border: 1px solid #2a2a2a; font-size: 12px;">
+                ${cd.failedChunkUrl ? `<tr><td style="padding: 10px 16px; border-bottom: 1px solid #2a2a2a;"><strong style="color: #888;">Failed Chunk:</strong> <code style="color: #ef4444; background: #2a2a2a; padding: 2px 6px; border-radius: 4px; word-break: break-all;">${escapeHtml(String(cd.failedChunkUrl))}</code></td></tr>` : ''}
+                <tr><td style="padding: 10px 16px; border-bottom: 1px solid #2a2a2a;">
+                  <strong style="color: #888;">Recovery Source:</strong> <span style="color: #d4a853;">${escapeHtml(String(cd.recoverySource || 'unknown'))}</span>
+                  ${cd.previousRecoveryTs ? ` &nbsp;|&nbsp; <strong style="color: #888;">Previous Recovery:</strong> <span style="color: #ef4444;">${escapeHtml(String(cd.previousRecoveryTs))}</span>` : ''}
+                </td></tr>
+                <tr><td style="padding: 10px 16px; border-bottom: 1px solid #2a2a2a;">
+                  <strong style="color: #888;">SW Installed:</strong> <span style="color: ${cd.swInstalled ? '#22c55e' : '#ef4444'};">${cd.swInstalled ? 'Yes' : 'No'}</span>
+                  &nbsp;|&nbsp; <strong style="color: #888;">SW Controller:</strong> <span style="color: ${cd.swController ? '#22c55e' : '#ef4444'};">${cd.swController ? 'Yes' : 'No'}</span>
+                  &nbsp;|&nbsp; <strong style="color: #888;">SW Waiting:</strong> <span style="color: ${cd.swWaiting ? '#f97316' : '#22c55e'};">${cd.swWaiting ? 'Yes (update pending!)' : 'No'}</span>
+                </td></tr>
+                ${cd.swVersion ? `<tr><td style="padding: 10px 16px; border-bottom: 1px solid #2a2a2a;"><strong style="color: #888;">SW Version:</strong> <code style="color: #3b82f6; background: #2a2a2a; padding: 2px 6px; border-radius: 4px;">${escapeHtml(String(cd.swVersion))}</code></td></tr>` : ''}
+                ${cd.swControllerUrl ? `<tr><td style="padding: 10px 16px; border-bottom: 1px solid #2a2a2a;"><strong style="color: #888;">SW URL:</strong> <span style="color: #888; word-break: break-all; font-size: 11px;">${escapeHtml(String(cd.swControllerUrl))}</span></td></tr>` : ''}
+                <tr><td style="padding: 10px 16px; border-bottom: 1px solid #2a2a2a;">
+                  <strong style="color: #888;">Cached Chunks:</strong> <span style="color: #ffffff;">${cd.cachedChunkCount ?? 'N/A'}</span>
+                  &nbsp;|&nbsp; <strong style="color: #888;">Cache Names:</strong> <span style="color: #888; font-size: 11px;">${cd.cacheNames && Array.isArray(cd.cacheNames) ? (cd.cacheNames as string[]).join(', ') || '(none)' : 'N/A'}</span>
+                </td></tr>
+                <tr><td style="padding: 10px 16px;">
+                  <strong style="color: #888;">PWA Mode:</strong> <span style="color: ${cd.isPWA ? '#a855f7' : '#888'};">${cd.isPWA ? 'Standalone (PWA)' : 'Browser'}</span>
+                  ${cd.displayMode ? ` &nbsp;|&nbsp; <strong style="color: #888;">Display:</strong> <span style="color: #888;">${escapeHtml(String(cd.displayMode))}</span>` : ''}
+                </td></tr>
+              </table>
+            </td>
+          </tr>`
+          })() : ''}
+
           <!-- Stack Trace -->
           ${report.error.stack ? `
           <tr>
@@ -325,6 +360,26 @@ export function generateBugReportText(report: BugReportPayload): string {
     if (report.environment.platform) lines.push(`Platform: ${report.environment.platform}`)
     if (report.environment.screenWidth) lines.push(`Screen: ${report.environment.screenWidth}x${report.environment.screenHeight}`)
     if (report.environment.userAgent) lines.push(`User Agent: ${report.environment.userAgent}`)
+  }
+
+  if (report.additionalData?.chunkDiagnostics) {
+    const cd = report.additionalData.chunkDiagnostics as Record<string, unknown>
+    lines.push('')
+    lines.push('───────────────────────────────────────────────────────────────')
+    lines.push('CHUNK & CACHE DIAGNOSTICS')
+    lines.push('───────────────────────────────────────────────────────────────')
+    if (cd.failedChunkUrl) lines.push(`Failed Chunk: ${cd.failedChunkUrl}`)
+    lines.push(`Recovery Source: ${cd.recoverySource || 'unknown'}`)
+    if (cd.previousRecoveryTs) lines.push(`Previous Recovery: ${cd.previousRecoveryTs}`)
+    lines.push(`SW Installed: ${cd.swInstalled ? 'Yes' : 'No'}`)
+    lines.push(`SW Controller: ${cd.swController ? 'Yes' : 'No'}`)
+    lines.push(`SW Waiting: ${cd.swWaiting ? 'Yes (update pending!)' : 'No'}`)
+    if (cd.swVersion) lines.push(`SW Version: ${cd.swVersion}`)
+    if (cd.swControllerUrl) lines.push(`SW URL: ${cd.swControllerUrl}`)
+    lines.push(`Cached Chunks: ${cd.cachedChunkCount ?? 'N/A'}`)
+    if (cd.cacheNames && Array.isArray(cd.cacheNames)) lines.push(`Cache Names: ${(cd.cacheNames as string[]).join(', ') || '(none)'}`)
+    lines.push(`PWA Mode: ${cd.isPWA ? 'Standalone (PWA)' : 'Browser'}`)
+    if (cd.displayMode) lines.push(`Display Mode: ${cd.displayMode}`)
   }
 
   if (report.error.stack) {
