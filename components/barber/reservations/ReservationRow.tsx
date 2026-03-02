@@ -9,7 +9,7 @@
 
 import { cn } from '@/lib/utils'
 import { getExternalLinkProps } from '@/lib/utils/external-link'
-import { Phone, X, MessageCircle, Pencil, EyeOff } from 'lucide-react'
+import { Phone, X, MessageCircle, EyeOff } from 'lucide-react'
 import { Button } from '@heroui/react'
 import type { Reservation, Service } from '@/types/database'
 
@@ -43,7 +43,7 @@ export const ReservationRow = ({
   updatingId,
   onDetail,
   onCancel,
-  onEdit,
+  onEdit: _onEdit,
   onHide,
   formatPhoneForWhatsApp,
 }: ReservationRowProps) => {

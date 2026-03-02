@@ -16,6 +16,7 @@ export default [
       "*.config.mjs",
       "__tests__/**",
       "netlify/**",
+      "firebase-functions/**",
     ],
   },
   ...tseslint.configs.recommended,

@@ -265,7 +265,7 @@ export function ManualBookingModal({
   type SlotStatus = 'available' | 'reserved' | 'breakout' | 'past'
   interface EnhancedSlot { timestamp: number; time: string; status: SlotStatus; reason?: string }
 
-  const { availableSlots, allSlotsWithStatus } = useMemo(() => {
+  const allSlotsWithStatus = useMemo(() => {
     const dayKey = getDayKeyInIsrael(selectedDate.getTime())
     const barberDaySettings = barberWorkDays.find(wd => wd.day_of_week === dayKey)
     let workStart: string
@@ -274,12 +274,12 @@ export function ManualBookingModal({
       workStart = barberDaySettings.start_time
       workEnd = barberDaySettings.end_time
     } else if (barberDaySettings && !barberDaySettings.is_working && !isPastDate) {
-      return { availableSlots: [], allSlotsWithStatus: [] }
+      return []
     } else {
       workStart = shopSettings?.work_hours_start || '09:00'
       workEnd = shopSettings?.work_hours_end || '19:00'
     }
-    if (dateClosureReason && !isPastDate) return { availableSlots: [], allSlotsWithStatus: [] }
+    if (dateClosureReason && !isPastDate) return []
 
     const { hour: startHour, minute: startMinute } = parseTimeString(workStart)
     const { hour: endHour, minute: endMinute } = parseTimeString(workEnd)
@@ -298,7 +298,7 @@ export function ManualBookingModal({
       if (breakoutCheck.blocked) return { ...slot, status: 'breakout' as SlotStatus, reason: breakoutCheck.reason || 'הפסקה' }
       return { ...slot, status: 'available' as SlotStatus }
     })
-    return { availableSlots: enhancedSlots.filter(s => s.status === 'available'), allSlotsWithStatus: enhancedSlots }
+    return enhancedSlots
   }, [selectedDate, shopSettings, reservedSlots, israelNow, isPastDate, barberWorkDays, breakouts, dateClosureReason])
 
   // --- Summary for footer ---

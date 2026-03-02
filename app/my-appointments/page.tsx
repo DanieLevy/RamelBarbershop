@@ -10,7 +10,7 @@ import { GlassCard } from '@/components/ui/GlassCard'
 import { AppointmentDetailModal } from '@/components/barber/AppointmentDetailModal'
 import { showToast } from '@/lib/toast'
 import { cn, formatTime as formatTimeUtil, timestampToIsraelDate, nowInIsrael, isSameDayInIsrael, normalizeTimestampFormat } from '@/lib/utils'
-import { Calendar, Scissors, User, X, History, ChevronRight, LogIn, Info, AlertCircle, Repeat, Clock, Pencil, RefreshCw, WifiOff } from 'lucide-react'
+import { Calendar, Scissors, User, X, History, ChevronRight, LogIn, Info, AlertCircle, Repeat, Clock, RefreshCw, WifiOff } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { ReservationWithDetails, CustomerRecurringAppointment } from '@/types/database'
 import { LoginModal } from '@/components/LoginModal'
@@ -91,8 +91,6 @@ function MyAppointmentsContent() {
     reservation: ReservationWithDetails | null
   }>({ isOpen: false, reservation: null })
   
-  // One-time tooltip for edit feature
-  const [showEditTooltip, setShowEditTooltip] = useState(false)
   
   // Cache for barber cancellation settings
   const [barberCancelSettings, setBarberCancelSettings] = useState<Map<string, number>>(new Map())
@@ -118,30 +116,6 @@ function MyAppointmentsContent() {
       // The data is non-critical so we silently fail
     }
   }
-
-  // Show one-time tooltip about the edit feature
-  useEffect(() => {
-    if (!isLoggedIn || loading || reservations.length === 0) return
-    const hasUpcoming = reservations.some(r => {
-      const resTime = normalizeTimestampFormat(r.time_timestamp)
-      return resTime > Date.now() && r.status === 'confirmed'
-    })
-    if (!hasUpcoming) return
-    
-    const tooltipKey = 'edit_reservation_tooltip_shown'
-    const alreadyShown = localStorage.getItem(tooltipKey)
-    if (alreadyShown) return
-    
-    // Show tooltip after a short delay so the page renders first
-    const timer = setTimeout(() => {
-      setShowEditTooltip(true)
-      localStorage.setItem(tooltipKey, '1')
-      // Auto-dismiss after 6 seconds
-      setTimeout(() => setShowEditTooltip(false), 6000)
-    }, 1200)
-    
-    return () => clearTimeout(timer)
-  }, [isLoggedIn, loading, reservations])
 
   // Handle URL params from push notification deep links
   // This processes highlight and tab params to show the specific reservation
@@ -639,7 +613,7 @@ function MyAppointmentsContent() {
             ) : (
               <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden">
                 <div className="divide-y divide-white/[0.04]">
-                  {filteredReservations.map((reservation, index) => {
+                  {filteredReservations.map((reservation) => {
                     const smartDate = getSmartDateTime(reservation.time_timestamp)
                     const upcoming = isUpcoming(reservation)
                     const cancelled = isCancelled(reservation)
