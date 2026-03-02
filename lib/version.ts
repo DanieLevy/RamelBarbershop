@@ -8,4 +8,4 @@
  * Example: 2.0.0-2026.02.02.1830
  */
 
-export const APP_VERSION = '2.1.2-2026.03.02.2033'
+export const APP_VERSION = '2.1.2-2026.03.02.2044'
