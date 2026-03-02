@@ -12,6 +12,16 @@ export function formatPrice(price: number): string {
 }
 
 /**
+ * Normalize a phone value for storage.
+ * Preserves walkin identifiers (e.g. "walkin-1709000000000") as-is,
+ * strips non-digit characters from real phone numbers.
+ */
+export function normalizePhone(phone: string): string {
+  if (phone.startsWith('walkin-')) return phone
+  return phone.replace(/\D/g, '')
+}
+
+/**
  * Generate a random ID
  */
 export function makeId(length = 6): string {

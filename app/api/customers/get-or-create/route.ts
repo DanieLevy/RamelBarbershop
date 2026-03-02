@@ -9,9 +9,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { reportApiError } from '@/lib/bug-reporter/helpers'
+import { normalizePhone } from '@/lib/utils/formatting'
 
 const getOrCreateSchema = z.object({
-  phone: z.string().min(9, 'מספר טלפון לא תקין').max(15),
+  phone: z.string().min(2).max(30),
   fullname: z.string().min(2, 'שם לא תקין'),
   providerUid: z.string().optional(),
   email: z.string().email('כתובת אימייל לא תקינה').optional(),
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
     
     const { phone, fullname, providerUid, email, supabaseUid } = validation.data
-    const normalizedPhone = phone.replace(/\D/g, '')
+    const normalizedPhone = normalizePhone(phone)
     const normalizedEmail = email?.trim().toLowerCase() || null
     
     console.log(`[${requestId}] Get or create customer for phone: ${normalizedPhone.slice(0, 3)}****`)

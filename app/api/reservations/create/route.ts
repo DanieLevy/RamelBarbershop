@@ -26,7 +26,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { reportApiError, reportServerError } from '@/lib/bug-reporter/helpers'
-import { normalizeToSlotBoundary } from '@/lib/utils'
+import { normalizeToSlotBoundary, normalizePhone } from '@/lib/utils'
 import type { DayOfWeek } from '@/types/database'
 
 // UUID validation
@@ -533,7 +533,7 @@ export async function POST(request: NextRequest) {
       p_service_id: body.serviceId,
       p_customer_id: body.customerId,
       p_customer_name: body.customerName.trim(),
-      p_customer_phone: body.customerPhone.replace(/\D/g, ''),
+      p_customer_phone: normalizePhone(body.customerPhone),
       p_date_timestamp: normalizedDateTimestamp,
       p_time_timestamp: normalizedTimeTimestamp,
       p_day_name: body.dayName,

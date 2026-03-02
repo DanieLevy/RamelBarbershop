@@ -8,6 +8,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
+import { normalizePhone } from '@/lib/utils/formatting'
 import { normalizeToSlotBoundary, SLOT_INTERVAL_MS } from '@/lib/utils'
 
 // ============================================================
@@ -149,7 +150,7 @@ export async function createReservation(
         serviceId: data.serviceId,
         customerId: data.customerId,
         customerName: data.customerName.trim(),
-        customerPhone: data.customerPhone.replace(/\D/g, ''),
+        customerPhone: normalizePhone(data.customerPhone),
         dateTimestamp: data.dateTimestamp,
         timeTimestamp: data.timeTimestamp,
         dayName: data.dayName,

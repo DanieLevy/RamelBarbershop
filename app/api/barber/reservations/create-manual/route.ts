@@ -12,6 +12,7 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { normalizePhone } from '@/lib/utils/formatting'
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyBarber, verifyOwnership } from '@/lib/auth/barber-api-auth'
 import { reportApiError } from '@/lib/bug-reporter/helpers'
@@ -280,7 +281,7 @@ export async function POST(request: NextRequest) {
       p_service_id: serviceId,
       p_customer_id: customerId,
       p_customer_name: customerName.trim(),
-      p_customer_phone: customerPhone.replace(/\D/g, ''),
+      p_customer_phone: normalizePhone(customerPhone),
       p_date_timestamp: normalizedDateTimestamp,
       p_time_timestamp: normalizedTimeTimestamp,
       p_day_name: dayName,
