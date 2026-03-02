@@ -75,7 +75,7 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){
-var PV=4,pvK='__purge_v';
+var PV=5,pvK='__purge_v';
 console.log('[Audit:boot] url='+location.href+' time='+new Date().toISOString());
 try{
   var hasSW='serviceWorker'in navigator;
@@ -112,7 +112,7 @@ try{
     console.log('[PurgeV] Up to date — no cleanup needed');
   }
 }catch(e){console.error('[PurgeV] Error:',e)}
-if(location.search.indexOf('_purge=')>=0){try{var pu=new URL(location.href);pu.searchParams.delete('_purge');pu.searchParams.delete('_cb');history.replaceState(null,'',pu.pathname+(pu.search||'')+pu.hash);console.log('[PurgeV] Cleaned _purge params from URL')}catch(e){}}
+if(location.search.indexOf('_purge=')>=0||location.search.indexOf('_cb=')>=0){try{var pu=new URL(location.href);pu.searchParams.delete('_purge');pu.searchParams.delete('_cb');history.replaceState(null,'',pu.pathname+(pu.search||'')+pu.hash);console.log('[PurgeV] Cleaned _purge/_cb params from URL')}catch(e){}}
 var K='__chunk_recovery',W=30000;
 function chk(m){return m&&(m.indexOf('ChunkLoadError')>=0||m.indexOf('Failed to load chunk')>=0||m.indexOf('Loading chunk')>=0||m.indexOf('dynamically imported module')>=0)}
 function go(msg){
@@ -121,8 +121,15 @@ function go(msg){
   console.log('[ChunkRecovery:inline] error="'+String(msg).slice(0,120)+'" elapsed='+elapsed+'ms cooldown='+W+'ms');
   if(elapsed<W){console.log('[ChunkRecovery:inline] Within cooldown — skipping');return}
   try{sessionStorage.setItem(K,''+Date.now())}catch(e){}
-  console.log('[ChunkRecovery:inline] Reloading for fresh assets');
-  location.reload();
+  console.log('[ChunkRecovery:inline] Clearing caches + cache-bust navigate');
+  var done=[];
+  if('caches'in window)done.push(caches.keys().then(function(n){console.log('[ChunkRecovery:inline] Clearing '+n.length+' caches');return Promise.all(n.map(function(c){return caches.delete(c)}))}));
+  if('serviceWorker'in navigator)done.push(navigator.serviceWorker.getRegistrations().then(function(regs){console.log('[ChunkRecovery:inline] Unregistering '+regs.length+' SW(s)');return Promise.all(regs.map(function(r){return r.unregister()}))}));
+  Promise.all(done).catch(function(){}).then(function(){
+    var u=location.pathname+location.search;
+    var sep=u.indexOf('?')>=0?'&':'?';
+    location.replace(u+sep+'_cb='+Date.now());
+  });
 }
 window.addEventListener('error',function(e){if(chk(e.message||'')){console.warn('[ChunkRecovery:inline] window.error: '+e.message+' file='+e.filename+' line='+e.lineno);go(e.message)}});
 window.addEventListener('unhandledrejection',function(e){var r=e.reason;var m=r?(r.message||''+r):'';if(chk(m)){console.warn('[ChunkRecovery:inline] unhandledrejection: '+m);go(m)}});

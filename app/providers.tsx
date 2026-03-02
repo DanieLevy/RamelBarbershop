@@ -44,9 +44,11 @@ export function Providers({ children }: { children: ReactNode }) {
         return
       }
 
-      console.log('[Providers:recovery] Reloading page')
+      console.log('[Providers:recovery] Cache-bust navigating for fresh assets')
       sessionStorage.setItem(STORAGE_KEY, Date.now().toString())
-      window.location.reload()
+      const u = window.location.pathname + window.location.search
+      const sep = u.includes('?') ? '&' : '?'
+      window.location.replace(u + sep + '_cb=' + Date.now())
     }
 
     const handleError = (event: ErrorEvent) => {
