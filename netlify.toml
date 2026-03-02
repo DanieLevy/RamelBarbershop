@@ -1,9 +1,10 @@
 # Netlify Configuration for Next.js App
-# This enables full Next.js support including API routes, SSR, ISR, and Scheduled Functions
-# Updated for Next.js 16.1.6 with proxy (formerly middleware) support
+# Full Next.js support (API routes, SSR, ISR, Middleware/Proxy) via @netlify/plugin-nextjs
+# Target: Next.js 16.1.6
 
 [build]
   command = "npm run build"
+  publish = "public"
   functions = "netlify/functions"
 
 # Environment-specific build settings
@@ -18,25 +19,22 @@
   external_node_modules = ["@supabase/supabase-js", "web-push"]
   included_files = ["netlify/functions/**"]
 
-# Scheduled function for reminders (runs every 30 minutes)
-# Schedule is defined in the function itself using @netlify/functions schedule()
-
 # Use the official Netlify Next.js plugin for full support
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Headers for security and caching
+# ──────────────────────────────────────────────────────
+# Headers
+# NOTE:
+# - We do NOT set Cache-Control / Netlify-CDN-Cache-Control globally here,
+#   to avoid fighting the Next.js runtime/plugin behavior for HTML/SSR/ISR.
+# - We DO set long-cache headers for static assets (/_next/static, icons, fonts, etc.).
+# ──────────────────────────────────────────────────────
+
+# Security headers (apply to everything)
 [[headers]]
   for = "/*"
   [headers.values]
-    # Default Cache-Control for HTML pages: always revalidate with server.
-    # Static assets (/_next/static/*, /fonts/*, /icons/*) override this below.
-    # This prevents browsers from serving stale HTML that references old chunk hashes.
-
-    # Explicitly disable Netlify CDN caching for ALL HTML pages by default.
-    # Without this, @netlify/plugin-nextjs may apply durable CDN caching to static
-    # Next.js pages, causing stale HTML (with old chunk hashes) to be served after deploys.
-    # Specific static pages (faq, terms, etc.) override this below with short CDN cache.
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
@@ -54,29 +52,6 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# Netlify Functions headers
-[[headers]]
-  for = "/.netlify/functions/*"
-  [headers.values]
-    Cache-Control = "no-store"
-    Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
-    Access-Control-Allow-Headers = "Content-Type, Authorization"
-
-# Service Worker headers
-[[headers]]
-  for = "/sw.js"
-  [headers.values]
-    Content-Type = "application/javascript; charset=utf-8"
-    Cache-Control = "no-cache, no-store, must-revalidate"
-    Service-Worker-Allowed = "/"
-
-[[headers]]
-  for = "/manifest.json"
-  [headers.values]
-    Cache-Control = "public, max-age=0, must-revalidate"
-    Content-Type = "application/manifest+json"
-
 # PWA icons with long cache
 [[headers]]
   for = "/icons/*"
@@ -88,6 +63,15 @@
   for = "/fonts/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# Netlify Functions headers
+[[headers]]
+  for = "/.netlify/functions/*"
+  [headers.values]
+    Cache-Control = "no-store"
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
 
 # API routes - no caching, CORS enabled
 [[headers]]
@@ -104,22 +88,31 @@
   [headers.values]
     Cache-Control = "no-store, no-cache, must-revalidate, private"
 
+# Service Worker headers
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Service-Worker-Allowed = "/"
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+    Content-Type = "application/manifest+json"
+
 # ──────────────────────────────────────────────────────
-# CDN-ONLY caching - reduces Netlify function invocations
-# Netlify-CDN-Cache-Control only affects CDN, NOT the browser.
-# Browser still follows Cache-Control set by Next.js.
-# This means repeat visits within the cache window are served
-# from CDN (no function invocation) while the browser still
-# gets fresh content on each visit.
+# Optional: CDN-only caching for a few mostly-static pages
+# (Netlify-CDN-Cache-Control affects Netlify CDN only; browsers follow Cache-Control.)
+# Keep these small to avoid stale HTML referencing old chunk hashes.
 # ──────────────────────────────────────────────────────
 
-# Homepage - brief CDN cache, no durable (deploy must invalidate immediately)
 [[headers]]
   for = "/"
   [headers.values]
     Netlify-CDN-Cache-Control = "public, max-age=60, stale-while-revalidate=300"
 
-# Legal/static pages - short CDN cache, no durable (deploy must invalidate immediately)
 [[headers]]
   for = "/faq"
   [headers.values]
@@ -140,7 +133,6 @@
   [headers.values]
     Netlify-CDN-Cache-Control = "public, max-age=300, stale-while-revalidate=600"
 
-# Products catalog - moderate CDN cache, no durable
 [[headers]]
   for = "/products"
   [headers.values]
@@ -151,13 +143,11 @@
   [headers.values]
     Netlify-CDN-Cache-Control = "public, max-age=300, stale-while-revalidate=600"
 
-# Login page - brief CDN cache, no durable
 [[headers]]
   for = "/login"
   [headers.values]
     Netlify-CDN-Cache-Control = "public, max-age=60, stale-while-revalidate=300"
 
-# Notifications page (customer) - no CDN cache (real-time data)
 [[headers]]
   for = "/notifications"
   [headers.values]
