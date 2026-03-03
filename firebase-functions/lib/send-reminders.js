@@ -414,6 +414,16 @@ async function getTodaysUnsentReservations() {
     }
     return reservations;
 }
+function isRecurringActiveToday(frequency, startDate, todayDateStr) {
+    if (frequency !== 'biweekly')
+        return true;
+    if (!startDate)
+        return true;
+    const startMs = new Date(startDate).getTime();
+    const todayMs = new Date(todayDateStr).getTime();
+    const diffDays = Math.round((todayMs - startMs) / 86400000);
+    return diffDays >= 0 && diffDays % 14 === 0;
+}
 async function getTodaysUnsentRecurring() {
     const supabase = getSupabase();
     const now = nowMs();
@@ -429,6 +439,8 @@ async function getTodaysUnsentRecurring() {
       customer_id,
       time_slot,
       last_reminder_date,
+      frequency,
+      start_date,
       customers!recurring_appointments_customer_id_fkey (fullname, phone),
       users!recurring_appointments_barber_id_fkey (fullname),
       services!recurring_appointments_service_id_fkey (name_he)
@@ -442,8 +454,18 @@ async function getTodaysUnsentRecurring() {
     }
     if (!data?.length)
         return [];
+    // Filter biweekly recurring to only the active alternating week
+    const activeData = data.filter(rec => isRecurringActiveToday(rec.frequency, rec.start_date, todayDateStr));
+    if (activeData.length < data.length) {
+        logger.info('[Reminders] Filtered biweekly recurring on off-week', {
+            total: data.length,
+            active: activeData.length,
+        });
+    }
+    if (!activeData.length)
+        return [];
     // Check barber closures
-    const barberIds = [...new Set(data.map(r => r.barber_id))];
+    const barberIds = [...new Set(activeData.map(r => r.barber_id))];
     const { data: closuresData } = await supabase
         .from('barber_closures')
         .select('barber_id')
@@ -458,7 +480,7 @@ async function getTodaysUnsentRecurring() {
     const settingsMap = new Map();
     settingsData?.forEach(s => settingsMap.set(s.barber_id, s.reminder_hours_before));
     const result = [];
-    for (const rec of data) {
+    for (const rec of activeData) {
         if (barbersClosed.has(rec.barber_id))
             continue;
         const { hour, minute } = parseTimeString(rec.time_slot);
