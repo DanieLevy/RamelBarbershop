@@ -48,6 +48,7 @@ export function CreateRecurringModal({
   const [selectedDay, setSelectedDay] = useState<DayOfWeek | null>(null)
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null)
   const [notes, setNotes] = useState('')
+  const [frequency, setFrequency] = useState<'weekly' | 'biweekly'>('weekly')
   
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
@@ -74,6 +75,7 @@ export function CreateRecurringModal({
       setSelectedDay(null)
       setSelectedTimeSlot(null)
       setNotes('')
+      setFrequency('weekly')
       setSearchQuery('')
       setSearchResults([])
       fetchServices()
@@ -342,6 +344,7 @@ export function CreateRecurringModal({
         time_slot: selectedTimeSlot,
         notes: notes.trim() || undefined,
         created_by: barberId,
+        frequency,
       })
       
       if (result.success) {
@@ -590,6 +593,38 @@ export function CreateRecurringModal({
               </div>
             )}
             
+            {/* Frequency Selection */}
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm font-medium text-foreground-light">
+                <Repeat size={16} className="text-foreground-muted" />
+                תדירות
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setFrequency('weekly')}
+                  className={cn(
+                    'flex-1 px-3 py-2 rounded-lg text-sm transition-colors border',
+                    frequency === 'weekly'
+                      ? 'bg-accent-gold text-background-dark border-accent-gold'
+                      : 'bg-white/5 text-foreground-light border-white/10 hover:bg-white/10'
+                  )}
+                >
+                  כל שבוע
+                </button>
+                <button
+                  onClick={() => setFrequency('biweekly')}
+                  className={cn(
+                    'flex-1 px-3 py-2 rounded-lg text-sm transition-colors border',
+                    frequency === 'biweekly'
+                      ? 'bg-accent-gold text-background-dark border-accent-gold'
+                      : 'bg-white/5 text-foreground-light border-white/10 hover:bg-white/10'
+                  )}
+                >
+                  כל שבועיים
+                </button>
+              </div>
+            </div>
+
             {/* Notes */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground-light">

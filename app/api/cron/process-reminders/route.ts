@@ -178,8 +178,25 @@ async function getTodaysUnsentReservations(): Promise<ReservationForReminder[]> 
 }
 
 /**
+ * Determine if a recurring appointment should fire today based on frequency.
+ * Weekly: always active. Biweekly: active only on alternating weeks anchored to start_date.
+ */
+function isRecurringActiveToday(
+  frequency: string | null,
+  startDate: string | null,
+  todayDateStr: string
+): boolean {
+  if (frequency !== 'biweekly') return true         // weekly: always active
+  if (!startDate) return true                        // no anchor: safe fallback
+  const startMs = new Date(startDate).getTime()
+  const todayMs = new Date(todayDateStr).getTime()
+  const diffDays = Math.round((todayMs - startMs) / 86400000)
+  return diffDays >= 0 && diffDays % 14 === 0
+}
+
+/**
  * Get recurring appointments for today that haven't received reminder yet
- * 
+ *
  * DEDUPLICATION: Uses `last_reminder_date` column on recurring_appointments table
  * Only fetches recurring where last_reminder_date != today (or is null)
  */
@@ -209,6 +226,8 @@ async function getTodaysUnsentRecurring(): Promise<ReservationForReminder[]> {
       customer_id,
       time_slot,
       last_reminder_date,
+      frequency,
+      start_date,
       customers!recurring_appointments_customer_id_fkey (fullname, phone),
       users!recurring_appointments_barber_id_fkey (fullname),
       services!recurring_appointments_service_id_fkey (name_he)
@@ -229,8 +248,22 @@ async function getTodaysUnsentRecurring(): Promise<ReservationForReminder[]> {
 
   console.log(`[ProcessReminders] Found ${data.length} recurring appointments without reminder today`)
 
+  // Filter biweekly recurring to only the active week
+  const activeData = data.filter(rec =>
+    isRecurringActiveToday(rec.frequency, rec.start_date, todayDateStr)
+  )
+
+  if (activeData.length < data.length) {
+    console.log(`[ProcessReminders] Filtered ${data.length - activeData.length} biweekly recurring on off-week`)
+  }
+
+  if (!activeData.length) {
+    console.log('[ProcessReminders] No active recurring appointments for today after frequency filter')
+    return []
+  }
+
   // Check for barber closures today
-  const barberIds = [...new Set(data.map(r => r.barber_id))]
+  const barberIds = [...new Set(activeData.map(r => r.barber_id))]
   
   const { data: closuresData } = await supabase
     .from('barber_closures')
@@ -253,7 +286,7 @@ async function getTodaysUnsentRecurring(): Promise<ReservationForReminder[]> {
   // Convert to ReservationForReminder format
   const recurringReminders: ReservationForReminder[] = []
 
-  for (const rec of data) {
+  for (const rec of activeData) {
     // Skip if barber has closure today
     if (barbersClosed.has(rec.barber_id)) {
       console.log(`[ProcessReminders] Skipping recurring ${rec.id} - barber closed today`)

@@ -42,6 +42,7 @@ interface CreateRecurringRequest {
   time_slot: string
   notes?: string
   created_by: string
+  frequency?: 'weekly' | 'biweekly'
 }
 
 interface CancelConflictsRequest {
@@ -56,6 +57,23 @@ interface DeleteRecurringRequest {
 }
 
 type PostRequestBody = CreateRecurringRequest | CancelConflictsRequest
+
+// ============================================================
+// Helper: Get next occurrence of a day of week in Israel timezone
+// ============================================================
+
+function getNextOccurrenceInIsrael(dayOfWeek: DayOfWeek): string {
+  const dayIndex: Record<DayOfWeek, number> = {
+    sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
+    thursday: 4, friday: 5, saturday: 6,
+  }
+  const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date())
+  const today = new Date(todayStr + 'T12:00:00')
+  let daysUntil = dayIndex[dayOfWeek] - today.getDay()
+  if (daysUntil < 0) daysUntil += 7
+  today.setDate(today.getDate() + daysUntil)
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(today)
+}
 
 // ============================================================
 // Helper: Cancel conflicting reservations
@@ -353,6 +371,11 @@ export async function POST(request: NextRequest) {
     }
     
     // 7. Create the recurring appointment
+    const frequency = createBody.frequency || 'weekly'
+    const startDate = frequency === 'biweekly'
+      ? getNextOccurrenceInIsrael(createBody.day_of_week)
+      : null
+
     const { data: recurring, error: createError } = await supabase
       .from('recurring_appointments')
       .insert({
@@ -364,6 +387,8 @@ export async function POST(request: NextRequest) {
         notes: createBody.notes?.trim() || null,
         is_active: true,
         created_by: createBody.created_by,
+        frequency,
+        start_date: startDate,
       })
       .select()
       .single()

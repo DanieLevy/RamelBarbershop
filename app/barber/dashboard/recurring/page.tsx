@@ -219,6 +219,16 @@ export default function RecurringPage() {
                         </span>
                       )}
                     </div>
+
+                    {/* Frequency Badge */}
+                    <span className={cn(
+                      'hidden sm:inline-flex text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0',
+                      item.frequency === 'biweekly'
+                        ? 'bg-teal-500/15 text-teal-400'
+                        : 'bg-white/5 text-foreground-muted'
+                    )}>
+                      {item.frequency === 'biweekly' ? 'דו-שבועי' : 'שבועי'}
+                    </span>
                     
                     {/* Delete Button - Compact */}
                     <Button

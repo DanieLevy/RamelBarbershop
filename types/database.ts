@@ -1117,6 +1117,8 @@ export type Database = {
           created_by: string | null
           deactivated_at: string | null
           last_reminder_date: string | null
+          frequency: 'weekly' | 'biweekly'
+          start_date: string | null
         }
         Insert: {
           id?: string
@@ -1131,6 +1133,8 @@ export type Database = {
           created_by?: string | null
           deactivated_at?: string | null
           last_reminder_date?: string | null
+          frequency?: 'weekly' | 'biweekly'
+          start_date?: string | null
         }
         Update: {
           id?: string
@@ -1145,6 +1149,8 @@ export type Database = {
           created_by?: string | null
           deactivated_at?: string | null
           last_reminder_date?: string | null
+          frequency?: 'weekly' | 'biweekly'
+          start_date?: string | null
         }
         Relationships: [
           {
@@ -1571,6 +1577,7 @@ export interface CreateRecurringAppointmentData {
   time_slot: string  // Format: "HH:MM" (e.g., "18:00")
   notes?: string
   created_by: string
+  frequency?: 'weekly' | 'biweekly'
 }
 
 /** Recurring appointment for customer display */
@@ -1581,4 +1588,5 @@ export interface CustomerRecurringAppointment {
   day_of_week: DayOfWeek
   day_of_week_hebrew: string
   time_slot: string
+  frequency: 'weekly' | 'biweekly'
 }

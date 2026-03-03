@@ -167,6 +167,7 @@ export const getRecurringByCustomer = async (
           id,
           day_of_week,
           time_slot,
+          frequency,
           users!recurring_appointments_barber_id_fkey (fullname),
           services!recurring_appointments_service_id_fkey (name_he)
         `)
@@ -188,6 +189,7 @@ export const getRecurringByCustomer = async (
         day_of_week: rec.day_of_week as DayOfWeek,
         day_of_week_hebrew: DAY_OF_WEEK_HEBREW[rec.day_of_week as DayOfWeek],
         time_slot: rec.time_slot,
+        frequency: (rec.frequency as 'weekly' | 'biweekly') || 'weekly',
       }))
     }, { maxRetries: 2, initialDelayMs: 500 })
   } catch (err) {

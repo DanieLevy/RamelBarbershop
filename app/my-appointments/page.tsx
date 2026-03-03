@@ -541,7 +541,7 @@ function MyAppointmentsContent() {
                         </div>
                         <div className="flex items-center gap-1 text-xs text-purple-400/60 bg-purple-500/10 px-2 py-1 rounded-full">
                           <Clock size={10} />
-                          <span>כל שבוע</span>
+                          <span>{rec.frequency === 'biweekly' ? 'כל שבועיים' : 'כל שבוע'}</span>
                         </div>
                       </div>
                     ))}
