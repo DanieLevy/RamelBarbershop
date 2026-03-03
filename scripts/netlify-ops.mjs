@@ -172,14 +172,19 @@ const actionVerify = async () => {
   let failCount = 0
 
   // ── 1. Check every page for correct cache behaviour ─────
+  // Grab reference deploy token from homepage to compare
+  const refHtml = await fetchHtml('/')
+  const refDpl = refHtml.match(/dpl=([a-f0-9]+)/)?.[1] || ''
+
   for (const path of PAGES_TO_VERIFY) {
     const { status, headers } = await fetchHeaders(path)
     const cacheStatus = headers['cache-status'] || ''
     const cacheControl = headers['cache-control'] || ''
     const prerender = headers['x-nextjs-prerender']
-    const durableBypass = cacheStatus.includes('fwd=bypass')
-    const durableStale = cacheStatus.includes('fwd=stale')
-    const durableStored = cacheStatus.includes('stored')
+    const durablePart = cacheStatus.split(',').find((s) => s.includes('Durable')) || ''
+    const durableBypass = durablePart.includes('fwd=bypass')
+    const durableStale = durablePart.includes('fwd=stale')
+    const durableStored = durablePart.includes('stored')
 
     if (status !== 200) {
       fail(`${path}  →  HTTP ${status}`)
@@ -188,10 +193,25 @@ const actionVerify = async () => {
       continue
     }
 
+    // Extract TTL from durable part (e.g. "ttl=-40" or "ttl=31534563")
+    const ttlMatch = durablePart.match(/ttl=(-?\d+)/)
+    const ttl = ttlMatch ? parseInt(ttlMatch[1], 10) : null
+
+    // A long positive TTL (> 1 day) means the plugin stored a 1-year cache — bad
+    const longTtl = ttl !== null && ttl > 86400
+
+    // Check if this page's deploy token matches the current deploy
+    let deployMismatch = false
+    if (durableStale && refDpl) {
+      const pageHtml = await fetchHtml(path)
+      const pageDpl = pageHtml.match(/dpl=([a-f0-9]+)/)?.[1] || ''
+      deployMismatch = pageDpl !== '' && pageDpl !== refDpl
+    }
+
     const problems = []
-    if (durableStale) problems.push('Durable serving stale content')
-    if (durableStored && !durableBypass) problems.push('Durable is storing this page')
-    if (prerender) problems.push(`x-nextjs-prerender detected (page is prerendered)`)
+    if (longTtl) problems.push(`Durable TTL is dangerously long (${ttl}s ≈ ${Math.round(ttl / 86400)}d)`)
+    if (deployMismatch) problems.push('Serving HTML from a DIFFERENT deploy (stale chunks!)')
+    if (prerender) problems.push(`x-nextjs-prerender detected`)
 
     if (problems.length > 0) {
       fail(`${path}  →  ${problems.join(', ')}`)
@@ -199,6 +219,11 @@ const actionVerify = async () => {
       console.log(`    ${c.dim}cache-control: ${cacheControl}${c.reset}`)
       failCount++
       allPassed = false
+    } else if (durableStale && !longTtl && !deployMismatch) {
+      // Short-TTL stale with matching deploy = benign SWR, content is current
+      const ttlLabel = ttl !== null ? `ttl=${ttl}s` : ''
+      warn(`${path}  →  ${c.yellow}Durable=SWR${c.reset} (${ttlLabel}, same deploy — benign)`)
+      passCount++
     } else {
       const durableLabel = durableBypass
         ? `${c.green}Durable=bypass${c.reset}`
@@ -292,19 +317,25 @@ const actionVerify = async () => {
   const { headers: h2 } = await fetchHeaders('/barber/login')
   const cs2 = h2['cache-status'] || ''
 
-  const durablePart = cs2.split(',').find((s) => s.includes('Durable')) || ''
-  const durableOk =
-    durablePart.includes('fwd=bypass') || durablePart.includes('fwd=miss')
-  const durableStaleNow = durablePart.includes('fwd=stale')
+  const durablePart2 = cs2.split(',').find((s) => s.includes('Durable')) || ''
+  const ttlMatch2 = durablePart2.match(/ttl=(-?\d+)/)
+  const ttl2 = ttlMatch2 ? parseInt(ttlMatch2[1], 10) : null
+  const longTtl2 = ttl2 !== null && ttl2 > 86400
+  const durableOk2 =
+    durablePart2.includes('fwd=bypass') || durablePart2.includes('fwd=miss')
+  const durableStaleNow2 = durablePart2.includes('fwd=stale')
 
-  if (durableOk) {
-    ok(`Second request: Durable cache bypassed  (${durablePart.trim()})`)
+  if (durableOk2) {
+    ok(`Second request: Durable cache bypassed  (${durablePart2.trim()})`)
     passCount++
-  } else if (durableStaleNow) {
-    fail(`Second request: Durable cache still active  (${durablePart.trim()})`)
-    info(`This means the CDN is re-caching HTML. Run: ${c.cyan}npm run netlify:purge${c.reset}`)
+  } else if (durableStaleNow2 && longTtl2) {
+    fail(`Second request: Durable cache has dangerous long TTL (${ttl2}s)`)
+    info(`The plugin is applying 1-year cache. Run: ${c.cyan}npm run netlify:purge${c.reset}`)
     failCount++
     allPassed = false
+  } else if (durableStaleNow2 && !longTtl2) {
+    ok(`Second request: Durable SWR with short TTL (${ttl2}s) — content is fresh`)
+    passCount++
   } else {
     warn(`Second request: unexpected  (${cs2})`)
   }
