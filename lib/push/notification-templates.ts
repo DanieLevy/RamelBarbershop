@@ -7,7 +7,7 @@
 
 import { format } from 'date-fns'
 import { he } from 'date-fns/locale'
-import { timestampToIsraelDate, formatHebrewDuration as formatDuration, nowInIsraelMs } from '@/lib/utils'
+import { timestampToIsraelDate } from '@/lib/utils'
 import type { 
   NotificationPayload, 
   NotificationType,
@@ -42,14 +42,6 @@ function formatUrlDate(timestamp: number): string {
 }
 
 /**
- * Format time duration in proper Hebrew grammar
- * Uses centralized utility from @/lib/utils
- */
-function formatHebrewDuration(minutes: number): string {
-  return formatDuration(minutes)
-}
-
-/**
  * Get notification template by type
  */
 export function getNotificationTemplate(
@@ -63,6 +55,8 @@ export function getNotificationTemplate(
       return getCancellationTemplate(context as CancellationContext)
     case 'booking_confirmed':
       return getBookingConfirmedTemplate(context as ReminderContext)
+    case 'manual_booking':
+      return getManualBookingTemplate(context as ReminderContext)
     case 'chat_message':
       return getChatMessageTemplate(context as { senderName: string; message: string })
     case 'barber_broadcast':
@@ -82,26 +76,11 @@ export function getNotificationTemplate(
 function getReminderTemplate(context: ReminderContext): NotificationPayload {
   const time = formatTime(context.appointmentTime)
   const date = formatShortDate(context.appointmentTime)
-  const fullDate = formatDate(context.appointmentTime)
-  
-  // Calculate time until appointment (use Israel timezone for consistency)
-  const now = nowInIsraelMs()
-  const msUntil = context.appointmentTime - now
-  const minutesUntil = Math.round(msUntil / 60000)
-  
-  // Build dynamic time text with proper Hebrew grammar
-  let timeUntilText: string
-  if (minutesUntil < 60) {
-    timeUntilText = `בעוד ${formatHebrewDuration(minutesUntil)}`
-  } else if (minutesUntil < 360) { // Less than 6 hours
-    timeUntilText = `בעוד ${formatHebrewDuration(minutesUntil)}`
-  } else {
-    timeUntilText = `היום בשעה ${time}`
-  }
-  
+  const barberFirstName = context.barberName.split(' ')[0]
+
   // Deep link with highlight param for focused view
   const deepLinkUrl = `/my-appointments?highlight=${context.reservationId}`
-  
+
   const notificationData: NotificationDataPayload = {
     type: 'reminder',
     recipientType: 'customer',
@@ -110,16 +89,16 @@ function getReminderTemplate(context: ReminderContext): NotificationPayload {
     date,
     url: deepLinkUrl
   }
-  
+
   return {
-    title: `⏰ תזכורת: התור שלך ${timeUntilText}`,
-    body: `היי ${context.customerName}! יש לך תור ל${context.serviceName} אצל ${context.barberName} ב${fullDate} בשעה ${time}`,
+    title: `תזכורת לתור שלך היום אצל ${barberFirstName}`,
+    body: `היי ${context.customerName}! יש לך תור ל${context.serviceName} היום בשעה ${time} 💈`,
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-72x72.png',
     tag: `reminder-${context.reservationId}`,
     url: deepLinkUrl,
     requireInteraction: true,
-    shouldBadge: true, // High priority - should show badge
+    shouldBadge: true,
     data: notificationData,
     actions: [
       { action: 'view', title: 'צפה בתור' },
@@ -235,6 +214,41 @@ function getBookingConfirmedTemplate(context: ReminderContext): NotificationPayl
     data: notificationData,
     actions: [
       { action: 'view', title: 'צפה בפרטים' },
+      { action: 'dismiss', title: 'סגור' }
+    ]
+  }
+}
+
+/**
+ * Manual booking template (barber creates booking for customer)
+ * Sent to the customer when a barber manually books an appointment for them
+ */
+function getManualBookingTemplate(context: ReminderContext): NotificationPayload {
+  const time = formatTime(context.appointmentTime)
+  const date = formatDate(context.appointmentTime)
+
+  const deepLinkUrl = `/my-appointments?highlight=${context.reservationId}&tab=upcoming`
+
+  const notificationData: NotificationDataPayload = {
+    type: 'manual_booking',
+    recipientType: 'customer',
+    reservationId: context.reservationId,
+    appointmentTime: context.appointmentTime,
+    url: deepLinkUrl
+  }
+
+  return {
+    title: `📅 תור נקבע עבורך!`,
+    body: `${context.barberName} קבע עבורך תור ל${context.serviceName} ב${date} בשעה ${time}`,
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/icon-72x72.png',
+    tag: `manual-booking-${context.reservationId}`,
+    url: deepLinkUrl,
+    requireInteraction: true,
+    shouldBadge: true,
+    data: notificationData,
+    actions: [
+      { action: 'view', title: 'צפה בתור' },
       { action: 'dismiss', title: 'סגור' }
     ]
   }

@@ -40,6 +40,13 @@ import webpush from 'web-push'
 import * as admin from 'firebase-admin'
 import * as logger from 'firebase-functions/logger'
 
+// Initialize Firebase Admin SDK with Application Default Credentials.
+// In Cloud Functions v2 runtime, ADC is automatically provided by GCP.
+// Must be called before any admin.messaging() or admin.firestore() calls.
+if (!admin.apps.length) {
+  admin.initializeApp()
+}
+
 // ============================================================
 // Types (mirrored from lib/push/types.ts)
 // ============================================================
@@ -299,27 +306,11 @@ interface ReminderPayload {
 
 function buildReminderPayload(res: ReservationForReminder): ReminderPayload {
   const time = formatTimeForNotification(res.time_timestamp)
-  const now = Date.now()
-  const msUntil = res.time_timestamp - now
-  const minutesUntil = Math.round(msUntil / 60_000)
-
-  const hoursUntil = Math.floor(minutesUntil / 60)
-  const minsLeft = minutesUntil % 60
-
-  let timeUntilText: string
-  if (minutesUntil < 60) {
-    timeUntilText = `בעוד ${minutesUntil} דקות`
-  } else if (hoursUntil === 1) {
-    timeUntilText = minsLeft > 0 ? `בעוד שעה ו-${minsLeft} דקות` : 'בעוד שעה'
-  } else if (minutesUntil < 360) {
-    timeUntilText = minsLeft > 0 ? `בעוד ${hoursUntil} שעות ו-${minsLeft} דקות` : `בעוד ${hoursUntil} שעות`
-  } else {
-    timeUntilText = `היום בשעה ${time}`
-  }
+  const barberFirstName = res.barber_name.split(' ')[0] || res.barber_name
 
   return {
-    title: `⏰ תזכורת: התור שלך ${timeUntilText}`,
-    body: `היי ${res.customer_name}! יש לך תור ל${res.service_name} אצל ${res.barber_name} היום בשעה ${time}`,
+    title: `תזכורת לתור שלך היום אצל ${barberFirstName}`,
+    body: `היי ${res.customer_name}! יש לך תור ל${res.service_name} היום בשעה ${time} 💈`,
     url: `/my-appointments?highlight=${res.id}`,
     reservationId: res.id,
     appointmentTime: res.time_timestamp,
@@ -603,19 +594,35 @@ async function getCustomerPushSubscriptions(customerId: string): Promise<PushSub
 
 async function markSmsReminderSent(reservationId: string): Promise<void> {
   const supabase = getSupabase()
-  await supabase
-    .from('reservations')
-    .update({ sms_reminder_sent_at: new Date().toISOString() })
-    .eq('id', reservationId)
-    .is('sms_reminder_sent_at', null)
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { error } = await supabase
+      .from('reservations')
+      .update({ sms_reminder_sent_at: new Date().toISOString() })
+      .eq('id', reservationId)
+      .is('sms_reminder_sent_at', null)
+    if (!error) return
+    if (attempt < 2) {
+      await new Promise(r => setTimeout(r, 400 * (attempt + 1)))
+    } else {
+      logger.error('[Reminders] ❌ Failed to mark sms_reminder_sent_at after 3 attempts', { reservationId })
+    }
+  }
 }
 
 async function markRecurringReminderSent(recurringId: string): Promise<void> {
   const supabase = getSupabase()
-  await supabase
-    .from('recurring_appointments')
-    .update({ last_reminder_date: getTodayDateStr() })
-    .eq('id', recurringId)
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { error } = await supabase
+      .from('recurring_appointments')
+      .update({ last_reminder_date: getTodayDateStr() })
+      .eq('id', recurringId)
+    if (!error) return
+    if (attempt < 2) {
+      await new Promise(r => setTimeout(r, 400 * (attempt + 1)))
+    } else {
+      logger.error('[Reminders] ❌ Failed to mark last_reminder_date after 3 attempts', { recurringId })
+    }
+  }
 }
 
 async function deactivateSubscription(subId: string): Promise<void> {
@@ -778,10 +785,10 @@ export async function processReminders(): Promise<BatchResults> {
         return { type: 'dry_run_skipped' as const }
       }
 
-      // In DRY_RUN mode, whitelisted users get real notifications but dedup columns
-      // are intentionally NOT marked, so Netlify also delivers to them for parallel
-      // verification. Double delivery is expected and desired for test users.
-      const skipDedup = dryRun && isWhitelisted(res.customer_id, res.barber_id)
+      // Always mark dedup after successful send.
+      // DRY_RUN=true: Firebase sends only to whitelisted users and marks their rows.
+      // Netlify (runs 97s later) sees rows already marked → naturally skips them.
+      const skipDedup = false
 
       const payload = buildReminderPayload(res)
       let smsSent = false, smsFailed = false, pushSent = false, pushFailed = false

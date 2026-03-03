@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyBarber, verifyOwnership } from '@/lib/auth/barber-api-auth'
 import { reportApiError } from '@/lib/bug-reporter/helpers'
 import { normalizeToSlotBoundary } from '@/lib/utils'
+import { pushService } from '@/lib/push/push-service'
 import type { DayOfWeek } from '@/types/database'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -149,7 +150,7 @@ export async function POST(request: NextRequest) {
 
         supabase
           .from('services')
-          .select('id')
+          .select('id, name_he')
           .eq('id', serviceId)
           .eq('barber_id', barberId)
           .eq('is_active', true)
@@ -327,6 +328,19 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[API/create-manual] Reservation created:', reservationId)
+
+    // Fire-and-forget: notify customer if they have an account with push subscriptions
+    if (customerId) {
+      pushService.sendManualBookingCustomerNotification({
+        reservationId: reservationId as string,
+        customerId,
+        barberId,
+        customerName: customerName.trim(),
+        barberName: auth.barber.fullname ?? '',
+        serviceName: serviceResult.data?.name_he ?? 'שירות',
+        appointmentTime: normalizedTimeTimestamp,
+      }).catch((err) => console.error('[create-manual] Push error:', err))
+    }
 
     return NextResponse.json({ success: true, reservationId })
   } catch (err) {

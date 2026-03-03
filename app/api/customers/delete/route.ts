@@ -33,11 +33,12 @@ export async function DELETE(request: NextRequest) {
 
     const { customerId } = validation.data
 
-    // Verify caller is the customer themselves
-    const auth = await verifyPushCaller(request, body)
+    // Verify caller is a real customer in the database
+    const auth = await verifyPushCaller(request, body as Record<string, unknown>)
     if (!auth.success) return auth.response
 
-    if (!auth.success || auth.userType !== 'customer' || auth.userId !== customerId) {
+    // Ensure the caller is the customer themselves
+    if (auth.userType !== 'customer' || auth.userId !== customerId) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 403 }
@@ -66,7 +67,7 @@ export async function DELETE(request: NextRequest) {
       throw cancelError
     }
 
-    // Deactivate push subscriptions
+    // Deactivate push subscriptions (non-fatal)
     const { error: pushError } = await supabase
       .from('push_subscriptions')
       .update({ is_active: false })
@@ -74,7 +75,6 @@ export async function DELETE(request: NextRequest) {
 
     if (pushError) {
       console.error(`[${requestId}] Error deactivating push subscriptions:`, pushError)
-      // Non-fatal — proceed with deletion
     }
 
     // Delete the customer row

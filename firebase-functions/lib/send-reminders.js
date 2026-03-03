@@ -77,6 +77,12 @@ const supabase_js_1 = require("@supabase/supabase-js");
 const web_push_1 = __importDefault(require("web-push"));
 const admin = __importStar(require("firebase-admin"));
 const logger = __importStar(require("firebase-functions/logger"));
+// Initialize Firebase Admin SDK with Application Default Credentials.
+// In Cloud Functions v2 runtime, ADC is automatically provided by GCP.
+// Must be called before any admin.messaging() or admin.firestore() calls.
+if (!admin.apps.length) {
+    admin.initializeApp();
+}
 // ============================================================
 // Israel Timezone Utilities (no external date-fns dep needed)
 // ============================================================
@@ -251,27 +257,10 @@ async function sendSmsReminder(phone, firstName, timestamp) {
 }
 function buildReminderPayload(res) {
     const time = formatTimeForNotification(res.time_timestamp);
-    const now = Date.now();
-    const msUntil = res.time_timestamp - now;
-    const minutesUntil = Math.round(msUntil / 60_000);
-    const hoursUntil = Math.floor(minutesUntil / 60);
-    const minsLeft = minutesUntil % 60;
-    let timeUntilText;
-    if (minutesUntil < 60) {
-        timeUntilText = `בעוד ${minutesUntil} דקות`;
-    }
-    else if (hoursUntil === 1) {
-        timeUntilText = minsLeft > 0 ? `בעוד שעה ו-${minsLeft} דקות` : 'בעוד שעה';
-    }
-    else if (minutesUntil < 360) {
-        timeUntilText = minsLeft > 0 ? `בעוד ${hoursUntil} שעות ו-${minsLeft} דקות` : `בעוד ${hoursUntil} שעות`;
-    }
-    else {
-        timeUntilText = `היום בשעה ${time}`;
-    }
+    const barberFirstName = res.barber_name.split(' ')[0] || res.barber_name;
     return {
-        title: `⏰ תזכורת: התור שלך ${timeUntilText}`,
-        body: `היי ${res.customer_name}! יש לך תור ל${res.service_name} אצל ${res.barber_name} היום בשעה ${time}`,
+        title: `תזכורת לתור שלך היום אצל ${barberFirstName}`,
+        body: `היי ${res.customer_name}! יש לך תור ל${res.service_name} היום בשעה ${time} 💈`,
         url: `/my-appointments?highlight=${res.id}`,
         reservationId: res.id,
         appointmentTime: res.time_timestamp,
@@ -521,18 +510,38 @@ async function getCustomerPushSubscriptions(customerId) {
 }
 async function markSmsReminderSent(reservationId) {
     const supabase = getSupabase();
-    await supabase
-        .from('reservations')
-        .update({ sms_reminder_sent_at: new Date().toISOString() })
-        .eq('id', reservationId)
-        .is('sms_reminder_sent_at', null);
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const { error } = await supabase
+            .from('reservations')
+            .update({ sms_reminder_sent_at: new Date().toISOString() })
+            .eq('id', reservationId)
+            .is('sms_reminder_sent_at', null);
+        if (!error)
+            return;
+        if (attempt < 2) {
+            await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+        }
+        else {
+            logger.error('[Reminders] ❌ Failed to mark sms_reminder_sent_at after 3 attempts', { reservationId });
+        }
+    }
 }
 async function markRecurringReminderSent(recurringId) {
     const supabase = getSupabase();
-    await supabase
-        .from('recurring_appointments')
-        .update({ last_reminder_date: getTodayDateStr() })
-        .eq('id', recurringId);
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const { error } = await supabase
+            .from('recurring_appointments')
+            .update({ last_reminder_date: getTodayDateStr() })
+            .eq('id', recurringId);
+        if (!error)
+            return;
+        if (attempt < 2) {
+            await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+        }
+        else {
+            logger.error('[Reminders] ❌ Failed to mark last_reminder_date after 3 attempts', { recurringId });
+        }
+    }
 }
 async function deactivateSubscription(subId) {
     const supabase = getSupabase();
@@ -668,10 +677,10 @@ async function processReminders() {
             if (dryRun && !isWhitelisted(res.customer_id, res.barber_id)) {
                 return { type: 'dry_run_skipped' };
             }
-            // In DRY_RUN mode, whitelisted users get real notifications but dedup columns
-            // are intentionally NOT marked, so Netlify also delivers to them for parallel
-            // verification. Double delivery is expected and desired for test users.
-            const skipDedup = dryRun && isWhitelisted(res.customer_id, res.barber_id);
+            // Always mark dedup after successful send.
+            // DRY_RUN=true: Firebase sends only to whitelisted users and marks their rows.
+            // Netlify (runs 97s later) sees rows already marked → naturally skips them.
+            const skipDedup = false;
             const payload = buildReminderPayload(res);
             let smsSent = false, smsFailed = false, pushSent = false, pushFailed = false;
             // SMS

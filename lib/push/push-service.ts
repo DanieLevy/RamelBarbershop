@@ -153,6 +153,27 @@ class PushNotificationService {
   }
 
   /**
+   * Send manual booking notification to customer (barber booked on their behalf)
+   */
+  async sendManualBookingCustomerNotification(context: ReminderContext): Promise<SendNotificationResult> {
+    const customerSettings = await this.getCustomerNotificationSettings(context.customerId)
+    if (!customerSettings?.notifications_enabled) {
+      return { success: false, sent: 0, failed: 0, errors: ['Notifications disabled'] }
+    }
+
+    const payload = getNotificationTemplate('manual_booking', context)
+
+    return this.sendTypedNotification({
+      type: 'manual_booking',
+      recipientType: 'customer',
+      recipientId: context.customerId,
+      reservationId: context.reservationId,
+      senderId: context.barberId,
+      payload
+    })
+  }
+
+  /**
    * Send a barber broadcast to their customers with future appointments
    */
   async sendBarberBroadcast(context: BroadcastContext): Promise<SendNotificationResult> {

@@ -11,7 +11,10 @@
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "db:test": "node scripts/backup-test.mjs",
+    "db:backup": "node scripts/backup-db.mjs",
+    "db:restore": "node scripts/restore-db.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.995.0",
@@ -52,6 +55,7 @@
     "eslint": "^9.17.0",
     "eslint-config-next": "^16.1.6",
     "jsdom": "^27.4.0",
+    "pg": "^8.19.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3",

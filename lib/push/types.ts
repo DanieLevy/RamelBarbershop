@@ -6,11 +6,12 @@
 export type DeviceType = 'ios' | 'android' | 'desktop'
 
 // Notification types for categorization
-export type NotificationType = 
+export type NotificationType =
   | 'reminder'           // Appointment reminder
   | 'cancellation'       // Booking cancelled
   | 'booking_confirmed'  // New booking made
   | 'cancel_request'     // Customer requests barber to cancel (blocked by policy)
+  | 'manual_booking'     // Barber manually booked for customer
   | 'chat_message'       // User-barber message
   | 'barber_broadcast'   // Barber to their customers
   | 'admin_broadcast'    // Admin to all users

@@ -40,3 +40,6 @@ next-env.d.ts
 # Firebase debug logs
 firebase-debug.log
 .firebase/
+
+# Database backups (contain sensitive production data)
+backups/
