@@ -1,10 +1,16 @@
 # Netlify Configuration for Next.js App (SSR/ISR + API routes)
 # Next.js 16.x + @netlify/plugin-nextjs
+#
+# CACHING FIX: Stale HTML → old chunk hashes → 404 / MIME text/plain
+# ───────────────────────────────────────────────────────────────────
+# The Durable Cache problem is solved by middleware.ts (application-level
+# Netlify-CDN-Cache-Control headers that override the plugin's 1-year TTL).
+# This file only handles static asset caching, security headers, and build config.
 
 [build]
   command = "npm run build"
+  publish = ".next"
   functions = "netlify/functions"
-  # IMPORTANT: do NOT set publish when using @netlify/plugin-nextjs
 
 [build.environment]
   NODE_VERSION = "22"
@@ -20,22 +26,20 @@
   package = "@netlify/plugin-nextjs"
 
 # ─────────────────────────────────────────────────────────────
-# Headers
-# Goal: prevent stale HTML from being cached at the Netlify edge
+# Security headers (apply to everything)
 # ─────────────────────────────────────────────────────────────
-
-# Default: DO NOT cache HTML at Netlify CDN
 [[headers]]
   for = "/*"
   [headers.values]
-    Netlify-CDN-Cache-Control = "no-store"
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-XSS-Protection = "1; mode=block"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
 
-# Hashed Next static assets: cache forever (browser cache)
+# ─────────────────────────────────────────────────────────────
+# Static assets: cache forever (content-hashed, safe to cache)
+# ─────────────────────────────────────────────────────────────
 [[headers]]
   for = "/_next/static/*"
   [headers.values]
@@ -46,16 +50,19 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# Netlify Functions: never cache
 [[headers]]
-  for = "/.netlify/functions/*"
+  for = "/icons/*"
   [headers.values]
-    Cache-Control = "no-store"
-    Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
-    Access-Control-Allow-Headers = "Content-Type, Authorization"
+    Cache-Control = "public, max-age=31536000, immutable"
 
-# Service Worker: must revalidate
+[[headers]]
+  for = "/fonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# ─────────────────────────────────────────────────────────────
+# PWA assets
+# ─────────────────────────────────────────────────────────────
 [[headers]]
   for = "/sw.js"
   [headers.values]
@@ -69,17 +76,20 @@
     Cache-Control = "public, max-age=0, must-revalidate"
     Content-Type = "application/manifest+json"
 
+# ─────────────────────────────────────────────────────────────
+# Netlify Functions: never cache
+# ─────────────────────────────────────────────────────────────
 [[headers]]
-  for = "/icons/*"
+  for = "/.netlify/functions/*"
   [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
+    Cache-Control = "no-store"
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
 
-[[headers]]
-  for = "/fonts/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-
+# ─────────────────────────────────────────────────────────────
 # API routes: no cache + CORS
+# ─────────────────────────────────────────────────────────────
 [[headers]]
   for = "/api/*"
   [headers.values]
@@ -92,50 +102,3 @@
   for = "/api/dev/*"
   [headers.values]
     Cache-Control = "no-store, no-cache, must-revalidate, private"
-
-# Optional: allow small Netlify edge caching on a few pages
-# (override the default no-store above)
-[[headers]]
-  for = "/"
-  [headers.values]
-    Netlify-CDN-Cache-Control = "public, max-age=60, stale-while-revalidate=300"
-
-[[headers]]
-  for = "/faq"
-  [headers.values]
-    Netlify-CDN-Cache-Control = "public, max-age=300, stale-while-revalidate=600"
-
-[[headers]]
-  for = "/terms"
-  [headers.values]
-    Netlify-CDN-Cache-Control = "public, max-age=300, stale-while-revalidate=600"
-
-[[headers]]
-  for = "/privacy-policy"
-  [headers.values]
-    Netlify-CDN-Cache-Control = "public, max-age=300, stale-while-revalidate=600"
-
-[[headers]]
-  for = "/accessibility"
-  [headers.values]
-    Netlify-CDN-Cache-Control = "public, max-age=300, stale-while-revalidate=600"
-
-[[headers]]
-  for = "/products"
-  [headers.values]
-    Netlify-CDN-Cache-Control = "public, max-age=300, stale-while-revalidate=600"
-
-[[headers]]
-  for = "/products/*"
-  [headers.values]
-    Netlify-CDN-Cache-Control = "public, max-age=300, stale-while-revalidate=600"
-
-[[headers]]
-  for = "/login"
-  [headers.values]
-    Netlify-CDN-Cache-Control = "public, max-age=60, stale-while-revalidate=300"
-
-[[headers]]
-  for = "/notifications"
-  [headers.values]
-    Netlify-CDN-Cache-Control = "public, max-age=0, must-revalidate"
