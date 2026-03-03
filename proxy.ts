@@ -1,17 +1,15 @@
 /**
- * Next.js Proxy for Rate Limiting and Security (Next.js 16+ convention)
- * 
- * Implements in-memory rate limiting for API endpoints.
- * Includes:
- * - Per-endpoint rate limits
- * - Exponential backoff for repeated violations
- * - Suspicious activity detection and logging
- * 
- * LIMITATIONS:
+ * Next.js Proxy (Next.js 16+ convention — replaces middleware.ts)
+ *
+ * Two responsibilities:
+ * 1. API rate limiting with in-memory stores and suspicious-activity blocking
+ * 2. Netlify CDN cache prevention for HTML pages (prevents stale-chunk 404s)
+ *
+ * RATE LIMITING LIMITATIONS:
  * - In-memory storage resets on serverless cold starts
  * - Not shared across multiple instances
  * - For production with high traffic, consider Redis (e.g., Upstash)
- * 
+ *
  * For this barbershop app (single instance, moderate traffic), in-memory
  * rate limiting provides effective protection against abuse and spam.
  */
@@ -277,52 +275,60 @@ const checkRateLimit = (ip: string, pathname: string): {
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
-  
-  // Only apply rate limiting to API routes
-  if (!pathname.startsWith('/api/')) {
-    return NextResponse.next()
-  }
-  
-  // Skip rate limiting for cron jobs and dev endpoints (they have their own auth)
-  if (pathname.startsWith('/api/cron/') || pathname.startsWith('/api/dev/')) {
-    return NextResponse.next()
-  }
-  
-  const ip = getClientIP(request)
-  const { allowed, remaining, resetAt, reason } = checkRateLimit(ip, pathname)
-  
-  if (!allowed) {
-    const retryAfter = Math.ceil((resetAt - Date.now()) / 1000)
-    
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: reason || 'Rate limit exceeded. Please try again later.',
-        retryAfter 
-      },
-      { 
-        status: 429,
-        headers: {
-          'Retry-After': String(retryAfter),
-          'X-RateLimit-Remaining': '0',
-          'X-RateLimit-Reset': String(Math.ceil(resetAt / 1000)),
+
+  // ── API routes → rate limiting ───────────────────────────────
+  if (pathname.startsWith('/api/')) {
+    if (pathname.startsWith('/api/cron/') || pathname.startsWith('/api/dev/')) {
+      return NextResponse.next()
+    }
+
+    const ip = getClientIP(request)
+    const { allowed, remaining, resetAt, reason } = checkRateLimit(ip, pathname)
+
+    if (!allowed) {
+      const retryAfter = Math.ceil((resetAt - Date.now()) / 1000)
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: reason || 'Rate limit exceeded. Please try again later.',
+          retryAfter,
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(retryAfter),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': String(Math.ceil(resetAt / 1000)),
+          },
         }
-      }
-    )
+      )
+    }
+
+    const response = NextResponse.next()
+    response.headers.set('X-RateLimit-Remaining', String(remaining))
+    response.headers.set('X-RateLimit-Reset', String(Math.ceil(resetAt / 1000)))
+    return response
   }
-  
-  // Add rate limit headers to response
+
+  // ── Page routes → prevent Netlify Durable Cache ──────────────
+  // @netlify/plugin-nextjs marks prerendered pages with a 1-year
+  // Netlify-CDN-Cache-Control. After a deploy the Durable Cache
+  // serves OLD HTML whose chunk hashes no longer exist → 404 →
+  // text/plain MIME → browser refuses to execute scripts.
+  // Application-level headers (set here) override the plugin.
   const response = NextResponse.next()
-  response.headers.set('X-RateLimit-Remaining', String(remaining))
-  response.headers.set('X-RateLimit-Reset', String(Math.ceil(resetAt / 1000)))
-  
+  response.headers.set(
+    'Netlify-CDN-Cache-Control',
+    'no-cache, no-store, must-revalidate'
+  )
+  response.headers.set('Cache-Control', 'public, max-age=0, must-revalidate')
   return response
 }
 
-// Configure which paths the middleware runs on
 export const config = {
   matcher: [
-    // Match all API routes
-    '/api/:path*',
+    // All routes except static assets, images, fonts, icons, PWA files
+    '/((?!_next/static|_next/image|favicon\\.ico|icon\\.png|logo\\.png|apple-touch-icon\\.png|fonts/|icons/|static/|sw\\.js|manifest\\.json).*)',
   ],
 }
