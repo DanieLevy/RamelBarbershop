@@ -189,8 +189,13 @@ async function getTodaysUnsentRecurring(): Promise<ReservationForReminder[]> {
   const todayStart = getIsraelDayStart(now)
   
   // Get today's day of week and date string
+  // IMPORTANT: must use Intl with Israel timezone — NOT toISOString().split('T')[0],
+  // which returns the UTC date (e.g. '2026-03-02' at 22:00 UTC = midnight Israel).
   const dayKey = getDayKeyInIsrael(now) as DayOfWeek
-  const todayDateStr = new Date(todayStart).toISOString().split('T')[0]
+  const todayDateStr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jerusalem',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date(now))
 
   console.log(`[ProcessReminders] Querying recurring for day=${dayKey}, date=${todayDateStr}`)
 
@@ -353,8 +358,11 @@ async function markSmsReminderSent(reservationId: string): Promise<boolean> {
  */
 async function markRecurringReminderSent(recurringId: string): Promise<boolean> {
   const supabase = getSupabase()
-  const todayStart = getIsraelDayStart(nowInIsraelMs())
-  const todayDateStr = new Date(todayStart).toISOString().split('T')[0]
+  // Use Intl with Israel timezone — same as getTodaysUnsentRecurring() above.
+  const todayDateStr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jerusalem',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date())
   
   const { error } = await supabase
     .from('recurring_appointments')
