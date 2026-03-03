@@ -3,9 +3,10 @@
 #
 # CACHING FIX: Stale HTML → old chunk hashes → 404 / MIME text/plain
 # ───────────────────────────────────────────────────────────────────
-# The Durable Cache problem is solved by middleware.ts (application-level
-# Netlify-CDN-Cache-Control headers that override the plugin's 1-year TTL).
-# This file only handles static asset caching, security headers, and build config.
+# The Durable Cache problem is solved at three layers:
+#   1. proxy.ts      — sets Netlify-CDN-Cache-Control at the app level
+#   2. netlify.toml  — sets Netlify-CDN-Cache-Control: no-store for /*
+#   3. layout.tsx    — export const dynamic = 'force-dynamic' (prevents prerender)
 
 [build]
   command = "npm run build"
@@ -31,6 +32,7 @@
 [[headers]]
   for = "/*"
   [headers.values]
+    Netlify-CDN-Cache-Control = "no-store"
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"

@@ -14,7 +14,12 @@
     "test:coverage": "vitest run --coverage",
     "db:test": "node scripts/backup-test.mjs",
     "db:backup": "node scripts/backup-db.mjs",
-    "db:restore": "node scripts/restore-db.mjs"
+    "db:restore": "node scripts/restore-db.mjs",
+    "netlify:status": "node scripts/netlify-ops.mjs status",
+    "netlify:purge": "node scripts/netlify-ops.mjs purge",
+    "netlify:verify": "node scripts/netlify-ops.mjs verify",
+    "netlify:full": "node scripts/netlify-ops.mjs full",
+    "netlify:headers": "node scripts/netlify-ops.mjs headers"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.995.0",
