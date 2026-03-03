@@ -35,10 +35,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Must have either customerId or barberId
+    // Must have exactly one of customerId or barberId
     if (!customerId && !barberId) {
       return NextResponse.json(
         { success: false, error: 'Either customerId or barberId is required' },
+        { status: 400 }
+      )
+    }
+    if (customerId && barberId) {
+      return NextResponse.json(
+        { success: false, error: 'Only one of customerId or barberId should be provided' },
         { status: 400 }
       )
     }

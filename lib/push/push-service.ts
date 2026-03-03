@@ -958,9 +958,12 @@ class PushNotificationService {
    */
   async saveSubscription(data: SaveSubscriptionData): Promise<{ subscriptionId: string | null; error?: string }> {
     try {
-      // Validate that user ID is provided (enforces user-based subscriptions)
+      // Validate that exactly one user ID is provided (enforces user-based subscriptions)
       if (!data.customerId && !data.barberId) {
         return { subscriptionId: null, error: 'Either customerId or barberId is required' }
+      }
+      if (data.customerId && data.barberId) {
+        return { subscriptionId: null, error: 'Only one of customerId or barberId should be provided, not both' }
       }
 
       // Check if subscription already exists (by endpoint)
