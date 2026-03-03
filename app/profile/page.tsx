@@ -1,7 +1,5 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
 import { useAuthStore } from '@/store/useAuthStore'
 import { UnifiedProfilePage } from '@/components/profile/UnifiedProfilePage'
 import type { ProfileUser } from '@/components/profile/UnifiedProfilePage'
