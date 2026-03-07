@@ -6,7 +6,7 @@
  * consistent Israel timezone handling.
  */
 
-import { format } from 'date-fns'
+import { endOfDay, format, getDay, startOfDay } from 'date-fns'
 import { toZonedTime, fromZonedTime } from 'date-fns-tz'
 
 // ============================================================
@@ -43,7 +43,15 @@ export function toIsraelTime(date: Date): Date {
  * IMPORTANT: This converts UTC timestamp to Israel local representation
  */
 export function timestampToIsraelDate(timestamp: number): Date {
-  return toZonedTime(new Date(timestamp), ISRAEL_TIMEZONE)
+  let normalized = timestamp
+
+  if (normalized > 1e14) {
+    normalized = Math.floor(normalized / 1000)
+  } else if (normalized > 0 && normalized < 1_000_000_000_000) {
+    normalized = normalized * 1000
+  }
+
+  return toZonedTime(new Date(normalized), ISRAEL_TIMEZONE)
 }
 
 /**
@@ -84,15 +92,11 @@ export function nowInIsraelMs(): number {
  * USE THIS for database queries filtering by day start
  */
 export function getIsraelDayStart(date: Date | number): number {
-  const israelDate = typeof date === 'number' 
-    ? timestampToIsraelDate(date) 
+  const israelDate = typeof date === 'number'
+    ? timestampToIsraelDate(date)
     : toIsraelTime(date)
-  
-  const year = israelDate.getFullYear()
-  const month = israelDate.getMonth() + 1 // getMonth is 0-indexed
-  const day = israelDate.getDate()
-  
-  return israelDateToTimestamp(year, month, day, 0, 0)
+
+  return fromZonedTime(startOfDay(israelDate), ISRAEL_TIMEZONE).getTime()
 }
 
 /**
@@ -100,9 +104,11 @@ export function getIsraelDayStart(date: Date | number): number {
  * USE THIS for database queries filtering by day end
  */
 export function getIsraelDayEnd(date: Date | number): number {
-  const dayStart = getIsraelDayStart(date)
-  // Add 24 hours minus 1 millisecond
-  return dayStart + (24 * 60 * 60 * 1000) - 1
+  const israelDate = typeof date === 'number'
+    ? timestampToIsraelDate(date)
+    : toIsraelTime(date)
+
+  return fromZonedTime(endOfDay(israelDate), ISRAEL_TIMEZONE).getTime()
 }
 
 /**
@@ -131,7 +137,7 @@ export function endOfDayInIsrael(date: Date | number): Date {
  */
 export function getDayIndexInIsrael(timestamp: number): number {
   const israelDate = timestampToIsraelDate(timestamp)
-  return israelDate.getDay()
+  return getDay(israelDate)
 }
 
 /**

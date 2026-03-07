@@ -198,20 +198,38 @@ describe('Booking Service', () => {
       expect(result.error).toBe('VALIDATION_ERROR')
     })
 
-    it('should reject missing dayName', async () => {
-      const data = createTestReservationData({ dayName: '' })
+    it('should allow missing dayName because the backend derives it', async () => {
+      const reservationId = 'new-reservation-uuid'
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true, reservationId }),
+      })
+
+      const data = createTestReservationData()
+      delete (data as Partial<CreateReservationData>).dayName
+
       const result = await createReservation(data)
-      
-      expect(result.success).toBe(false)
-      expect(result.error).toBe('VALIDATION_ERROR')
+
+      expect(result.success).toBe(true)
+      const callBody = JSON.parse(mockFetch.mock.calls[0][1].body)
+      expect(callBody.dayName).toBeUndefined()
     })
 
-    it('should reject missing dayNum', async () => {
-      const data = createTestReservationData({ dayNum: '' })
+    it('should allow missing dayNum because the backend derives it', async () => {
+      const reservationId = 'new-reservation-uuid'
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true, reservationId }),
+      })
+
+      const data = createTestReservationData()
+      delete (data as Partial<CreateReservationData>).dayNum
+
       const result = await createReservation(data)
-      
-      expect(result.success).toBe(false)
-      expect(result.error).toBe('VALIDATION_ERROR')
+
+      expect(result.success).toBe(true)
+      const callBody = JSON.parse(mockFetch.mock.calls[0][1].body)
+      expect(callBody.dayNum).toBeUndefined()
     })
   })
 

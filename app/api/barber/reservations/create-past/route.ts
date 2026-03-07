@@ -16,6 +16,7 @@ import { normalizePhone } from '@/lib/utils/formatting'
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyBarber, verifyOwnership } from '@/lib/auth/barber-api-auth'
 import { reportApiError } from '@/lib/bug-reporter/helpers'
+import { getCanonicalReservationDayFields } from '@/lib/utils'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -30,10 +31,10 @@ export async function POST(request: NextRequest) {
       customerPhone,
       dateTimestamp,
       timeTimestamp,
-      dayName,
-      dayNum,
       barberNotes,
     } = body
+
+    const { dayName: canonicalDayName, dayNum: canonicalDayNum } = getCanonicalReservationDayFields(timeTimestamp)
 
     // --- Input validation ---
     if (!barberId || !UUID_REGEX.test(barberId)) {
@@ -78,13 +79,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-    if (!dayName?.trim() || !dayNum?.trim()) {
-      return NextResponse.json(
-        { success: false, error: 'VALIDATION_ERROR', message: 'פרטי יום חסרים' },
-        { status: 400 }
-      )
-    }
-
     // Verify timestamp is in the past
     if (timeTimestamp > Date.now()) {
       return NextResponse.json(
@@ -153,8 +147,8 @@ export async function POST(request: NextRequest) {
         customer_phone: normalizePhone(customerPhone),
         date_timestamp: dateTimestamp,
         time_timestamp: timeTimestamp,
-        day_name: dayName,
-        day_num: dayNum,
+        day_name: canonicalDayName,
+        day_num: canonicalDayNum,
         status: 'completed',
         barber_notes: barberNotes?.trim() || null,
       })

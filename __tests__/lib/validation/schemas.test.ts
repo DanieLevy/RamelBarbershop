@@ -229,6 +229,12 @@ describe('API Validation Schemas', () => {
         expect(result.data.customerPhone).toBe('972502879998')
       }
     })
+
+    it('should allow omitted day display fields', () => {
+      const { dayName: _dayName, dayNum: _dayNum, ...data } = validData
+      const result = validateInput(CreateReservationSchema, data)
+      expect(result.success).toBe(true)
+    })
   })
 
   // ============================================================
@@ -500,6 +506,12 @@ describe('API Validation Schemas', () => {
       const data = { ...validData, customerPhone: 'invalid' }
       const result = validateInput(ManualBookingSchema, data)
       expect(result.success).toBe(false)
+    })
+
+    it('should allow omitted day display fields', () => {
+      const { dayName: _dayName, dayNum: _dayNum, ...data } = validData
+      const result = validateInput(ManualBookingSchema, data)
+      expect(result.success).toBe(true)
     })
   })
 

@@ -1645,6 +1645,7 @@ export interface CreateRecurringAppointmentData {
   notes?: string
   created_by: string
   frequency?: 'weekly' | 'biweekly'
+  allowConflicts?: boolean
 }
 
 /** Recurring appointment for customer display */

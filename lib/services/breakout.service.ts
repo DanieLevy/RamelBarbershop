@@ -8,6 +8,8 @@
 import { createClient } from '@/lib/supabase/client'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
 import {
+  BLOCKING_RESERVATION_STATUS,
+  doesBreakoutApplyToDate,
   getSlotKey,
   timestampToIsraelDate,
   israelDateToTimestamp,
@@ -15,6 +17,9 @@ import {
   getIsraelDateString,
   getTodayDateString,
   SLOT_INTERVAL_MINUTES,
+  enumerateDateStringsInRange,
+  getUpcomingDateStringsForDay,
+  parseTimeToMinutes,
 } from '@/lib/utils'
 import type {
   BarberBreakout,
@@ -50,16 +55,9 @@ export interface ConflictingReservation {
 // Validation & Helpers
 // ============================================================
 
-const VALID_DAYS: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-
 /**
  * Parse time string (HH:MM) to minutes since midnight
  */
-const parseTimeToMinutes = (time: string): number => {
-  const [hours, minutes] = time.split(':').map(Number)
-  return hours * 60 + minutes
-}
-
 /**
  * Check if a slot timestamp falls within a time range
  */
@@ -141,23 +139,7 @@ export async function getBreakoutsForDate(
   
   // Filter breakouts applicable to this date
   const applicableBreakouts = (data as BarberBreakout[]).filter(breakout => {
-    switch (breakout.breakout_type) {
-      case 'single':
-        // Check if it's exactly this date
-        return breakout.start_date === dateString
-      
-      case 'date_range':
-        // Check if date falls within range
-        return breakout.start_date && breakout.end_date &&
-          dateString >= breakout.start_date && dateString <= breakout.end_date
-      
-      case 'recurring':
-        // Check if it's the matching day of week
-        return breakout.day_of_week === dayOfWeek
-      
-      default:
-        return false
-    }
+    return doesBreakoutApplyToDate(breakout, dateString, dayOfWeek)
   })
   
   return applicableBreakouts
@@ -247,41 +229,15 @@ export async function checkBreakoutConflicts(
     
     case 'date_range':
       if (data.startDate && data.endDate) {
-        // Generate all dates in range (up to 30 days to prevent excessive queries)
-        const startDate = new Date(data.startDate)
-        const endDate = new Date(data.endDate)
-        const maxDays = 30
-        const currentDate = new Date(startDate) // Create new Date to iterate
-        let count = 0
-        
-        while (currentDate <= endDate && count < maxDays) {
-          const dateStr = currentDate.toISOString().split('T')[0]
-          if (dateStr >= today) {
-            datesToCheck.push(dateStr)
-          }
-          currentDate.setDate(currentDate.getDate() + 1)
-          count++
-        }
+        datesToCheck = enumerateDateStringsInRange(data.startDate, data.endDate, 30)
+          .filter((dateStr) => dateStr >= today)
       }
       break
     
     case 'recurring':
-      // For recurring, check next 4 weeks of the specified day
       if (data.dayOfWeek) {
-        const dayIndex = VALID_DAYS.indexOf(data.dayOfWeek)
-        const now = new Date()
-        
-        for (let week = 0; week < 4; week++) {
-          const targetDate = new Date(now)
-          const currentDayIndex = now.getDay()
-          const daysUntilTarget = (dayIndex - currentDayIndex + 7) % 7
-          targetDate.setDate(now.getDate() + daysUntilTarget + (week * 7))
-          
-          const dateStr = targetDate.toISOString().split('T')[0]
-          if (dateStr >= today) {
-            datesToCheck.push(dateStr)
-          }
-        }
+        datesToCheck = getUpcomingDateStringsForDay(data.dayOfWeek, 4)
+          .filter((dateStr) => dateStr >= today)
       }
       break
   }
@@ -314,7 +270,7 @@ export async function checkBreakoutConflicts(
         )
       `)
       .eq('barber_id', barberId)
-      .eq('status', 'active')
+      .eq('status', BLOCKING_RESERVATION_STATUS)
       .gte('time_timestamp', dayStart)
       .lte('time_timestamp', dayEnd)
     

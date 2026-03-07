@@ -10,7 +10,7 @@ import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { useBugReporter } from '@/hooks/useBugReporter'
 import { workDaysToMap } from '@/lib/services/availability.service'
 import { withSupabaseRetry } from '@/lib/utils/retry'
-import { getRecurringForDay } from '@/lib/services/recurring.service'
+import { getRecurringForDate } from '@/lib/services/recurring.service'
 import { getBreakoutsForDate, isSlotInBreakout } from '@/lib/services/breakout.service'
 import { resolveBarberWorkHoursForDate } from '@/lib/utils/special-days'
 
@@ -119,7 +119,7 @@ export function TimeSelection({ barberId, barberWorkDays = [], barberBookingSett
               .eq('barber_id', barberId)
               .gte('time_timestamp', dayStartMs)
               .lte('time_timestamp', dayEndMs)
-              .neq('status', 'cancelled')
+              .eq('status', 'confirmed')
             if (res.error) throw new Error(res.error.message)
             return res
           })
@@ -157,11 +157,10 @@ export function TimeSelection({ barberId, barberWorkDays = [], barberBookingSett
         
         // Fetch recurring appointments for this day
         // These are pre-set appointments that repeat every week
-        const dayKey = getDayKeyInIsrael(date.dateTimestamp) as DayOfWeek
         let recurringSlots: Array<{ time_slot: string; customer_name: string }> = []
         
         try {
-          recurringSlots = await getRecurringForDay(barberId, dayKey)
+          recurringSlots = await getRecurringForDate(barberId, date.dateTimestamp)
         } catch (recError) {
           console.error('[TimeSelection] Error fetching recurring slots:', recError)
           // Continue without recurring data

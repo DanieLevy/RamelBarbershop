@@ -337,7 +337,7 @@ describe.skipIf(!hasSupabaseEnv)('E2E Booking Flow (Read-Only)', () => {
           .eq('barber_id', barbers[0].id)
           .gte('time_timestamp', now)
           .lte('time_timestamp', weekFromNow)
-          .neq('status', 'cancelled')
+          .eq('status', 'confirmed')
         
         expect(error).toBeNull()
         expect(Array.isArray(data)).toBe(true)

@@ -44,8 +44,8 @@ export const CreateReservationSchema = z.object({
   customerPhone: PhoneSchema,
   dateTimestamp: TimestampSchema,
   timeTimestamp: TimestampSchema,
-  dayName: z.string().min(1),
-  dayNum: z.string().min(1),
+  dayName: z.string().min(1).optional(),
+  dayNum: z.string().min(1).optional(),
 })
 
 export type CreateReservationInput = z.infer<typeof CreateReservationSchema>
@@ -201,8 +201,8 @@ export const ManualBookingSchema = z.object({
   customerPhone: PhoneSchema,
   dateTimestamp: TimestampSchema,
   timeTimestamp: TimestampSchema,
-  dayName: z.string().min(1),
-  dayNum: z.string().min(1),
+  dayName: z.string().min(1).optional(),
+  dayNum: z.string().min(1).optional(),
 })
 
 export type ManualBookingInput = z.infer<typeof ManualBookingSchema>

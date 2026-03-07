@@ -46,7 +46,7 @@ export async function DELETE(request: NextRequest) {
     const { targetBarberId } = parsed.data
     const supabase = createAdminClient()
 
-    // First, cancel all active reservations for this barber
+    // First, cancel all future confirmed reservations for this barber
     const { error: cancelError } = await supabase
       .from('reservations')
       .update({
@@ -56,7 +56,7 @@ export async function DELETE(request: NextRequest) {
         barber_hidden_at: new Date().toISOString(),
       })
       .eq('barber_id', targetBarberId)
-      .eq('status', 'active')
+      .eq('status', 'confirmed')
 
     if (cancelError) {
       console.error('[API/barber/manage] Cancel reservations error:', cancelError)

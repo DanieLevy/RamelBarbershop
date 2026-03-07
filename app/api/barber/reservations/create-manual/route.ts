@@ -16,7 +16,15 @@ import { normalizePhone } from '@/lib/utils/formatting'
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyBarber, verifyOwnership } from '@/lib/auth/barber-api-auth'
 import { reportApiError } from '@/lib/bug-reporter/helpers'
-import { normalizeToSlotBoundary } from '@/lib/utils'
+import {
+  doesBreakoutApplyToDate,
+  doesRecurringApplyToDate,
+  getCanonicalReservationDayFields,
+  getIsraelDateString,
+  normalizeToSlotBoundary,
+  parseTimeToMinutes,
+} from '@/lib/utils'
+import { isShopOpenOnDate } from '@/lib/utils/special-days'
 import { pushService } from '@/lib/push/push-service'
 import type { DayOfWeek } from '@/types/database'
 
@@ -39,12 +47,6 @@ const ERROR_MESSAGES: Record<string, string> = {
   UNKNOWN_ERROR: 'שגיאה בלתי צפויה. נסה שוב.',
 }
 
-function getDayOfWeekFromTimestamp(timestamp: number): string {
-  const date = new Date(timestamp)
-  const day = date.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem', weekday: 'long' }).toLowerCase()
-  return day
-}
-
 function timestampToTimeSlot(timestamp: number): string {
   const date = new Date(timestamp)
   const timeStr = date.toLocaleString('en-US', {
@@ -55,19 +57,6 @@ function timestampToTimeSlot(timestamp: number): string {
   })
   const [hours, minutes] = timeStr.split(':')
   return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`
-}
-
-function getIsraelDateString(timestamp: number): string {
-  const date = new Date(timestamp)
-  const year = date.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem', year: 'numeric' })
-  const month = date.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem', month: '2-digit' })
-  const day = date.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem', day: '2-digit' })
-  return `${year}-${month}-${day}`
-}
-
-function timeToMinutes(timeStr: string): number {
-  const parts = timeStr.split(':').map(Number)
-  return parts[0] * 60 + (parts[1] || 0)
 }
 
 function parseBookingError(message: string): string {
@@ -96,8 +85,6 @@ export async function POST(request: NextRequest) {
       customerPhone,
       dateTimestamp,
       timeTimestamp,
-      dayName,
-      dayNum,
       barberNotes,
     } = body
 
@@ -110,8 +97,6 @@ export async function POST(request: NextRequest) {
     if (!customerPhone?.trim()) validationErrors.push('customerPhone required')
     if (!dateTimestamp || typeof dateTimestamp !== 'number') validationErrors.push('dateTimestamp invalid')
     if (!timeTimestamp || typeof timeTimestamp !== 'number') validationErrors.push('timeTimestamp invalid')
-    if (!dayName?.trim()) validationErrors.push('dayName required')
-    if (!dayNum?.trim()) validationErrors.push('dayNum required')
 
     if (validationErrors.length > 0) {
       return NextResponse.json(
@@ -133,17 +118,32 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient()
 
-    const dayOfWeek = getDayOfWeekFromTimestamp(timeTimestamp)
+    const normalizedCustomerPhone = normalizePhone(customerPhone)
+    const {
+      dayKey: dayOfWeek,
+      dayName: canonicalDayName,
+      dayNum: canonicalDayNum,
+    } = getCanonicalReservationDayFields(timeTimestamp)
     const timeSlot = timestampToTimeSlot(timeTimestamp)
-    const dateString = getIsraelDateString(dateTimestamp)
-    const slotMinutes = timeToMinutes(timeSlot)
+    const dateString = getIsraelDateString(timeTimestamp)
+    const slotMinutes = parseTimeToMinutes(timeSlot)
 
     // --- Parallel pre-checks (subset - no working hours validation) ---
-    const [barberResult, serviceResult, recurringResult, breakoutResult, barberClosuresResult, shopClosuresResult] =
+    const [
+      barberResult,
+      serviceResult,
+      recurringResult,
+      breakoutResult,
+      barberClosuresResult,
+      shopClosuresResult,
+      shopSettingsResult,
+      barberSpecialDayResult,
+      shopSpecialDayResult,
+    ] =
       await Promise.all([
         supabase
           .from('users')
-          .select('id, is_active')
+          .select('id, is_active, blocked_customers')
           .eq('id', barberId)
           .eq('is_barber', true)
           .single(),
@@ -179,6 +179,25 @@ export async function POST(request: NextRequest) {
         supabase
           .from('barbershop_closures')
           .select('id, start_date, end_date'),
+
+        supabase
+          .from('barbershop_settings')
+          .select('open_days')
+          .limit(1)
+          .maybeSingle(),
+
+        supabase
+          .from('barber_special_days')
+          .select('id, start_time, end_time')
+          .eq('barber_id', barberId)
+          .eq('date', dateString)
+          .maybeSingle(),
+
+        supabase
+          .from('shop_special_days')
+          .select('id, start_time, end_time')
+          .eq('date', dateString)
+          .maybeSingle(),
       ])
 
     // Barber exists and is active
@@ -191,6 +210,13 @@ export async function POST(request: NextRequest) {
     if (barberResult.data.is_active === false) {
       return NextResponse.json(
         { success: false, error: 'BARBER_PAUSED', message: ERROR_MESSAGES.BARBER_PAUSED },
+        { status: 400 }
+      )
+    }
+
+    if (barberResult.data.blocked_customers?.includes(normalizedCustomerPhone)) {
+      return NextResponse.json(
+        { success: false, error: 'CUSTOMER_BLOCKED', message: ERROR_MESSAGES.CUSTOMER_BLOCKED },
         { status: 400 }
       )
     }
@@ -227,19 +253,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (
+      shopSettingsResult.data &&
+      !isShopOpenOnDate({
+        dateStr: dateString,
+        dayKey: dayOfWeek,
+        shopOpenDays: (shopSettingsResult.data.open_days as string[] | null | undefined) ?? [],
+        shopSpecialDays: shopSpecialDayResult.data ? [{ ...shopSpecialDayResult.data, date: dateString }] : [],
+        barberSpecialDays: barberSpecialDayResult.data ? [{ ...barberSpecialDayResult.data, date: dateString }] : [],
+      })
+    ) {
+      return NextResponse.json(
+        { success: false, error: 'SHOP_CLOSED', message: ERROR_MESSAGES.SHOP_CLOSED },
+        { status: 409 }
+      )
+    }
+
     // Recurring appointment conflict
     if (recurringResult.data) {
       const rec = recurringResult.data
-      const isActiveOnDate =
-        rec.frequency !== 'biweekly' ||
-        !rec.start_date ||
-        (() => {
-          const startMs = new Date(rec.start_date).getTime()
-          const slotMs = new Date(dateString).getTime()
-          const diffDays = Math.round((slotMs - startMs) / 86400000)
-          return diffDays >= 0 && diffDays % 14 === 0
-        })()
-      if (isActiveOnDate) {
+      if (doesRecurringApplyToDate(rec, dateString, dayOfWeek as DayOfWeek)) {
         return NextResponse.json(
           { success: false, error: 'SLOT_RESERVED_RECURRING', message: ERROR_MESSAGES.SLOT_RESERVED_RECURRING },
           { status: 409 }
@@ -250,27 +283,9 @@ export async function POST(request: NextRequest) {
     // Breakout conflicts
     if (breakoutResult.data && breakoutResult.data.length > 0) {
       for (const breakout of breakoutResult.data) {
-        let appliesToDate = false
-        switch (breakout.breakout_type) {
-          case 'single':
-            appliesToDate = breakout.start_date === dateString
-            break
-          case 'date_range':
-            appliesToDate = !!(
-              breakout.start_date &&
-              breakout.end_date &&
-              dateString >= breakout.start_date &&
-              dateString <= breakout.end_date
-            )
-            break
-          case 'recurring':
-            appliesToDate = breakout.day_of_week === dayOfWeek
-            break
-        }
-
-        if (appliesToDate) {
-          const startMinutes = timeToMinutes(breakout.start_time)
-          const endMinutes = breakout.end_time ? timeToMinutes(breakout.end_time) : 24 * 60
+        if (doesBreakoutApplyToDate(breakout, dateString, dayOfWeek as DayOfWeek)) {
+          const startMinutes = parseTimeToMinutes(breakout.start_time)
+          const endMinutes = breakout.end_time ? parseTimeToMinutes(breakout.end_time) : 24 * 60
           if (slotMinutes >= startMinutes && slotMinutes < endMinutes) {
             return NextResponse.json(
               { success: false, error: 'SLOT_IN_BREAKOUT', message: ERROR_MESSAGES.SLOT_IN_BREAKOUT },
@@ -294,11 +309,11 @@ export async function POST(request: NextRequest) {
       p_service_id: serviceId,
       p_customer_id: customerId,
       p_customer_name: customerName.trim(),
-      p_customer_phone: normalizePhone(customerPhone),
+      p_customer_phone: normalizedCustomerPhone,
       p_date_timestamp: normalizedDateTimestamp,
       p_time_timestamp: normalizedTimeTimestamp,
-      p_day_name: dayName,
-      p_day_num: dayNum,
+      p_day_name: canonicalDayName,
+      p_day_num: canonicalDayNum,
       p_barber_notes: barberNotes?.trim() || null,
       p_max_days_ahead: BARBER_MAX_DAYS_AHEAD,
     })

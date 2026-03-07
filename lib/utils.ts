@@ -17,6 +17,7 @@
 
 export * from './utils/timezone'
 export * from './utils/slots'
+export * from './utils/booking-domain'
 export * from './utils/date-formatting'
 export * from './utils/hebrew'
 export * from './utils/barber-slugs'

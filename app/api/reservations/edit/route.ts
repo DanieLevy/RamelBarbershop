@@ -27,8 +27,15 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { reportApiError, reportServerError } from '@/lib/bug-reporter/helpers'
-import { normalizeToSlotBoundary } from '@/lib/utils'
-import type { DayOfWeek } from '@/types/database'
+import {
+  doesBreakoutApplyToDate,
+  doesRecurringApplyToDate,
+  getCanonicalReservationDayFields,
+  getIsraelDateString,
+  normalizeToSlotBoundary,
+  parseTimeToMinutes,
+} from '@/lib/utils'
+import { isShopOpenOnDate } from '@/lib/utils/special-days'
 
 // UUID validation
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -41,8 +48,8 @@ interface EditReservationRequest {
   adminId?: string
   newTimeTimestamp: number
   newDateTimestamp: number
-  newDayName: string
-  newDayNum: string
+  newDayName?: string
+  newDayNum?: string
   newServiceId?: string
   expectedVersion?: number
 }
@@ -72,19 +79,6 @@ const ERROR_MESSAGES: Record<string, string> = {
 }
 
 /**
- * Get day of week from timestamp in Israel timezone
- */
-function getDayOfWeekFromTimestamp(timestamp: number): DayOfWeek {
-  const date = new Date(timestamp)
-  const israelDateStr = date.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem', weekday: 'long' }).toLowerCase()
-  const dayMap: Record<string, DayOfWeek> = {
-    'sunday': 'sunday', 'monday': 'monday', 'tuesday': 'tuesday',
-    'wednesday': 'wednesday', 'thursday': 'thursday', 'friday': 'friday', 'saturday': 'saturday',
-  }
-  return dayMap[israelDateStr] || 'sunday'
-}
-
-/**
  * Convert timestamp to time slot string (HH:MM) in Israel timezone
  */
 function timestampToTimeSlot(timestamp: number): string {
@@ -97,25 +91,6 @@ function timestampToTimeSlot(timestamp: number): string {
   })
   const [hours, minutes] = israelTimeStr.split(':')
   return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`
-}
-
-/**
- * Get date string in Israel timezone (YYYY-MM-DD)
- */
-function getIsraelDateString(timestamp: number): string {
-  const date = new Date(timestamp)
-  const year = date.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem', year: 'numeric' })
-  const month = date.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem', month: '2-digit' })
-  const day = date.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem', day: '2-digit' })
-  return `${year}-${month}-${day}`
-}
-
-/**
- * Convert time string (HH:MM or HH:MM:SS) to minutes since midnight
- */
-function timeToMinutes(timeStr: string): number {
-  const parts = timeStr.split(':').map(Number)
-  return parts[0] * 60 + (parts[1] || 0)
 }
 
 export async function POST(request: NextRequest) {
@@ -147,12 +122,6 @@ export async function POST(request: NextRequest) {
     }
     if (!body.newDateTimestamp || typeof body.newDateTimestamp !== 'number') {
       validationErrors.push('newDateTimestamp is required')
-    }
-    if (!body.newDayName?.trim()) {
-      validationErrors.push('newDayName is required')
-    }
-    if (!body.newDayNum?.trim()) {
-      validationErrors.push('newDayNum is required')
     }
     if (body.newServiceId && !UUID_REGEX.test(body.newServiceId)) {
       validationErrors.push('newServiceId must be a valid UUID')
@@ -305,10 +274,14 @@ export async function POST(request: NextRequest) {
     }
     
     // Pre-compute values for validation
-    const dayOfWeek = getDayOfWeekFromTimestamp(normalizedNewTime)
+    const {
+      dayKey: dayOfWeek,
+      dayName: canonicalDayName,
+      dayNum: canonicalDayNum,
+    } = getCanonicalReservationDayFields(normalizedNewTime)
     const timeSlot = timestampToTimeSlot(normalizedNewTime)
-    const dateString = getIsraelDateString(normalizedNewDate)
-    const slotMinutes = timeToMinutes(timeSlot)
+    const dateString = getIsraelDateString(normalizedNewTime)
+    const slotMinutes = parseTimeToMinutes(timeSlot)
     
     console.log(`[API/Edit] Rescheduling reservation ${body.reservationId} by ${callerType}: ${timestampToTimeSlot(normalizedOldTime)} → ${timeSlot} on ${dateString}${serviceChanged ? ' (service changed)' : ''}`)
     
@@ -324,6 +297,8 @@ export async function POST(request: NextRequest) {
       slotCheckResult,
       bookingSettingsResult,
       barberSpecialDayResult,
+      shopSettingsResult,
+      shopSpecialDayResult,
     ] = await Promise.all([
       // 1. Recurring appointment conflict
       supabase
@@ -386,14 +361,43 @@ export async function POST(request: NextRequest) {
         .eq('barber_id', body.barberId)
         .eq('date', dateString)
         .maybeSingle(),
+
+      supabase
+        .from('barbershop_settings')
+        .select('open_days')
+        .limit(1)
+        .maybeSingle(),
+
+      supabase
+        .from('shop_special_days')
+        .select('id, start_time, end_time')
+        .eq('date', dateString)
+        .maybeSingle(),
     ])
     
     // ============================================================
     // PHASE 4: Evaluate Validation Results
     // ============================================================
     
-    // 4.1 Check working hours (with barber_special_days override)
+    // 4.1 Check shop-open state and working hours (with special-day overrides)
     const specialDay = barberSpecialDayResult.data ?? null
+    const shopSpecialDay = shopSpecialDayResult.data ?? null
+
+    if (
+      shopSettingsResult.data &&
+      !isShopOpenOnDate({
+        dateStr: dateString,
+        dayKey: dayOfWeek,
+        shopOpenDays: (shopSettingsResult.data.open_days as string[] | null | undefined) ?? [],
+        shopSpecialDays: shopSpecialDay ? [{ ...shopSpecialDay, date: dateString }] : [],
+        barberSpecialDays: specialDay ? [{ ...specialDay, date: dateString }] : [],
+      })
+    ) {
+      return NextResponse.json(
+        { success: false, error: 'SHOP_CLOSED', message: ERROR_MESSAGES.SHOP_CLOSED },
+        { status: 409 }
+      )
+    }
 
     if (workDaysResult.error) {
       console.error('[API/Edit] Work days check error:', workDaysResult.error)
@@ -419,8 +423,8 @@ export async function POST(request: NextRequest) {
 
       // OUTSIDE_WORK_HOURS: use whichever hours apply
       if (effectiveStartTime && effectiveEndTime) {
-        const startMinutes = timeToMinutes(effectiveStartTime)
-        const endMinutes   = timeToMinutes(effectiveEndTime)
+        const startMinutes = parseTimeToMinutes(effectiveStartTime)
+        const endMinutes = parseTimeToMinutes(effectiveEndTime)
 
         if (slotMinutes < startMinutes || slotMinutes >= endMinutes) {
           return NextResponse.json(
@@ -458,16 +462,7 @@ export async function POST(request: NextRequest) {
     // 4.4 Check recurring conflict
     if (recurringResult.data) {
       const rec = recurringResult.data
-      const isActiveOnDate =
-        rec.frequency !== 'biweekly' ||
-        !rec.start_date ||
-        (() => {
-          const startMs = new Date(rec.start_date).getTime()
-          const slotMs = new Date(dateString).getTime()
-          const diffDays = Math.round((slotMs - startMs) / 86400000)
-          return diffDays >= 0 && diffDays % 14 === 0
-        })()
-      if (isActiveOnDate) {
+      if (doesRecurringApplyToDate(rec, dateString, dayOfWeek)) {
         return NextResponse.json(
           { success: false, error: 'SLOT_RESERVED_RECURRING', message: ERROR_MESSAGES.SLOT_RESERVED_RECURRING },
           { status: 409 }
@@ -478,24 +473,9 @@ export async function POST(request: NextRequest) {
     // 4.5 Check breakout conflicts
     if (breakoutResult.data && breakoutResult.data.length > 0) {
       for (const breakout of breakoutResult.data) {
-        let appliesToDate = false
-        
-        switch (breakout.breakout_type) {
-          case 'single':
-            appliesToDate = breakout.start_date === dateString
-            break
-          case 'date_range':
-            appliesToDate = !!(breakout.start_date && breakout.end_date &&
-              dateString >= breakout.start_date && dateString <= breakout.end_date)
-            break
-          case 'recurring':
-            appliesToDate = breakout.day_of_week === dayOfWeek
-            break
-        }
-        
-        if (appliesToDate) {
-          const startMinutes = timeToMinutes(breakout.start_time)
-          const endMinutes = breakout.end_time ? timeToMinutes(breakout.end_time) : 24 * 60
+        if (doesBreakoutApplyToDate(breakout, dateString, dayOfWeek)) {
+          const startMinutes = parseTimeToMinutes(breakout.start_time)
+          const endMinutes = breakout.end_time ? parseTimeToMinutes(breakout.end_time) : 24 * 60
           
           if (slotMinutes >= startMinutes && slotMinutes < endMinutes) {
             return NextResponse.json(
@@ -561,8 +541,8 @@ export async function POST(request: NextRequest) {
     if (timeChanged) {
       updatePayload.date_timestamp = normalizedNewDate
       updatePayload.time_timestamp = normalizedNewTime
-      updatePayload.day_name = body.newDayName
-      updatePayload.day_num = body.newDayNum
+      updatePayload.day_name = canonicalDayName
+      updatePayload.day_num = canonicalDayNum
       updatePayload.sms_reminder_sent_at = null
     }
     
@@ -621,8 +601,8 @@ export async function POST(request: NextRequest) {
       const newValues: Record<string, string | number | null> = {
         date_timestamp: timeChanged ? normalizedNewDate : reservation.date_timestamp,
         time_timestamp: timeChanged ? normalizedNewTime : reservation.time_timestamp,
-        day_name: timeChanged ? body.newDayName : reservation.day_name,
-        day_num: timeChanged ? body.newDayNum : reservation.day_num,
+        day_name: timeChanged ? canonicalDayName : reservation.day_name,
+        day_num: timeChanged ? canonicalDayNum : reservation.day_num,
       }
       
       if (serviceChanged) {

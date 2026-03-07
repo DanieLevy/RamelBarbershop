@@ -5,16 +5,18 @@
  * reservation data integrity before database operations.
  */
 
+import { getCanonicalReservationDayFields } from '@/lib/utils'
+
 export interface ReservationCreateData {
   barber_id: string
   service_id: string
-  customer_id: string  // REQUIRED - all bookings require login
+  customer_id: string
   customer_name: string
   customer_phone: string
   date_timestamp: number
   time_timestamp: number
-  day_name: string
-  day_num: string
+  day_name?: string
+  day_num?: string
   status?: 'confirmed' | 'cancelled' | 'completed'
 }
 
@@ -55,17 +57,9 @@ export function validateReservationData(data: Partial<ReservationCreateData>): R
     errors.push('time_timestamp is required and must be a number')
   }
   
-  if (!data.day_name?.trim()) {
-    errors.push('day_name is required')
-  }
-  
-  if (!data.day_num?.trim()) {
-    errors.push('day_num is required')
-  }
-
-  // customer_id is REQUIRED - all bookings require login
+  // customer_id is required for the current production booking contract
   if (!data.customer_id?.trim()) {
-    errors.push('customer_id is required (all bookings require login)')
+    errors.push('customer_id is required')
   }
 
   // UUID format validation
@@ -87,6 +81,8 @@ export function validateReservationData(data: Partial<ReservationCreateData>): R
     return { valid: false, errors }
   }
 
+  const derivedDayFields = getCanonicalReservationDayFields(data.time_timestamp!)
+
   return {
     valid: true,
     errors: [],
@@ -98,16 +94,15 @@ export function validateReservationData(data: Partial<ReservationCreateData>): R
       customer_phone: data.customer_phone!,
       date_timestamp: data.date_timestamp!,
       time_timestamp: data.time_timestamp!,
-      day_name: data.day_name!,
-      day_num: data.day_num!,
+      day_name: data.day_name?.trim() || derivedDayFields.dayName,
+      day_num: data.day_num?.trim() || derivedDayFields.dayNum,
       status: data.status || 'confirmed'
     }
   }
 }
 
 /**
- * Alias for validateReservationData - kept for compatibility
- * All reservations now require customer_id (no guest bookings)
+ * Alias kept for compatibility with older imports.
  */
 export const validateLoggedInReservation = validateReservationData
 
@@ -128,4 +123,3 @@ export function hasBarberId<T extends { barber_id?: string | null }>(
 ): reservation is T & { barber_id: string } {
   return typeof reservation.barber_id === 'string' && reservation.barber_id.length > 0
 }
-

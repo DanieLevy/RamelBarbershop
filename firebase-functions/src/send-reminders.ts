@@ -821,6 +821,7 @@ export async function processReminders(): Promise<BatchResults> {
 
       const payload = buildReminderPayload(res)
       let smsSent = false, smsFailed = false, pushSent = false, pushFailed = false
+      let dedupMarked = false
 
       // SMS
       if (sendSms) {
@@ -835,6 +836,7 @@ export async function processReminders(): Promise<BatchResults> {
             } else {
               await markSmsReminderSent(res.id)
             }
+            dedupMarked = true
           }
           logger.info('[Reminders] ✅ SMS sent', { id: res.id, recurring: res.isRecurring, skipDedup })
         } else {
@@ -879,6 +881,15 @@ export async function processReminders(): Promise<BatchResults> {
         if (succeeded > 0) {
           pushSent = true
           logger.info('[Reminders] ✅ Push batch done', { id: res.id, sent: succeeded, failed })
+          // Mark dedup if not already marked by the SMS path
+          if (!dedupMarked && !skipDedup) {
+            if (res.isRecurring && res.recurringId) {
+              await markRecurringReminderSent(res.recurringId)
+            } else {
+              await markSmsReminderSent(res.id)
+            }
+            dedupMarked = true
+          }
         }
         if (failed > 0) {
           pushFailed = true

@@ -13,6 +13,15 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { reportApiError } from '@/lib/bug-reporter/helpers'
+import {
+  addDaysToDateString,
+  BLOCKING_RESERVATION_STATUS,
+  getDayKeyFromDateString,
+  getSlotKey,
+  getUpcomingDateStringsForDay,
+  getTodayDateString,
+  israelDateToTimestamp,
+} from '@/lib/utils'
 import type { DayOfWeek } from '@/types/database'
 
 // UUID validation
@@ -43,6 +52,7 @@ interface CreateRecurringRequest {
   notes?: string
   created_by: string
   frequency?: 'weekly' | 'biweekly'
+  allowConflicts?: boolean
 }
 
 interface CancelConflictsRequest {
@@ -58,21 +68,89 @@ interface DeleteRecurringRequest {
 
 type PostRequestBody = CreateRecurringRequest | CancelConflictsRequest
 
+interface ConflictingReservation {
+  id: string
+  date: string
+  dateFormatted: string
+  time: string
+  customer_name: string
+  customer_id: string
+}
+
 // ============================================================
 // Helper: Get next occurrence of a day of week in Israel timezone
 // ============================================================
 
 function getNextOccurrenceInIsrael(dayOfWeek: DayOfWeek): string {
-  const dayIndex: Record<DayOfWeek, number> = {
-    sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
-    thursday: 4, friday: 5, saturday: 6,
+  return getUpcomingDateStringsForDay(dayOfWeek, 1)[0]
+}
+
+function formatDateHebrew(dateString: string): string {
+  const date = new Date(`${dateString}T00:00:00`)
+  const dayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
+  const dayName = dayNames[date.getDay()]
+  const day = date.getDate()
+  const month = date.getMonth() + 1
+  return `יום ${dayName}, ${day}/${month}`
+}
+
+async function checkReservationConflicts(
+  supabase: ReturnType<typeof createAdminClient>,
+  barberId: string,
+  dayOfWeek: DayOfWeek,
+  timeSlot: string,
+  maxDaysAhead = 21
+): Promise<ConflictingReservation[]> {
+  const [hours, minutes] = timeSlot.split(':').map(Number)
+  const today = getTodayDateString()
+  const conflicts: ConflictingReservation[] = []
+
+  for (let dayOffset = 0; dayOffset <= maxDaysAhead; dayOffset += 1) {
+    const dateStr = addDaysToDateString(today, dayOffset)
+    if (getDayKeyFromDateString(dateStr) !== dayOfWeek) continue
+
+    const [year, month, day] = dateStr.split('-').map(Number)
+    const dayStart = israelDateToTimestamp(year, month, day, 0, 0)
+    const dayEnd = israelDateToTimestamp(year, month, day, 23, 59)
+    const slotTimestamp = israelDateToTimestamp(year, month, day, hours, minutes)
+
+    const { data, error } = await supabase
+      .from('reservations')
+      .select(`
+        id,
+        customer_id,
+        time_timestamp,
+        customers!reservations_customer_id_fkey (fullname)
+      `)
+      .eq('barber_id', barberId)
+      .eq('status', BLOCKING_RESERVATION_STATUS)
+      .gte('time_timestamp', dayStart)
+      .lte('time_timestamp', dayEnd)
+
+    if (error || !data) {
+      if (error) {
+        console.error('[API/Recurring] Conflict check error:', error)
+      }
+      continue
+    }
+
+    const targetSlotKey = getSlotKey(slotTimestamp)
+
+    for (const reservation of data) {
+      if (getSlotKey(reservation.time_timestamp) !== targetSlotKey) continue
+
+      conflicts.push({
+        id: reservation.id,
+        date: dateStr,
+        dateFormatted: formatDateHebrew(dateStr),
+        time: timeSlot,
+        customer_name: (reservation.customers as { fullname?: string } | null)?.fullname || 'לקוח',
+        customer_id: reservation.customer_id,
+      })
+    }
   }
-  const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date())
-  const today = new Date(todayStr + 'T12:00:00')
-  let daysUntil = dayIndex[dayOfWeek] - today.getDay()
-  if (daysUntil < 0) daysUntil += 7
-  today.setDate(today.getDate() + daysUntil)
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(today)
+
+  return conflicts
 }
 
 // ============================================================
@@ -105,55 +183,13 @@ async function handleCancelConflicts(body: CancelConflictsRequest): Promise<Next
     )
   }
   
-  const supabase = createAdminClient()
-  
-  // Verify all reservations belong to this barber
-  const { data: reservations, error: fetchError } = await supabase
-    .from('reservations')
-    .select('id, barber_id, status')
-    .in('id', reservationIds)
-    .eq('status', 'active')
-  
-  if (fetchError) {
-    console.error('[API/Recurring] Fetch reservations error:', fetchError)
-    return NextResponse.json(
-      { success: false, error: 'DATABASE_ERROR', message: 'שגיאה בטעינת התורים' },
-      { status: 500 }
-    )
-  }
-  
-  // Check all belong to this barber
-  const unauthorized = reservations?.filter(r => r.barber_id !== barberId)
-  if (unauthorized && unauthorized.length > 0) {
-    return NextResponse.json(
-      { success: false, error: 'UNAUTHORIZED', message: 'חלק מהתורים לא שייכים לספר זה' },
-      { status: 403 }
-    )
-  }
-  
-  // Cancel all reservations
-  const { error: updateError } = await supabase
-    .from('reservations')
-    .update({
-      status: 'cancelled',
-      cancelled_at: new Date().toISOString(),
-      cancellation_reason: 'בוטל עקב יצירת תור קבוע',
-    })
-    .in('id', reservationIds)
-  
-  if (updateError) {
-    console.error('[API/Recurring] Cancel reservations error:', updateError)
-    // Note: Request not available in helper, using reportServerError pattern
-    console.error('[API/Recurring] Cancel reservations database error:', updateError)
-    return NextResponse.json(
-      { success: false, error: 'DATABASE_ERROR', message: 'שגיאה בביטול התורים' },
-      { status: 500 }
-    )
-  }
-  
-  console.log(`[API/Recurring] Cancelled ${reservationIds.length} conflicting reservations for barber ${barberId}`)
-  
-  return NextResponse.json({ success: true, cancelledCount: reservationIds.length })
+  return NextResponse.json({
+    success: true,
+    cancelledCount: 0,
+    barberId,
+    reservationIds,
+    warning: 'cancel_conflicts is deprecated. Existing reservations were left unchanged.',
+  })
 }
 
 // ============================================================
@@ -369,8 +405,29 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       )
     }
+
+    // 7. Detect overlapping confirmed reservations (warn-only)
+    const conflicts = await checkReservationConflicts(
+      supabase,
+      createBody.barber_id,
+      createBody.day_of_week,
+      createBody.time_slot
+    )
+
+    if (conflicts.length > 0 && !createBody.allowConflicts) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'CONFLICTS_EXIST',
+          message: 'קיימים תורים רגילים בשעה זו בשבועות הקרובים.',
+          conflicts,
+          canProceed: true,
+        },
+        { status: 409 }
+      )
+    }
     
-    // 7. Create the recurring appointment
+    // 8. Create the recurring appointment
     const frequency = createBody.frequency || 'weekly'
     const startDate = frequency === 'biweekly'
       ? getNextOccurrenceInIsrael(createBody.day_of_week)
@@ -429,6 +486,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       recurring,
+      conflicts,
+      warningCount: conflicts.length,
+      cancelledCount: 0,
     })
     
   } catch (err) {

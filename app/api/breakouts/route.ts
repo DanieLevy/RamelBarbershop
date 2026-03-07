@@ -14,11 +14,16 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { reportApiError } from '@/lib/bug-reporter/helpers'
 import {
+  BLOCKING_RESERVATION_STATUS,
+  doesBreakoutApplyToDate,
+  enumerateDateStringsInRange,
   getIsraelDateString,
   getDayKeyInIsrael,
+  getUpcomingDateStringsForDay,
   israelDateToTimestamp,
   timestampToIsraelDate,
   getTodayDateString,
+  parseTimeToMinutes,
 } from '@/lib/utils'
 import type { BreakoutType, DayOfWeek } from '@/types/database'
 
@@ -37,7 +42,7 @@ const VALID_TYPES: BreakoutType[] = ['single', 'date_range', 'recurring']
 // ============================================================
 
 const ERROR_MESSAGES: Record<string, string> = {
-  CONFLICTS_EXIST: 'קיימים תורים בזמנים אלו. יש לבטלם לפני יצירת ההפסקה.',
+  CONFLICTS_EXIST: 'קיימים תורים בזמנים אלו. ניתן להמשיך והם יישארו מאושרים.',
   INVALID_TIME_RANGE: 'טווח השעות אינו תקין.',
   INVALID_DATE_RANGE: 'טווח התאריכים אינו תקין.',
   INVALID_DAY_OF_WEEK: 'יום השבוע אינו תקין.',
@@ -61,6 +66,7 @@ interface CreateBreakoutRequest {
   dayOfWeek?: DayOfWeek
   reason?: string
   cancelConflicts?: boolean
+  allowConflicts?: boolean
 }
 
 interface ConflictingReservation {
@@ -80,11 +86,6 @@ interface DeleteBreakoutRequest {
 // ============================================================
 // Helper: Parse time to minutes
 // ============================================================
-
-const parseTimeToMinutes = (time: string): number => {
-  const [hours, minutes] = time.split(':').map(Number)
-  return hours * 60 + minutes
-}
 
 // ============================================================
 // Helper: Check for conflicting reservations
@@ -115,39 +116,14 @@ async function checkConflicts(
     
     case 'date_range':
       if (startDate && endDate) {
-        const start = new Date(startDate)
-        const end = new Date(endDate)
-        const maxDays = 30
-        let count = 0
-        const current = new Date(start)
-        
-        while (current <= end && count < maxDays) {
-          const dateStr = current.toISOString().split('T')[0]
-          if (dateStr >= today) {
-            datesToCheck.push(dateStr)
-          }
-          current.setDate(current.getDate() + 1)
-          count++
-        }
+        datesToCheck = enumerateDateStringsInRange(startDate, endDate, 30)
+          .filter((dateStr) => dateStr >= today)
       }
       break
     
     case 'recurring':
       if (dayOfWeek) {
-        const dayIndex = VALID_DAYS.indexOf(dayOfWeek)
-        const now = new Date()
-        
-        for (let week = 0; week < 4; week++) {
-          const targetDate = new Date(now)
-          const currentDayIndex = now.getDay()
-          const daysUntilTarget = (dayIndex - currentDayIndex + 7) % 7
-          targetDate.setDate(now.getDate() + daysUntilTarget + (week * 7))
-          
-          const dateStr = targetDate.toISOString().split('T')[0]
-          if (dateStr >= today) {
-            datesToCheck.push(dateStr)
-          }
-        }
+        datesToCheck = getUpcomingDateStringsForDay(dayOfWeek, 4).filter((dateStr) => dateStr >= today)
       }
       break
   }
@@ -173,7 +149,7 @@ async function checkConflicts(
         services!inner (name)
       `)
       .eq('barber_id', barberId)
-      .eq('status', 'active')
+      .eq('status', BLOCKING_RESERVATION_STATUS)
       .gte('time_timestamp', dayStart)
       .lte('time_timestamp', dayEnd)
     
@@ -262,17 +238,7 @@ export async function GET(request: NextRequest) {
       const dayOfWeek = getDayKeyInIsrael(ts) as DayOfWeek
       
       const filtered = (data || []).filter(breakout => {
-        switch (breakout.breakout_type) {
-          case 'single':
-            return breakout.start_date === dateString
-          case 'date_range':
-            return breakout.start_date && breakout.end_date &&
-              dateString >= breakout.start_date && dateString <= breakout.end_date
-          case 'recurring':
-            return breakout.day_of_week === dayOfWeek
-          default:
-            return false
-        }
+        return doesBreakoutApplyToDate(breakout, dateString, dayOfWeek)
       })
       
       return NextResponse.json({ success: true, data: filtered })
@@ -394,46 +360,19 @@ export async function POST(request: NextRequest) {
       body.dayOfWeek
     )
     
-    if (conflicts.length > 0 && !body.cancelConflicts) {
+    const allowConflicts = body.allowConflicts || body.cancelConflicts
+
+    if (conflicts.length > 0 && !allowConflicts) {
       return NextResponse.json(
         {
           success: false,
           error: 'CONFLICTS_EXIST',
           message: ERROR_MESSAGES.CONFLICTS_EXIST,
           conflicts,
+          canProceed: true,
         },
         { status: 409 }
       )
-    }
-    
-    // Cancel conflicting reservations if requested
-    if (conflicts.length > 0 && body.cancelConflicts) {
-      const conflictIds = conflicts.map(c => c.id)
-      
-      const { error: cancelError } = await supabase
-        .from('reservations')
-        .update({
-          status: 'cancelled',
-          cancellation_reason: 'בוטל עקב הפסקה של הספר',
-          cancelled_at: new Date().toISOString(),
-        })
-        .in('id', conflictIds)
-      
-      if (cancelError) {
-        console.error('[API/Breakouts] Cancel conflicts error:', cancelError)
-        await reportApiError(
-          new Error(cancelError.message),
-          request,
-          'Cancel breakout conflicts failed',
-          { severity: 'high', additionalData: { barberId: body.barberId, conflictIds } }
-        )
-        return NextResponse.json(
-          { success: false, error: 'DATABASE_ERROR', message: ERROR_MESSAGES.DATABASE_ERROR },
-          { status: 500 }
-        )
-      }
-      
-      console.log(`[API/Breakouts] Cancelled ${conflictIds.length} conflicting reservations`)
     }
     
     // Build insert data
@@ -475,7 +414,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       breakout,
-      cancelledCount: body.cancelConflicts ? conflicts.length : 0,
+      conflicts,
+      warningCount: conflicts.length,
+      cancelledCount: 0,
     })
     
   } catch (err) {

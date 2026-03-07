@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, AlertTriangle, Calendar, Clock, User, Loader2, Trash2 } from 'lucide-react'
+import { X, AlertTriangle, Calendar, Clock, User, Loader2 } from 'lucide-react'
 import { Portal } from '@/components/ui/Portal'
 import { Button } from '@heroui/react'
 import type { ConflictingReservation } from '@/lib/services/recurring.service'
@@ -9,8 +9,8 @@ import type { ConflictingReservation } from '@/lib/services/recurring.service'
 interface RecurringConflictModalProps {
   isOpen: boolean
   onClose: () => void
-  onConfirm: () => Promise<void>
-  onCreateWithoutCancel: () => Promise<void>
+  onProceed: () => Promise<void>
+  onBack: () => Promise<void>
   conflicts: ConflictingReservation[]
   dayLabel: string
   timeSlot: string
@@ -19,36 +19,34 @@ interface RecurringConflictModalProps {
 export function RecurringConflictModal({
   isOpen,
   onClose,
-  onConfirm,
-  onCreateWithoutCancel,
+  onProceed,
+  onBack,
   conflicts,
   dayLabel,
   timeSlot,
 }: RecurringConflictModalProps) {
   const [loading, setLoading] = useState(false)
-  const [creatingOnly, setCreatingOnly] = useState(false)
 
   if (!isOpen) return null
 
-  const handleConfirm = async () => {
+  const handleProceed = async () => {
     setLoading(true)
     try {
-      await onConfirm()
+      await onProceed()
     } finally {
       setLoading(false)
     }
   }
 
-  const handleCreateWithoutCancel = async () => {
-    setCreatingOnly(true)
+  const handleBack = async () => {
     try {
-      await onCreateWithoutCancel()
+      await onBack()
     } finally {
-      setCreatingOnly(false)
+      onClose()
     }
   }
 
-  const isBusy = loading || creatingOnly
+  const isBusy = loading
 
   return (
     <Portal>
@@ -93,7 +91,7 @@ export function RecurringConflictModal({
           <div className="flex-1 overflow-y-auto p-5 space-y-4">
             <p className="text-sm text-foreground-muted">
               קיימים {conflicts.length} תורים רגילים בשעה זו בשבועות הקרובים.
-              ניתן ליצור את התור הקבוע בלי לבטל אותם, או לבטלם ולהמשיך.
+              אם תמשיך, התור הקבוע ייווצר והתורים הקיימים יישארו מאושרים.
             </p>
 
             {/* Conflicts List */}
@@ -122,12 +120,6 @@ export function RecurringConflictModal({
                       <span className="text-sm truncate">{conflict.customer_name}</span>
                     </div>
                   </div>
-
-                  {/* Will be cancelled indicator */}
-                  <div className="flex items-center gap-1 text-xs text-red-400/70">
-                    <Trash2 size={12} />
-                    <span>יבוטל</span>
-                  </div>
                 </div>
               ))}
             </div>
@@ -136,55 +128,35 @@ export function RecurringConflictModal({
             <div className="flex items-start gap-2 p-3 bg-amber-500/10 rounded-xl border border-amber-500/20">
               <AlertTriangle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
               <p className="text-xs text-amber-300/90">
-                שים לב: ביטול התורים הוא סופי. הלקוחות יקבלו הודעה על הביטול.
+                השעות האלו ייחסמו להזמנות חדשות, אבל התורים שכבר נקבעו לא ישתנו.
               </p>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex flex-col gap-2 px-5 py-4 border-t border-white/5 bg-background-dark/30">
+          <div className="flex gap-2 px-5 py-4 border-t border-white/5 bg-background-dark/30">
             <Button
-              onPress={handleCreateWithoutCancel}
+              variant="secondary"
+              onPress={handleBack}
               isDisabled={isBusy}
-              className="w-full bg-accent-gold text-background-dark font-medium"
+              className="flex-1"
             >
-              {creatingOnly ? (
+              חזרה
+            </Button>
+            <Button
+              onPress={handleProceed}
+              isDisabled={isBusy}
+              className="flex-1 bg-accent-gold text-background-dark font-medium"
+            >
+              {loading ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
                   <span>יוצר תור קבוע...</span>
                 </>
               ) : (
-                <span>צור קבוע בלי לבטל תורים</span>
+                <span>צור בכל זאת</span>
               )}
             </Button>
-            <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                onPress={onClose}
-                isDisabled={isBusy}
-                className="flex-1"
-              >
-                ביטול
-              </Button>
-              <Button
-                variant="danger"
-                onPress={handleConfirm}
-                isDisabled={isBusy}
-                className="flex-1"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" />
-                    <span>מבטל...</span>
-                  </>
-                ) : (
-                  <>
-                    <Trash2 size={18} />
-                    <span>בטל וצור קבוע</span>
-                  </>
-                )}
-              </Button>
-            </div>
           </div>
         </div>
       </div>

@@ -51,6 +51,19 @@ function isClosedDay(): boolean {
  */
 export default async function handler(_req: Request, _context: Context) {
   const startTime = Date.now()
+  const reminderSource = process.env.REMINDER_SOURCE || 'netlify'
+
+  if (reminderSource === 'firebase') {
+    console.log('[Netlify Trigger] 🔴 DISABLED — REMINDER_SOURCE=firebase. Reminders handled by Firebase Cloud Functions.')
+    return new Response(JSON.stringify({
+      success: true,
+      source: 'netlify',
+      skipped: true,
+      reason: 'REMINDER_SOURCE=firebase — reminders managed by Firebase Cloud Functions',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }
+
+  console.log('[Netlify Trigger] 🟢 ACTIVE — REMINDER_SOURCE=netlify (or not set). Handling reminders via Netlify.')
 
   // Skip Monday and Saturday — barbershop is always closed on these days (hardcoded)
   if (isClosedDay()) {

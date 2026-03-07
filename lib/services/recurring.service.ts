@@ -8,7 +8,18 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
-import { getSlotKey, timestampToIsraelDate, israelDateToTimestamp, getIsraelDayStart, getDayKeyInIsrael } from '@/lib/utils'
+import {
+  addDaysToDateString,
+  BLOCKING_RESERVATION_STATUS,
+  doesRecurringApplyToDate,
+  getDayKeyInIsrael,
+  getDayKeyFromDateString,
+  getIsraelDateString,
+  getSlotKey,
+  getTodayDateString,
+  israelDateToTimestamp,
+  timestampToIsraelDate,
+} from '@/lib/utils'
 import { withSupabaseRetry, isTransientNetworkError } from '@/lib/utils/retry'
 import type {
   RecurringAppointment,
@@ -28,6 +39,9 @@ export interface CreateRecurringResult {
   recurring?: RecurringAppointment
   error?: RecurringErrorCode
   message?: string
+  conflicts?: ConflictingReservation[]
+  warningCount?: number
+  canProceed?: boolean
 }
 
 export interface DeleteRecurringResult {
@@ -37,6 +51,7 @@ export interface DeleteRecurringResult {
 
 export type RecurringErrorCode =
   | 'SLOT_CONFLICT'
+  | 'CONFLICTS_EXIST'
   | 'CUSTOMER_BLOCKED'
   | 'CUSTOMER_NOT_FOUND'
   | 'BARBER_NOT_WORKING'
@@ -52,6 +67,7 @@ export type RecurringErrorCode =
 
 const ERROR_MESSAGES: Record<RecurringErrorCode, string> = {
   SLOT_CONFLICT: 'כבר קיים תור קבוע בשעה זו.',
+  CONFLICTS_EXIST: 'קיימים תורים רגילים בשעה זו בשבועות הקרובים.',
   CUSTOMER_BLOCKED: 'הלקוח חסום ולא ניתן להוסיף תור קבוע.',
   CUSTOMER_NOT_FOUND: 'הלקוח לא נמצא במערכת.',
   BARBER_NOT_WORKING: 'אינך עובד ביום או בשעה זו.',
@@ -248,6 +264,48 @@ export const getRecurringForDay = async (
   }
 }
 
+export const getRecurringForDate = async (
+  barberId: string,
+  dateTimestamp: number
+): Promise<Array<{ time_slot: string; customer_name: string }>> => {
+  if (!barberId || !isValidUUID(barberId)) {
+    return []
+  }
+
+  try {
+    const supabase = createClient()
+    const dateStr = getIsraelDateString(dateTimestamp)
+    const dayOfWeek = getDayKeyFromDateString(dateStr)
+
+    const { data, error } = await supabase
+      .from('recurring_appointments')
+      .select(`
+        time_slot,
+        frequency,
+        start_date,
+        customers!recurring_appointments_customer_id_fkey (fullname)
+      `)
+      .eq('barber_id', barberId)
+      .eq('day_of_week', dayOfWeek)
+      .eq('is_active', true)
+
+    if (error) {
+      console.error('[RecurringService] Error fetching date recurring:', error)
+      return []
+    }
+
+    return (data || [])
+      .filter((rec) => doesRecurringApplyToDate(rec, dateStr, dayOfWeek))
+      .map((rec) => ({
+        time_slot: rec.time_slot,
+        customer_name: (rec.customers as { fullname: string })?.fullname || 'לקוח קבוע',
+      }))
+  } catch (err) {
+    console.error('[RecurringService] Exception fetching date recurring:', err)
+    return []
+  }
+}
+
 /**
  * Check if a slot conflicts with existing recurring appointment
  */
@@ -340,12 +398,17 @@ export const createRecurring = async (
         success: false,
         error: errorCode,
         message,
+        conflicts: result.conflicts,
+        warningCount: result.warningCount,
+        canProceed: result.canProceed,
       }
     }
     
     return {
       success: true,
       recurring: result.recurring as RecurringAppointment,
+      conflicts: result.conflicts,
+      warningCount: result.warningCount,
     }
   } catch (err) {
     console.error('[RecurringService] Exception creating recurring:', err)
@@ -438,50 +501,27 @@ export const checkReservationConflicts = async (
   try {
     const supabase = createClient()
     
-    // Calculate date range in milliseconds (today to maxDaysAhead)
-    // Using Israel timezone for consistency
-    const nowMs = Date.now()
-    const startOfTodayIsrael = getIsraelDayStart(nowMs)
-    const endMs = startOfTodayIsrael + (maxDaysAhead * 24 * 60 * 60 * 1000)
-    
-    // Get target day number (0 = Sunday, etc.)
-    const targetDayIndex = VALID_DAYS.indexOf(dayOfWeek)
-    
     // Parse time slot
     const [hours, minutes] = timeSlot.split(':').map(Number)
-    
-    // Calculate all matching timestamps within range
+    const today = getTodayDateString()
     const matchingTimestamps: number[] = []
-    
-    for (let dayOffset = 0; dayOffset <= maxDaysAhead; dayOffset++) {
-      const dayMs = startOfTodayIsrael + (dayOffset * 24 * 60 * 60 * 1000)
-      
-      // Get day of week in Israel timezone using proper utility
-      const israelDate = timestampToIsraelDate(dayMs)
-      
-      if (israelDate.getDay() === targetDayIndex) {
-        // This day matches our target day of week
-        // Calculate the exact timestamp using Israel timezone (handles DST correctly)
-        const appointmentTimestamp = israelDateToTimestamp(
-          israelDate.getFullYear(),
-          israelDate.getMonth() + 1,
-          israelDate.getDate(),
-          hours,
-          minutes
-        )
-        // Only include if it's in the future
-        if (appointmentTimestamp > nowMs) {
-          matchingTimestamps.push(appointmentTimestamp)
-        }
-      }
+
+    for (let dayOffset = 0; dayOffset <= maxDaysAhead; dayOffset += 1) {
+      const dateStr = addDaysToDateString(today, dayOffset)
+      if (getDayKeyFromDateString(dateStr) !== dayOfWeek) continue
+
+      const [year, month, day] = dateStr.split('-').map(Number)
+      matchingTimestamps.push(israelDateToTimestamp(year, month, day, hours, minutes))
     }
     
     if (matchingTimestamps.length === 0) {
       return []
     }
+
+    const startOfRange = Math.min(...matchingTimestamps)
+    const endOfRange = Math.max(...matchingTimestamps) + (24 * 60 * 60 * 1000)
     
     // Query reservations within the date range that match our timestamps
-    // We query all active reservations and filter by matching timestamps
     const { data, error } = await supabase
       .from('reservations')
       .select(`
@@ -491,9 +531,9 @@ export const checkReservationConflicts = async (
         customers!reservations_customer_id_fkey (fullname)
       `)
       .eq('barber_id', barberId)
-      .eq('status', 'active')
-      .gte('time_timestamp', startOfTodayIsrael)
-      .lte('time_timestamp', endMs)
+      .eq('status', BLOCKING_RESERVATION_STATUS)
+      .gte('time_timestamp', startOfRange)
+      .lte('time_timestamp', endOfRange)
     
     if (error) {
       console.error('[RecurringService] Error checking reservation conflicts:', error)
@@ -510,10 +550,9 @@ export const checkReservationConflicts = async (
     
     // Format for display
     return conflicts.map(r => {
-      const date = new Date(r.time_timestamp)
-      const israelDate = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }))
-      const dateString = israelDate.toISOString().split('T')[0]
-      const timeString = israelDate.toTimeString().substring(0, 5)
+      const israelDate = timestampToIsraelDate(r.time_timestamp)
+      const dateString = getIsraelDateString(r.time_timestamp)
+      const timeString = `${String(israelDate.getHours()).padStart(2, '0')}:${String(israelDate.getMinutes()).padStart(2, '0')}`
       
       return {
         id: r.id,
@@ -545,7 +584,8 @@ const formatDateHebrew = (dateString: string): string => {
 }
 
 /**
- * Cancel multiple reservations by their IDs
+ * Legacy compatibility helper.
+ * The server no longer cancels conflicting reservations during recurring creation.
  */
 export const cancelConflictingReservations = async (
   reservationIds: string[],

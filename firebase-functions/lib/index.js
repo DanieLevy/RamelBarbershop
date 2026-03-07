@@ -68,14 +68,6 @@ exports.sendReminders = void 0;
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const logger = __importStar(require("firebase-functions/logger"));
 const send_reminders_1 = require("./send-reminders");
-// Barbershop is always closed Monday and Saturday — skip to save invocations
-const CLOSED_DAYS = ['Monday', 'Saturday'];
-function isClosedDay() {
-    return CLOSED_DAYS.includes(new Intl.DateTimeFormat('en-US', {
-        weekday: 'long',
-        timeZone: 'Asia/Jerusalem',
-    }).format(new Date()));
-}
 exports.sendReminders = (0, scheduler_1.onSchedule)({
     // Every 30 min, 05:00–19:00 UTC = 07:00–22:00 Israel (covers UTC+2 winter & UTC+3 summer)
     schedule: '0,30 5-19 * * *',
@@ -84,12 +76,6 @@ exports.sendReminders = (0, scheduler_1.onSchedule)({
     memory: '512MiB',
     timeoutSeconds: 540, // 9 minutes — sufficient for any batch size
 }, async () => {
-    if (isClosedDay()) {
-        logger.info('[Firebase Cron] Barbershop closed today — skipping', {
-            day: new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'Asia/Jerusalem' }).format(new Date()),
-        });
-        return;
-    }
     logger.info('[Firebase Cron] Starting reminder job', { time: new Date().toISOString() });
     const startTime = Date.now();
     try {

@@ -20,11 +20,12 @@ const VALID_UUID_3 = '6e0526f0-9e6b-4603-bb7f-e975f046b261'
 
 describe('Reservation Validation', () => {
   describe('validateReservationData', () => {
-    // ALL bookings require login - customer_id is ALWAYS required
+    // Customer identity is still required, but day display fields are compatibility-only
+    // and may be derived server-side when omitted by callers.
     const validData = {
       barber_id: VALID_UUID,
       service_id: VALID_UUID_2,
-      customer_id: VALID_UUID_3,  // Required - no guest bookings
+      customer_id: VALID_UUID_3,
       customer_name: 'דניאל לוי',
       customer_phone: '0501234567',
       date_timestamp: Date.now(),
@@ -82,18 +83,20 @@ describe('Reservation Validation', () => {
       expect(result.errors.some(e => e.includes('time_timestamp'))).toBe(true)
     })
 
-    it('should fail validation for missing day_name', () => {
+    it('should derive day_name when it is omitted', () => {
       const data = { ...validData, day_name: '' }
       const result = validateReservationData(data)
-      expect(result.valid).toBe(false)
-      expect(result.errors).toContain('day_name is required')
+      expect(result.valid).toBe(true)
+      expect(result.errors).toHaveLength(0)
+      expect(result.data?.day_name).toBeTruthy()
     })
 
-    it('should fail validation for missing day_num', () => {
+    it('should derive day_num when it is omitted', () => {
       const data = { ...validData, day_num: '' }
       const result = validateReservationData(data)
-      expect(result.valid).toBe(false)
-      expect(result.errors).toContain('day_num is required')
+      expect(result.valid).toBe(true)
+      expect(result.errors).toHaveLength(0)
+      expect(result.data?.day_num).toBeTruthy()
     })
 
     it('should fail validation for invalid barber_id UUID format', () => {
@@ -117,7 +120,7 @@ describe('Reservation Validation', () => {
       expect(result.errors).toContain('customer_id must be a valid UUID')
     })
 
-    it('should fail validation for missing customer_id (no guest bookings)', () => {
+    it('should fail validation for missing customer_id on customer-linked reservations', () => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { customer_id, ...dataWithoutCustomerId } = validData
       const result = validateReservationData(dataWithoutCustomerId)
@@ -163,8 +166,7 @@ describe('Reservation Validation', () => {
   })
 
   describe('validateLoggedInReservation', () => {
-    // validateLoggedInReservation is now an alias for validateReservationData
-    // since ALL bookings require login (no guest bookings)
+    // validateLoggedInReservation is a compatibility alias for validateReservationData.
     const validLoggedInData = {
       barber_id: VALID_UUID,
       service_id: VALID_UUID_2,
@@ -259,4 +261,3 @@ describe('Reservation Validation', () => {
     })
   })
 })
-

@@ -16,6 +16,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { reportApiError } from '@/lib/bug-reporter/helpers'
 import { verifyBarber, verifyOwnership } from '@/lib/auth/barber-api-auth'
+import { getTodayDateString } from '@/lib/utils'
 import { z } from 'zod'
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = createAdminClient()
-    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date())
+    const today = getTodayDateString()
 
     const { data, error } = await supabase
       .from('barber_special_days')
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate date is not in the past (Israel timezone)
-    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date())
+    const today = getTodayDateString()
     if (date < today) {
       return NextResponse.json(
         { success: false, error: 'VALIDATION_ERROR', message: 'לא ניתן להוסיף יום מיוחד בעבר' },

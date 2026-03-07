@@ -34,18 +34,6 @@ import { onSchedule } from 'firebase-functions/v2/scheduler'
 import * as logger from 'firebase-functions/logger'
 import { processReminders } from './send-reminders'
 
-// Barbershop is always closed Monday and Saturday — skip to save invocations
-const CLOSED_DAYS = ['Monday', 'Saturday']
-
-function isClosedDay(): boolean {
-  return CLOSED_DAYS.includes(
-    new Intl.DateTimeFormat('en-US', {
-      weekday: 'long',
-      timeZone: 'Asia/Jerusalem',
-    }).format(new Date())
-  )
-}
-
 export const sendReminders = onSchedule(
   {
     // Every 30 min, 05:00–19:00 UTC = 07:00–22:00 Israel (covers UTC+2 winter & UTC+3 summer)
@@ -56,13 +44,6 @@ export const sendReminders = onSchedule(
     timeoutSeconds: 540, // 9 minutes — sufficient for any batch size
   },
   async () => {
-    if (isClosedDay()) {
-      logger.info('[Firebase Cron] Barbershop closed today — skipping', {
-        day: new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'Asia/Jerusalem' }).format(new Date()),
-      })
-      return
-    }
-
     logger.info('[Firebase Cron] Starting reminder job', { time: new Date().toISOString() })
     const startTime = Date.now()
 

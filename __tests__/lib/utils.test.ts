@@ -34,6 +34,8 @@ import {
   getIsraelDateString,
   isSameDayInIsrael,
   nowInIsraelMs,
+  getIsraelDayStart,
+  getIsraelDayEnd,
 } from '@/lib/utils'
 
 describe('Israel Timezone Utilities', () => {
@@ -68,6 +70,18 @@ describe('Israel Timezone Utilities', () => {
       const timestamp = 1703851200000 // 2023-12-29 12:00:00 UTC
       const result = timestampToIsraelDate(timestamp)
       expect(result).toBeInstanceOf(Date)
+    })
+
+    it('should normalize second-based timestamps', () => {
+      const timestamp = israelDateToTimestamp(2026, 3, 9, 9, 0)
+      const result = timestampToIsraelDate(Math.floor(timestamp / 1000))
+      expect(formatDateShort(result.getTime())).toBe('09/03/2026')
+    })
+
+    it('should normalize accidentally double-multiplied timestamps', () => {
+      const timestamp = israelDateToTimestamp(2026, 3, 9, 9, 0)
+      const result = timestampToIsraelDate(timestamp * 1000)
+      expect(formatDateShort(result.getTime())).toBe('09/03/2026')
     })
   })
 
@@ -160,6 +174,14 @@ describe('Israel Timezone Utilities', () => {
       const t2 = t1 - 48 * 60 * 60 * 1000 // 2 days ago
       const result = isSameDayInIsrael(t1, t2)
       expect(result).toBe(false)
+    })
+  })
+
+  describe('Israel day boundaries', () => {
+    it('keeps the same Israel calendar date at day start and end', () => {
+      const timestamp = israelDateToTimestamp(2026, 3, 27, 12, 0)
+      expect(getIsraelDateString(getIsraelDayStart(timestamp))).toBe('2026-03-27')
+      expect(getIsraelDateString(getIsraelDayEnd(timestamp))).toBe('2026-03-27')
     })
   })
 })
@@ -422,4 +444,3 @@ describe('isDateDisabled', () => {
     expect(result).toBe(false)
   })
 })
-

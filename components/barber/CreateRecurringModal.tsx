@@ -7,8 +7,6 @@ import { createClient } from '@/lib/supabase/client'
 import { 
   createRecurring, 
   checkRecurringConflict, 
-  checkReservationConflicts,
-  cancelConflictingReservations,
   type ConflictingReservation,
 } from '@/lib/services/recurring.service'
 import { RecurringConflictModal } from '@/components/barber/RecurringConflictModal'
@@ -268,67 +266,34 @@ export function CreateRecurringModal({
       return
     }
     
-    // Check for existing reservation conflicts
     setSaving(true)
     try {
-      const conflicts = await checkReservationConflicts(barberId, selectedDay, selectedTimeSlot)
-      
-      if (conflicts.length > 0) {
-        // Show conflict modal
-        setConflictingReservations(conflicts)
-        setConflictModalOpen(true)
-        setSaving(false)
-        return
-      }
-      
-      // No conflicts - proceed with creation
       await createRecurringAppointment()
     } catch (err) {
       console.error('Save error:', err)
-      await report(err instanceof Error ? err : new Error(String(err)), 'Checking conflicts for recurring appointment')
-      showToast.error('שגיאה בבדיקת התנגשויות')
+      await report(err instanceof Error ? err : new Error(String(err)), 'Creating recurring appointment')
+      showToast.error('שגיאה ביצירת התור הקבוע')
       setSaving(false)
     }
   }
 
-  // Handle conflict confirmation - cancel conflicts and create recurring
-  const handleConfirmConflicts = async () => {
+  const handleProceedWithConflicts = async () => {
     if (!selectedCustomer || !selectedService || !selectedDay || !selectedTimeSlot) {
       return
     }
 
     try {
-      // Cancel conflicting reservations
-      const reservationIds = conflictingReservations.map(c => c.id)
-      const cancelResult = await cancelConflictingReservations(reservationIds, barberId)
-      
-      if (!cancelResult.success) {
-        showToast.error(cancelResult.error || 'שגיאה בביטול התורים המתנגשים')
-        return
-      }
-
-      // Verify no more conflicts
-      const remainingConflicts = await checkReservationConflicts(barberId, selectedDay, selectedTimeSlot)
-      if (remainingConflicts.length > 0) {
-        showToast.error('נותרו תורים מתנגשים. נסה שוב.')
-        setConflictingReservations(remainingConflicts)
-        return
-      }
-
-      // Close conflict modal and create recurring
       setConflictModalOpen(false)
-      setConflictingReservations([])
-      
-      await createRecurringAppointment()
+      await createRecurringAppointment(true)
     } catch (err) {
       console.error('Conflict handling error:', err)
-      await report(err instanceof Error ? err : new Error(String(err)), 'Handling conflicts for recurring appointment')
-      showToast.error('שגיאה בטיפול בהתנגשויות')
+      await report(err instanceof Error ? err : new Error(String(err)), 'Continuing recurring appointment with conflicts')
+      showToast.error('שגיאה ביצירת התור הקבוע')
     }
   }
 
   // Actually create the recurring appointment
-  const createRecurringAppointment = async () => {
+  const createRecurringAppointment = async (allowConflicts = false) => {
     if (!selectedCustomer || !selectedService || !selectedDay || !selectedTimeSlot) {
       return
     }
@@ -345,11 +310,18 @@ export function CreateRecurringModal({
         notes: notes.trim() || undefined,
         created_by: barberId,
         frequency,
+        allowConflicts,
       })
       
       if (result.success) {
         showToast.success('התור הקבוע נוצר בהצלחה!')
+        if ((result.warningCount ?? 0) > 0) {
+          showToast.info(`${result.warningCount} תורים קיימים נשארו מאושרים`)
+        }
         onSuccess()
+      } else if (result.error === 'CONFLICTS_EXIST' && result.conflicts) {
+        setConflictingReservations(result.conflicts)
+        setConflictModalOpen(true)
       } else {
         showToast.error(result.message || 'שגיאה ביצירת התור הקבוע')
       }
@@ -678,11 +650,10 @@ export function CreateRecurringModal({
           setConflictModalOpen(false)
           setConflictingReservations([])
         }}
-        onConfirm={handleConfirmConflicts}
-        onCreateWithoutCancel={async () => {
+        onProceed={handleProceedWithConflicts}
+        onBack={async () => {
           setConflictModalOpen(false)
           setConflictingReservations([])
-          await createRecurringAppointment()
         }}
         conflicts={conflictingReservations}
         dayLabel={selectedDay ? DAY_OPTIONS.find(d => d.value === selectedDay)?.label || '' : ''}

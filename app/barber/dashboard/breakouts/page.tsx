@@ -95,7 +95,7 @@ export default function BreakoutsPage() {
     }
   }, [barber?.id, fetchBreakouts])
 
-  const handleSubmit = async (cancelConflicts = false) => {
+  const handleSubmit = async (allowConflicts = false) => {
     if (!barber?.id) return
     
     const formData = pendingFormData || form
@@ -138,7 +138,7 @@ export default function BreakoutsPage() {
           endDate: formData.breakoutType === 'date_range' ? formData.endDate : undefined,
           dayOfWeek: formData.breakoutType === 'recurring' ? formData.dayOfWeek : undefined,
           reason: formData.reason || undefined,
-          cancelConflicts,
+          allowConflicts,
         }),
       })
       
@@ -146,8 +146,8 @@ export default function BreakoutsPage() {
       
       if (data.success) {
         showToast.success('ההפסקה נוספה בהצלחה')
-        if (data.cancelledCount > 0) {
-          showToast.info(`${data.cancelledCount} תורים בוטלו`)
+        if ((data.warningCount ?? 0) > 0) {
+          showToast.info(`${data.warningCount} תורים קיימים נשארו מאושרים`)
         }
         setShowForm(false)
         setPendingFormData(null)
@@ -533,7 +533,7 @@ export default function BreakoutsPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-foreground-light">קיימים תורים בשעות אלו</h3>
-                  <p className="text-sm text-foreground-muted">יש לבטל את התורים הבאים כדי להמשיך</p>
+                  <p className="text-sm text-foreground-muted">ניתן להמשיך, והתורים הקיימים יישארו מאושרים</p>
                 </div>
               </div>
               
@@ -557,14 +557,14 @@ export default function BreakoutsPage() {
                 <Button
                   onPress={() => handleSubmit(true)}
                   isDisabled={saving}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 text-white rounded-xl font-medium hover:bg-red-500/90"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-gold text-background-dark rounded-xl font-medium hover:bg-accent-gold/90"
                 >
                   {saving ? (
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-background-dark border-t-transparent rounded-full animate-spin" />
                   ) : (
-                    <Trash2 size={18} />
+                    <AlertCircle size={18} />
                   )}
-                  <span>בטל תורים והמשך</span>
+                  <span>צור הפסקה בכל זאת</span>
                 </Button>
                 <Button
                   variant="ghost"

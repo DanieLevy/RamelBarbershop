@@ -9,10 +9,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { TimeSelection } from '@/components/BookingWizard/TimeSelection'
+import { israelDateToTimestamp } from '@/lib/utils'
 
 // Mock the booking store
 const mockBookingStore = {
-  date: { dayName: 'א׳', dayNum: '5', dateTimestamp: Date.now() },
+  date: { dayName: 'ב׳', dayNum: '9', dateTimestamp: israelDateToTimestamp(2026, 3, 9, 12, 0) },
   timeTimestamp: null,
   setTime: vi.fn(),
   nextStep: vi.fn(),
@@ -28,8 +29,8 @@ const mockSupabaseSelect = vi.fn()
 const mockSupabaseEq = vi.fn()
 const mockSupabaseGte = vi.fn()
 const mockSupabaseLte = vi.fn()
-const mockSupabaseNeq = vi.fn()
 const mockSupabaseSingle = vi.fn()
+const mockReservationQuery = vi.fn()
 
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
@@ -39,7 +40,7 @@ vi.mock('@/lib/supabase/client', () => ({
           single: mockSupabaseSingle.mockResolvedValue({ data: null, error: null }),
           gte: mockSupabaseGte.mockReturnValue({
             lte: mockSupabaseLte.mockReturnValue({
-              neq: mockSupabaseNeq.mockResolvedValue({ data: [], error: null }),
+              eq: mockReservationQuery.mockResolvedValue({ data: [], error: null }),
             }),
           }),
         }),
@@ -70,11 +71,20 @@ vi.mock('@/lib/services/availability.service', () => ({
   })),
 }))
 
+vi.mock('@/lib/services/recurring.service', () => ({
+  getRecurringForDate: vi.fn(async () => []),
+}))
+
+vi.mock('@/lib/services/breakout.service', () => ({
+  getBreakoutsForDate: vi.fn(async () => []),
+  isSlotInBreakout: vi.fn(() => ({ blocked: false })),
+}))
+
 describe('TimeSelection Component', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockSupabaseSingle.mockResolvedValue({ data: null, error: null })
-    mockSupabaseNeq.mockResolvedValue({ data: [], error: null })
+    mockReservationQuery.mockResolvedValue({ data: [], error: null })
   })
 
   it('renders loading state initially', () => {
@@ -90,7 +100,7 @@ describe('TimeSelection Component', () => {
   })
 
   it('displays time slots after loading', async () => {
-    mockSupabaseNeq.mockResolvedValue({ 
+    mockReservationQuery.mockResolvedValue({
       data: [], 
       error: null 
     })

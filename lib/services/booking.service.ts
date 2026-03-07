@@ -23,8 +23,8 @@ export interface CreateReservationData {
   customerPhone: string
   dateTimestamp: number
   timeTimestamp: number
-  dayName: string
-  dayNum: string
+  dayName?: string
+  dayNum?: string
   barberNotes?: string
 }
 
@@ -121,13 +121,7 @@ export async function createReservation(
   if (!data.timeTimestamp || typeof data.timeTimestamp !== 'number') {
     validationErrors.push('timeTimestamp is required')
   }
-  if (!data.dayName?.trim()) {
-    validationErrors.push('dayName is required')
-  }
-  if (!data.dayNum?.trim()) {
-    validationErrors.push('dayNum is required')
-  }
-  
+
   if (validationErrors.length > 0) {
     console.error('[BookingService] Validation failed:', validationErrors)
     return {
@@ -153,8 +147,8 @@ export async function createReservation(
         customerPhone: normalizePhone(data.customerPhone),
         dateTimestamp: data.dateTimestamp,
         timeTimestamp: data.timeTimestamp,
-        dayName: data.dayName,
-        dayNum: data.dayNum,
+        dayName: data.dayName?.trim() || undefined,
+        dayNum: data.dayNum?.trim() || undefined,
         barberNotes: data.barberNotes?.trim() || null,
       }),
     })
@@ -462,8 +456,8 @@ export interface EditReservationData {
   adminId?: string
   newTimeTimestamp: number
   newDateTimestamp: number
-  newDayName: string
-  newDayNum: string
+  newDayName?: string
+  newDayNum?: string
   newServiceId?: string
   expectedVersion?: number
 }
@@ -512,8 +506,8 @@ export async function editReservation(
         adminId: data.adminId,
         newTimeTimestamp: data.newTimeTimestamp,
         newDateTimestamp: data.newDateTimestamp,
-        newDayName: data.newDayName,
-        newDayNum: data.newDayNum,
+        newDayName: data.newDayName?.trim() || undefined,
+        newDayNum: data.newDayNum?.trim() || undefined,
         newServiceId: data.newServiceId,
         expectedVersion: data.expectedVersion,
       }),
