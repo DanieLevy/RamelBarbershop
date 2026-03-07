@@ -6,7 +6,7 @@ import { BookingWizardClient } from '@/components/BookingWizard/BookingWizardCli
 import { BarberNotFoundClient } from '@/components/BarberProfile/BarberNotFoundClient'
 import { isValidUUID, generateSlugFromEnglishName, getPreferredBarberSlug } from '@/lib/utils'
 import { getCachedShopSettings } from '@/lib/data/cached-queries'
-import type { User, BarberWithWorkDays, Service, BarbershopClosure, BarberClosure, BarberMessage, BarberBookingSettings, WorkDay } from '@/types/database'
+import type { User, BarberWithWorkDays, Service, BarbershopClosure, BarberClosure, BarberMessage, BarberBookingSettings, WorkDay, ShopSpecialDay, BarberSpecialDay } from '@/types/database'
 
 interface BookPageProps {
   params: Promise<{ barberId: string }>
@@ -130,7 +130,7 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
   // Fetch closures and cached shop settings in parallel
   // Note: closures must be fresh (date-specific), shop settings can be cached
   const supabase = await createClient()
-  const [shopSettings, shopClosuresResult, barberClosuresResult] = await Promise.all([
+  const [shopSettings, shopClosuresResult, barberClosuresResult, shopSpecialDaysResult, barberSpecialDaysResult] = await Promise.all([
     // Shop settings - cached for 10 minutes
     getCachedShopSettings(),
     // Barbershop closures - must be fresh (date-filtered)
@@ -143,11 +143,24 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
       .from('barber_closures')
       .select('id, barber_id, start_date, end_date, reason, created_at')
       .eq('barber_id', barberWithData.id)
-      .gte('end_date', todayStr)
+      .gte('end_date', todayStr),
+    // Shop special days - upcoming dates when shop is open on normally-closed days
+    supabase
+      .from('shop_special_days')
+      .select('id, date, start_time, end_time, reason, created_at')
+      .gte('date', todayStr),
+    // Barber special days - upcoming dates when barber works on normally-off days
+    supabase
+      .from('barber_special_days')
+      .select('id, barber_id, date, start_time, end_time, reason, created_at')
+      .eq('barber_id', barberWithData.id)
+      .gte('date', todayStr),
   ])
-  
+
   const shopClosures = shopClosuresResult.data as BarbershopClosure[] | null
   const barberClosures = barberClosuresResult.data as BarberClosure[] | null
+  const shopSpecialDays = shopSpecialDaysResult.data as ShopSpecialDay[] | null
+  const barberSpecialDays = barberSpecialDaysResult.data as BarberSpecialDay[] | null
   
   // Extract and filter nested data
   const activeServices = (barberWithData.services || []).filter(s => s.is_active)
@@ -182,6 +195,8 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
           shopSettings={shopSettings}
           shopClosures={shopClosures || []}
           barberClosures={barberClosures || []}
+          shopSpecialDays={shopSpecialDays || []}
+          barberSpecialDays={barberSpecialDays || []}
           barberMessages={activeMessages}
           barberBookingSettings={barberBookingSettings}
           preSelectedServiceId={preSelectedServiceId}

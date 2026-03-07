@@ -25,6 +25,7 @@ import {
   Repeat,
   Coffee,
   CalendarOff,
+  CalendarPlus,
   BarChart3,
   UserX,
   CalendarRange,
@@ -44,6 +45,7 @@ const navItems: NavItem[] = [
   { label: 'תורים קבועים', href: '/barber/dashboard/recurring', icon: Repeat },
   { label: 'הפסקות', href: '/barber/dashboard/breakouts', icon: Coffee },
   { label: 'ימי היעדרות', href: '/barber/dashboard/absence-days', icon: CalendarOff },
+  { label: 'ימים מיוחדים', href: '/barber/dashboard/special-days', icon: CalendarPlus },
   { label: 'הלקוחות שלי', href: '/barber/dashboard/customers', icon: Users },
   { label: 'לקוחות חסומים', href: '/barber/dashboard/blocked-customers', icon: UserX },
   { label: 'השירותים שלי', href: '/barber/dashboard/services', icon: Scissors },
@@ -62,6 +64,7 @@ const adminNavItems: NavItem[] = [
   { label: 'מוצרים', href: '/barber/dashboard/products', icon: Package, adminOnly: true },
   { label: 'שעות פתיחה', href: '/barber/dashboard/schedule', icon: CalendarCheck, adminOnly: true },
   { label: 'ימי סגירה', href: '/barber/dashboard/closures', icon: XCircle, adminOnly: true },
+  { label: 'ימי פתיחה מיוחדים', href: '/barber/dashboard/shop-special-days', icon: CalendarPlus, adminOnly: true },
 ]
 
 interface DashboardSidebarProps {

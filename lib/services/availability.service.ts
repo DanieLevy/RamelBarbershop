@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
-import type { BarbershopSettings, BarbershopClosure, BarberClosure, BarberMessage, WorkDay, BarberBookingSettings } from '@/types/database'
+import type { BarbershopSettings, BarbershopClosure, BarberClosure, BarberMessage, WorkDay, BarberBookingSettings, ShopSpecialDay, BarberSpecialDay } from '@/types/database'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
 import { getTodayDateString, getIsraelDateString, getDayKeyInIsrael } from '@/lib/utils'
 import { withSupabaseRetry, isTransientNetworkError } from '@/lib/utils/retry'
@@ -320,6 +320,49 @@ export async function getBarberBookingSettings(barberId: string): Promise<Barber
   }
   
   return data as BarberBookingSettings | null
+}
+
+/**
+ * Get upcoming shop special days (dates when shop opens on normally-closed days)
+ */
+export async function getShopSpecialDays(): Promise<ShopSpecialDay[]> {
+  const supabase = createClient()
+
+  const { data, error } = await supabase
+    .from('shop_special_days')
+    .select('id, date, start_time, end_time, reason, created_at')
+    .gte('date', getTodayDateString())
+    .order('date', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching shop special days:', error)
+    await reportSupabaseError(error, 'Fetching shop special days', { table: 'shop_special_days', operation: 'select' })
+    return []
+  }
+
+  return (data as ShopSpecialDay[]) || []
+}
+
+/**
+ * Get upcoming barber special days (dates when barber works on normally-off days)
+ */
+export async function getBarberSpecialDays(barberId: string): Promise<BarberSpecialDay[]> {
+  const supabase = createClient()
+
+  const { data, error } = await supabase
+    .from('barber_special_days')
+    .select('id, barber_id, date, start_time, end_time, reason, created_at')
+    .eq('barber_id', barberId)
+    .gte('date', getTodayDateString())
+    .order('date', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching barber special days:', error)
+    await reportSupabaseError(error, 'Fetching barber special days', { table: 'barber_special_days', operation: 'select' })
+    return []
+  }
+
+  return (data as BarberSpecialDay[]) || []
 }
 
 /**

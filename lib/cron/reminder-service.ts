@@ -31,6 +31,8 @@ interface RecurringWithJoins {
   customer_id: string
   time_slot: string
   last_reminder_date: string | null
+  frequency: string | null
+  start_date: string | null
   customers: { fullname: string; phone: string } | null
   users: { fullname: string } | null
   services: { name_he: string } | null
@@ -232,6 +234,8 @@ async function getRecurringAppointmentsForToday(
       customer_id,
       time_slot,
       last_reminder_date,
+      frequency,
+      start_date,
       customers!recurring_appointments_customer_id_fkey (
         fullname,
         phone
@@ -256,11 +260,28 @@ async function getRecurringAppointmentsForToday(
     console.log('[ReminderService] No recurring appointments for today')
     return []
   }
-  
-  console.log(`[ReminderService] Found ${data.length} recurring appointments for ${dayKey}`)
-  
+
+  // Filter out biweekly recurring appointments that are on their off-week
+  const israelDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date(now))
+  const activeData = data.filter((rec) => {
+    const r = rec as unknown as RecurringWithJoins
+    if (r.frequency !== 'biweekly') return true
+    if (!r.start_date) return true
+    const startMs = new Date(r.start_date).getTime()
+    const todayMs = new Date(israelDateStr).getTime()
+    const diffDays = Math.round((todayMs - startMs) / 86400000)
+    return diffDays >= 0 && diffDays % 14 === 0
+  })
+
+  if (activeData.length === 0) {
+    console.log('[ReminderService] No active recurring appointments for today (biweekly off-week)')
+    return []
+  }
+
+  console.log(`[ReminderService] Found ${activeData.length} active recurring appointments for ${dayKey} (${data.length} total)`)
+
   // Get all unique barber IDs from recurring
-  const barberIds = [...new Set(data.map(r => r.barber_id).filter(Boolean))]
+  const barberIds = [...new Set(activeData.map(r => r.barber_id).filter(Boolean))]
   
   // Check for barber closures today (reusing todayDateStr from above)
   const { data: closuresData, error: closuresError } = await client
@@ -302,7 +323,7 @@ async function getRecurringAppointmentsForToday(
   // Convert recurring appointments to the standard format
   const recurringReminders: AppointmentForReminder[] = []
   
-  for (const rec of data) {
+  for (const rec of activeData) {
     const recData = rec as unknown as RecurringWithJoins
     
     // Skip if barber has a closure today

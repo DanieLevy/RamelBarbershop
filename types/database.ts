@@ -343,6 +343,71 @@ export type Database = {
         }
         Relationships: []
       }
+      shop_special_days: {
+        Row: {
+          id: string
+          date: string
+          start_time: string
+          end_time: string
+          reason: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          date: string
+          start_time: string
+          end_time: string
+          reason?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          date?: string
+          start_time?: string
+          end_time?: string
+          reason?: string | null
+          created_at?: string | null
+        }
+        Relationships: []
+      }
+      barber_special_days: {
+        Row: {
+          id: string
+          barber_id: string
+          date: string
+          start_time: string
+          end_time: string
+          reason: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          barber_id: string
+          date: string
+          start_time: string
+          end_time: string
+          reason?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          barber_id?: string
+          date?: string
+          start_time?: string
+          end_time?: string
+          reason?: string | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "barber_special_days_barber_id_fkey"
+            columns: ["barber_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       barbershop_settings: {
         Row: {
           address: string | null
@@ -1370,6 +1435,8 @@ export type User = Tables<'users'>
 export type Customer = Tables<'customers'>
 export type BarbershopSettings = Tables<'barbershop_settings'>
 export type BarbershopClosure = Tables<'barbershop_closures'>
+export type ShopSpecialDay = Tables<'shop_special_days'>
+export type BarberSpecialDay = Tables<'barber_special_days'>
 // BarberSchedule removed - deprecated, use work_days table instead
 export type BarberClosure = Tables<'barber_closures'>
 export type BarberBreakout = Tables<'barber_breakouts'>

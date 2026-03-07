@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBookingStore } from '@/store/useBookingStore'
-import type { WorkDay, BarbershopSettings, BarbershopClosure, BarberClosure, BarberBookingSettings } from '@/types/database'
+import type { WorkDay, BarbershopSettings, BarbershopClosure, BarberClosure, BarberBookingSettings, ShopSpecialDay, BarberSpecialDay } from '@/types/database'
 import { cn, nowInIsrael, getIsraelDayStart, getDayIndexInIsrael } from '@/lib/utils'
 import { ChevronRight, ChevronLeft, X } from 'lucide-react'
 import { Button } from '@heroui/react'
@@ -28,6 +28,8 @@ interface DateSelectionProps {
   shopClosures?: BarbershopClosure[]
   barberClosures?: BarberClosure[]
   barberBookingSettings?: BarberBookingSettings | null
+  shopSpecialDays?: ShopSpecialDay[]
+  barberSpecialDays?: BarberSpecialDay[]
 }
 
 // Hebrew weekday labels (RTL order: Sunday first on right)
@@ -66,12 +68,14 @@ interface AvailabilityResult {
   closureReason?: string // Custom reason from barber/shop closure
 }
 
-export function DateSelection({ 
-  workDays, 
-  shopSettings, 
-  shopClosures = [], 
+export function DateSelection({
+  workDays,
+  shopSettings,
+  shopClosures = [],
   barberClosures = [],
-  barberBookingSettings
+  barberBookingSettings,
+  shopSpecialDays = [],
+  barberSpecialDays = [],
 }: DateSelectionProps) {
   const router = useRouter()
   const { date: selectedDate, setDate, nextStep, barberId } = useBookingStore()
@@ -174,50 +178,56 @@ export function DateSelection({
       }
     }
     
-    // 4. Check if shop is closed on this day
-    if (shopSettings?.open_days && !shopSettings.open_days.includes(day.dayKey)) {
+    // Special day lookups for this date
+    const shopSpecialDay  = shopSpecialDays.find(s => s.date === day.dateString)
+    const barberSpecialDay = barberSpecialDays.find(s => s.date === day.dateString)
+
+    // 4. Check if shop is closed on this day (skip if shop_special_day exists)
+    if (!shopSpecialDay && shopSettings?.open_days && !shopSettings.open_days.includes(day.dayKey)) {
       return { available: false, reason: 'המספרה סגורה', type: 'shop_closed' }
     }
-    
-    // 5. Check shop closure with optional reason
-    const shopClosure = shopClosures.find(c => 
+
+    // 5. Check shop closure with optional reason (hard block — not overridden by special days)
+    const shopClosure = shopClosures.find(c =>
       day.dateString >= c.start_date && day.dateString <= c.end_date
     )
     if (shopClosure) {
-      return { 
-        available: false, 
-        reason: shopClosure.reason || 'המספרה סגורה', 
+      return {
+        available: false,
+        reason: shopClosure.reason || 'המספרה סגורה',
         type: 'shop_closure',
         closureReason: shopClosure.reason || undefined
       }
     }
-    
-    // 6. Check if barber works on this day using work_days table
+
+    // 6. Check if barber works on this day (skip if barber_special_day exists)
     const workDayEntry = workDays.find((wd) => wd.day_of_week.toLowerCase() === day.dayKey)
-    if (workDayEntry) {
-      if (!workDayEntry.is_working) {
+    if (!barberSpecialDay) {
+      if (workDayEntry) {
+        if (!workDayEntry.is_working) {
+          return { available: false, reason: 'הספר לא עובד', type: 'barber_not_working' }
+        }
+      } else if (shopSettings && !shopSettings.open_days.includes(day.dayKey)) {
+        // Fallback to shop settings if no work_days data
         return { available: false, reason: 'הספר לא עובד', type: 'barber_not_working' }
       }
-    } else if (shopSettings && !shopSettings.open_days.includes(day.dayKey)) {
-      // Fallback to shop settings if no work_days data
-      return { available: false, reason: 'הספר לא עובד', type: 'barber_not_working' }
     }
-    
-    // 7. Check barber closure with optional reason
-    const barberClosure = barberClosures.find(c => 
+
+    // 7. Check barber closure with optional reason (hard block — not overridden by special days)
+    const barberClosure = barberClosures.find(c =>
       day.dateString >= c.start_date && day.dateString <= c.end_date
     )
     if (barberClosure) {
-      return { 
-        available: false, 
-        reason: barberClosure.reason || 'הספר לא זמין', 
+      return {
+        available: false,
+        reason: barberClosure.reason || 'הספר לא זמין',
         type: 'barber_closure',
         closureReason: barberClosure.reason || undefined
       }
     }
     
     return { available: true }
-  }, [shopSettings, shopClosures, barberClosures, workDays, maxBookingDate, barberBookingSettings])
+  }, [shopSettings, shopClosures, barberClosures, workDays, maxBookingDate, barberBookingSettings, shopSpecialDays, barberSpecialDays])
 
   // Handle date selection - allows clicking outside-month days if they're available
   const handleSelect = useCallback((day: CalendarDay, index: number) => {

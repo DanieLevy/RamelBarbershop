@@ -228,6 +228,7 @@ export async function POST(request: NextRequest) {
       shopClosuresResult,
       workDaysResult,
       bookingSettingsResult,
+      barberSpecialDayResult,
     ] = await Promise.all([
       // 1. Barber data: exists, is active, blocked customers list
       supabase
@@ -236,35 +237,35 @@ export async function POST(request: NextRequest) {
         .eq('id', body.barberId)
         .eq('is_barber', true)
         .single(),
-      
+
       // 2. Recurring appointment conflict
       supabase
         .from('recurring_appointments')
-        .select('id')
+        .select('id, frequency, start_date')
         .eq('barber_id', body.barberId)
         .eq('day_of_week', dayOfWeek)
         .eq('time_slot', timeSlot)
         .eq('is_active', true)
         .maybeSingle(),
-      
+
       // 3. Breakout conflicts (barber breaks)
       supabase
         .from('barber_breakouts')
         .select('id, start_time, end_time, breakout_type, start_date, end_date, day_of_week')
         .eq('barber_id', body.barberId)
         .eq('is_active', true),
-      
+
       // 4. Barber closures (absence days)
       supabase
         .from('barber_closures')
         .select('id, start_date, end_date')
         .eq('barber_id', body.barberId),
-      
+
       // 5. Barbershop closures
       supabase
         .from('barbershop_closures')
         .select('id, start_date, end_date'),
-      
+
       // 6. Work days for this barber on requested day
       supabase
         .from('work_days')
@@ -272,12 +273,20 @@ export async function POST(request: NextRequest) {
         .eq('user_id', body.barberId)
         .eq('day_of_week', dayOfWeek)
         .single(),
-      
+
       // 7. Per-barber booking settings
       supabase
         .from('barber_booking_settings')
         .select('max_booking_days_ahead, min_hours_before_booking')
         .eq('barber_id', body.barberId)
+        .maybeSingle(),
+
+      // 8. Barber special day override for this exact date
+      supabase
+        .from('barber_special_days')
+        .select('id, start_time, end_time')
+        .eq('barber_id', body.barberId)
+        .eq('date', dateString)
         .maybeSingle(),
     ])
     
@@ -380,7 +389,9 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // 3.5 Check working hours
+    // 3.5 Check working hours (with barber_special_days override)
+    const specialDay = barberSpecialDayResult.data ?? null
+
     if (workDaysResult.error) {
       console.error('[API/Create] Work days check error:', workDaysResult.error)
       // Report but don't fail - database function will catch this
@@ -389,27 +400,32 @@ export async function POST(request: NextRequest) {
         severity: 'medium',
         additionalData: { barberId: body.barberId, dayOfWeek },
       })
-    } else if (workDaysResult.data) {
+    } else {
       const workDay = workDaysResult.data
-      
-      // Check if barber works on this day
-      if (!workDay.is_working) {
+
+      // Effective hours: special day overrides regular work_days
+      const effectiveStartTime = specialDay?.start_time ?? workDay?.start_time
+      const effectiveEndTime   = specialDay?.end_time   ?? workDay?.end_time
+
+      // NOT_WORKING_DAY: skip check if barber has a special day for this date
+      if (!specialDay && (!workDay || !workDay.is_working)) {
         console.log('[API/Create] Barber not working on day:', dayOfWeek)
         return NextResponse.json(
           { success: false, error: 'NOT_WORKING_DAY', message: ERROR_MESSAGES.NOT_WORKING_DAY },
           { status: 400 }
         )
       }
-      
-      // Check if time is within working hours
-      if (workDay.start_time && workDay.end_time) {
-        const startMinutes = timeToMinutes(workDay.start_time)
-        const endMinutes = timeToMinutes(workDay.end_time)
-        
+
+      // OUTSIDE_WORK_HOURS: use whichever hours apply
+      if (effectiveStartTime && effectiveEndTime) {
+        const startMinutes = timeToMinutes(effectiveStartTime)
+        const endMinutes   = timeToMinutes(effectiveEndTime)
+
         if (slotMinutes < startMinutes || slotMinutes >= endMinutes) {
           console.log('[API/Create] Outside work hours:', {
             requested: timeSlot,
-            workHours: `${workDay.start_time} - ${workDay.end_time}`,
+            workHours: `${effectiveStartTime} - ${effectiveEndTime}`,
+            isSpecialDay: !!specialDay,
           })
           return NextResponse.json(
             { success: false, error: 'OUTSIDE_WORK_HOURS', message: ERROR_MESSAGES.OUTSIDE_WORK_HOURS },
@@ -457,11 +473,23 @@ export async function POST(request: NextRequest) {
     }
     
     if (recurringResult.data) {
-      console.log('[API/Create] Recurring conflict found:', recurringResult.data.id)
-      return NextResponse.json(
-        { success: false, error: 'SLOT_RESERVED_RECURRING', message: ERROR_MESSAGES.SLOT_RESERVED_RECURRING },
-        { status: 409 }
-      )
+      const rec = recurringResult.data
+      const isActiveOnDate =
+        rec.frequency !== 'biweekly' ||
+        !rec.start_date ||
+        (() => {
+          const startMs = new Date(rec.start_date).getTime()
+          const slotMs = new Date(dateString).getTime()
+          const diffDays = Math.round((slotMs - startMs) / 86400000)
+          return diffDays >= 0 && diffDays % 14 === 0
+        })()
+      if (isActiveOnDate) {
+        console.log('[API/Create] Recurring conflict found:', rec.id)
+        return NextResponse.json(
+          { success: false, error: 'SLOT_RESERVED_RECURRING', message: ERROR_MESSAGES.SLOT_RESERVED_RECURRING },
+          { status: 409 }
+        )
+      }
     }
     
     // 3.9 Check breakout conflicts

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { useAuthStore } from '@/store/useAuthStore'
-import type { BarberWithWorkDays, Service, BarbershopSettings, BarbershopClosure, BarberClosure, BarberMessage, BarberBookingSettings } from '@/types/database'
+import type { BarberWithWorkDays, Service, BarbershopSettings, BarbershopClosure, BarberClosure, BarberMessage, BarberBookingSettings, ShopSpecialDay, BarberSpecialDay } from '@/types/database'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { StepIndicator } from './StepIndicator'
 import { ServiceSelection } from './ServiceSelection'
@@ -25,18 +25,22 @@ interface BookingWizardClientProps {
   shopSettings?: BarbershopSettings | null
   shopClosures?: BarbershopClosure[]
   barberClosures?: BarberClosure[]
+  shopSpecialDays?: ShopSpecialDay[]
+  barberSpecialDays?: BarberSpecialDay[]
   barberMessages?: BarberMessage[]
   barberBookingSettings?: BarberBookingSettings | null
   preSelectedServiceId?: string
 }
 
-export function BookingWizardClient({ 
-  barberId, 
-  barber, 
+export function BookingWizardClient({
+  barberId,
+  barber,
   services,
   shopSettings,
   shopClosures = [],
   barberClosures = [],
+  shopSpecialDays = [],
+  barberSpecialDays = [],
   barberMessages = [],
   barberBookingSettings,
   preSelectedServiceId,
@@ -145,21 +149,24 @@ export function BookingWizardClient({
         return <ServiceSelection services={services} />
       case 'date':
         return (
-          <DateSelection 
+          <DateSelection
             workDays={barber.work_days}
             shopSettings={shopSettings}
             shopClosures={shopClosures}
             barberClosures={dynamicBarberClosures}
             barberBookingSettings={barberBookingSettings}
+            shopSpecialDays={shopSpecialDays}
+            barberSpecialDays={barberSpecialDays}
           />
         )
       case 'time':
         return (
-          <TimeSelection 
+          <TimeSelection
             barberId={barberId}
             shopSettings={shopSettings}
             barberWorkDays={barber.work_days}
             barberBookingSettings={barberBookingSettings}
+            barberSpecialDays={barberSpecialDays}
           />
         )
       case 'details':

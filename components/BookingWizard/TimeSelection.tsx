@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { createClient } from '@/lib/supabase/client'
 import { formatTime, cn, parseTimeString, generateTimeSlots, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael, nowInIsrael, getSlotKey, timestampToIsraelDate, israelDateToTimestamp } from '@/lib/utils'
-import type { TimeSlot, BarbershopSettings, WorkDay, BarberBookingSettings, DayOfWeek, BarberBreakout } from '@/types/database'
+import type { TimeSlot, BarbershopSettings, WorkDay, BarberBookingSettings, DayOfWeek, BarberBreakout, BarberSpecialDay } from '@/types/database'
 import { ChevronRight, ChevronDown, ChevronUp, Clock, Repeat, Coffee } from 'lucide-react'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
 import { useBugReporter } from '@/hooks/useBugReporter'
@@ -18,6 +18,7 @@ interface TimeSelectionProps {
   shopSettings?: BarbershopSettings | null
   barberWorkDays?: WorkDay[]
   barberBookingSettings?: BarberBookingSettings | null
+  barberSpecialDays?: BarberSpecialDay[]
 }
 
 interface EnrichedTimeSlot extends TimeSlot {
@@ -28,7 +29,7 @@ interface EnrichedTimeSlot extends TimeSlot {
   breakoutReason?: string // Optional reason for breakout (e.g., "צהריים")
 }
 
-export function TimeSelection({ barberId, barberWorkDays = [], barberBookingSettings }: TimeSelectionProps) {
+export function TimeSelection({ barberId, barberWorkDays = [], barberBookingSettings, barberSpecialDays = [] }: TimeSelectionProps) {
   const { date, timeTimestamp, setTime, nextStep, prevStep } = useBookingStore()
   const [availableSlots, setAvailableSlots] = useState<EnrichedTimeSlot[]>([])
   const [reservedSlots, setReservedSlots] = useState<EnrichedTimeSlot[]>([])
@@ -40,26 +41,36 @@ export function TimeSelection({ barberId, barberWorkDays = [], barberBookingSett
   const [showTooSoon, setShowTooSoon] = useState(false)
   const { report } = useBugReporter('TimeSelection')
 
-  // Get work hours for a specific day - uses ONLY barber-specific work_days
-  // Returns null if barber work hours are unavailable (never falls back to shop settings
-  // which has work_hours_end: '00:00:00' causing slots until 23:30)
+  // Get work hours for a specific day.
+  // Priority: barber_special_days > barber work_days
+  // Returns null if no usable hours found (shows retry instead of wrong slots)
   const getWorkHoursForDay = (dateTimestamp: number): { start: string; end: string } | null => {
+    const normalizeTime = (time: string): string => {
+      const parts = time.split(':')
+      return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`
+    }
+
+    // 1. Check barber_special_days for this exact date
+    const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date(dateTimestamp))
+    const specialDay = barberSpecialDays.find(s => s.date === dateStr)
+    if (specialDay) {
+      return {
+        start: normalizeTime(specialDay.start_time),
+        end: normalizeTime(specialDay.end_time),
+      }
+    }
+
+    // 2. Fall back to barber work_days
     const dayName = getDayKeyInIsrael(dateTimestamp)
     const workDaysMap = workDaysToMap(barberWorkDays)
-    
-    // Only use barber-specific hours - never fall back to shop settings for time slots
     const dayHours = workDaysMap[dayName]
     if (dayHours && dayHours.isWorking && dayHours.startTime && dayHours.endTime) {
-      const normalizeTime = (time: string): string => {
-        const parts = time.split(':')
-        return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`
-      }
       return {
         start: normalizeTime(dayHours.startTime),
         end: normalizeTime(dayHours.endTime),
       }
     }
-    
+
     return null
   }
 

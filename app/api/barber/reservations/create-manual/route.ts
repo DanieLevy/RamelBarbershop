@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
 
         supabase
           .from('recurring_appointments')
-          .select('id')
+          .select('id, frequency, start_date')
           .eq('barber_id', barberId)
           .eq('day_of_week', dayOfWeek as DayOfWeek)
           .eq('time_slot', timeSlot)
@@ -229,10 +229,22 @@ export async function POST(request: NextRequest) {
 
     // Recurring appointment conflict
     if (recurringResult.data) {
-      return NextResponse.json(
-        { success: false, error: 'SLOT_RESERVED_RECURRING', message: ERROR_MESSAGES.SLOT_RESERVED_RECURRING },
-        { status: 409 }
-      )
+      const rec = recurringResult.data
+      const isActiveOnDate =
+        rec.frequency !== 'biweekly' ||
+        !rec.start_date ||
+        (() => {
+          const startMs = new Date(rec.start_date).getTime()
+          const slotMs = new Date(dateString).getTime()
+          const diffDays = Math.round((slotMs - startMs) / 86400000)
+          return diffDays >= 0 && diffDays % 14 === 0
+        })()
+      if (isActiveOnDate) {
+        return NextResponse.json(
+          { success: false, error: 'SLOT_RESERVED_RECURRING', message: ERROR_MESSAGES.SLOT_RESERVED_RECURRING },
+          { status: 409 }
+        )
+      }
     }
 
     // Breakout conflicts
