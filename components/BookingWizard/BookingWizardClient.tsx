@@ -15,7 +15,7 @@ import { Confirmation } from './Confirmation'
 import { LoggedInConfirmation } from './LoggedInConfirmation'
 import { Bell } from 'lucide-react'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { getBarberClosures } from '@/lib/services/availability.service'
+import { getBarberClosures, getBarberSpecialDays, getShopSpecialDays } from '@/lib/services/availability.service'
 import { createClient } from '@/lib/supabase/client'
 
 interface BookingWizardClientProps {
@@ -48,15 +48,24 @@ export function BookingWizardClient({
   const { step, setBarberId, setService, nextStep, setLoggedInUser, reset, getActualStep, isUserLoggedIn } = useBookingStore()
   const { customer: loggedInCustomer, isLoggedIn, isInitialized } = useAuthStore()
   
-  // Dynamic closures state - initialized with server-side data, updated via real-time subscription
+  // Dynamic schedule state - initialized with server-side data, updated via real-time subscription
   const [dynamicBarberClosures, setDynamicBarberClosures] = useState<BarberClosure[]>(barberClosures)
+  const [dynamicShopSpecialDays, setDynamicShopSpecialDays] = useState<ShopSpecialDay[]>(shopSpecialDays)
+  const [dynamicBarberSpecialDays, setDynamicBarberSpecialDays] = useState<BarberSpecialDay[]>(barberSpecialDays)
   
-  // Refresh closures from server with retry for transient network errors (Safari "Load failed")
-  const refreshClosures = useCallback(async (retryCount = 0) => {
+  // Refresh schedule data from server with retry for transient network errors (Safari "Load failed")
+  const refreshScheduleData = useCallback(async (retryCount = 0) => {
     const MAX_RETRIES = 2
     try {
-      const freshClosures = await getBarberClosures(barberId)
+      const [freshClosures, freshShopSpecialDays, freshBarberSpecialDays] = await Promise.all([
+        getBarberClosures(barberId),
+        getShopSpecialDays(),
+        getBarberSpecialDays(barberId),
+      ])
+
       setDynamicBarberClosures(freshClosures)
+      setDynamicShopSpecialDays(freshShopSpecialDays)
+      setDynamicBarberSpecialDays(freshBarberSpecialDays)
     } catch (err) {
       const isNetworkError = err instanceof TypeError && 
         (err.message === 'Load failed' || err.message === 'Failed to fetch' || err.message === 'NetworkError when attempting to fetch resource.')
@@ -64,14 +73,14 @@ export function BookingWizardClient({
       if (isNetworkError && retryCount < MAX_RETRIES) {
         // Exponential backoff retry for transient network errors (common on mobile Safari)
         const delay = Math.min(1000 * Math.pow(2, retryCount), 4000)
-        console.warn(`[BookingWizard] Network error fetching closures, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`)
+        console.warn(`[BookingWizard] Network error fetching schedule data, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`)
         await new Promise(resolve => setTimeout(resolve, delay))
-        return refreshClosures(retryCount + 1)
+        return refreshScheduleData(retryCount + 1)
       }
       
       // After retries exhausted or non-network error, log but keep existing data
-      // Server-side closures passed as props serve as reliable fallback
-      console.error('[BookingWizard] Error refreshing closures:', err)
+      // Server-side data passed as props serves as reliable fallback
+      console.error('[BookingWizard] Error refreshing schedule data:', err)
     }
   }, [barberId])
   
@@ -81,25 +90,48 @@ export function BookingWizardClient({
     return () => reset()
   }, [barberId, setBarberId, reset])
   
-  // Real-time subscription for barber closures
+  // Real-time subscription for closures and special days
   useEffect(() => {
     const supabase = createClient()
     
-    // Subscribe to barber_closures changes for this barber
     const channel = supabase
-      .channel(`barber_closures_${barberId}`)
+      .channel(`booking_schedule_${barberId}`)
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          event: '*',
           schema: 'public',
           table: 'barber_closures',
           filter: `barber_id=eq.${barberId}`
         },
         (payload) => {
           console.log('[BookingWizard] Closure change detected:', payload.eventType)
-          // Refresh closures when any change occurs
-          refreshClosures()
+          refreshScheduleData()
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'barber_special_days',
+          filter: `barber_id=eq.${barberId}`
+        },
+        (payload) => {
+          console.log('[BookingWizard] Barber special day change detected:', payload.eventType)
+          refreshScheduleData()
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'shop_special_days'
+        },
+        (payload) => {
+          console.log('[BookingWizard] Shop special day change detected:', payload.eventType)
+          refreshScheduleData()
         }
       )
       .subscribe()
@@ -107,15 +139,15 @@ export function BookingWizardClient({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [barberId, refreshClosures])
+  }, [barberId, refreshScheduleData])
   
-  // Refresh closures when entering date selection step
+  // Refresh schedule data when entering date or time selection steps
   useEffect(() => {
     const actualStep = getActualStep()
-    if (actualStep === 'date') {
-      refreshClosures()
+    if (actualStep === 'date' || actualStep === 'time') {
+      refreshScheduleData()
     }
-  }, [step, getActualStep, refreshClosures])
+  }, [step, getActualStep, refreshScheduleData])
 
   // Handle pre-selected service - auto-advance to date selection
   useEffect(() => {
@@ -155,8 +187,8 @@ export function BookingWizardClient({
             shopClosures={shopClosures}
             barberClosures={dynamicBarberClosures}
             barberBookingSettings={barberBookingSettings}
-            shopSpecialDays={shopSpecialDays}
-            barberSpecialDays={barberSpecialDays}
+            shopSpecialDays={dynamicShopSpecialDays}
+            barberSpecialDays={dynamicBarberSpecialDays}
           />
         )
       case 'time':
@@ -166,7 +198,7 @@ export function BookingWizardClient({
             shopSettings={shopSettings}
             barberWorkDays={barber.work_days}
             barberBookingSettings={barberBookingSettings}
-            barberSpecialDays={barberSpecialDays}
+            barberSpecialDays={dynamicBarberSpecialDays}
           />
         )
       case 'details':

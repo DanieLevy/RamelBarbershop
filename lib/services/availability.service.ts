@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/client'
-import type { BarbershopSettings, BarbershopClosure, BarberClosure, BarberMessage, WorkDay, BarberBookingSettings, ShopSpecialDay, BarberSpecialDay } from '@/types/database'
+import type { BarbershopSettings, BarbershopClosure, BarberClosure, BarberMessage, WorkDay, BarberBookingSettings, ShopSpecialDay, BarberSpecialDay, DayOfWeek } from '@/types/database'
 import { reportSupabaseError } from '@/lib/bug-reporter/helpers'
 import { getTodayDateString, getIsraelDateString, getDayKeyInIsrael } from '@/lib/utils'
 import { withSupabaseRetry, isTransientNetworkError } from '@/lib/utils/retry'
+import { findSpecialDayByDate, isShopOpenOnDate, resolveBarberWorkHoursForDate, type SpecialDayLike } from '@/lib/utils/special-days'
 
 /**
  * Day-specific work hours for a barber
@@ -14,6 +15,16 @@ export type DayWorkHours = {
     startTime: string | null
     endTime: string | null
   }
+}
+
+interface AvailabilityOptions {
+  shopSpecialDays?: readonly SpecialDayLike[]
+  barberSpecialDays?: readonly SpecialDayLike[]
+}
+
+interface WorkHoursOptions {
+  dateStr?: string
+  barberSpecialDays?: readonly SpecialDayLike[]
 }
 
 /**
@@ -177,15 +188,25 @@ export function isDateAvailable(
   shopSettings: BarbershopSettings | null,
   shopClosures: BarbershopClosure[],
   barberClosures: BarberClosure[],
-  barberWorkDays?: DayWorkHours
+  barberWorkDays?: DayWorkHours,
+  options: AvailabilityOptions = {}
 ): { available: boolean; reason?: string } {
   // Use Israel timezone for date calculations
   const dateStr = getIsraelDateString(dateTimestamp)
   // Use Israel timezone for day of week
-  const dayName = getDayKeyInIsrael(dateTimestamp)
+  const dayName = getDayKeyInIsrael(dateTimestamp) as DayOfWeek
   
-  // Check if shop is open on this day
-  if (shopSettings && !shopSettings.open_days.includes(dayName)) {
+  // Shop or barber special days open the date for this barber even if the shop is normally closed.
+  if (
+    shopSettings &&
+    !isShopOpenOnDate({
+      dateStr,
+      dayKey: dayName,
+      shopOpenDays: shopSettings.open_days,
+      shopSpecialDays: options.shopSpecialDays,
+      barberSpecialDays: options.barberSpecialDays,
+    })
+  ) {
     return { available: false, reason: 'המספרה סגורה ביום זה' }
   }
   
@@ -197,14 +218,11 @@ export function isDateAvailable(
     return { available: false, reason: shopClosure.reason || 'המספרה סגורה בתאריך זה' }
   }
   
-  // Check if barber works on this day using day-specific work days
-  if (barberWorkDays && barberWorkDays[dayName]) {
+  // Barber special day overrides a normally-off weekday for this exact date.
+  if (!findSpecialDayByDate(options.barberSpecialDays, dateStr) && barberWorkDays && barberWorkDays[dayName]) {
     if (!barberWorkDays[dayName].isWorking) {
       return { available: false, reason: 'הספר לא עובד ביום זה' }
     }
-  } else if (!barberWorkDays && shopSettings && !shopSettings.open_days.includes(dayName)) {
-    // If no work days data, use shop settings as fallback
-    return { available: false, reason: 'הספר לא עובד ביום זה' }
   }
   
   // Check barber closures
@@ -229,8 +247,30 @@ export function isDateAvailable(
 export function getWorkHours(
   shopSettings: BarbershopSettings | null,
   dayName?: string,
-  barberWorkDays?: DayWorkHours
+  barberWorkDays?: DayWorkHours,
+  options: WorkHoursOptions = {}
 ): { start: string; end: string } {
+  if (dayName && options.dateStr) {
+    const effectiveHours = resolveBarberWorkHoursForDate({
+      dateStr: options.dateStr,
+      dayKey: dayName as DayOfWeek,
+      workDaysMap: barberWorkDays ?? {},
+      barberSpecialDays: options.barberSpecialDays,
+    })
+
+    if (effectiveHours.isWorking && effectiveHours.startTime && effectiveHours.endTime) {
+      const normalizeTime = (time: string): string => {
+        const parts = time.split(':')
+        return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`
+      }
+
+      return {
+        start: normalizeTime(effectiveHours.startTime),
+        end: normalizeTime(effectiveHours.endTime),
+      }
+    }
+  }
+
   // Day-specific hours take priority
   if (dayName && barberWorkDays && barberWorkDays[dayName]) {
     const dayHours = barberWorkDays[dayName]

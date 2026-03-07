@@ -4,7 +4,7 @@ import { notFound, redirect } from 'next/navigation'
 import { AppHeader } from '@/components/AppHeader'
 import { BookingWizardClient } from '@/components/BookingWizard/BookingWizardClient'
 import { BarberNotFoundClient } from '@/components/BarberProfile/BarberNotFoundClient'
-import { isValidUUID, generateSlugFromEnglishName, getPreferredBarberSlug } from '@/lib/utils'
+import { isValidUUID, generateSlugFromEnglishName, getPreferredBarberSlug, getTodayDateString } from '@/lib/utils'
 import { getCachedShopSettings } from '@/lib/data/cached-queries'
 import type { User, BarberWithWorkDays, Service, BarbershopClosure, BarberClosure, BarberMessage, BarberBookingSettings, WorkDay, ShopSpecialDay, BarberSpecialDay } from '@/types/database'
 
@@ -123,9 +123,8 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
     )
   }
   
-  // Format today's date in LOCAL timezone (not UTC!) for closure filtering
-  const now = new Date()
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  // Use Israel timezone so special-day and closure filtering matches the booking wizard.
+  const todayStr = getTodayDateString()
   
   // Fetch closures and cached shop settings in parallel
   // Note: closures must be fresh (date-specific), shop settings can be cached
@@ -205,4 +204,3 @@ export default async function BookPage({ params, searchParams }: BookPageProps) 
     </>
   )
 }
-

@@ -3,10 +3,11 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBookingStore } from '@/store/useBookingStore'
-import type { WorkDay, BarbershopSettings, BarbershopClosure, BarberClosure, BarberBookingSettings, ShopSpecialDay, BarberSpecialDay } from '@/types/database'
-import { cn, nowInIsrael, getIsraelDayStart, getDayIndexInIsrael } from '@/lib/utils'
+import type { WorkDay, BarbershopSettings, BarbershopClosure, BarberClosure, BarberBookingSettings, ShopSpecialDay, BarberSpecialDay, DayOfWeek } from '@/types/database'
+import { cn, nowInIsrael, getIsraelDayStart, getDayIndexInIsrael, getIsraelDateString } from '@/lib/utils'
 import { ChevronRight, ChevronLeft, X } from 'lucide-react'
 import { Button } from '@heroui/react'
+import { findSpecialDayByDate, isShopOpenOnDate } from '@/lib/utils/special-days'
 
 /**
  * Monthly Calendar Picker Component
@@ -68,6 +69,10 @@ interface AvailabilityResult {
   closureReason?: string // Custom reason from barber/shop closure
 }
 
+type SpecialDayType = 'shop' | 'barber' | 'combined'
+
+const normalizeTimeLabel = (time: string) => time.split(':').slice(0, 2).join(':')
+
 export function DateSelection({
   workDays,
   shopSettings,
@@ -84,6 +89,30 @@ export function DateSelection({
   const [unavailableInfo, setUnavailableInfo] = useState<UnavailableInfo>({ show: false, reason: '' })
   const gridRef = useRef<HTMLDivElement>(null)
   const cellRefs = useRef<(HTMLButtonElement | null)[]>([])
+
+  const getSpecialDayInfo = useCallback((dateString: string): {
+    shopSpecialDay: ShopSpecialDay | null
+    barberSpecialDay: BarberSpecialDay | null
+    specialDay: ShopSpecialDay | BarberSpecialDay | null
+    specialDayType: SpecialDayType | null
+  } => {
+    const shopSpecialDay = findSpecialDayByDate(shopSpecialDays, dateString)
+    const barberSpecialDay = findSpecialDayByDate(barberSpecialDays, dateString)
+
+    return {
+      shopSpecialDay,
+      barberSpecialDay,
+      specialDay: barberSpecialDay ?? shopSpecialDay,
+      specialDayType:
+        shopSpecialDay && barberSpecialDay
+          ? 'combined'
+          : barberSpecialDay
+            ? 'barber'
+            : shopSpecialDay
+              ? 'shop'
+              : null,
+    }
+  }, [shopSpecialDays, barberSpecialDays])
 
   // Generate calendar days for the current month view
   const calendarDays = useMemo(() => {
@@ -178,12 +207,20 @@ export function DateSelection({
       }
     }
     
-    // Special day lookups for this date
-    const shopSpecialDay  = shopSpecialDays.find(s => s.date === day.dateString)
-    const barberSpecialDay = barberSpecialDays.find(s => s.date === day.dateString)
+    const { barberSpecialDay } = getSpecialDayInfo(day.dateString)
 
-    // 4. Check if shop is closed on this day (skip if shop_special_day exists)
-    if (!shopSpecialDay && shopSettings?.open_days && !shopSettings.open_days.includes(day.dayKey)) {
+    // 4. Check if shop is closed on this day.
+    // A special day for the shop or the barber opens the date for this barber.
+    if (
+      shopSettings?.open_days &&
+      !isShopOpenOnDate({
+        dateStr: day.dateString,
+        dayKey: day.dayKey as DayOfWeek,
+        shopOpenDays: shopSettings.open_days,
+        shopSpecialDays,
+        barberSpecialDays,
+      })
+    ) {
       return { available: false, reason: 'המספרה סגורה', type: 'shop_closed' }
     }
 
@@ -227,7 +264,7 @@ export function DateSelection({
     }
     
     return { available: true }
-  }, [shopSettings, shopClosures, barberClosures, workDays, maxBookingDate, barberBookingSettings, shopSpecialDays, barberSpecialDays])
+  }, [shopSettings, shopClosures, barberClosures, workDays, maxBookingDate, barberBookingSettings, shopSpecialDays, barberSpecialDays, getSpecialDayInfo])
 
   // Handle date selection - allows clicking outside-month days if they're available
   const handleSelect = useCallback((day: CalendarDay, index: number) => {
@@ -380,6 +417,18 @@ export function DateSelection({
     return `${startDay} ${startMonth} - ${endDay} ${endMonth}`
   }
 
+  const selectedDateString = useMemo(() => {
+    return selectedDate ? getIsraelDateString(selectedDate.dateTimestamp) : null
+  }, [selectedDate])
+
+  const selectedSpecialDayInfo = useMemo(() => {
+    return selectedDateString ? getSpecialDayInfo(selectedDateString) : null
+  }, [selectedDateString, getSpecialDayInfo])
+
+  const selectedDateParts = useMemo(() => {
+    return selectedDateString ? selectedDateString.split('-').map(Number) : null
+  }, [selectedDateString])
+
   return (
     <div className="flex flex-col gap-5">
       {/* Header */}
@@ -455,10 +504,12 @@ export function DateSelection({
               {week.map((day, dayIndex) => {
                 const globalIndex = weekIndex * 7 + dayIndex
                 const availability = checkAvailability(day)
+                const { specialDay } = getSpecialDayInfo(day.dateString)
                 const isSelected = selectedDate?.dateTimestamp === day.dateTimestamp
                 const isUnavailable = !availability.available
                 const isOutsideMonth = !day.isCurrentMonth
                 const isClickable = availability.available && !day.isPast
+                const hasSpecialDay = !!specialDay
                 
                 // Determine visual style based on unavailability type
                 const isOutOfRange = availability.type === 'out_of_range'
@@ -469,7 +520,7 @@ export function DateSelection({
                   <Button
                     key={dayIndex}
                     ref={el => { cellRefs.current[globalIndex] = el as HTMLButtonElement | null }}
-                    aria-label={`${day.dayNum} ${HEBREW_MONTHS[day.date.getMonth()]}${isUnavailable ? ` - ${availability.reason}` : ''}`}
+                    aria-label={`${day.dayNum} ${HEBREW_MONTHS[day.date.getMonth()]}${hasSpecialDay ? ' - יום מיוחד' : ''}${isUnavailable ? ` - ${availability.reason}` : ''}`}
                     onPress={() => handleSelect(day, globalIndex)}
                     isDisabled={!isClickable}
                     variant="ghost"
@@ -521,6 +572,12 @@ export function DateSelection({
                     )}
                   >
                     {day.dayNum}
+                    {hasSpecialDay && (
+                      <span className={cn(
+                        'absolute top-1 left-1 w-1.5 h-1.5 rounded-full',
+                        isSelected ? 'bg-background-dark/80' : 'bg-sky-400'
+                      )} />
+                    )}
                     {/* Closure indicator dot */}
                     {hasClosure && !isOutOfRange && (
                       <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-orange-400" />
@@ -551,6 +608,12 @@ export function DateSelection({
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 rounded-md bg-white/5 border border-white/10" />
             <span>פנוי</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded-md bg-white/5 border border-white/10 relative">
+              <span className="absolute top-1 left-1 w-1.5 h-1.5 rounded-full bg-sky-400" />
+            </div>
+            <span>יום מיוחד</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 rounded-md bg-accent-gold shadow-sm" />
@@ -584,16 +647,38 @@ export function DateSelection({
       <div className="flex flex-col gap-3">
         {/* Selected Date Display */}
         {selectedDate && (
-          <div className="text-center py-2">
+          <div className="text-center py-2 space-y-3">
             <p className="text-foreground-muted text-sm">
               תאריך נבחר:{' '}
               <span className="text-accent-gold font-medium">
                 יום {selectedDate.dayName},{' '}
-                {selectedDate.dayNum} {selectedDate.dateTimestamp ? 
-                  HEBREW_MONTHS[new Date(selectedDate.dateTimestamp).getMonth()] : ''}{' '}
-                {selectedDate.dateTimestamp ? new Date(selectedDate.dateTimestamp).getFullYear() : ''}
+                {selectedDate.dayNum} {selectedDateParts ?
+                  HEBREW_MONTHS[selectedDateParts[1] - 1] : ''}{' '}
+                {selectedDateParts ? selectedDateParts[0] : ''}
               </span>
             </p>
+            {selectedSpecialDayInfo?.specialDay && (
+              <div className="rounded-xl border border-sky-400/30 bg-sky-500/10 p-3 text-right">
+                <div className="flex items-center gap-2 text-sky-300">
+                  <span className="h-2 w-2 rounded-full bg-sky-400 shrink-0" />
+                  <span className="text-sm font-medium">
+                    {selectedSpecialDayInfo.specialDayType === 'combined'
+                      ? 'יום מיוחד של המספרה והספר'
+                      : selectedSpecialDayInfo.specialDayType === 'shop'
+                        ? 'יום מיוחד של המספרה'
+                        : 'יום מיוחד של הספר'}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-foreground-light">
+                  שעות: {normalizeTimeLabel(selectedSpecialDayInfo.specialDay.start_time)}-{normalizeTimeLabel(selectedSpecialDayInfo.specialDay.end_time)}
+                </p>
+                {selectedSpecialDayInfo.specialDay.reason && (
+                  <p className="mt-1 text-sm text-foreground-muted">
+                    {selectedSpecialDayInfo.specialDay.reason}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
 

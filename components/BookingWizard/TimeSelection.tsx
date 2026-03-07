@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useBookingStore } from '@/store/useBookingStore'
 import { createClient } from '@/lib/supabase/client'
-import { formatTime, cn, parseTimeString, generateTimeSlots, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael, nowInIsrael, getSlotKey, timestampToIsraelDate, israelDateToTimestamp } from '@/lib/utils'
+import { formatTime, cn, parseTimeString, generateTimeSlots, getIsraelDayStart, getIsraelDayEnd, getDayKeyInIsrael, getIsraelDateString, nowInIsrael, getSlotKey, timestampToIsraelDate, israelDateToTimestamp } from '@/lib/utils'
 import type { TimeSlot, BarbershopSettings, WorkDay, BarberBookingSettings, DayOfWeek, BarberBreakout, BarberSpecialDay } from '@/types/database'
 import { ChevronRight, ChevronDown, ChevronUp, Clock, Repeat, Coffee } from 'lucide-react'
 import { ScissorsLoader } from '@/components/ui/ScissorsLoader'
@@ -12,6 +12,7 @@ import { workDaysToMap } from '@/lib/services/availability.service'
 import { withSupabaseRetry } from '@/lib/utils/retry'
 import { getRecurringForDay } from '@/lib/services/recurring.service'
 import { getBreakoutsForDate, isSlotInBreakout } from '@/lib/services/breakout.service'
+import { resolveBarberWorkHoursForDate } from '@/lib/utils/special-days'
 
 interface TimeSelectionProps {
   barberId: string
@@ -50,24 +51,19 @@ export function TimeSelection({ barberId, barberWorkDays = [], barberBookingSett
       return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`
     }
 
-    // 1. Check barber_special_days for this exact date
-    const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date(dateTimestamp))
-    const specialDay = barberSpecialDays.find(s => s.date === dateStr)
-    if (specialDay) {
-      return {
-        start: normalizeTime(specialDay.start_time),
-        end: normalizeTime(specialDay.end_time),
-      }
-    }
+    const dateStr = getIsraelDateString(dateTimestamp)
+    const dayName = getDayKeyInIsrael(dateTimestamp) as DayOfWeek
+    const effectiveHours = resolveBarberWorkHoursForDate({
+      dateStr,
+      dayKey: dayName,
+      workDaysMap: workDaysToMap(barberWorkDays),
+      barberSpecialDays,
+    })
 
-    // 2. Fall back to barber work_days
-    const dayName = getDayKeyInIsrael(dateTimestamp)
-    const workDaysMap = workDaysToMap(barberWorkDays)
-    const dayHours = workDaysMap[dayName]
-    if (dayHours && dayHours.isWorking && dayHours.startTime && dayHours.endTime) {
+    if (effectiveHours.isWorking && effectiveHours.startTime && effectiveHours.endTime) {
       return {
-        start: normalizeTime(dayHours.startTime),
-        end: normalizeTime(dayHours.endTime),
+        start: normalizeTime(effectiveHours.startTime),
+        end: normalizeTime(effectiveHours.endTime),
       }
     }
 

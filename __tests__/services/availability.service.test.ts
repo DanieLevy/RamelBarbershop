@@ -243,6 +243,64 @@ describe('Availability Service', () => {
       })
     })
 
+    describe('Special Days', () => {
+      it('should return available when a barber special day opens a normally closed shop day', () => {
+        const shopSettings = createShopSettings({
+          open_days: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+        })
+        const saturdayTimestamp = getDateForDayOfWeek(6)
+        const dateStr = getIsraelDateString(saturdayTimestamp)
+        const barberSpecialDays = [{
+          id: 'special-1',
+          barber_id: 'barber-id',
+          date: dateStr,
+          start_time: '12:00',
+          end_time: '16:00',
+          reason: 'Special opening',
+          created_at: new Date().toISOString(),
+        }]
+
+        const result = isDateAvailable(
+          saturdayTimestamp,
+          shopSettings,
+          [],
+          [],
+          createBarberWorkDays(),
+          { barberSpecialDays }
+        )
+
+        expect(result.available).toBe(true)
+      })
+
+      it('should return available when a barber special day overrides a non-working barber day', () => {
+        const shopSettings = createShopSettings({
+          open_days: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
+        })
+        const fridayTimestamp = getDateForDayOfWeek(5)
+        const dateStr = getIsraelDateString(fridayTimestamp)
+        const barberSpecialDays = [{
+          id: 'special-2',
+          barber_id: 'barber-id',
+          date: dateStr,
+          start_time: '08:30',
+          end_time: '14:00',
+          reason: 'Friday exception',
+          created_at: new Date().toISOString(),
+        }]
+
+        const result = isDateAvailable(
+          fridayTimestamp,
+          shopSettings,
+          [],
+          [],
+          createBarberWorkDays(),
+          { barberSpecialDays }
+        )
+
+        expect(result.available).toBe(true)
+      })
+    })
+
     describe('Barber Closures', () => {
       it('should return unavailable during barber closure period', () => {
         // Use all 7 days open so the open_days check doesn't interfere
@@ -401,6 +459,32 @@ describe('Availability Service', () => {
       
       expect(result.start).toBe('10:00')
       expect(result.end).toBe('18:00')
+    })
+
+    it('should return barber special day hours when available for the selected date', () => {
+      const shopSettings = createShopSettings({
+        work_hours_start: '09:00',
+        work_hours_end: '19:00',
+      })
+      const saturdayTimestamp = getDateForDayOfWeek(6)
+      const dateStr = getIsraelDateString(saturdayTimestamp)
+      const barberSpecialDays = [{
+        id: 'special-3',
+        barber_id: 'barber-id',
+        date: dateStr,
+        start_time: '11:00',
+        end_time: '15:30',
+        reason: 'Saturday opening',
+        created_at: new Date().toISOString(),
+      }]
+      
+      const result = getWorkHours(shopSettings, 'saturday', createBarberWorkDays(), {
+        dateStr,
+        barberSpecialDays,
+      })
+      
+      expect(result.start).toBe('11:00')
+      expect(result.end).toBe('15:30')
     })
 
     it('should fall back to shop settings when no barber work days', () => {
