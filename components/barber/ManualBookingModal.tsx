@@ -262,6 +262,11 @@ export function ManualBookingModal({
     return null
   }, [selectedDate, isPastDate, shopClosures, barberClosures])
 
+  const isClosedDay = useMemo(() => {
+    if (isPastDate) return false
+    return !!dateClosureReason || !currentDayWorkHours.isWorking
+  }, [isPastDate, dateClosureReason, currentDayWorkHours.isWorking])
+
   type SlotStatus = 'available' | 'reserved' | 'breakout' | 'past'
   interface EnhancedSlot { timestamp: number; time: string; status: SlotStatus; reason?: string }
 
@@ -273,13 +278,10 @@ export function ManualBookingModal({
     if (barberDaySettings && barberDaySettings.is_working && barberDaySettings.start_time && barberDaySettings.end_time) {
       workStart = barberDaySettings.start_time
       workEnd = barberDaySettings.end_time
-    } else if (barberDaySettings && !barberDaySettings.is_working && !isPastDate) {
-      return []
     } else {
       workStart = shopSettings?.work_hours_start || '09:00'
       workEnd = shopSettings?.work_hours_end || '19:00'
     }
-    if (dateClosureReason && !isPastDate) return []
 
     const { hour: startHour, minute: startMinute } = parseTimeString(workStart)
     const { hour: endHour, minute: endMinute } = parseTimeString(workEnd)
@@ -299,7 +301,7 @@ export function ManualBookingModal({
       return { ...slot, status: 'available' as SlotStatus }
     })
     return enhancedSlots
-  }, [selectedDate, shopSettings, reservedSlots, israelNow, isPastDate, barberWorkDays, breakouts, dateClosureReason])
+  }, [selectedDate, shopSettings, reservedSlots, israelNow, isPastDate, barberWorkDays, breakouts])
 
   // --- Summary for footer ---
   const finalTime = isOutOfHours ? customTimeTimestamp : selectedTime
@@ -388,6 +390,10 @@ export function ManualBookingModal({
         const pastNote = 'תור ידני - הוזן בדיעבד'
         finalNotes = finalNotes ? `${pastNote} | ${finalNotes}` : pastNote
       }
+      if (isClosedDay && !isOutOfHours) {
+        const closedNote = 'תור ידני ביום סגור'
+        finalNotes = finalNotes ? `${closedNote} | ${finalNotes}` : closedNote
+      }
 
       if (isPastDate) {
         const response = await fetch('/api/barber/reservations/create-past', {
@@ -410,7 +416,7 @@ export function ManualBookingModal({
       } else {
         let reservationId: string | undefined
 
-        if (isOutOfHours) {
+        if (isOutOfHours || isClosedDay) {
           const response = await fetch('/api/barber/reservations/create-manual', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -460,7 +466,7 @@ export function ManualBookingModal({
           }
         }
 
-        showToast.success(isOutOfHours ? 'התור מחוץ לשעות נוצר בהצלחה!' : 'התור נוצר בהצלחה')
+        showToast.success(isOutOfHours ? 'התור מחוץ לשעות נוצר בהצלחה!' : isClosedDay ? 'התור ביום סגור נוצר בהצלחה!' : 'התור נוצר בהצלחה')
       }
 
       onSuccess()
@@ -506,13 +512,19 @@ export function ManualBookingModal({
                       הסתיים
                     </span>
                   )}
+                  {isClosedDay && !isPastDate && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[10px] font-medium">
+                      <AlertTriangle size={9} />
+                      יום סגור
+                    </span>
+                  )}
                   {isOutOfHours && (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 text-[10px] font-medium">
                       <AlertTriangle size={9} />
                       מחוץ לשעות
                     </span>
                   )}
-                  {!isPastDate && !isOutOfHours && (
+                  {!isPastDate && !isOutOfHours && !isClosedDay && (
                     <p className="text-foreground-muted text-[11px]">רישום תור על-ידי הספר</p>
                   )}
                 </div>
@@ -865,48 +877,59 @@ export function ManualBookingModal({
                       <div className="flex items-center justify-center py-6">
                         <Loader2 size={18} className="text-accent-gold animate-spin" />
                       </div>
-                    ) : dateClosureReason ? (
-                      <div className="text-center py-3">
-                        <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/15 mb-2">
-                          <p className="text-red-400 text-xs">{dateClosureReason}</p>
-                        </div>
-                      </div>
-                    ) : allSlotsWithStatus.length === 0 ? (
-                      <div className="text-center py-3">
-                        <p className="text-foreground-muted/60 text-xs">אין משבצות זמינות ביום זה</p>
-                      </div>
                     ) : (
-                      <div className="grid grid-cols-5 gap-1.5 max-h-[200px] overflow-y-auto pb-1">
-                        {allSlotsWithStatus.map(slot => {
-                          const isUnavailable = slot.status !== 'available'
-                          const isSelected = selectedTime === slot.timestamp && !isUnavailable
-                          return (
-                            <button
-                              key={slot.timestamp}
-                              type="button"
-                              onClick={() => { if (!isUnavailable) setSelectedTime(slot.timestamp) }}
-                              disabled={isUnavailable}
-                              title={isUnavailable ? `${slot.time} - ${slot.reason}` : slot.time}
-                              className={cn(
-                                'py-2.5 rounded-xl text-sm font-medium tabular-nums transition-all relative',
-                                isSelected
-                                  ? 'bg-accent-gold text-background-dark shadow-md ring-2 ring-accent-gold/30'
-                                  : slot.status === 'reserved'
-                                    ? 'bg-red-500/8 text-red-400/40 border border-red-500/10 cursor-not-allowed line-through'
-                                    : slot.status === 'breakout'
-                                      ? 'bg-orange-500/8 text-orange-400/40 border border-orange-500/10 cursor-not-allowed line-through'
-                                      : slot.status === 'past'
-                                        ? 'bg-white/[0.02] text-foreground-muted/20 cursor-not-allowed'
-                                        : 'bg-white/[0.05] text-foreground-light border border-white/[0.06] hover:bg-accent-gold/10 hover:border-accent-gold/20 hover:text-accent-gold active:scale-95'
-                              )}
-                              aria-label={isUnavailable ? `${slot.time} - ${slot.reason}` : `בחר שעה ${slot.time}`}
-                              tabIndex={isUnavailable ? -1 : 0}
-                            >
-                              {slot.time}
-                            </button>
-                          )
-                        })}
-                      </div>
+                      <>
+                        {isClosedDay && (
+                          <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/15 mb-2.5">
+                            <AlertTriangle size={14} className="text-amber-400 shrink-0" />
+                            <div className="flex-1">
+                              <p className="text-amber-300 text-xs font-medium">
+                                {dateClosureReason || 'הספר לא עובד ביום זה'}
+                              </p>
+                              <p className="text-amber-300/60 text-[10px] mt-0.5">
+                                ניתן לקבוע תור ידני גם ביום סגור
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        {allSlotsWithStatus.length === 0 ? (
+                          <div className="text-center py-3">
+                            <p className="text-foreground-muted/60 text-xs">אין משבצות זמינות ביום זה</p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-5 gap-1.5 max-h-[200px] overflow-y-auto pb-1">
+                            {allSlotsWithStatus.map(slot => {
+                              const isUnavailable = slot.status !== 'available'
+                              const isSelected = selectedTime === slot.timestamp && !isUnavailable
+                              return (
+                                <button
+                                  key={slot.timestamp}
+                                  type="button"
+                                  onClick={() => { if (!isUnavailable) setSelectedTime(slot.timestamp) }}
+                                  disabled={isUnavailable}
+                                  title={isUnavailable ? `${slot.time} - ${slot.reason}` : slot.time}
+                                  className={cn(
+                                    'py-2.5 rounded-xl text-sm font-medium tabular-nums transition-all relative',
+                                    isSelected
+                                      ? 'bg-accent-gold text-background-dark shadow-md ring-2 ring-accent-gold/30'
+                                      : slot.status === 'reserved'
+                                        ? 'bg-red-500/8 text-red-400/40 border border-red-500/10 cursor-not-allowed line-through'
+                                        : slot.status === 'breakout'
+                                          ? 'bg-orange-500/8 text-orange-400/40 border border-orange-500/10 cursor-not-allowed line-through'
+                                          : slot.status === 'past'
+                                            ? 'bg-white/[0.02] text-foreground-muted/20 cursor-not-allowed'
+                                            : 'bg-white/[0.05] text-foreground-light border border-white/[0.06] hover:bg-accent-gold/10 hover:border-accent-gold/20 hover:text-accent-gold active:scale-95'
+                                  )}
+                                  aria-label={isUnavailable ? `${slot.time} - ${slot.reason}` : `בחר שעה ${slot.time}`}
+                                  tabIndex={isUnavailable ? -1 : 0}
+                                >
+                                  {slot.time}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </>
                     )}
                   </>
                 )}
@@ -1070,7 +1093,9 @@ export function ManualBookingModal({
                       ? 'bg-blue-500 text-white hover:bg-blue-600'
                       : isOutOfHours
                         ? 'bg-orange-500 text-white hover:bg-orange-600'
-                        : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
+                        : isClosedDay
+                          ? 'bg-amber-500 text-white hover:bg-amber-600'
+                          : 'bg-accent-gold text-background-dark hover:bg-accent-gold/90'
                 )}
               >
                 {saving ? (
@@ -1082,6 +1107,8 @@ export function ManualBookingModal({
                   'רשום תור (הסתיים)'
                 ) : isOutOfHours ? (
                   'צור תור מחוץ לשעות'
+                ) : isClosedDay ? (
+                  'צור תור ביום סגור'
                 ) : (
                   'צור תור'
                 )}

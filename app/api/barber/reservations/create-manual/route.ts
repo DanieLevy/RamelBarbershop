@@ -6,8 +6,9 @@
  *
  * Key differences from /api/reservations/create:
  * - Requires barber authentication (verifyBarber + verifyOwnership)
- * - Bypasses: working hours, non-working day, min_hours_before, date_out_of_range
- * - Keeps: slot conflict, barber/shop closures, customer blocking, service ownership
+ * - Bypasses: working hours, non-working day, min_hours_before, date_out_of_range,
+ *   barber/shop closures, shop open_days (barber has full override authority)
+ * - Keeps: slot conflict, customer blocking, service ownership
  * - Uses create_reservation_atomic with a large max_days_ahead to bypass date range limit
  */
 
@@ -24,7 +25,6 @@ import {
   normalizeToSlotBoundary,
   parseTimeToMinutes,
 } from '@/lib/utils'
-import { isShopOpenOnDate } from '@/lib/utils/special-days'
 import { pushService } from '@/lib/push/push-service'
 import type { DayOfWeek } from '@/types/database'
 
@@ -128,17 +128,12 @@ export async function POST(request: NextRequest) {
     const dateString = getIsraelDateString(timeTimestamp)
     const slotMinutes = parseTimeToMinutes(timeSlot)
 
-    // --- Parallel pre-checks (subset - no working hours validation) ---
+    // --- Parallel pre-checks (manual booking bypasses closures and working hours) ---
     const [
       barberResult,
       serviceResult,
       recurringResult,
       breakoutResult,
-      barberClosuresResult,
-      shopClosuresResult,
-      shopSettingsResult,
-      barberSpecialDayResult,
-      shopSpecialDayResult,
     ] =
       await Promise.all([
         supabase
@@ -170,34 +165,6 @@ export async function POST(request: NextRequest) {
           .select('id, start_time, end_time, breakout_type, start_date, end_date, day_of_week')
           .eq('barber_id', barberId)
           .eq('is_active', true),
-
-        supabase
-          .from('barber_closures')
-          .select('id, start_date, end_date')
-          .eq('barber_id', barberId),
-
-        supabase
-          .from('barbershop_closures')
-          .select('id, start_date, end_date'),
-
-        supabase
-          .from('barbershop_settings')
-          .select('open_days')
-          .limit(1)
-          .maybeSingle(),
-
-        supabase
-          .from('barber_special_days')
-          .select('id, start_time, end_time')
-          .eq('barber_id', barberId)
-          .eq('date', dateString)
-          .maybeSingle(),
-
-        supabase
-          .from('shop_special_days')
-          .select('id, start_time, end_time')
-          .eq('date', dateString)
-          .maybeSingle(),
       ])
 
     // Barber exists and is active
@@ -226,46 +193,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'INVALID_SERVICE', message: ERROR_MESSAGES.INVALID_SERVICE },
         { status: 400 }
-      )
-    }
-
-    // Barber closures (barber on vacation - hard constraint even for manual bookings)
-    if (!barberClosuresResult.error && barberClosuresResult.data) {
-      for (const closure of barberClosuresResult.data) {
-        if (dateString >= closure.start_date && dateString <= closure.end_date) {
-          return NextResponse.json(
-            { success: false, error: 'BARBER_CLOSED', message: ERROR_MESSAGES.BARBER_CLOSED },
-            { status: 409 }
-          )
-        }
-      }
-    }
-
-    // Shop closures (shop physically closed - hard constraint)
-    if (!shopClosuresResult.error && shopClosuresResult.data) {
-      for (const closure of shopClosuresResult.data) {
-        if (dateString >= closure.start_date && dateString <= closure.end_date) {
-          return NextResponse.json(
-            { success: false, error: 'SHOP_CLOSED', message: ERROR_MESSAGES.SHOP_CLOSED },
-            { status: 409 }
-          )
-        }
-      }
-    }
-
-    if (
-      shopSettingsResult.data &&
-      !isShopOpenOnDate({
-        dateStr: dateString,
-        dayKey: dayOfWeek,
-        shopOpenDays: (shopSettingsResult.data.open_days as string[] | null | undefined) ?? [],
-        shopSpecialDays: shopSpecialDayResult.data ? [{ ...shopSpecialDayResult.data, date: dateString }] : [],
-        barberSpecialDays: barberSpecialDayResult.data ? [{ ...barberSpecialDayResult.data, date: dateString }] : [],
-      })
-    ) {
-      return NextResponse.json(
-        { success: false, error: 'SHOP_CLOSED', message: ERROR_MESSAGES.SHOP_CLOSED },
-        { status: 409 }
       )
     }
 

@@ -115,7 +115,10 @@ function getIsraelDayStartMs(now = Date.now()) {
     return Date.parse(israelDateStr + 'T00:00:00Z') - 2 * HOUR_MS;
 }
 function getIsraelDayEndMs(now = Date.now()) {
-    return getIsraelDayStartMs(now) + 24 * HOUR_MS - 1;
+    // +25h always lands in the next Israel day regardless of DST transitions (max ±1h),
+    // then find that day's midnight and subtract 1ms → correct 23:59:59.999 of today.
+    const nextDayApprox = getIsraelDayStartMs(now) + 25 * HOUR_MS;
+    return getIsraelDayStartMs(nextDayApprox) - 1;
 }
 function getDayKeyInIsrael(now = Date.now()) {
     const dayName = new Intl.DateTimeFormat('en-US', {
@@ -139,12 +142,30 @@ function getIsraelDateComponents(timestamp) {
 }
 /**
  * Convert Israel local date/time to UTC timestamp.
- * Uses the same offset detection trick as getIsraelDayStartMs.
+ * Uses the same Intl verification pattern as getIsraelDayStartMs, applied to the target
+ * hour:minute — NOT derived from midnight offset. This correctly handles DST spring-forward
+ * days where the UTC offset changes mid-day (e.g. 10:00 AM is UTC+3, not UTC+2 like midnight).
  */
 function israelDateToTimestamp(year, month, day, hour = 0, minute = 0) {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const dayStartMs = getIsraelDayStartMs(Date.parse(dateStr + 'T12:00:00Z'));
-    return dayStartMs + (hour * 3600 + minute * 60) * 1000;
+    const timeStr = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+    const naiveUtcMs = Date.parse(`${dateStr}T${timeStr}Z`);
+    for (const offsetH of [3, 2]) {
+        const candidate = naiveUtcMs - offsetH * HOUR_MS;
+        const candDate = new Intl.DateTimeFormat('en-CA', {
+            timeZone: ISRAEL_TZ,
+            year: 'numeric', month: '2-digit', day: '2-digit',
+        }).format(new Date(candidate));
+        const candTime = new Intl.DateTimeFormat('en-US', {
+            timeZone: ISRAEL_TZ,
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false,
+        }).format(new Date(candidate));
+        if (candDate === dateStr && candTime === timeStr)
+            return candidate;
+    }
+    // Fallback (shouldn't happen for valid Israel times)
+    return naiveUtcMs - 2 * HOUR_MS;
 }
 function parseTimeString(timeStr) {
     const [hour, minute] = timeStr.split(':').map(Number);
@@ -271,6 +292,7 @@ function buildReminderPayload(res) {
 // ============================================================
 async function sendWebPush(sub, payload) {
     ensureVapid();
+    const ttlSeconds = Math.max(0, Math.floor((payload.appointmentTime - Date.now()) / 1000));
     const pushSub = {
         endpoint: sub.endpoint,
         keys: { p256dh: sub.p256dh, auth: sub.auth },
@@ -291,7 +313,7 @@ async function sendWebPush(sub, payload) {
         },
     });
     try {
-        await web_push_1.default.sendNotification(pushSub, notification);
+        await web_push_1.default.sendNotification(pushSub, notification, { TTL: ttlSeconds });
         return { success: true };
     }
     catch (err) {
@@ -305,12 +327,17 @@ async function sendWebPush(sub, payload) {
 // Push — FCM (firebase-admin)
 // ============================================================
 async function sendFcmPush(fcmToken, payload) {
+    // TTL = seconds until appointment (clamped to 0 if already past)
+    const ttlSeconds = Math.max(0, Math.floor((payload.appointmentTime - Date.now()) / 1000));
     try {
         await admin.messaging().send({
             token: fcmToken,
             notification: { title: payload.title, body: payload.body },
             apns: {
-                headers: { 'apns-priority': '10' },
+                headers: {
+                    'apns-priority': '10',
+                    'apns-expiration': String(Math.floor(payload.appointmentTime / 1000)),
+                },
                 payload: {
                     aps: {
                         badge: 1,
@@ -320,6 +347,7 @@ async function sendFcmPush(fcmToken, payload) {
             },
             android: {
                 priority: 'high',
+                ttl: ttlSeconds * 1000, // Android ttl is in milliseconds
                 notification: { sound: 'default', channelId: 'default' },
             },
             data: {
@@ -521,14 +549,22 @@ async function getCustomerSettings(ids) {
     data?.forEach(s => map.set(s.customer_id, s));
     return map;
 }
-async function getCustomerPushSubscriptions(customerId) {
+async function getCustomerPushSubscriptionsBatch(customerIds) {
+    const map = new Map();
+    if (!customerIds.length)
+        return map;
     const supabase = getSupabase();
     const { data } = await supabase
         .from('push_subscriptions')
-        .select('id, endpoint, p256dh, auth, token_type, fcm_token, is_active')
-        .eq('customer_id', customerId)
+        .select('id, customer_id, endpoint, p256dh, auth, token_type, fcm_token, is_active')
+        .in('customer_id', customerIds)
         .eq('is_active', true);
-    return data || [];
+    data?.forEach((sub) => {
+        const existing = map.get(sub.customer_id) || [];
+        existing.push(sub);
+        map.set(sub.customer_id, existing);
+    });
+    return map;
 }
 async function markSmsReminderSent(reservationId) {
     const supabase = getSupabase();
@@ -672,14 +708,12 @@ async function processReminders() {
         await saveBatchLog(results, Date.now() - start);
         return results;
     }
-    // Pre-fetch customer settings and push subscriptions
+    // Pre-fetch customer settings and push subscriptions (both batched — 2 queries total)
     const customerIds = [...new Set(reservations.map(r => r.customer_id))];
-    const [customerSettings, ...pushSubArrays] = await Promise.all([
+    const [customerSettings, pushSubMap] = await Promise.all([
         getCustomerSettings(customerIds),
-        ...customerIds.map(id => getCustomerPushSubscriptions(id)),
+        getCustomerPushSubscriptionsBatch(customerIds),
     ]);
-    const pushSubMap = new Map();
-    customerIds.forEach((id, i) => pushSubMap.set(id, pushSubArrays[i]));
     // Process in batches of 5
     const BATCH_SIZE = 5;
     for (let i = 0; i < reservations.length; i += BATCH_SIZE) {
